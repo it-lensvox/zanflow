@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useSearchParams, useNavigate } from 'react-router-dom';
-import { FileText, Search, Filter, ChevronDown } from 'lucide-react';
+import { useSearchParams, useNavigate, useOutletContext } from 'react-router-dom';
+import { FileText, Search, Filter, ChevronDown, Bell } from 'lucide-react';
 import { Button, Card, CardContent, Input } from '@/components/common';
-import { documentsApi, projectsApi } from '@/services/api';
+import { documentsApi, notificationsApi, projectsApi } from '@/services/api';
 import type { Document, Project } from '@/types';
 import { ViewToggle, DualView, useViewMode, } from '@/components/layout/DualView';
 import { createDocumentsTableColumns, DocumentGridCard } from '@/components/layout/DualView/documentsConfig';
@@ -145,7 +145,16 @@ export function Documents() {
     e.stopPropagation();
     setDeleteConfirm({ id: doc.id, name: doc.name });
   };
+  const { data: summary } = useQuery({
+    queryKey: ['notifications-summary'],
+    queryFn: () => notificationsApi.getSummary(),
+    refetchInterval: 30000,
+  });
 
+  const { isActivityOpen, setIsActivityOpen } = useOutletContext<{
+    isActivityOpen: boolean;
+    setIsActivityOpen: (open: boolean) => void;
+  }>();
   const emptyState = (
     <div className="flex flex-col items-center justify-center py-12">
       <FileText className="h-12 w-12 text-muted-foreground mb-4" />
@@ -175,7 +184,20 @@ export function Documents() {
                 Manage all ground truth documents across projects
               </p>
             </div>
-            <ViewToggle viewMode={viewMode} onViewModeChange={setViewMode} />
+            <div className="flex items-center gap-3">
+              <ViewToggle viewMode={viewMode} onViewModeChange={setViewMode} />
+              <Button
+                className="relative"
+                onClick={() => setIsActivityOpen(!isActivityOpen)}
+              >
+                <Bell className="h-5 w-5" />
+                {(summary?.unread ?? 0) > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                    {summary?.unread}
+                  </span>
+                )}
+              </Button>
+            </div>
           </div>
 
           {/* Search and Filters */}

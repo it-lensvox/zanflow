@@ -1,8 +1,8 @@
 import React, { useState, useCallback } from 'react';
-import { Plus, Grid3X3, List, Search } from 'lucide-react';
-import { useNavigate, Outlet, useLocation } from 'react-router-dom';
+import { Plus, Grid3X3, List, Search, Bell } from 'lucide-react';
+import { useNavigate, Outlet, useLocation, useOutletContext } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { taskApi } from '@/services/api';
+import { notificationsApi, taskApi } from '@/services/api';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { TaskDetailModal } from './TaskDetailModal';
 import { AITask } from './AITask';
@@ -11,6 +11,7 @@ import { DualView } from '@/components/layout/DualView/DualView';
 import { createTasksTableColumns, TaskGridCard, getStatusConfig, priorityOptions, statusOptions, } from '@/components/layout/DualView/taskConfig';
 import { useTableFilters, ColumnFilterConfig } from '@/hooks/useTableFilters';
 import { SearchFilter, ListFilter, DateFilter, FilterHeaderWrapper } from '@/components/layout/DualView/FilterComponents';
+import { Button } from '@/components/common/Button';
 
 export const MyTask: React.FC = () => {
     const navigate = useNavigate();
@@ -124,7 +125,15 @@ export const MyTask: React.FC = () => {
         user,
         navigate
     });
-
+    const { data: summary } = useQuery({
+        queryKey: ['notifications-summary'],
+        queryFn: () => notificationsApi.getSummary(),
+        refetchInterval: 30000,
+    });
+    const { isActivityOpen, setIsActivityOpen } = useOutletContext<{
+        isActivityOpen: boolean;
+        setIsActivityOpen: (open: boolean) => void;
+    }>();
     return (
         <div className="w-full p-8 space-y-8">
             {location.pathname.startsWith('/taskboard') && !location.pathname.endsWith('/create') ? (
@@ -160,6 +169,17 @@ export const MyTask: React.FC = () => {
                                             </button>
                                         </>
                                     )}
+                                    <Button
+                                        className="relative bg-[#F7EC8D]"
+                                        onClick={() => setIsActivityOpen(!isActivityOpen)}
+                                    >
+                                        <Bell className="h-5 w-5 text-gray-800" />
+                                        {(summary?.unread ?? 0) > 0 && (
+                                            <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                                                {summary?.unread}
+                                            </span>
+                                        )}
+                                    </Button>
                                 </div>
                             </div>
 

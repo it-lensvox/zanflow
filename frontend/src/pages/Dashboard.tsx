@@ -31,6 +31,7 @@ import type { Project, Document } from '@/types';
 import { getStatusConfig } from '@/components/layout/DualView/taskConfig';
 import { NotificationsPage } from './NotificationsPage';
 import { ProjectGridCard } from '@/components/layout/DualView/projectsConfig';
+import { useOutletContext } from 'react-router-dom';
 
 // Type Definitions
 type TaskStatus = 'pending' | 'backlog' | 'in_progress' | 'completed' | 'deployed' | 'deferred' | 'review';
@@ -58,6 +59,11 @@ interface Task {
 export function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { isActivityOpen, setIsActivityOpen } = useOutletContext<{
+  isActivityOpen: boolean;
+  setIsActivityOpen: (open: boolean) => void;
+}>();
+
 
   // State Management
   const [selectedTaskStatus, setSelectedTaskStatus] = React.useState<TaskStatus>('in_progress');
@@ -65,7 +71,6 @@ export function Dashboard() {
   const [updatingTaskId, setUpdatingTaskId] = React.useState<number | null>(null);
   const [updatingDocId, setUpdatingDocId] = React.useState<string | null>(null);
   const queryClient = useQueryClient();
-  const [isActivityOpen, setIsActivityOpen] = React.useState(false);
   const [openTaskDropdownId, setOpenTaskDropdownId] = React.useState<number | null>(null);
   const [dropdownPos, setDropdownPos] = React.useState<{ top: number; left: number } | null>(null);
   const [openDocDropdownId, setOpenDocDropdownId] = React.useState<string | null>(null);
@@ -243,20 +248,6 @@ export function Dashboard() {
             </p>
           </div>
           <div className="flex gap-2">
-            {/* 3. Notification Toggle Button */}
-            {/* <Button
-              variant={isActivityOpen ? "secondary" : "outline"}
-              className="relative"
-              onClick={() => setIsActivityOpen(!isActivityOpen)}
-            >
-              <Bell className="h-5 w-5" />
-              {(summary?.unread ?? 0) > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                  {summary?.unread}
-                </span>
-              )}
-            </Button> */}
-
             <Link to="/taskboard/create">
               <Button>
                 Create Task
@@ -268,6 +259,17 @@ export function Dashboard() {
                 New Project
               </Button>
             </Link>
+            <Button
+              className="relative"
+              onClick={() => setIsActivityOpen(!isActivityOpen)}
+            >
+              <Bell className="h-5 w-5" />
+              {(summary?.unread ?? 0) > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                  {summary?.unread}
+                </span>
+              )}
+            </Button>
           </div>
         </div>
 
@@ -648,18 +650,6 @@ export function Dashboard() {
           </CardContent>
         </Card>
       </div>
-      {/* Right Sidebar - Activity Feed */}
-      {/* {isActivityOpen && (
-        <>
-          <div
-            className="fixed inset-0  "
-            onClick={() => setIsActivityOpen(false)}
-          />
-          <div className="fixed inset-y-0 right-0 w-[340px] bg-white border-l border-black/10 z-[9999]">
-            <NotificationsPage onClose={() => setIsActivityOpen(false)} />
-          </div>
-        </>
-      )} */}
     </div>
   );
 }
