@@ -48,10 +48,9 @@ export function TableView<T>({
   return (
     <div className={`bg-white border border-[#dfe1e6] rounded-md shadow-sm font-sans text-[13px] ${className}`}>
       <table className="w-full border-collapse">
-        <thead className="bg-[#fafbfc] border-b border-[#dfe1e6]">
+        <thead className="bg-[#fafbfc] border-b border-[#dfe1e6] sticky top-0 z-10">
           <tr>
             {columns.map((column) => {
-              // Simply check if the label (which contains our FilterHeaderWrapper) is present
               const hasFilter = !!column.label;
 
               return (
@@ -61,9 +60,7 @@ export function TableView<T>({
                   style={column.width ? { width: column.width } : undefined}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    {/* The label now handles the inline Search Input internally */}
                     <div className="flex-1 min-w-0">{column.label}</div>
-
                     <div className="flex items-center gap-1 opacity-0 group-hover/header:opacity-100 transition-opacity">
                       {onSort && (
                         <button
