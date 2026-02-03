@@ -30,13 +30,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           const userData = await authApi.getMe();
           setUser(userData);
-        } catch (error:any) {
-          console.error("Initial auth failed:", error);
+        } catch (error: any) {
           if (error.response?.status !== 401 && error.response?.status !== 403) {
             setUser(null);
           }
           setUser(null);
         }
+      } else {
       }
       setIsLoading(false);
     };
@@ -49,9 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       navigate('/login');
     };
-
     window.addEventListener('auth:token-expired', handleTokenExpired);
-    
     return () => {
       window.removeEventListener('auth:token-expired', handleTokenExpired);
     };

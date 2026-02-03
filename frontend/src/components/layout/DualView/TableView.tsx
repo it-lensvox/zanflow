@@ -46,7 +46,7 @@ export function TableView<T>({
   rowClassName,
 }: TableViewProps<T>) {
   return (
-    <div className={`bg-white border border-[#dfe1e6] rounded-md shadow-sm font-sans text-[13px] ${className}`}>
+    <div className={`bg-white border border-[#dfe1e6] rounded-md shadow-sm font-sans text-[13px] overflow-auto h-full ${className}`}>
       <table className="w-full border-collapse">
         <thead className="bg-[#fafbfc] border-b border-[#dfe1e6] sticky top-0 z-10">
           <tr>

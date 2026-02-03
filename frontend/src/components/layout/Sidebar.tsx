@@ -2,13 +2,13 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  LayoutDashboard, FolderKanban, FileText, TestTube2, Settings, LogOut,
+  LayoutDashboard, FolderKanban, FileText, Settings, LogOut,
   Users, ChevronDown, ChevronUp, Plus, CheckSquare, CheckCircle,
-  Clock, PlayCircle, Pause, Crown, TrendingUp, ListTodo, Calendar, Bell, Eye, MessageSquare
+  Clock, PlayCircle, Pause, Crown, TrendingUp, ListTodo, Calendar, Eye, MessageSquare, UserPlus
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
-import { projectsApi } from '@/services/api';
+import { projectsApi, teamsApi } from '@/services/api';
 import type { Project } from '@/types';
 import { getProjectTypeColor } from '@/lib/utils';
 import { notificationsApi } from '@/services/api';
@@ -44,7 +44,7 @@ const FavouriteProjectsAccordion = ({ projects }: { projects: Project[] }) => {
           </div>
           <span className="truncate">{project.name}</span>
 
-          {/* Create Task Shortcut Icon */}
+          {/* Create Task */}
           <div
             role="button"
             className="absolute right-2 p-0.5 rounded-md hover:bg-background/50 hover:text-primary text-muted-foreground opacity-0 group-hover:opacity-100 transition-all"
@@ -63,6 +63,7 @@ const FavouriteProjectsAccordion = ({ projects }: { projects: Project[] }) => {
   );
 };
 
+
 export function Sidebar() {
   const { user, logout } = useAuth();
   const location = useLocation();
@@ -77,7 +78,8 @@ export function Sidebar() {
   const [isProjectsOpen, setIsProjectsOpen] = useState(location.pathname.startsWith('/projects'));
   const [isTasksOpen, setIsTasksOpen] = useState(location.pathname.startsWith('/taskboard'));
   const [isAdminOpen, setIsAdminOpen] = useState(location.pathname.startsWith('/admin'));
-
+  const [isCreateTeamOpen, setIsCreateTeamOpen] = useState(false);
+  const showAdmin = user?.role && ADMIN_ROLES.includes(user.role);
   const { data: projectsData } = useQuery({
     queryKey: ['projects'],
     queryFn: () => projectsApi.list(),
@@ -90,6 +92,13 @@ export function Sidebar() {
     refetchInterval: 30000,
   });
 
+  // Fetching Create teams
+  const { data: teamsData } = useQuery({
+    queryKey: ['teams'],
+    queryFn: () => teamsApi.list(),
+    enabled: showAdmin,
+  });
+
   const projects = useMemo(() => {
     if (!projectsData) return [];
     if (Array.isArray(projectsData)) return projectsData;
@@ -97,7 +106,13 @@ export function Sidebar() {
     return [];
   }, [projectsData]) as Project[];
 
-  const showAdmin = user?.role && ADMIN_ROLES.includes(user.role);
+  const teams = useMemo(() => {
+    if (!teamsData) return [];
+    if (Array.isArray(teamsData)) return teamsData;
+    if ('results' in teamsData && Array.isArray(teamsData.results)) return teamsData.results;
+    return [];
+  }, [teamsData]);
+
 
   return (
     <div
@@ -237,7 +252,6 @@ export function Sidebar() {
         {[
           { name: 'Documents', href: '/documents', icon: FileText },
           { name: 'Calendar', href: '/calendar', icon: Calendar },
-          // { name: 'Test Runs', href: '/test-runs', icon: TestTube2 },
         ].map((item) => (
           <NavLink
             key={item.name}
@@ -265,7 +279,7 @@ export function Sidebar() {
           <div className="space-y-1">
             <div
               onClick={() => setIsAdminOpen(!isAdminOpen)}
-              className={cn('flex items-center gap-3 rounded-lg px-3 py-2 text-sm. font-medium cursor-pointer transition-colors',
+              className={cn('flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium cursor-pointer transition-colors',
                 location.pathname.startsWith('/admin') ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-accent',
                 !isExpanded && "justify-center px-0")}
             >
@@ -279,10 +293,84 @@ export function Sidebar() {
             </div>
             {isExpanded && isAdminOpen && (
               <div className="ml-4 border-l pl-2 space-y-1 animate-in slide-in-from-left-2">
-                <NavLink to="/admin/user-roles" className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-muted-foreground hover:text-primary">
+                {/* Create Team Accordion */}
+                <div className="space-y-1">
+                  <div
+                    className={cn(
+                      "flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs transition-colors cursor-pointer",
+                      location.pathname.startsWith('/admin/create-team') || location.pathname.startsWith('/admin/teams')
+                        ? "bg-primary/10 text-primary font-medium"
+                        : "text-muted-foreground hover:text-primary"
+                    )}
+                    onClick={() => {
+                      navigate('/admin/create-team');
+                      setIsCreateTeamOpen(true);
+                    }}
+                  >
+                    <UserPlus className="h-3.5 w-3.5" />
+                    <span className="flex-1">Create Team</span>
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsCreateTeamOpen(!isCreateTeamOpen);
+                      }}
+                    >
+                      {isCreateTeamOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                    </div>
+                  </div>
+
+                  {/* Teams inside Create Team */}
+                  {isCreateTeamOpen && teams.length > 0 && (
+                    <div className="ml-4 border-l pl-2 space-y-1 animate-in slide-in-from-left-2">
+                      {teams.map((team) => (
+                        <NavLink
+                          key={team.id}
+                          to={`/admin/teams/${team.id}`}
+                          className={({ isActive }) =>
+                            cn('flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
+                              isActive ? 'bg-primary/10 text-primary font-semibold' : 'text-muted-foreground hover:text-primary')
+                          }
+                        >
+                          <div 
+                            className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] text-white font-bold uppercase"
+                            style={{ backgroundColor: team.color || '#6366f1' }}
+                          >
+                            {team.name.charAt(0)}
+                          </div>
+                          <span className="truncate">{team.name}</span>
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Roles */}
+                <NavLink
+                  to="/admin/user-roles"
+                  className={({ isActive }) =>
+                    cn(
+                      "flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs transition-colors",
+                      isActive
+                        ? "bg-primary/10 text-primary font-medium"
+                        : "text-muted-foreground hover:text-primary"
+                    )
+                  }
+                >
                   <Users className="h-3.5 w-3.5" /> Roles
                 </NavLink>
-                <NavLink to="/admin/team-performance" className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs text-muted-foreground hover:text-primary">
+
+                {/* Performance */}
+                <NavLink
+                  to="/admin/team-performance"
+                  className={({ isActive }) =>
+                    cn(
+                      "flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs transition-colors",
+                      isActive
+                        ? "bg-primary/10 text-primary font-medium"
+                        : "text-muted-foreground hover:text-primary"
+                    )
+                  }
+                >
                   <TrendingUp className="h-3.5 w-3.5" /> Performance
                 </NavLink>
               </div>

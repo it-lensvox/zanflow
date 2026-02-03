@@ -1,13 +1,8 @@
+import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
-  ArrowLeft,
-  FileText,
-  CheckCircle,
-  Clock,
-  AlertCircle,
-  Plus,
-  Settings,
+  ArrowLeft, FileText, CheckCircle, Clock, AlertCircle, Plus, Settings, Sparkles,
 } from 'lucide-react';
 import {
   Button,
@@ -20,10 +15,12 @@ import {
 import { projectsApi, documentsApi } from '@/services/api';
 import { formatDate, getStatusColor } from '@/lib/utils';
 import type { Project, Document } from '@/types';
+import { AITask } from '@/pages/MyTask/AITask';
 
 
 export function ProjectDetail() {
   const navigate = useNavigate();
+  const [showAIModal, setShowAIModal] = useState(false);
 
   const { id } = useParams<{ id: string }>();
 
@@ -91,6 +88,14 @@ export function ProjectDetail() {
           </div>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAIModal(true)}
+          >
+            <Sparkles className="h-4 w-4 mr-2" />
+            Generate Task by AI
+          </Button>
           <Link to={`/projects/${id}/settings`}>
             <Button variant="outline" size="sm">
               <Settings className="h-4 w-4 mr-2" />
@@ -237,6 +242,13 @@ export function ProjectDetail() {
           )}
         </CardContent>
       </Card>
+
+      {showAIModal && (
+        <AITask
+          onClose={() => setShowAIModal(false)}
+          fixedProjectId={Number(id)}
+        />
+      )}
     </div>
   );
 }

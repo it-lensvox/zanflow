@@ -217,7 +217,7 @@ export const MyTask: React.FC = () => {
                         </div>
 
                         {/* Content Section*/}
-                        <div className="flex-1 overflow-auto px-8 pb-8">
+                        <div className="flex-1 overflow-hidden px-8 pb-8 min-h-0">
                             <DualView
                                 viewMode={viewMode}
                                 isLoading={loading}

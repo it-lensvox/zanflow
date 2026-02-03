@@ -8,25 +8,10 @@ import { useParams } from 'react-router-dom';
 import { projectsApi } from '@/services/api';
 import { TaskDetails } from '@/pages/TaskType/TaskDetails';
 import { APITesting } from '@/pages/TaskType/APITesting';
-
 import {
-  Dashboard,
-  Login,
-  Projects,
-  ProjectCreate,
-  DocumentCreate,
-  DocumentDetail,
-  Documents,
-  ProjectSettings,
-  UserManagement,
-  MyTask,
-  CreateTask,
-  TeamPerformance,
-  Calendar,
-  // NotificationsPage,
-  Profile,
-  ResetPassword,
-  TeamChatModern,
+  Dashboard,Login,Projects, ProjectCreate,DocumentCreate, DocumentDetail, Documents, 
+  ProjectSettings, UserManagement, CreateTeam, MyTask, CreateTask, TeamPerformance, Calendar, Profile, 
+  ResetPassword, TeamChatModern,
 } from '@/pages';
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
@@ -132,15 +117,10 @@ function AppRoutes() {
         <Route path="/projects/:id/api-testing" element={<APITesting />} />
         <Route path="/projects/:projectId/documents/new" element={<DocumentCreate />} />
         <Route path="/projects/:id/settings" element={<ProjectSettings />} />
-        {/* <Route path="/notifications" element={<NotificationsPage />} /> */}
         <Route path="/documents" element={<Documents />} />
         <Route path="/documents/:id" element={<DocumentDetail />} />
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/team-chat" element={<TeamChatModern />} />
-
-        <Route path="/test-runs" element={<div>Test Runs (Phase 2)</div>} />
-        <Route path="/test-runs/:id" element={<div>Test Run Detail (Phase 2)</div>} />
-
         <Route path="/settings" element={<div>Settings</div>} />
         {/* Taskboard Routes */}
         <Route path="/taskboard" element={<MyTask />}>
@@ -164,6 +144,7 @@ function AppRoutes() {
 
         {/* Admin Accordion */}
         <Route path="/admin" element={<AdminDashboard />}>
+        <Route path="create-team" element={<CreateTeam />} />
           <Route path="user-roles" element={<UserManagement />} />
           <Route path="team-performance" element={<TeamPerformance />} />
           <Route index element={<Navigate to="user-roles" replace />} />

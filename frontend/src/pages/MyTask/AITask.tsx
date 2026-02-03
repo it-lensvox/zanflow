@@ -9,12 +9,14 @@ import { ProjectMinimal, AITaskSuggestionPayload } from '@/types';
 interface AITaskProps {
     onClose: () => void;
     onGenerate?: (projectId: number, description: string) => void;
+    fixedProjectId?: number;
 }
 
-export const AITask: React.FC<AITaskProps> = ({ onClose, onGenerate }) => {
+export const AITask: React.FC<AITaskProps> = ({ onClose, onGenerate, fixedProjectId }) => {
     const navigate = useNavigate();
-    const [selectedProjects, setSelectedProjects] = useState<number[]>([]);
+    const [selectedProjects, setSelectedProjects] = useState<number[]>(fixedProjectId ? [fixedProjectId] : []);
     const [projectDropdownOpen, setProjectDropdownOpen] = useState(false);
+    const [projectSearchInput, setProjectSearchInput] = useState('');
     const [allProjectOptions, setAllProjectOptions] = useState<ProjectMinimal[]>([]);
     const [description, setDescription] = useState('');
     const [isDataLoading, setIsDataLoading] = useState(true);
@@ -22,6 +24,7 @@ export const AITask: React.FC<AITaskProps> = ({ onClose, onGenerate }) => {
     const [loading, setLoading] = useState(false);
     const editorRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const projectSearchInputRef = useRef<HTMLInputElement>(null);
 
     const execCommand = (command: string, value: string | undefined = undefined) => {
         document.execCommand(command, false, value);
@@ -81,7 +84,7 @@ export const AITask: React.FC<AITaskProps> = ({ onClose, onGenerate }) => {
     useEffect(() => {
         const fetchProjects = async () => {
             setIsDataLoading(true);
-           try {
+            try {
                 const projectData = await projectsApi.list();
                 setAllProjectOptions(projectData.results);
             } catch (err) {
@@ -94,12 +97,31 @@ export const AITask: React.FC<AITaskProps> = ({ onClose, onGenerate }) => {
         fetchProjects();
     }, []);
 
+    // Filter projects based on search input with priority sorting
+    const filteredProjectOptions = React.useMemo(() => {
+        if (!projectSearchInput.trim()) {
+            return allProjectOptions;
+        }
+
+        const searchLower = projectSearchInput.toLowerCase();
+        const startsWithSearch = allProjectOptions.filter((project) =>
+            project.name.toLowerCase().startsWith(searchLower)
+        );
+        const containsSearch = allProjectOptions.filter(
+            (project) =>
+                !project.name.toLowerCase().startsWith(searchLower) &&
+                project.name.toLowerCase().includes(searchLower)
+        );
+
+        return [...startsWithSearch, ...containsSearch];
+    }, [allProjectOptions, projectSearchInput]);
+
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             const target = event.target as HTMLElement;
-            if (!target.closest('.relative')) {
-                setProjectDropdownOpen(false);
-            }
+            const isOutsideProject = !target.closest('[data-dropdown="project"]');
+
+            if (isOutsideProject) setProjectDropdownOpen(false);
         };
 
         document.addEventListener('mousedown', handleClickOutside);
@@ -201,49 +223,90 @@ export const AITask: React.FC<AITaskProps> = ({ onClose, onGenerate }) => {
                                 <Briefcase className="w-4 h-4" />
                                 Project <span className="text-red-500">*</span>
                             </label>
-                            <div className="relative">
+                            <div className="relative" data-dropdown="project">
                                 <div
-                                    className="w-full p-2.5 rounded border border-gray-300 bg-white flex flex-wrap gap-2 min-h-[42px] cursor-pointer hover:border-gray-400 transition-colors"
-                                    onClick={() => setProjectDropdownOpen(!projectDropdownOpen)}
+                                    className={`w-full p-2.5 rounded border border-gray-300 bg-white flex flex-wrap gap-2 min-h-[42px] ${fixedProjectId ? 'cursor-not-allowed bg-gray-50' : 'cursor-pointer hover:border-gray-400'
+                                        } transition-colors`}
+                                    onClick={() => {
+                                        if (!fixedProjectId) {
+                                            setProjectDropdownOpen(true);
+                                            setTimeout(() => projectSearchInputRef.current?.focus(), 0);
+                                        }
+                                    }}
                                 >
                                     {selectedProjects.length === 0 ? (
-                                        <span className="text-gray-400 text-sm">Select a project</span>
+                                        !projectDropdownOpen ? (
+                                            <span className="text-gray-400 text-sm">Search project</span>
+                                        ) : (
+                                            <input
+                                                ref={projectSearchInputRef}
+                                                type="text"
+                                                value={projectSearchInput}
+                                                onChange={(e) => setProjectSearchInput(e.target.value)}
+                                                onClick={(e) => e.stopPropagation()}
+                                                placeholder="Search project"
+                                                className="flex-1 min-w-[120px] outline-none text-sm text-gray-400"
+                                            />
+                                        )
                                     ) : (
-                                        selectedProjects.map((projectId) => {
-                                            const project = allProjectOptions.find(p => p.id === projectId);
-                                            if (!project) return null;
-                                            return (
-                                                <span key={projectId} className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-sm font-medium flex items-center gap-1">
-                                                    {project.name}
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setSelectedProjects([]);
-                                                        }}
-                                                        className="hover:text-red-600"
-                                                    >
-                                                        ×
-                                                    </button>
-                                                </span>
-                                            );
-                                        })
+                                        <>
+                                            {selectedProjects.map((projectId) => {
+                                                const project = allProjectOptions.find(p => p.id === projectId);
+                                                if (!project) return null;
+                                                return (
+                                                    <span key={projectId} className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-sm font-medium flex items-center gap-1">
+                                                        {project.name}
+                                                        {!fixedProjectId && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setSelectedProjects([]);
+                                                                    setProjectSearchInput('');
+                                                                }}
+                                                                className="hover:text-red-600"
+                                                            >
+                                                                ×
+                                                            </button>
+                                                        )}
+                                                    </span>
+                                                );
+                                            })}
+                                            {!fixedProjectId && projectDropdownOpen && (
+                                                <input
+                                                    ref={projectSearchInputRef}
+                                                    type="text"
+                                                    value={projectSearchInput}
+                                                    onChange={(e) => setProjectSearchInput(e.target.value)}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    placeholder="Search project"
+                                                    className="flex-1 min-w-[120px] outline-none text-sm text-gray-400"
+                                                />
+                                            )}
+                                        </>
                                     )}
                                 </div>
-                                {projectDropdownOpen && (
+                                {projectDropdownOpen && !fixedProjectId && (
                                     <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
-                                        {allProjectOptions.map((project) => (
-                                            <div
-                                                key={project.id}
-                                                className="px-4 py-2.5 hover:bg-gray-50 cursor-pointer text-sm"
-                                                onClick={() => {
-                                                    setSelectedProjects([project.id]);
-                                                    setProjectDropdownOpen(false);
-                                                }}
-                                            >
-                                                {project.name}
+                                        {filteredProjectOptions.length > 0 ? (
+                                            filteredProjectOptions.map((project) => (
+                                                <div
+                                                    key={project.id}
+                                                    className="px-4 py-2.5 hover:bg-gray-50 cursor-pointer text-sm"
+                                                    onClick={() => {
+                                                        setSelectedProjects([project.id]);
+                                                        setProjectDropdownOpen(false);
+                                                        setProjectSearchInput('');
+                                                    }}
+                                                >
+                                                    {project.name}
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="px-4 py-2.5 text-sm text-gray-500 text-center">
+                                                No projects found
                                             </div>
-                                        ))}
+                                        )}
                                     </div>
                                 )}
                             </div>
