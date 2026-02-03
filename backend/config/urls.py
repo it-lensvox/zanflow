@@ -26,6 +26,7 @@ urlpatterns = [
         path('api-testing/', include('apps.api_testing.urls')),
         path("notification/", include("apps.notification.urls")),
         path("chat/", include("apps.chat.urls")),
+        path("teams/", include("apps.teams.urls")),
     ])),
     
     # API Documentation
