@@ -17,6 +17,7 @@ import {
   DocumentDetail,
   Documents,
   ProjectSettings,
+  CreateTeam,
   UserManagement,
   MyTask,
   CreateTask,

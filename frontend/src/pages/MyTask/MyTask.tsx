@@ -143,24 +143,24 @@ export const MyTask: React.FC = () => {
                     </div>
                 ) : (
                     <>
-                        <div className="flex-shrink-0 p-8 pb-4">
-                            <div className="flex flex-col gap-6">
-                                {/* Header Section */}
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <h1 className="text-3xl font-bold text-gray-900">Task Board</h1>
-                                        <p className="text-lg text-muted-foreground mt-1">Manage and track your tasks efficiently</p>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        {['admin', 'manager', 'annotator'].includes(user?.role || '') && (
-                                            <>
-                                                <button
-                                                    onClick={() => navigate('/taskboard/create')}
-                                                    className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
-                                                >
-                                                    <Plus className="w-4 h-4 mr-2" />
-                                                    Add New
-                                                </button>
+                    <div className="flex-shrink-0 p-8 pb-4">
+                        <div className="flex flex-col gap-6">
+                            {/* Header Section */}
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h1 className="text-3xl font-bold text-gray-900">Task Board</h1>
+                                    <p className="text-lg text-muted-foreground mt-1">Manage and track your tasks efficiently</p>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    {['admin', 'manager', 'annotator'].includes(user?.role || '') && (
+                                        <>
+                                            <button
+                                                onClick={() => navigate('/taskboard/create')}
+                                                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
+                                            >
+                                                <Plus className="w-4 h-4 mr-2" />
+                                                Add New
+                                            </button>
 
                                             <button
                                                 onClick={() => setShowAITaskModal(true)}
@@ -170,6 +170,17 @@ export const MyTask: React.FC = () => {
                                             </button>
                                         </>
                                     )}
+                                    <Button
+                                        className="relative bg-[#F7EC8D]"
+                                        onClick={() => setIsActivityOpen(!isActivityOpen)}
+                                    >
+                                        <Bell className="h-5 w-5 text-gray-800" />
+                                        {(summary?.unread ?? 0) > 0 && (
+                                            <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                                                {summary?.unread}
+                                            </span>
+                                        )}
+                                    </Button>
                                 </div>
                             </div>
 
@@ -303,6 +314,7 @@ export const MyTask: React.FC = () => {
                                     </div>
                                 </div>
                             )}
+                        </div>
                         </div>
                     </>
                 )
