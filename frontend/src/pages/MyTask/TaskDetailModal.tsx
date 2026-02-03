@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
     X, Trash2, Save, Edit3, Loader2, ChevronDown, FileText, Download, Send, Maximize2, Minimize2,
-    Clock, ListTodo, PlayCircle, CheckCircle, CheckSquare, Pause, Calendar, Plus, Link,
+    Clock, ListTodo, PlayCircle, CheckCircle, CheckSquare, Pause, Calendar, Plus, Link, ExternalLink,
 } from 'lucide-react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { taskApi, usersApi, documentsApi } from '@/services/api';
 import { useAuth } from '@/hooks/useAuth';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -20,29 +21,6 @@ const formatDate = (dateString: string) => {
     }
 };
 
-const formatRelativeTime = (dateString?: string) => {
-    if (!dateString) return '';
-    try {
-        const date = new Date(dateString);
-        if (isNaN(date.getTime())) return '';
-
-        const now = new Date();
-        const diffInSeconds = Math.max(0, Math.floor((now.getTime() - date.getTime()) / 1000));
-
-        if (diffInSeconds < 60) return 'Updated just now';
-
-        const minutes = Math.floor(diffInSeconds / 60);
-        if (minutes < 60) return `Updated ${minutes} ${minutes === 1 ? 'minute' : 'minutes'} ago`;
-
-        const hours = Math.floor(minutes / 60);
-        if (hours < 24) return `Updated ${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
-
-        const days = Math.floor(hours / 24);
-        return `Updated ${days} ${days === 1 ? 'day' : 'days'} ago`;
-    } catch {
-        return '';
-    }
-};
 interface TaskDetailModalProps {
     task: Task;
     onClose: () => void;
@@ -56,6 +34,12 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
         labels: (task as any).label_details || task.labels || []
     }), [task]);
     const { user } = useAuth();
+    const navigate = useNavigate();
+
+    const handleOpenFullPage = () => {
+        onClose();
+        navigate(`/tasks/${task.id}`);
+    };
     const [selectedStatus, setSelectedStatus] = useState<Task['status']>(task.status);
     const [isEditingStatus, setIsEditingStatus] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -429,8 +413,12 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
                             )}
                             Save Changes
                         </button>
-                        <button onClick={toggleMaximize} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
-                            {isMaximized ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+                        <button
+                            onClick={handleOpenFullPage}
+                            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
+                            title="Open in full page"
+                        >
+                            <Maximize2 className="w-5 h-5" />
                         </button>
                         {(user?.role === 'admin' || task.assigned_by === user?.id) && (
                             <button onClick={() => setShowDeleteConfirm(true)} className="p-2 text-gray-400 hover:text-red-600 rounded-lg">

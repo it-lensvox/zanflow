@@ -6,9 +6,7 @@ import type {
   Label, DocumentStatus, ChatMessage, ChatRoom, ChatRoomMessagesResponse, CreatePrivateChatPayload, WebSocketSendMessagePayload, WebSocketGlobalMessage
 } from '@/types';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://192.168.1.12:8000/api/v1';
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://192.168.1.12:8001/';
-
+const API_URL = import.meta.env.VITE_API_URL || 'http://192.168.1.18:8000/api/v1';
 
 export const api = axios.create({
   baseURL: API_URL,
@@ -16,12 +14,6 @@ export const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
-
-export const fileApi = axios.create({
-  baseURL: API_BASE_URL,
-  headers: { "Content-Type": "application/json" },
-});
-
 
 // Token management
 const TOKEN_KEY = 'zanflow_tokens';
@@ -175,7 +167,7 @@ export const notificationsApi = {
 
   // Mark a notification as read
   markAsRead: async (id: number) => {
-    const response = await api.patch(`/notification/${id}/`, { is_read: true });
+    const response = await api.post(`/notification/${id}/mark-read/`);
     return response.data;
   },
 
@@ -331,49 +323,6 @@ export const documentsApi = {
   delete: async (id: string) => {
     await api.delete(`/documents/${id}/`);
   },
-
-  // uploadSource: async (id: string, file: File) => {
-  //   const formData = new FormData();
-  //   formData.append('file', file);
-  //   const response = await api.post(`/documents/${id}/upload-source/`, formData, {
-  //     headers: { 'Content-Type': 'multipart/form-data' },
-  //   });
-  //   return response.data;
-  // },
-
-  // getVersions: async (id: string) => {
-  //   const response = await api.get(`/documents/${id}/versions/`);
-  //   return response.data;
-  // },
-
-  // createVersion: async (id: string, data: { gt_data: Record<string, unknown>; change_summary?: string }) => {
-  //   const response = await api.post(`/documents/${id}/versions/`, data);
-  //   return response.data;
-  // },
-
-  // getVersionDiff: async (id: string, v1: string | number, v2: string | number) => {
-  //   const response = await api.get(`/documents/${id}/versions/diff/`, {
-  //     params: { v1, v2 },
-  //   });
-  //   return response.data;
-  // },
-
-  // submitForReview: async (id: string) => {
-  //   const response = await api.post(`/documents/${id}/submit-for-review/`);
-  //   return response.data;
-  // },
-
-  // approve: async (id: string, versionId?: string) => {
-  //   const response = await api.post(`/documents/${id}/approve/`, {
-  //     version_id: versionId,
-  //   });
-  //   return response.data;
-  // },
-  // // Add inside documentsApi object:
-  // addLabel: async (documentId: string, labelId: number) => {
-  //   const response = await api.post(`/documents/${documentId}/labels/`, { label_id: labelId });
-  //   return response.data;
-  // },
 
   removeLabel: async (documentId: string, labelId: number) => {
     const response = await api.delete(`/documents/${documentId}/labels/${labelId}/`);
@@ -754,75 +703,6 @@ export class GlobalChatWebSocketService {
 
 // Export singleton instance for global use (optional)
 export const globalChatSocket = new GlobalChatWebSocketService();
-
-
-// // Tools PdfVsHtml API
-// export const toolApi = {
-//   getProjectFolders: async () => {
-//     const res = await fileApi.get<ToolDocumentListPayload>("/documents/");
-//     return res.data.documents || [];
-//   },
-//   getDocumentsInProject: async (projectName: string) => {
-//     const res = await fileApi.get<ToolDocumentListPayload>(`/documents/${projectName}/`);
-//     return res.data.documents || [];
-//   },
-
-//   getDocumentDetail: async (projectName: string, docName: string) => {
-//     const res = await fileApi.get<DocumentDetailResponse>(`/documents/${projectName}/${docName}/`);
-//     return res.data;
-//   },
-
-//   getAllGroundTruth: async () => {
-//     const res = await fileApi.get<{ documents: Omit<GroundTruthEntry, 'id'>[] }>("/ground_truth/all");
-//     return res.data.documents.map((entry: any, index: number) => ({
-//       ...entry,
-//       id: `gt-server-${Date.now()}-${index}`,
-//       docName: entry.docName || entry.document
-//     })) as GroundTruthEntry[];
-//   },
-
-//   // New function to submit a new ground truth entry
-//   submitGroundTruth: async (docName: string, entry: Omit<GroundTruthApiResponse, 'id' | 'docName'>) => {
-//     const res = await fileApi.post(`/ground_truth/${docName}/`, entry);
-//     return res.data;
-//   },
-
-
-//   // Tools JSONViewer API
-//   getTableCellsFileNames: async () => {
-//     const res = await fileApi.post<GetTableCellsResponse>("/backend/get_table_cells", { load_json: [] }, {
-//       headers: {
-//         "Content-Type": "application/json"
-//       }
-//     });
-//     return res.data;
-//   },
-//   fetchPageContentJson: async (fileName: string) => {
-//     const data = {
-//       elastic_indx: "10k",
-//       select_fields: [
-//         "page",
-//         "table",
-//         "image",
-//         "text",
-//         "cell",
-//         "entity",
-//         "key_value",
-//         "table_np",
-//       ],
-//       PDF: [
-//         fileName,
-//       ],
-//       highlight_words: [],
-//     };
-//     const res = await fileApi.post<PageContentResponse | PageContentErrorResponse>("/backend/get_page_content", data, {
-//       headers: {
-//         "Content-Type": "application/json"
-//       }
-//     });
-//     return res.data;
-//   },
-// };
 
 // API Testing Platform API
 export const apiTestingApi = {

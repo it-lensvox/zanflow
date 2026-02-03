@@ -28,6 +28,7 @@ import {
   ResetPassword,
   TeamChatModern,
 } from '@/pages';
+import { TaskDetailPage } from '@/pages/MyTask/TaskDetailPage';
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { isAllowed, isLoading, isAuthenticated } = useAuth();
@@ -142,6 +143,9 @@ function AppRoutes() {
         <Route path="/test-runs/:id" element={<div>Test Run Detail (Phase 2)</div>} />
 
         <Route path="/settings" element={<div>Settings</div>} />
+        {/* Task Detail Page (full-page view) */}
+        <Route path="/tasks/:id" element={<TaskDetailPage />} />
+
         {/* Taskboard Routes */}
         <Route path="/taskboard" element={<MyTask />}>
           <Route index element={null} />

@@ -83,13 +83,6 @@ export function Sidebar() {
     queryFn: () => projectsApi.list(),
   });
 
-  // Fetching notification
-  const { data: notifySummary } = useQuery({
-    queryKey: ['notifications-summary'],
-    queryFn: () => notificationsApi.getSummary(),
-    refetchInterval: 30000,
-  });
-
   const projects = useMemo(() => {
     if (!projectsData) return [];
     if (Array.isArray(projectsData)) return projectsData;
@@ -250,11 +243,6 @@ export function Sidebar() {
           >
             <div className="relative">
               <item.icon className="h-5 w-5 shrink-0" />
-              {item.name === 'Activity' && (notifySummary?.unread ?? 0) > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#ee6b6e] text-[10px] font-bold text-white">
-                  {notifySummary?.unread}
-                </span>
-              )}
             </div>
             {isExpanded && <span>{item.name}</span>}
           </NavLink>
