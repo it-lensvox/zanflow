@@ -92,13 +92,6 @@ export function Sidebar() {
     refetchInterval: 30000,
   });
 
-  // Fetching Create teams
-  const { data: teamsData } = useQuery({
-    queryKey: ['teams'],
-    queryFn: () => teamsApi.list(),
-    enabled: showAdmin,
-  });
-
   const projects = useMemo(() => {
     if (!projectsData) return [];
     if (Array.isArray(projectsData)) return projectsData;
@@ -252,6 +245,8 @@ export function Sidebar() {
         {[
           { name: 'Documents', href: '/documents', icon: FileText },
           { name: 'Calendar', href: '/calendar', icon: Calendar },
+          { name: 'Activity', href: '/notifications', icon: Bell },
+          // { name: 'Test Runs', href: '/test-runs', icon: TestTube2 },
         ].map((item) => (
           <NavLink
             key={item.name}
@@ -264,11 +259,6 @@ export function Sidebar() {
           >
             <div className="relative">
               <item.icon className="h-5 w-5 shrink-0" />
-              {item.name === 'Activity' && (notifySummary?.unread ?? 0) > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#ee6b6e] text-[10px] font-bold text-white">
-                  {notifySummary?.unread}
-                </span>
-              )}
             </div>
             {isExpanded && <span>{item.name}</span>}
           </NavLink>

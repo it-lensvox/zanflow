@@ -9,10 +9,25 @@ import { projectsApi } from '@/services/api';
 import { TaskDetails } from '@/pages/TaskType/TaskDetails';
 import { APITesting } from '@/pages/TaskType/APITesting';
 import {
-  Dashboard,Login,Projects, ProjectCreate,DocumentCreate, DocumentDetail, Documents, 
-  ProjectSettings, UserManagement, CreateTeam, MyTask, CreateTask, TeamPerformance, Calendar, Profile, 
-  ResetPassword, TeamChatModern,
+  Dashboard,
+  Login,
+  Projects,
+  ProjectCreate,
+  DocumentCreate,
+  DocumentDetail,
+  Documents,
+  ProjectSettings,
+  UserManagement,
+  MyTask,
+  CreateTask,
+  TeamPerformance,
+  Calendar,
+  NotificationsPage,
+  Profile,
+  ResetPassword,
+  TeamChatModern,
 } from '@/pages';
+import { TaskDetailPage } from '@/pages/MyTask/TaskDetailPage';
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { isAllowed, isLoading, isAuthenticated } = useAuth();
@@ -117,11 +132,15 @@ function AppRoutes() {
         <Route path="/projects/:id/api-testing" element={<APITesting />} />
         <Route path="/projects/:projectId/documents/new" element={<DocumentCreate />} />
         <Route path="/projects/:id/settings" element={<ProjectSettings />} />
+        <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/documents" element={<Documents />} />
         <Route path="/documents/:id" element={<DocumentDetail />} />
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/team-chat" element={<TeamChatModern />} />
         <Route path="/settings" element={<div>Settings</div>} />
+        {/* Task Detail Page (full-page view) */}
+        <Route path="/tasks/:id" element={<TaskDetailPage />} />
+
         {/* Taskboard Routes */}
         <Route path="/taskboard" element={<MyTask />}>
           <Route index element={null} />

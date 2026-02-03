@@ -7,7 +7,8 @@ import type {
   CreateTeamPayload, Team
 } from '@/types';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://192.168.1.18:8000/api/v1';
+const API_URL = import.meta.env.VITE_API_URL || 'http://192.168.1.12:8000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://192.168.1.12:8001/';
 
 
 export const api = axios.create({
@@ -170,7 +171,7 @@ export const notificationsApi = {
 
   // Mark a notification as read
   markAsRead: async (id: number) => {
-    const response = await api.patch(`/notification/${id}/`, { is_read: true });
+    const response = await api.post(`/notification/${id}/mark-read/`);
     return response.data;
   },
 

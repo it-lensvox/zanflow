@@ -162,26 +162,14 @@ export const MyTask: React.FC = () => {
                                                     Add New
                                                 </button>
 
-                                                <button
-                                                    onClick={() => setShowAITaskModal(true)}
-                                                    className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-md text-sm font-medium hover:bg-purple-700 transition-colors shadow-sm"
-                                                >
-                                                    Generate Task by AI
-                                                </button>
-                                            </>
-                                        )}
-                                        <Button
-                                            className="relative bg-[#F7EC8D]"
-                                            onClick={() => setIsActivityOpen(!isActivityOpen)}
-                                        >
-                                            <Bell className="h-5 w-5 text-gray-800" />
-                                            {(summary?.unread ?? 0) > 0 && (
-                                                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                                                    {summary?.unread}
-                                                </span>
-                                            )}
-                                        </Button>
-                                    </div>
+                                            <button
+                                                onClick={() => setShowAITaskModal(true)}
+                                                className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-md text-sm font-medium hover:bg-purple-700 transition-colors shadow-sm"
+                                            >
+                                                Generate Task by AI
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             </div>
 
