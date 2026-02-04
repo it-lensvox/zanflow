@@ -144,6 +144,9 @@ export const MyTask: React.FC = () => {
                 ) : (
                     <>
                     <div className="flex-shrink-0 p-8 pb-4"></div>
+
+                    <div className="flex-shrink-0 p-8 pb-4">
+
                         <div className="flex flex-col gap-6">
                             {/* Header Section */}
                             <div className="flex items-center justify-between">
@@ -314,6 +317,7 @@ export const MyTask: React.FC = () => {
                                     </div>
                                 </div>
                             )}
+                        </div>
                         </div>
                     </>
                 )

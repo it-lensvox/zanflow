@@ -26,7 +26,9 @@ import {
   Profile,
   ResetPassword,
   TeamChatModern,
-  CreateTeam
+  CreateTeam,
+  Dashboard, Login, Projects, ProjectCreate, DocumentCreate, DocumentDetail, Documents, ProjectSettings,
+  Teams, UserManagement, MyTask, CreateTask, TeamPerformance, Calendar, NotificationsPage, Profile, ResetPassword, TeamChatModern,
 } from '@/pages';
 import { TaskDetailPage } from '@/pages/MyTask/TaskDetailPage';
 
@@ -164,10 +166,10 @@ function AppRoutes() {
 
         {/* Admin Accordion */}
         <Route path="/admin" element={<AdminDashboard />}>
-        <Route path="create-team" element={<CreateTeam />} />
+          <Route path="teams" element={<Teams />} />
           <Route path="user-roles" element={<UserManagement />} />
           <Route path="team-performance" element={<TeamPerformance />} />
-          <Route index element={<Navigate to="user-roles" replace />} />
+          <Route index element={<Navigate to="teams" replace />} />
         </Route>
 
       </Route>

@@ -623,7 +623,7 @@ export interface TeamTypeChoicesResponse {
   team_types: TeamTypeChoice[];
 }
 
-// Create Team Payload
+// Create Save Team Payload
 export interface CreateTeamPayload {
   name: string;
   team_type: string;
@@ -665,6 +665,7 @@ export interface Team {
   members: TeamMember[];
   my_role: 'owner' | 'member';
   can_manage: boolean;
+  is_favourite: boolean;
   created_at: string;
   updated_at: string;
 }

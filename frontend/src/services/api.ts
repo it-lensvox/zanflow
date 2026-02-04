@@ -7,7 +7,7 @@ import type {
   CreateTeamPayload, Team
 } from '@/types';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://192.168.1.12:8000/api/v1';
+const API_URL = import.meta.env.VITE_API_URL || 'http://192.168.1.18:8000/api/v1';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://192.168.1.12:8001/';
 
 
@@ -487,6 +487,25 @@ export const teamsApi = {
   list: async () => {
     const response = await api.get<PaginatedResponse<Team>>('/teams/');
     return response.data;
+  },
+
+  // For favorite toggle
+  toggleFavorite: async (id: number, isFavourite: boolean) => {
+    const response = await api.post(`/teams/${id}/favorite/`, {
+      is_favourite: isFavourite
+    });
+    return response.data;
+  },
+
+  // Add member to team
+  addMember: async (teamId: number, data: { user_id: number; role: string }) => {
+    const response = await api.post(`/teams/${teamId}/members/`, data);
+    return response.data;
+  },
+
+  // Delete team
+  delete: async (id: number) => {
+    await api.delete(`/teams/${id}/`);
   },
 };
 

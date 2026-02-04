@@ -526,6 +526,10 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                         <div className="p-5 space-y-4">
                             {/* Project Selection */}
                             <div className="relative" data-dropdown="project">
+                                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                                    <Briefcase className="w-4 h-4" />
+                                    Project <span className="text-red-500">*</span>
+                                </label>
                                 <div
                                     className={`w-full p-2.5 rounded border border-gray-300 bg-white flex flex-wrap gap-2 min-h-[42px] ${fixedProjectId ? 'cursor-not-allowed bg-gray-50' : 'cursor-pointer hover:border-gray-400'
                                         } transition-colors`}
