@@ -6,7 +6,7 @@ export interface TableColumn<T> {
   label: React.ReactNode;
   width?: string;
   className?: string;
-  render?: (item: T, index: number) => React.ReactNode;
+  render?: (item: T, index: number, onDelete?: (item: T) => void) => React.ReactNode;
   headerClassName?: string;
 }
 
@@ -102,7 +102,7 @@ export function TableView<T>({
                   key={column.key}
                   className={`py-2 px-3 h-12 align-middle text-[13px] border-r border-[#f4f5f7] group-hover:border-r-[#dfe1e6] last:border-r-0 relative ${column.className || ''}`}
                 >
-                  {column.render ? column.render(item, index) : (item as any)[column.key]}
+                  {column.render ? column.render(item, index, onRowClick) : (item as any)[column.key]}
                 </td>
               ))}
             </tr>
