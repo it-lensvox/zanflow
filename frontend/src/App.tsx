@@ -8,7 +8,6 @@ import { useParams } from 'react-router-dom';
 import { projectsApi } from '@/services/api';
 import { TaskDetails } from '@/pages/TaskType/TaskDetails';
 import { APITesting } from '@/pages/TaskType/APITesting';
-
 import {
   Dashboard,
   Login,
@@ -18,16 +17,18 @@ import {
   DocumentDetail,
   Documents,
   ProjectSettings,
+  CreateTeam,
   UserManagement,
   MyTask,
   CreateTask,
   TeamPerformance,
   Calendar,
-  // NotificationsPage,
+  NotificationsPage,
   Profile,
   ResetPassword,
   TeamChatModern,
 } from '@/pages';
+import { TaskDetailPage } from '@/pages/MyTask/TaskDetailPage';
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { isAllowed, isLoading, isAuthenticated } = useAuth();
@@ -132,16 +133,15 @@ function AppRoutes() {
         <Route path="/projects/:id/api-testing" element={<APITesting />} />
         <Route path="/projects/:projectId/documents/new" element={<DocumentCreate />} />
         <Route path="/projects/:id/settings" element={<ProjectSettings />} />
-        {/* <Route path="/notifications" element={<NotificationsPage />} /> */}
+        <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/documents" element={<Documents />} />
         <Route path="/documents/:id" element={<DocumentDetail />} />
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/team-chat" element={<TeamChatModern />} />
-
-        <Route path="/test-runs" element={<div>Test Runs (Phase 2)</div>} />
-        <Route path="/test-runs/:id" element={<div>Test Run Detail (Phase 2)</div>} />
-
         <Route path="/settings" element={<div>Settings</div>} />
+        {/* Task Detail Page (full-page view) */}
+        <Route path="/tasks/:id" element={<TaskDetailPage />} />
+
         {/* Taskboard Routes */}
         <Route path="/taskboard" element={<MyTask />}>
           <Route index element={null} />
@@ -164,6 +164,7 @@ function AppRoutes() {
 
         {/* Admin Accordion */}
         <Route path="/admin" element={<AdminDashboard />}>
+        <Route path="create-team" element={<CreateTeam />} />
           <Route path="user-roles" element={<UserManagement />} />
           <Route path="team-performance" element={<TeamPerformance />} />
           <Route index element={<Navigate to="user-roles" replace />} />

@@ -60,11 +60,13 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
     const [selectedLabelIds, setSelectedLabelIds] = useState<number[]>([]);
     const [labelDropdownOpen, setLabelDropdownOpen] = useState(false);
     const [assigneeSearchInput, setAssigneeSearchInput] = useState('');
+    const [projectSearchInput, setProjectSearchInput] = useState('');
     const [highlightedUserIndex, setHighlightedUserIndex] = useState(0);
     const [isTitleRefining, setIsTitleRefining] = useState(false);
     const [isDescRefining, setIsDescRefining] = useState(false);
     const editorRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const projectSearchInputRef = useRef<HTMLInputElement>(null);
 
     const execCommand = (command: string, value: string | undefined = undefined) => {
         document.execCommand(command, false, value);
@@ -251,6 +253,27 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
         );
     }, [allUserOptions, assignedToList, assigneeSearchInput]);
 
+    // Filter projects based on search input with priority sorting
+    const filteredProjectOptions = React.useMemo(() => {
+        if (!projectSearchInput.trim()) {
+            return allProjectOptions;
+        }
+
+        const searchLower = projectSearchInput.toLowerCase();
+        const startsWithSearch = allProjectOptions.filter((project) =>
+            project.name.toLowerCase().startsWith(searchLower)
+        );
+        const containsSearch = allProjectOptions.filter(
+            (project) =>
+                !project.name.toLowerCase().startsWith(searchLower) &&
+                project.name.toLowerCase().includes(searchLower)
+        );
+
+        return [...startsWithSearch, ...containsSearch];
+    }, [allProjectOptions, projectSearchInput]);
+
+
+
     // Handle initial load errors
     useEffect(() => {
         if (usersError || projectsError) {
@@ -261,13 +284,17 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             const target = event.target as HTMLElement;
-            if (!target.closest('.relative')) {
-                setStatusDropdownOpen(false);
-                setPriorityDropdownOpen(false);
-                setDropdownOpen(false);
-                setProjectDropdownOpen(false);
-                setLabelDropdownOpen(false);
-            }
+            const isOutsideStatus = !target.closest('[data-dropdown="status"]');
+            const isOutsidePriority = !target.closest('[data-dropdown="priority"]');
+            const isOutsideAssignee = !target.closest('[data-dropdown="assignee"]');
+            const isOutsideProject = !target.closest('[data-dropdown="project"]');
+            const isOutsideLabel = !target.closest('[data-dropdown="label"]');
+
+            if (isOutsideStatus) setStatusDropdownOpen(false);
+            if (isOutsidePriority) setPriorityDropdownOpen(false);
+            if (isOutsideAssignee) setDropdownOpen(false);
+            if (isOutsideProject) setProjectDropdownOpen(false);
+            if (isOutsideLabel) setLabelDropdownOpen(false);
         };
 
         document.addEventListener('mousedown', handleClickOutside);
@@ -498,25 +525,43 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
 
                         <div className="p-5 space-y-4">
                             {/* Project Selection */}
-                            <div>
+                            <div className="relative" data-dropdown="project">
                                 <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
                                     <Briefcase className="w-4 h-4" />
                                     Project <span className="text-red-500">*</span>
                                 </label>
-                                <div className="relative">
-                                    <div
-                                        className={`w-full p-2.5 rounded border border-gray-300 bg-white flex flex-wrap gap-2 min-h-[42px] ${fixedProjectId ? 'cursor-not-allowed bg-gray-50' : 'cursor-pointer hover:border-gray-400'} transition-colors`}
-                                        onClick={() => !fixedProjectId && setProjectDropdownOpen(!projectDropdownOpen)}
-                                    >
-                                        {projectsLoading ? (
-                                            <span className="text-gray-400 text-sm flex items-center gap-2">
-                                                <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                                                Loading projects...
-                                            </span>
-                                        ) : selectedProjects.length === 0 ? (
-                                            <span className="text-gray-400 text-sm">Select a project</span>
+                                <div
+                                    className={`w-full p-2.5 rounded border border-gray-300 bg-white flex flex-wrap gap-2 min-h-[42px] ${fixedProjectId ? 'cursor-not-allowed bg-gray-50' : 'cursor-pointer hover:border-gray-400'
+                                        } transition-colors`}
+                                    onClick={() => {
+                                        if (!fixedProjectId) {
+                                            setProjectDropdownOpen(true);
+                                            setTimeout(() => projectSearchInputRef.current?.focus(), 0);
+                                        }
+                                    }}
+                                >
+                                    {projectsLoading ? (
+                                        <span className="text-gray-400 text-sm flex items-center gap-2">
+                                            <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                                            Loading projects...
+                                        </span>
+                                    ) : selectedProjects.length === 0 ? (
+                                        !projectDropdownOpen ? (
+                                            <span className="text-gray-400 text-sm">Search project</span>
                                         ) : (
-                                            selectedProjects.map((projectId) => {
+                                            <input
+                                                ref={projectSearchInputRef}
+                                                type="text"
+                                                value={projectSearchInput}
+                                                onChange={(e) => setProjectSearchInput(e.target.value)}
+                                                onClick={(e) => e.stopPropagation()}
+                                                placeholder="Search project"
+                                                className="flex-1 min-w-[120px] outline-none text-sm text-gray-400"
+                                            />
+                                        )
+                                    ) : (
+                                        <>
+                                            {selectedProjects.map((projectId) => {
                                                 const project = allProjectOptions.find(p => p.id === projectId);
                                                 if (!project) return null;
                                                 return (
@@ -528,6 +573,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     setSelectedProjects([]);
+                                                                    setProjectSearchInput('');
                                                                 }}
                                                                 className="hover:text-red-600"
                                                             >
@@ -536,26 +582,44 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                                                         )}
                                                     </span>
                                                 );
-                                            })
-                                        )}
-                                    </div>
-                                    {projectDropdownOpen && (
-                                        <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
-                                            {allProjectOptions.map((project) => (
+                                            })}
+                                            {!fixedProjectId && projectDropdownOpen && (
+                                                <input
+                                                    ref={projectSearchInputRef}
+                                                    type="text"
+                                                    value={projectSearchInput}
+                                                    onChange={(e) => setProjectSearchInput(e.target.value)}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    placeholder="Search project"
+                                                    className="flex-1 min-w-[120px] outline-none text-sm text-gray-400"
+                                                />
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                                {projectDropdownOpen && !fixedProjectId && (
+                                    <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                                        {filteredProjectOptions.length > 0 ? (
+                                            filteredProjectOptions.map((project) => (
                                                 <div
                                                     key={project.id}
                                                     className="px-4 py-2.5 hover:bg-gray-50 cursor-pointer text-sm"
                                                     onClick={() => {
                                                         setSelectedProjects([project.id]);
                                                         setProjectDropdownOpen(false);
+                                                        setProjectSearchInput('');
                                                     }}
                                                 >
                                                     {project.name}
                                                 </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="px-4 py-2.5 text-sm text-gray-500 text-center">
+                                                No projects found
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Task Title */}
@@ -827,7 +891,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                                         <label className="text-sm font-medium text-gray-700 mb-2 block">
                                             Status
                                         </label>
-                                        <div className="relative">
+                                        <div className="relative" data-dropdown="status">
                                             <div
                                                 className="w-full p-2.5 rounded border border-gray-300 hover:border-gray-400 cursor-pointer bg-white flex items-center justify-between min-h-[42px] transition-colors"
                                                 onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
@@ -869,7 +933,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                                             <Flag className="w-4 h-4" />
                                             Priority
                                         </label>
-                                        <div className="relative">
+                                        <div className="relative" data-dropdown="priority">
                                             <div
                                                 className="w-full p-2.5 rounded border border-gray-300 hover:border-gray-400 cursor-pointer bg-white flex items-center justify-between min-h-[42px] transition-colors"
                                                 onClick={() => setPriorityDropdownOpen(!priorityDropdownOpen)}
@@ -968,7 +1032,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                                         <User className="w-4 h-4" />
                                         Assignees <span className="text-red-500">*</span>
                                     </label>
-                                    <div className="relative">
+                                    <div className="relative" data-dropdown="assignee">
                                         {/* Main input field - shows selected users + allows typing */}
                                         <div className="w-full p-2.5 rounded border border-gray-300 hover:border-gray-400 bg-white flex flex-wrap gap-2 min-h-[42px] transition-colors">
                                             {usersLoading ? (
@@ -999,7 +1063,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                                                         );
                                                     })}
 
-                                                    {/* Search input - integrated into the main field */}
+                                                    {/* Search input */}
                                                     <input
                                                         type="text"
                                                         value={assigneeSearchInput}
@@ -1252,7 +1316,10 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                 </form>
             </div>
             {showAIModal && (
-                <AITask onClose={() => setShowAIModal(false)} />
+                <AITask
+                    onClose={() => setShowAIModal(false)}
+                    fixedProjectId={fixedProjectId || (selectedProjects.length > 0 ? selectedProjects[0] : undefined)}
+                />
             )}
         </div>
     );

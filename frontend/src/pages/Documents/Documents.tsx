@@ -173,11 +173,11 @@ export function Documents() {
   );
 
   return (
-    <div className="flex w-full min-h-screen">
-      <div className="flex-1 min-w-0 p-8">
-        <div className="space-y-8">
+    <div className="flex w-full h-screen">
+      <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden">
+        <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between px-8 pt-8">
             <div>
               <h1 className="text-3xl font-bold">Documents</h1>
               <p className="text-muted-foreground">
@@ -201,7 +201,7 @@ export function Documents() {
           </div>
 
           {/* Search and Filters */}
-          <Card>
+          <div className="px-8 shrink-0"><Card>
             <CardContent className="p-4">
               <div className="flex flex-col gap-4">
                 <div className="flex gap-4">
@@ -269,33 +269,35 @@ export function Documents() {
                 )}
               </div>
             </CardContent>
-          </Card>
-
+          </Card></div>
+          
           {/* Documents View */}
-          <DualView
-            viewMode={viewMode}
-            isLoading={isLoading}
-            gridProps={{
-              data: displayedDocuments,
-              renderCard: (doc) => (
-                <DocumentGridCard
-                  key={doc.id}
-                  document={doc}
-                  onDeleteClick={handleDeleteClick}
-                />
-              ),
-              emptyState,
-              gridClassName: 'grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4',
-            }}
-            tableProps={{
-              data: displayedDocuments,
-              columns: createDocumentsTableColumns({ onDeleteClick: handleDeleteClick }),
-              rowKey: (doc) => doc.id,
-              onRowClick: (doc) => navigate(`/documents/${doc.id}`),
-              emptyState,
-              rowClassName: () => 'group',
-            }}
-          />
+          <div className="flex-1 overflow-hidden px-8 pb-8 pt-6 min-h-0">
+            <DualView
+              viewMode={viewMode}
+              isLoading={isLoading}
+              gridProps={{
+                data: displayedDocuments,
+                renderCard: (doc) => (
+                  <DocumentGridCard
+                    key={doc.id}
+                    document={doc}
+                    onDeleteClick={handleDeleteClick}
+                  />
+                ),
+                emptyState,
+                gridClassName: 'grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4',
+              }}
+              tableProps={{
+                data: displayedDocuments,
+                columns: createDocumentsTableColumns({ onDeleteClick: handleDeleteClick }),
+                rowKey: (doc) => doc.id,
+                onRowClick: (doc) => navigate(`/documents/${doc.id}`),
+                emptyState,
+                rowClassName: () => 'group',
+              }}
+            />
+          </div>
         </div>
       </div>
 

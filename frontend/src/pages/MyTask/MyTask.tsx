@@ -135,7 +135,7 @@ export const MyTask: React.FC = () => {
         setIsActivityOpen: (open: boolean) => void;
     }>();
     return (
-        <div className="w-full p-8 space-y-8">
+        <div className="w-full h-screen flex flex-col">
             {location.pathname.startsWith('/taskboard') && !location.pathname.endsWith('/create') ? (
                 loading ? (
                     <div className="flex items-center justify-center h-64">
@@ -143,6 +143,7 @@ export const MyTask: React.FC = () => {
                     </div>
                 ) : (
                     <>
+                    <div className="flex-shrink-0 p-8 pb-4">
                         <div className="flex flex-col gap-6">
                             {/* Header Section */}
                             <div className="flex items-center justify-between">
@@ -215,7 +216,7 @@ export const MyTask: React.FC = () => {
                         </div>
 
                         {/* Content Section*/}
-                        <div className="space-y-0">
+                        <div className="flex-1 overflow-hidden px-8 pb-8 min-h-0">
                             <DualView
                                 viewMode={viewMode}
                                 isLoading={loading}
@@ -313,6 +314,7 @@ export const MyTask: React.FC = () => {
                                     </div>
                                 </div>
                             )}
+                        </div>
                         </div>
                     </>
                 )

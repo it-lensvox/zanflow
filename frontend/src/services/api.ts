@@ -1,15 +1,20 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import type {
-  AuthTokens, User as AppUser, PaginatedResponse, PaginatedProjectsResponse, GetUploadUrlPayload, GetUploadUrlResponse, ConfirmUploadPayload,
-  ConfirmUploadResponse, GetDownloadUrlPayload, GetDownloadUrlResponse, TaskComment, CreateTaskCommentPayload, AITaskSuggestionResponse, AITaskSuggestionPayload, APICollection,
+  AuthTokens, User as AppUser, PaginatedResponse, PaginatedProjectsResponse, GetUploadUrlPayload, GetUploadUrlResponse, ConfirmUploadResponse, GetDownloadUrlPayload, ConfirmUploadPayload,
+  GetDownloadUrlResponse, TaskComment, CreateTaskCommentPayload, AITaskSuggestionResponse, AITaskSuggestionPayload, APICollection,
   APIEndpoint, AuthCredential, ExecutionRun, ExecutionResult, APITestingDashboard, CreateCollectionPayload, CreateEndpointPayload, CreateCredentialPayload, RunCollectionPayload, ProjectCreatePayload,
-  Label, DocumentStatus, ChatMessage, ChatRoom, ChatRoomMessagesResponse, CreatePrivateChatPayload, WebSocketSendMessagePayload, WebSocketGlobalMessage, RefineTextPayload, RefineTextResponse
+  Label, DocumentStatus, ChatMessage, ChatRoom, ChatRoomMessagesResponse, CreatePrivateChatPayload, WebSocketSendMessagePayload, WebSocketGlobalMessage, RefineTextPayload, RefineTextResponse, TeamTypeChoicesResponse,
+  CreateTeamPayload, Team
 } from '@/types';
+
 
 //const API_URL = import.meta.env.VITE_API_URL || 'http://192.168.1.12:8000/api/v1';
 //const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://192.168.1.12:8001/';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+//const API_URL = import.meta.env.VITE_API_URL || 'http://192.168.1.18:8000/api/v1';
+//const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://192.168.1.12:8001/';
 
 
 export const api = axios.create({
@@ -81,17 +86,17 @@ api.interceptors.response.use(
           setTokens(newTokens);
           api.defaults.headers.common['Authorization'] = `Bearer ${newTokens.access}`;
           originalRequest.headers.Authorization = `Bearer ${newTokens.access}`;
-
           return api(originalRequest);
         } catch (refreshError) {
-          console.error("Token refresh failed:", refreshError);
           clearTokens();
           window.dispatchEvent(new CustomEvent('auth:token-expired'));
           return Promise.reject(refreshError);
         }
+      } else {
+        clearTokens();
+        window.dispatchEvent(new CustomEvent('auth:token-expired'));
       }
     }
-
     return Promise.reject(error);
   }
 );
@@ -187,7 +192,7 @@ export const notificationsApi = {
 
   // Mark a notification as read
   markAsRead: async (id: number) => {
-    const response = await api.patch(`/notification/${id}/`, { is_read: true });
+    const response = await api.post(`/notification/${id}/mark-read/`);
     return response.data;
   },
 
@@ -344,76 +349,12 @@ export const documentsApi = {
     await api.delete(`/documents/${id}/`);
   },
 
-  // uploadSource: async (id: string, file: File) => {
-  //   const formData = new FormData();
-  //   formData.append('file', file);
-  //   const response = await api.post(`/documents/${id}/upload-source/`, formData, {
-  //     headers: { 'Content-Type': 'multipart/form-data' },
-  //   });
-  //   return response.data;
-  // },
-
-  // getVersions: async (id: string) => {
-  //   const response = await api.get(`/documents/${id}/versions/`);
-  //   return response.data;
-  // },
-
-  // createVersion: async (id: string, data: { gt_data: Record<string, unknown>; change_summary?: string }) => {
-  //   const response = await api.post(`/documents/${id}/versions/`, data);
-  //   return response.data;
-  // },
-
-  // getVersionDiff: async (id: string, v1: string | number, v2: string | number) => {
-  //   const response = await api.get(`/documents/${id}/versions/diff/`, {
-  //     params: { v1, v2 },
-  //   });
-  //   return response.data;
-  // },
-
-  // submitForReview: async (id: string) => {
-  //   const response = await api.post(`/documents/${id}/submit-for-review/`);
-  //   return response.data;
-  // },
-
-  // approve: async (id: string, versionId?: string) => {
-  //   const response = await api.post(`/documents/${id}/approve/`, {
-  //     version_id: versionId,
-  //   });
-  //   return response.data;
-  // },
-  // // Add inside documentsApi object:
-  // addLabel: async (documentId: string, labelId: number) => {
-  //   const response = await api.post(`/documents/${documentId}/labels/`, { label_id: labelId });
-  //   return response.data;
-  // },
-
   removeLabel: async (documentId: string, labelId: number) => {
     const response = await api.delete(`/documents/${documentId}/labels/${labelId}/`);
     return response.data;
   },
 };
 
-// Test Runs API
-export const testRunsApi = {
-  list: async (params?: { project?: number; status?: string }) => {
-    const response = await api.get('/test-runs/', { params });
-    return response.data;
-  },
-
-  get: async (id: string) => {
-    const response = await api.get(`/test-runs/${id}/`);
-    return response.data;
-  },
-
-  create: async (data: {
-    project: number;
-    name?: string;
-    config?: Record<string, unknown>;
-  }) => {
-    const response = await api.post('/test-runs/', data);
-    return response.data;
-  },
-};
 
 // Add New Task API
 export const taskApi = {
@@ -549,6 +490,26 @@ export const taskApi = {
 
 };
 
+// Create Teams API
+export const teamsApi = {
+
+  // TeamType
+  getTeamTypeChoices: async () => {
+    const response = await api.get<TeamTypeChoicesResponse>('/teams/choices/');
+    return response.data;
+  },
+
+  // Save Team
+  create: async (data: CreateTeamPayload) => {
+    const response = await api.post<Team>('/teams/', data);
+    return response.data;
+  },
+
+  list: async () => {
+    const response = await api.get<PaginatedResponse<Team>>('/teams/');
+    return response.data;
+  },
+};
 
 // User ManagementAPI
 export const usersApi = {
@@ -630,8 +591,12 @@ export class ChatWebSocketService {
     }
 
     // Construct WS URL with Token
+<<<<<<< HEAD
     //const wsUrl = `ws://192.168.1.12:8000/ws/chat/${roomId}/?token=${tokens.access}`;
     const wsUrl = `ws://localhost:8000/ws/chat/${roomId}/?token=${tokens.access}`;
+=======
+    const wsUrl = `ws://192.168.1.18:8000/ws/chat/${roomId}/?token=${tokens.access}`;
+>>>>>>> origin/Shifali
 
     this.ws = new WebSocket(wsUrl);
 
@@ -777,75 +742,6 @@ export class GlobalChatWebSocketService {
 
 // Export singleton instance for global use (optional)
 export const globalChatSocket = new GlobalChatWebSocketService();
-
-
-// // Tools PdfVsHtml API
-// export const toolApi = {
-//   getProjectFolders: async () => {
-//     const res = await fileApi.get<ToolDocumentListPayload>("/documents/");
-//     return res.data.documents || [];
-//   },
-//   getDocumentsInProject: async (projectName: string) => {
-//     const res = await fileApi.get<ToolDocumentListPayload>(`/documents/${projectName}/`);
-//     return res.data.documents || [];
-//   },
-
-//   getDocumentDetail: async (projectName: string, docName: string) => {
-//     const res = await fileApi.get<DocumentDetailResponse>(`/documents/${projectName}/${docName}/`);
-//     return res.data;
-//   },
-
-//   getAllGroundTruth: async () => {
-//     const res = await fileApi.get<{ documents: Omit<GroundTruthEntry, 'id'>[] }>("/ground_truth/all");
-//     return res.data.documents.map((entry: any, index: number) => ({
-//       ...entry,
-//       id: `gt-server-${Date.now()}-${index}`,
-//       docName: entry.docName || entry.document
-//     })) as GroundTruthEntry[];
-//   },
-
-//   // New function to submit a new ground truth entry
-//   submitGroundTruth: async (docName: string, entry: Omit<GroundTruthApiResponse, 'id' | 'docName'>) => {
-//     const res = await fileApi.post(`/ground_truth/${docName}/`, entry);
-//     return res.data;
-//   },
-
-
-//   // Tools JSONViewer API
-//   getTableCellsFileNames: async () => {
-//     const res = await fileApi.post<GetTableCellsResponse>("/backend/get_table_cells", { load_json: [] }, {
-//       headers: {
-//         "Content-Type": "application/json"
-//       }
-//     });
-//     return res.data;
-//   },
-//   fetchPageContentJson: async (fileName: string) => {
-//     const data = {
-//       elastic_indx: "10k",
-//       select_fields: [
-//         "page",
-//         "table",
-//         "image",
-//         "text",
-//         "cell",
-//         "entity",
-//         "key_value",
-//         "table_np",
-//       ],
-//       PDF: [
-//         fileName,
-//       ],
-//       highlight_words: [],
-//     };
-//     const res = await fileApi.post<PageContentResponse | PageContentErrorResponse>("/backend/get_page_content", data, {
-//       headers: {
-//         "Content-Type": "application/json"
-//       }
-//     });
-//     return res.data;
-//   },
-// };
 
 // API Testing Platform API
 export const apiTestingApi = {

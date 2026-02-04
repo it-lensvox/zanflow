@@ -210,18 +210,6 @@ export interface Document {
 export type FileType = 'pdf' | 'image' | 'json' | 'text' | 'video' | 'other';
 export type DocumentStatus = 'draft' | 'in_review' | 'approved' | 'archived';
 
-
-// export interface DocumentComment {
-//   id: number;
-//   content: string;
-//   field_reference?: string;
-//   parent?: number;
-//   is_resolved: boolean;
-//   created_by: UserMinimal;
-//   created_at: string;
-//   replies?: DocumentComment[];
-// }
-
 // Test types
 export interface TestRun {
   id: string;
@@ -408,17 +396,6 @@ export interface GetUploadUrlResponse {
   fields: Record<string, string>;
   file_key: string;
 }
-
-//3rd API call Confirm Upload
-// export interface ConfirmUploadPayload {
-//   file_key: string;
-//   file_name: string;
-//   file_type: string;
-//   metadata?: {
-//     gt_category?: 'gt' | 'running_gt';
-//     [key: string]: any;
-//   };
-// }
 
 export interface ConfirmUploadResponse {
   id: string;
@@ -636,6 +613,62 @@ export interface CalendarEvent {
   type: 'task' | 'event' | 'meeting';
 }
 
+// Create Team Types
+export interface TeamTypeChoice {
+  value: string;
+  label: string;
+}
+
+export interface TeamTypeChoicesResponse {
+  team_types: TeamTypeChoice[];
+}
+
+// Create Team Payload
+export interface CreateTeamPayload {
+  name: string;
+  team_type: string;
+  description: string;
+  leader_id: number;
+  member_ids: number[];
+}
+
+// Team Member User Info
+export interface TeamMemberUserInfo {
+  id: number;
+  email: string;
+  full_name: string;
+  initials: string;
+}
+
+// Team Member
+export interface TeamMember {
+  id: number;
+  user: TeamMemberUserInfo;
+  role: 'owner' | 'member';
+  role_display: string;
+  can_manage: boolean;
+  joined_at: string;
+  created_at: string;
+}
+
+// Team Response
+export interface Team {
+  id: number;
+  name: string;
+  team_type: string;
+  team_type_display: string;
+  color: string;
+  description: string;
+  leader: number;
+  leader_info: TeamMemberUserInfo;
+  member_count: number;
+  members: TeamMember[];
+  my_role: 'owner' | 'member';
+  can_manage: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 // Team Chat types
 export interface ChatUserMinimal {
   id: number;
@@ -668,8 +701,8 @@ export interface ChatRoom {
   is_active: boolean;
 }
 
-// Based on standard message patterns 
-// NEW - Matches actual API response
+
+
 export interface ChatMessage {
   id: string | number;
   room: string;
