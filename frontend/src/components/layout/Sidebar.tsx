@@ -85,6 +85,11 @@ export function Sidebar() {
     queryFn: () => projectsApi.list(),
   });
 
+  const { data: teamsData } = useQuery({
+    queryKey: ['teams'],
+    queryFn: () => teamsApi.list(),
+  });
+
   // Fetching notification
   const { data: notifySummary } = useQuery({
     queryKey: ['notifications-summary'],
@@ -245,7 +250,7 @@ export function Sidebar() {
         {[
           { name: 'Documents', href: '/documents', icon: FileText },
           { name: 'Calendar', href: '/calendar', icon: Calendar },
-          { name: 'Activity', href: '/notifications', icon: Bell },
+          // { name: 'Activity', href: '/notifications', icon: Bell },
           // { name: 'Test Runs', href: '/test-runs', icon: TestTube2 },
         ].map((item) => (
           <NavLink
@@ -312,7 +317,7 @@ export function Sidebar() {
                   {/* Teams inside Create Team */}
                   {isCreateTeamOpen && teams.length > 0 && (
                     <div className="ml-4 border-l pl-2 space-y-1 animate-in slide-in-from-left-2">
-                      {teams.map((team) => (
+                      {teams.map((team: any) => (
                         <NavLink
                           key={team.id}
                           to={`/admin/teams/${team.id}`}

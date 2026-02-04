@@ -14,43 +14,43 @@ interface DocumentTableColumnsProps {
 
 const getDocumentStatusConfig = (status: DocumentStatus) => {
   const normalizedStatus = status.toLowerCase() as Lowercase<DocumentStatus>;
-  
+
   switch (normalizedStatus) {
     case 'draft':
-      return { 
-        bg: 'bg-yellow-50', 
-        text: 'text-yellow-800', 
-        label: 'DRAFT', 
-        icon: File 
+      return {
+        bg: 'bg-yellow-50',
+        text: 'text-yellow-800',
+        label: 'DRAFT',
+        icon: File
       };
     case 'in_review':
-      return { 
-        bg: 'bg-blue-50', 
-        text: 'text-blue-800', 
-        label: 'IN REVIEW', 
-        icon: Clock 
+      return {
+        bg: 'bg-blue-50',
+        text: 'text-blue-800',
+        label: 'IN REVIEW',
+        icon: Clock
       };
     case 'approved':
-      return { 
-        bg: 'bg-green-50', 
-        text: 'text-green-800', 
-        label: 'APPROVED', 
-        icon: CheckCircle 
+      return {
+        bg: 'bg-green-50',
+        text: 'text-green-800',
+        label: 'APPROVED',
+        icon: CheckCircle
       };
     case 'archived':
-      return { 
-        bg: 'bg-gray-50', 
-        text: 'text-gray-800', 
-        label: 'ARCHIVED', 
-        icon: FileText 
+      return {
+        bg: 'bg-gray-50',
+        text: 'text-gray-800',
+        label: 'ARCHIVED',
+        icon: FileText
       };
     default: {
       const exhaustiveCheck: never = normalizedStatus;
-      return { 
-        bg: 'bg-gray-50', 
-        text: 'text-gray-800', 
-        label: String(status).toUpperCase().replace('_', ' '), 
-        icon: FileText 
+      return {
+        bg: 'bg-gray-50',
+        text: 'text-gray-800',
+        label: String(status).toUpperCase().replace('_', ' '),
+        icon: FileText
       };
     }
   }
@@ -141,6 +141,7 @@ export const createDocumentsTableColumns = ({ onDeleteClick }: DocumentTableColu
     {
       key: 'name',
       label: 'Document',
+      // width: '350px',  // Added width
       render: (doc: Document) => (
         <div className="flex items-center justify-between w-full group/cell">
           <div className="flex items-center gap-2 min-w-0 pr-2">
@@ -165,6 +166,7 @@ export const createDocumentsTableColumns = ({ onDeleteClick }: DocumentTableColu
     {
       key: 'project',
       label: 'Project',
+      width: '180px',  // Added width
       render: (doc: Document) => (
         <span className="text-[12px] text-gray-700 font-medium">
           {doc.project_name || 'General'}
@@ -174,7 +176,7 @@ export const createDocumentsTableColumns = ({ onDeleteClick }: DocumentTableColu
     {
       key: 'file_type',
       label: 'Type',
-      width: '100px',
+      width: '120px',
       render: (doc: Document) => (
         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600 uppercase border border-gray-200">
           {doc.file_type}
@@ -184,12 +186,13 @@ export const createDocumentsTableColumns = ({ onDeleteClick }: DocumentTableColu
     {
       key: 'status',
       label: 'Status',
-      width: '140px',
+      width: '120px',  // Reduced from 140px
       render: (doc: Document) => <StatusDropdown doc={doc} />,
     },
     {
       key: 'created_by',
       label: 'Uploaded By',
+      width: '180px',  // Added width
       render: (doc: Document) => (
         <div className="flex items-center gap-2">
           <div className="h-6 w-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-700">
@@ -200,6 +203,7 @@ export const createDocumentsTableColumns = ({ onDeleteClick }: DocumentTableColu
       ),
     },
   ];
+
 };
 
 interface DocumentGridCardProps {
@@ -210,7 +214,7 @@ interface DocumentGridCardProps {
 export function DocumentGridCard({ document: doc, onDeleteClick }: DocumentGridCardProps) {
   const getStatusConfig = (status: DocumentStatus) => {
     const normalizedStatus = status.toLowerCase() as Lowercase<DocumentStatus>;
-    
+
     switch (normalizedStatus) {
       case 'approved':
         return { badge: 'bg-green-50 text-green-600 border border-green-200', label: 'APPROVED' };
@@ -222,9 +226,9 @@ export function DocumentGridCard({ document: doc, onDeleteClick }: DocumentGridC
         return { badge: 'bg-gray-100 text-gray-600 border border-gray-200', label: 'ARCHIVED' };
       default: {
         const exhaustiveCheck: never = normalizedStatus;
-        return { 
-          badge: 'bg-gray-50 text-gray-600 border border-gray-200', 
-          label: String(status).toUpperCase().replace('_', ' ') 
+        return {
+          badge: 'bg-gray-50 text-gray-600 border border-gray-200',
+          label: String(status).toUpperCase().replace('_', ' ')
         };
       }
     }

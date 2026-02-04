@@ -26,6 +26,7 @@ import {
   Profile,
   ResetPassword,
   TeamChatModern,
+  CreateTeam
 } from '@/pages';
 import { TaskDetailPage } from '@/pages/MyTask/TaskDetailPage';
 
