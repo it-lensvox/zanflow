@@ -71,13 +71,8 @@ class TeamViewSet(TeamPermissionMixin, viewsets.ModelViewSet):
     ordering = ["-created_at"]
     
     def get_queryset(self):
-        """
-        Return teams based on user's membership.
-        Annotate with member count for efficiency.
-        """
         user = self.request.user
         
-        # Get team IDs where user is a member
         member_team_ids = TeamMember.objects.filter(
             user=user,
             deleted_at__isnull=True
@@ -85,12 +80,13 @@ class TeamViewSet(TeamPermissionMixin, viewsets.ModelViewSet):
         
         return Team.objects.filter(
             id__in=member_team_ids
-        ).select_related("leader")
+        ).select_related("leader").prefetch_related("favorited_by", "members__user")
     
     def get_serializer_class(self):
         """Return appropriate serializer based on action."""
-        if self.action == "list":
-            return TeamListSerializer
+        # Change 'list' and 'my_teams' to use TeamDetailSerializer instead of TeamListSerializer
+        if self.action in ["list", "my_teams"]:
+            return TeamDetailSerializer
         if self.action == "create":
             return TeamCreateSerializer
         if self.action in ["update", "partial_update"]:
@@ -130,26 +126,54 @@ class TeamViewSet(TeamPermissionMixin, viewsets.ModelViewSet):
             )
     
     def destroy(self, request, *args, **kwargs):
-        """Soft delete a team."""
+        """
+        Delete a team. 
+        Only the team leader (owner) is permitted to delete.
+        """
         team = self.get_object()
         
+        # Check if the requesting user is the assigned team leader
+        if team.leader != request.user:
+            return Response(
+                {"detail": "Only the team leader can delete this team."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
         try:
+            # Using your TeamService for consistent soft-deletion logic
             TeamService.delete_team(
                 team=team,
                 deleted_by=request.user,
-                hard_delete=False
+                hard_delete=False  # Keep it False to use your soft-delete logic
             )
             return Response(status=status.HTTP_204_NO_CONTENT)
-        except PermissionError as e:
-            return Response(
-                {"detail": str(e)},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        except TeamServiceError as e:
+        except Exception as e:
             return Response(
                 {"detail": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
+    
+    @action(detail=True, methods=["post"])
+    def favorite(self, request, pk=None):
+        """Toggle favorite status for the current user."""
+        team = self.get_object()
+        user = request.user
+        
+        if team.favorited_by.filter(id=user.id).exists():
+            team.favorited_by.remove(user)
+            return Response({"is_favourite": False}, status=status.HTTP_200_OK)
+        else:
+            team.favorited_by.add(user)
+            return Response({"is_favourite": True}, status=status.HTTP_200_OK)
+
+    # @action(detail=False, methods=["get"])
+    # def favorites(self, request):
+    #     """List only teams favorited by the current user."""
+    #     queryset = self.get_queryset().filter(favorited_by=request.user)
+    #     # Reuse your existing list logic
+    #     page = self.paginate_queryset(queryset)
+    #     serializer = TeamListSerializer(page or queryset, many=True, context={"request": request})
+    #     return self.get_paginated_response(serializer.data) if page else Response(serializer.data)
     
     @action(detail=False, methods=["get"])
     def my_teams(self, request):

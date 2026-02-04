@@ -112,4 +112,9 @@ urlpatterns = [
         AvailableUsersView.as_view(),
         name="team-available-users"
     ),
+    path(
+    "<int:pk>/favorite/",
+    TeamViewSet.as_view({"post": "favorite"}),
+    name="team-favorite"
+),
 ]

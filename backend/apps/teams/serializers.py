@@ -125,6 +125,7 @@ class TeamListSerializer(serializers.ModelSerializer):
     """Serializer for team list view (minimal data)."""
     
     member_count = serializers.SerializerMethodField()
+    is_favourite = serializers.SerializerMethodField()
     team_type_display = serializers.CharField(
         source="get_team_type_display",
         read_only=True
@@ -145,8 +146,14 @@ class TeamListSerializer(serializers.ModelSerializer):
             "member_count",
             "my_role",
             "created_at",
+            "is_favourite",
         ]
         read_only_fields = fields
+    def get_is_favourite(self, obj):
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            return obj.favorited_by.filter(id=request.user.id).exists()
+        return False
     
     def get_member_count(self, obj):
         """Get the count of active team members."""
@@ -164,6 +171,9 @@ class TeamDetailSerializer(serializers.ModelSerializer):
     """Serializer for detailed team view including members."""
     
     member_count = serializers.SerializerMethodField()
+    # 1. Add the field here
+    is_favourite = serializers.SerializerMethodField() 
+    can_delete = serializers.SerializerMethodField()
     team_type_display = serializers.CharField(
         source="get_team_type_display",
         read_only=True
@@ -188,8 +198,10 @@ class TeamDetailSerializer(serializers.ModelSerializer):
             "members",
             "my_role",
             "can_manage",
+            "is_favourite",  # 2. Add it to the fields list
             "created_at",
             "updated_at",
+            "can_delete",
         ]
         read_only_fields = [
             "id",
@@ -197,14 +209,28 @@ class TeamDetailSerializer(serializers.ModelSerializer):
             "members",
             "my_role",
             "can_manage",
+            "is_favourite", # 3. Make it read-only
             "created_at",
             "updated_at",
         ]
     
+    # 4. Add the logic method
+    def get_is_favourite(self, obj):
+        """Check if the current user has favorited this team."""
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            # Check if current user ID is in the favorited_by ManyToMany relationship
+            return obj.favorited_by.filter(id=request.user.id).exists()
+        return False
     def get_member_count(self, obj):
         """Get the count of active team members."""
         return obj.member_count
-    
+    def get_can_delete(self, obj):
+        """Check if the current user is the leader and can delete."""
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            return obj.leader == request.user
+        return False
     def get_members(self, obj):
         """Get all active team members."""
         members = obj.members.filter(deleted_at__isnull=True).select_related("user")

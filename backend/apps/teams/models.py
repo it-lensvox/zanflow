@@ -92,6 +92,11 @@ class Team(BaseModel):
         choices=TeamType.choices,
         default=TeamType.DEVELOPMENT
     )
+    favorited_by = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name="favorite_teams",
+        blank=True
+    )
     color = models.CharField(
         max_length=20,
         choices=TeamColor.choices,
