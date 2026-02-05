@@ -10,7 +10,8 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    port: 3001,
     host: true,
+    allowedHosts: ['localhost', '3.85.51.24', 'zanflow.lensvox.com']
   },
 });
