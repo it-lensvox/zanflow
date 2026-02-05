@@ -13,10 +13,56 @@ from django.dispatch import receiver
 
 from apps.projects.models import Project, ProjectMembership
 from .models import ChatRoom, ChatRoomMembership
-
+from apps.teams.models import Team, TeamMembership
 logger = logging.getLogger(__name__)
 
+@receiver(post_save, sender=Team)
+def create_team_chat_room(sender, instance, created, **kwargs):
+    """Auto-create chat room when a new Team is created."""
+    if created:
+        try:
+            from .services import ChatRoomService
+            # Assuming 'created_by' exists on your Team model
+            ChatRoomService.create_team_room(instance, instance.created_by)
+        except Exception as e:
+            logger.error(f"Failed to create team chat: {str(e)}")
 
+@receiver(post_save, sender=TeamMembership)
+def add_user_to_team_chat(sender, instance, created, **kwargs):
+    """Auto-add user to chat when they join a Team."""
+    if created:
+        try:
+            team = instance.team
+            user = instance.user
+            
+            room = ChatRoom.objects.filter(
+                room_type=ChatRoom.RoomType.TEAM, 
+                team=team
+            ).first()
+            
+            if room:
+                from .services import ChatRoomService
+                ChatRoomService.add_participant(room, user)
+        except Exception as e:
+            logger.error(f"Failed to add user to team chat: {str(e)}")
+
+@receiver(post_delete, sender=TeamMembership)
+def remove_user_from_team_chat(sender, instance, **kwargs):
+    """Auto-remove user from chat when they leave a Team."""
+    try:
+        team = instance.team
+        user = instance.user
+        
+        room = ChatRoom.objects.filter(
+            room_type=ChatRoom.RoomType.TEAM, 
+            team=team
+        ).first()
+        
+        if room:
+            from .services import ChatRoomService
+            ChatRoomService.remove_participant(room, user)
+    except Exception as e:
+        logger.error(f"Failed to remove user from team chat: {str(e)}")
 @receiver(post_save, sender=Project)
 def create_project_chat_room(sender, instance, created, **kwargs):
     """

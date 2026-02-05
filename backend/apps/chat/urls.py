@@ -28,6 +28,7 @@ from .views import (
     OnlineUsersView,
     UnreadCountView,
     UserListView,
+    SendMessageView
 )
 
 urlpatterns = [
@@ -162,5 +163,10 @@ urlpatterns = [
         'unread/',
         UnreadCountView.as_view(),
         name='chat-unread-counts'
+    ),
+    path(
+        'rooms/<uuid:room_id>/send/',
+        SendMessageView.as_view(),
+        name='chat-room-send-message'
     ),
 ]

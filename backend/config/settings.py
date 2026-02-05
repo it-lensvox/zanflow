@@ -51,6 +51,7 @@ LOCAL_APPS = [
     "apps.api_testing",
     "apps.notification",
     "apps.chat",
+    "apps.teams",
     
 ]
 
@@ -155,7 +156,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # CORS
 CORS_ALLOWED_ORIGINS = config(
     "CORS_ALLOWED_ORIGINS",
-    default="http://localhost:5173,http://127.0.0.1:5173,http://192.168.1.121:5173,http://192.168.1.12:5173,http://192.168.1.6:5173,ws://192.168.1.11:8000"
+    default="http://localhost:5173,http://127.0.0.1:5173,http://192.168.1.121:5173,http://192.168.1.12:5173,http://192.168.1.6:5173,ws://192.168.1.18:8000"
 ).split(",")
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = config("CORS_ALLOW_ALL", default=True, cast=bool)  # For development

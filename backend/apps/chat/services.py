@@ -18,7 +18,9 @@ from django.db.models import Q, Max, Count, Subquery, OuterRef, Exists
 from django.utils import timezone
 
 from .models import ChatRoom, ChatMessage, ChatRoomMembership, MessageReadStatus
-
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+from .utils import fetch_link_preview
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
@@ -92,7 +94,32 @@ class ChatRoomService:
             ChatRoomService.add_participant(room, created_by)
         
         return room
-
+    @staticmethod
+    @transaction.atomic
+    def create_team_room(team, created_by) -> ChatRoom:
+        """
+        Create or get a team-specific chat room.
+        """
+        room, created = ChatRoom.objects.get_or_create(
+            room_type=ChatRoom.RoomType.TEAM,
+            team=team,
+            defaults={
+                'name': f"{team.name} Chat",
+                'created_by': created_by,
+                'slug': f"team-{team.id}",
+            }
+        )
+        
+        if created:
+            # Auto-add existing team members
+            if hasattr(team, 'members'):
+                for member in team.members.all():
+                    ChatRoomService.add_participant(room, member.user)
+            
+            # Always add the creator
+            ChatRoomService.add_participant(room, created_by, 'admin')
+        
+        return room
     @staticmethod
     @transaction.atomic
     def get_or_create_private_room(user1, user2) -> Tuple[ChatRoom, bool]:
@@ -285,20 +312,19 @@ class ChatMessageService:
         reply_to_id: Optional[UUID] = None
     ) -> ChatMessage:
         """
-        Create a new chat message.
-        
-        Args:
-            room: ChatRoom instance
-            sender: User sending the message
-            content: Message text content
-            message_type: Type of message (text, image, file, system)
-            attachment: Optional file attachment
-            attachment_name: Original filename
-            reply_to_id: UUID of message being replied to
-            
-        Returns:
-            Created ChatMessage instance
+        Create a new chat message and broadcast it via WebSocket.
         """
+        metadata = {}
+
+        # LOGIC: If it's a link, fetch preview data
+        if message_type == 'link':
+            # content should be the URL
+            metadata = fetch_link_preview(content)
+        
+        # LOGIC: If text message contains a URL (optional auto-detection)
+        elif message_type == 'text' and content.startswith('http'):
+            # You could auto-convert text to link here if you wanted
+            pass
         message = ChatMessage.objects.create(
             room=room,
             sender=sender,
@@ -306,16 +332,31 @@ class ChatMessageService:
             message_type=message_type,
             attachment=attachment,
             attachment_name=attachment_name,
-            reply_to_id=reply_to_id
+            reply_to_id=reply_to_id,
+            metadata=metadata
         )
         
-        # Update room's updated_at timestamp
+        # 2. Update room's updated_at timestamp
         room.updated_at = timezone.now()
         room.save(update_fields=['updated_at'])
         
+        # 3. Broadcast to WebSocket Group (Real-time update)
+        # We do this AFTER creation so the S3 URL is generated
+        channel_layer = get_channel_layer()
+        if channel_layer:
+            from .serializers import ChatMessageSerializer
+            serialized_data = ChatMessageSerializer(message).data
+            async_to_sync(channel_layer.group_send)(
+            room.channel_group_name,
+            {
+                'type': 'chat_message',
+                'message': serialized_data 
+            }
+        )
+        
         logger.debug(f"Message created in room {room.id} by user {sender.id}")
         
-        # Trigger notification (async)
+        # 4. Trigger notification (async)
         ChatMessageService._send_notification(message)
         
         return message

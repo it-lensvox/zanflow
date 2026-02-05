@@ -28,6 +28,7 @@ from apps.notification.services import (
     notify_project_member_added,
     notify_project_updated,
 )
+from rest_framework.exceptions import PermissionDenied
 
 
 class ProjectFilter(filters.FilterSet):
@@ -186,6 +187,11 @@ class ProjectViewSet(viewsets.ModelViewSet):
             )
         # ====================================================================
     def perform_destroy(self, instance):
+        # Check if the requesting user is the creator of the project
+        if instance.created_by != self.request.user:
+            raise PermissionDenied("You do not have permission to delete this project. Only the creator can delete it.")
+
+        # If the check passes, proceed with logging and deletion
         log_action(instance, "delete", old_value=ProjectSerializer(instance).data)
         instance.delete()
 

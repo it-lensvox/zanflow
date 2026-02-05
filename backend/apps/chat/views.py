@@ -13,7 +13,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from drf_spectacular.utils import extend_schema, OpenApiParameter
-
+from rest_framework.parsers import MultiPartParser, FormParser
 from .models import ChatRoom, ChatMessage, ChatRoomMembership
 from .serializers import (
     ChatRoomListSerializer,
@@ -24,6 +24,7 @@ from .serializers import (
     AddParticipantSerializer,
     RoomSettingsSerializer,
     MessageSearchSerializer,
+    ChatMessageCreateSerializer
 )
 from .services import ChatRoomService, ChatMessageService, ChatPermissionService
 
@@ -107,7 +108,85 @@ class ChatRoomListView(APIView):
         )
         
         return Response(serializer.data)
+class SendMessageView(APIView):
+    """
+    Send a message with optional file attachment.
+    
+    POST /api/v1/chat/rooms/<room_id>/send/
+    Headers: Content-Type: multipart/form-data
+    Form Fields:
+        - content: Text message (optional if file exists)
+        - attachment: File object (optional)
+        - reply_to: UUID (optional)
+    """
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]  # Required for handling files
 
+    @extend_schema(
+        summary="Send message (Text or File)",
+        request=ChatMessageCreateSerializer,
+        responses={201: ChatMessageSerializer}
+    )
+    def post(self, request, room_id):
+        room = get_object_or_404(ChatRoom, id=room_id, is_active=True)
+        
+        # Check permissions
+        if not ChatPermissionService.can_send_message(request.user, room):
+            return Response(
+                {'error': 'You do not have permission to send messages in this room'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Validate basic data
+        serializer = ChatMessageCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        # Extract file data
+        attachment = request.FILES.get('attachment')
+        
+        # Determine message type
+        message_type = 'text'
+        attachment_name = ''
+        
+        if attachment:
+            message_type = 'file'
+            attachment_name = attachment.name
+            # Basic validation check for images vs generic files
+            if attachment.content_type.startswith('image/'):
+                message_type = 'image'
+
+        # Ensure we have either text or a file
+        content = serializer.validated_data.get('content', '').strip()
+        if not content and not attachment:
+             return Response(
+                {'error': 'Message must contain either text or a file'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Service handles creation + S3 upload + WebSocket broadcast
+            message = ChatMessageService.create_message(
+                room=room,
+                sender=request.user,
+                content=content,
+                message_type=message_type,
+                attachment=attachment,
+                attachment_name=attachment_name,
+                reply_to_id=serializer.validated_data.get('reply_to')
+            )
+            
+            response_serializer = ChatMessageSerializer(
+                message, 
+                context={'request': request}
+            )
+            return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            logger.error(f"Failed to send message: {str(e)}")
+            return Response(
+                {'error': 'Failed to send message'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 class ChatRoomDetailView(APIView):
     """

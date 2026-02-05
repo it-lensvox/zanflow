@@ -6,7 +6,8 @@ from django.conf import settings
 from django.db import models
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 
 class Notification(models.Model):
     """
@@ -156,3 +157,17 @@ class NotificationPreference(models.Model):
     
     def __str__(self):
         return f"Notification preferences for {self.user.username}"
+    
+    @receiver(post_delete)
+    def delete_related_notifications(sender, instance, **kwargs):
+        """
+        Automatically delete notifications when the related object (Task, Project, etc.) is deleted.
+        """
+        # Get the ContentType for the model being deleted
+        content_type = ContentType.objects.get_for_model(instance)
+        
+        # Filter and delete all notifications pointing to this specific object
+        Notification.objects.filter(
+            content_type=content_type,
+            object_id=instance.pk
+        ).delete()

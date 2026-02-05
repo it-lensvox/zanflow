@@ -170,20 +170,18 @@ class TaskRetrieveUpdateView(APIView):
             "message": "Task deleted successfully"
         }, status=status.HTTP_204_NO_CONTENT)
     def delete(self, request, task_id): 
-        # 1. Get the task or return 404 if not found
         task = get_object_or_404(Task, id=task_id)
 
-        # 2. Permission Check: Allow if user is a Manager OR an Admin (superuser)
-        if not (request.user.is_manager or request.user.is_superuser):
+        # STRICT CHECK: Only the user who created the task (assigned_by) can delete it.
+        # Note: If you want Superusers to also be able to delete, use:
+        # if task.assigned_by != request.user and not request.user.is_superuser:
+        if task.assigned_by != request.user:
              return Response(
-                {"detail": "You do not have permission to delete tasks."},
+                {"detail": "You do not have permission to delete this task. Only the creator can delete it."},
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        # 3. Delete the task
         task.delete()
-        
-        # 4. Return success response (204 No Content is standard for deletes)
         return Response({
             "message": "Task deleted successfully"
         }, status=status.HTTP_204_NO_CONTENT)
