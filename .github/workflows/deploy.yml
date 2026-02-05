@@ -19,15 +19,32 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           command_timeout: 30m
           script: |
+            set -e
+            
             cd ${{ secrets.APP_DIR }}
             
-            # Pull latest code
+            echo "📥 Pulling latest code..."
             git fetch origin
             git checkout ${{ github.ref_name }}
             git pull origin ${{ github.ref_name }}
             
-            # Rebuild and deploy (keep existing .env files)
+            echo "🔧 Replacing localhost URLs with production URLs..."
+            sed -i 's|VITE_API_URL=http://localhost:8000/api/v1|VITE_API_URL=https://zanflow.lensvox.com/api/v1|g' docker-compose.yml
+            sed -i 's|VITE_API_BASE_URL=http://localhost:8000|VITE_API_BASE_URL=https://zanflow.lensvox.com|g' docker-compose.yml
+            
+            echo "🔍 Validating docker-compose.yml..."
+            sudo docker-compose config > /dev/null
+            
+            echo "🛑 Stopping old containers..."
             sudo docker-compose down
+            
+            echo "🚀 Building and starting..."
             sudo docker-compose up --build -d
+            
+            echo "⏳ Waiting for services..."
+            sleep 15
+            
+            echo "📊 Container status:"
+            sudo docker-compose ps
             
             echo "✅ Deployment completed!"
