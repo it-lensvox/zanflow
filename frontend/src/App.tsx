@@ -9,24 +9,6 @@ import { projectsApi } from '@/services/api';
 import { TaskDetails } from '@/pages/TaskType/TaskDetails';
 import { APITesting } from '@/pages/TaskType/APITesting';
 import {
-  Dashboard,
-  Login,
-  Projects,
-  ProjectCreate,
-  DocumentCreate,
-  DocumentDetail,
-  Documents,
-  ProjectSettings,
-  UserManagement,
-  MyTask,
-  CreateTask,
-  TeamPerformance,
-  Calendar,
-  NotificationsPage,
-  Profile,
-  ResetPassword,
-  TeamChatModern,
-  CreateTeam,
   Dashboard, Login, Projects, ProjectCreate, DocumentCreate, DocumentDetail, Documents, ProjectSettings,
   Teams, UserManagement, MyTask, CreateTask, TeamPerformance, Calendar, NotificationsPage, Profile, ResetPassword, TeamChatModern,
 } from '@/pages';
