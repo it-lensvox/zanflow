@@ -397,7 +397,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     {
       key: 'type',
       label: 'Type',
-      width: '80px',
+      width: '110px',
       render: (task: Task) => (
         <div className="flex items-center gap-1.5">
           <CheckSquare className="w-4 h-4 text-blue-600" />
@@ -432,7 +432,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     {
       key: 'assigned_to',
       label: 'Assignee',
-      width: '120px',
+      width: '140px',
       render: (task: Task) => (
         <div className="flex -space-x-1.5">
           {task.assigned_to_user_details.slice(0, 3).map((u) => (
@@ -464,7 +464,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     {
       key: 'labels',
       label: 'Labels',
-      width: '150px',
+      width: '120px',
       render: (task: Task) => (
         <div className="flex flex-wrap gap-1.5 items-center h-full min-h-[24px]" onClick={(e) => e.stopPropagation()}>
           {task.labels && task.labels.length > 0 ? (
@@ -486,13 +486,13 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     {
       key: 'end_date',
       label: 'Due Date',
-      width: '120px',
+      width: '140px',
       render: (task: Task) => <DateInput task={task} field="end_date" />,
     },
     {
       key: 'duration',
       label: 'Duration',
-      width: '110px',
+      width: '140px',
       render: (task: Task) => (
         <input
           type="text"

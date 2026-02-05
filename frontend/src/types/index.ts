@@ -690,19 +690,21 @@ export interface ChatRoomMembership {
 export interface ChatRoom {
   id: string;
   name: string;
-  room_type: 'private' | 'group';
+  room_type: 'private' | 'group' | 'project' | 'team';
   slug: string;
   project: number | null;
-  participants: ChatUserMinimal[];
-  created_by: ChatUserMinimal;
-  memberships: ChatRoomMembership[];
+  participants?: ChatUserMinimal[];
+  participant_count?: number;
+  created_by?: ChatUserMinimal;
+  memberships?: ChatRoomMembership[];
   current_user_membership?: ChatRoomMembership;
+  last_message?: string | null;
+  unread_count?: number;
+  is_member?: boolean;
   created_at: string;
   updated_at: string;
   is_active: boolean;
 }
-
-
 
 export interface ChatMessage {
   id: string | number;
@@ -726,6 +728,38 @@ export interface ChatRoomMessagesResponse {
   messages: ChatMessage[];
   count: number;
   has_more: boolean;
+}
+
+//Team Chat Project Render list
+export interface ProjectChatRoom {
+  id: string;
+  name: string;
+  room_type: 'project';
+  slug: string;
+  project: number;
+  participant_count: number;
+  last_message: string | null;
+  unread_count: number;
+  is_member: boolean;
+  created_at: string;
+  updated_at: string;
+  is_active: boolean;
+}
+
+//Team and Channels Render list
+export interface TeamChatRoom {
+  id: string;
+  name: string;
+  room_type: 'team';
+  slug: string;
+  project: null;
+  participant_count: number;
+  last_message: string | null;
+  unread_count: number;
+  is_member: boolean;
+  created_at: string;
+  updated_at: string;
+  is_active: boolean;
 }
 
 // Payload for creating a private room
