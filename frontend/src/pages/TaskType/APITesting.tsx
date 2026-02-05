@@ -12,7 +12,8 @@ import type {
   APICollection, APIEndpoint, AuthCredential, ExecutionRun,
   CreateCollectionPayload, CreateEndpointPayload, CreateCredentialPayload
 } from '@/types';
-import './ApiTesting.scss';
+//import './ApiTesting.scss';
+import './APITesting.scss';
 
 // HTTP Method colors
 const METHOD_COLORS: Record<string, string> = {
