@@ -144,7 +144,7 @@ export const DateFilter: React.FC<DateFilterProps> = ({
 
 export interface FilterHeaderWrapperProps {
     children: React.ReactNode;
-    columnLabel: string;
+    columnLabel: React.ReactNode;
     filterType: 'search' | 'list' | 'date' | 'none';
     isActive: boolean;
     filterContent?: React.ReactNode;
@@ -164,7 +164,9 @@ export const FilterHeaderWrapper: React.FC<FilterHeaderWrapperProps> = ({
                     {children}
                 </div>
             )}
-            <span className="truncate">{columnLabel}</span>
+            <span className="truncate text-[14px] font-bold tracking-wide text-gray-700">
+                {columnLabel}
+            </span>
             {(filterType === 'list' || filterType === 'date') && isActive && filterContent}
         </div>
     );

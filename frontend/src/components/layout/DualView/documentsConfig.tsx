@@ -140,7 +140,7 @@ export const createDocumentsTableColumns = ({ onDeleteClick }: DocumentTableColu
   return [
     {
       key: 'name',
-      label: 'Document',
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Document</span>,
       // width: '350px',  // Added width
       render: (doc: Document) => (
         <div className="flex items-center justify-between w-full group/cell">
@@ -165,7 +165,7 @@ export const createDocumentsTableColumns = ({ onDeleteClick }: DocumentTableColu
     },
     {
       key: 'project',
-      label: 'Project',
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Project</span>,
       width: '180px',  // Added width
       render: (doc: Document) => (
         <span className="text-[12px] text-gray-700 font-medium">
@@ -175,7 +175,7 @@ export const createDocumentsTableColumns = ({ onDeleteClick }: DocumentTableColu
     },
     {
       key: 'file_type',
-      label: 'Type',
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Type</span>,
       width: '120px',
       render: (doc: Document) => (
         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600 uppercase border border-gray-200">
@@ -185,13 +185,13 @@ export const createDocumentsTableColumns = ({ onDeleteClick }: DocumentTableColu
     },
     {
       key: 'status',
-      label: 'Status',
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Status</span>,
       width: '120px',  // Reduced from 140px
       render: (doc: Document) => <StatusDropdown doc={doc} />,
     },
     {
       key: 'created_by',
-      label: 'Uploaded By',
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Uploaded By</span>,
       width: '180px',  // Added width
       render: (doc: Document) => (
         <div className="flex items-center gap-2">
@@ -245,7 +245,7 @@ export function DocumentGridCard({ document: doc, onDeleteClick }: DocumentGridC
       <div className="flex justify-between items-start gap-2 mb-3">
         <div className="pr-2 flex flex-col">
           {/* Project Name */}
-          <span className="text-sm font-bold text-gray-900 line-clamp-1 mb-0.5" title={doc.project_name}>
+          <span className="text-sm font-bold text-gray-700 line-clamp-1 mb-0.5" title={doc.project_name}>
             {doc.project_name || 'General'}
           </span>
           {/* Document Name */}

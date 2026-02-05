@@ -150,7 +150,7 @@ export function TaskGridCard({ task, onTaskClick }: TaskGridCardProps) {
       <div className="flex justify-between items-start gap-2 mb-3">
         <div className="pr-2 flex flex-col">
           {/* Project Name */}
-          <span className="text-sm font-bold text-gray-900 line-clamp-1 mb-0.5" title={task.project_details?.name || task.project_name || undefined}>
+          <span className="text-sm font-bold text-gray-700 line-clamp-1 mb-0.5" title={task.project_details?.name || task.project_name || undefined}>
             {task.project_details?.name || task.project_name || 'No Project'}
           </span>
           {/* Task Heading */}
@@ -394,123 +394,124 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
   };
 
   return [
-    {
-      key: 'type',
-      label: 'Type',
-      width: '80px',
-      render: (task: Task) => (
-        <div className="flex items-center gap-1.5">
-          <CheckSquare className="w-4 h-4 text-blue-600" />
-        </div>
-      ),
-    },
-    {
-      key: 'project',
-      label: 'Project',
+  {
+    key: 'type',
+    label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Type</span>,
+    width: '8%', 
+    render: (task: Task) => (
+      <div className="flex items-center gap-1.5">
+        <CheckSquare className="w-4 h-4 text-blue-600" />
+      </div>
+    ),
+  },
+  {
+    key: 'project',
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Project</span>,
       width: '150px',
-      render: (task: Task) => (
+    render: (task: Task) => (
         <span className="text-[12px] text-gray-700 font-medium">
-          {task.project_details?.name || task.project_name || 'No Project'}
-        </span>
-      ),
-    },
-    {
-      key: 'heading',
-      label: 'Task Title',
-      render: (task: Task) => (
+        {task.project_details?.name || task.project_name || 'No Project'}
+      </span>
+    ),
+  },
+  {
+    key: 'heading',
+    label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Task Title</span>,
+    width: '25%', 
+    render: (task: Task) => (
         <span className="font-medium text-[#172b4d] truncate block max-w-[300px]" title={task.heading}>
-          {task.heading}
-        </span>
-      ),
-    },
-    {
-      key: 'status',
-      label: 'Status',
-      width: '140px',
-      render: (task: Task) => <StatusDropdown task={task} />,
-    },
-    {
-      key: 'assigned_to',
-      label: 'Assignee',
-      width: '120px',
-      render: (task: Task) => (
-        <div className="flex -space-x-1.5">
-          {task.assigned_to_user_details.slice(0, 3).map((u) => (
-            <div
-              key={u.id}
-              className="w-6 h-6 rounded-full bg-[#8d87b5] text-white flex items-center justify-center text-[10px] font-semibold ring-1 ring-white"
-              title={`${u.first_name} ${u.last_name}`}
-            >
-              {u.first_name[0]}{u.last_name[0]}
-            </div>
-          ))}
-          {task.assigned_to_user_details.length > 3 && (
+        {task.heading}
+      </span>
+    ),
+  },
+  {
+    key: 'status',
+    label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Status</span>,
+    width: '10%',
+    render: (task: Task) => <StatusDropdown task={task} />,
+  },
+  {
+    key: 'assigned_to',
+    label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Assignee</span>,
+    width: '10%',
+    render: (task: Task) => (
+      <div className="flex -space-x-1.5">
+        {task.assigned_to_user_details.slice(0, 3).map((u) => (
+          <div
+            key={u.id}
+            className="w-6 h-6 rounded-full bg-[#8d87b5] text-white flex items-center justify-center text-[10px] font-semibold ring-1 ring-white"
+            title={`${u.first_name} ${u.last_name}`}
+          >
+            {u.first_name[0]}{u.last_name[0]}
+          </div>
+        ))}
+        {task.assigned_to_user_details.length > 3 && (
             <div
               className="w-6 h-6 rounded-full bg-gray-400 text-white flex items-center justify-center text-[10px] font-semibold ring-1 ring-white"
               title={`+${task.assigned_to_user_details.length - 3} more`}
             >
-              +{task.assigned_to_user_details.length - 3}
-            </div>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: 'priority',
-      label: 'Priority',
-      width: '120px',
-      render: (task: Task) => <PriorityDropdown task={task} />,
-    },
-    {
-      key: 'labels',
-      label: 'Labels',
-      width: '150px',
-      render: (task: Task) => (
-        <div className="flex flex-wrap gap-1.5 items-center h-full min-h-[24px]" onClick={(e) => e.stopPropagation()}>
-          {task.labels && task.labels.length > 0 ? (
-            task.labels.map((label) => (
-              <span
-                key={label.id}
+            +{task.assigned_to_user_details.length - 3}
+          </div>
+        )}
+      </div>
+    ),
+  },
+  {
+    key: 'priority',
+    label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Priority</span>,
+    width: '10%',
+    render: (task: Task) => <PriorityDropdown task={task} />,
+  },
+  {
+    key: 'labels',
+    label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Labels</span>,
+    width: '10%',
+    render: (task: Task) => (
+      <div className="flex flex-wrap gap-1.5 items-center h-full min-h-[24px]" onClick={(e) => e.stopPropagation()}>
+        {task.labels && task.labels.length > 0 ? (
+          task.labels.map((label) => (
+            <span
+              key={label.id}
                 className="px-2 py-0.5 rounded text-[10px] font-bold text-white shadow-sm whitespace-nowrap"
-                style={{ backgroundColor: label.color || '#3b82f6' }}
-              >
-                {label.name}
-              </span>
-            ))
-          ) : (
-            <span className="text-gray-300 text-[11px] pl-1">—</span>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: 'end_date',
-      label: 'Due Date',
-      width: '120px',
-      render: (task: Task) => <DateInput task={task} field="end_date" />,
-    },
-    {
-      key: 'duration',
-      label: 'Duration',
-      width: '110px',
-      render: (task: Task) => (
-        <input
-          type="text"
-          defaultValue={(task as any).duration_time || (task as any).duration || ''}
-          placeholder="—"
-          onBlur={async (e) => {
-            const val = e.target.value;
-            try {
-              await taskApi.update(task.id, { duration_time: val } as any);
-              queryClient.invalidateQueries({ queryKey: ['tasks'] });
-            } catch (err) {
-              console.error('Failed to update duration:', err);
-            }
-          }}
-          onClick={(e) => e.stopPropagation()}
-          className="w-full bg-transparent border-none text-[12px] focus:ring-1 focus:ring-blue-400 rounded px-1 py-0.5 placeholder-gray-300"
-        />
-      ),
-    },
-  ];
+              style={{ backgroundColor: label.color || '#3b82f6' }}
+            >
+              {label.name}
+            </span>
+          ))
+        ) : (
+          <span className="text-gray-300 text-[11px] pl-1">—</span>
+        )}
+      </div>
+    ),
+  },
+  {
+    key: 'end_date',
+    label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Due Date</span>,
+    width: '10%',
+    render: (task: Task) => <DateInput task={task} field="end_date" />,
+  },
+  {
+    key: 'duration',
+    label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Duration</span>,
+    width: '15%',
+    render: (task: Task) => (
+      <input
+        type="text"
+        defaultValue={(task as any).duration_time || (task as any).duration || ''}
+        placeholder="—"
+        onBlur={async (e) => {
+          const val = e.target.value;
+          try {
+            await taskApi.update(task.id, { duration_time: val } as any);
+            queryClient.invalidateQueries({ queryKey: ['tasks'] });
+          } catch (err) {
+            console.error('Failed to update duration:', err);
+          }
+        }}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full bg-transparent border-none text-[12px] focus:ring-1 focus:ring-blue-400 rounded px-1 py-0.5 placeholder-gray-300"
+      />
+    ),
+  },
+];
 };

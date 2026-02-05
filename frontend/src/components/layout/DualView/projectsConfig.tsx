@@ -98,30 +98,30 @@ export const getProjectsTableColumns = (
     },
     {
       key: 'document_count',
-      label: 'Documents',
-      width: '120px',
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Documents</span>,
+      width: '15%',
       render: (project: any) => (
         <span className="text-gray-700 font-medium text-[13px]">{project.document_count || 0} docs</span>
       ),
     },
     {
       key: 'members',
-      label: 'Members',
-      width: '120px',
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Members</span>,
+      width: '15%',
       render: (project: Project) => <ProjectMembersList project={project} />,
     },
     {
       key: 'updated_at',
-      label: 'Updated',
-      width: '150px',
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Updated</span>,
+      width: '12%',
       render: (project: any) => (
         <span className="text-gray-500 text-[13px]">{formatRelativeTime(project.updated_at)}</span>
       ),
     },
     {
       key: 'favorite',
-      label: 'Favorite',
-      width: '80px',
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Favorite</span>,
+      width: '6%',
       className: 'text-center',
       render: (project: any) => (
         <button
@@ -158,7 +158,7 @@ export function ProjectGridCard({ project, onToggleFavorite }: ProjectGridCardPr
               {project.name?.slice(0, 1)?.toUpperCase()}
             </div>
             <div className="flex flex-col">
-              <span className="text-sm font-bold text-gray-900 line-clamp-1">{project.name}</span>
+              <span className="text-sm font-bold text-gray-700 line-clamp-1">{project.name}</span>
               <span className="text-xs font-medium text-gray-500">
                 {formatRelativeTime(project.updated_at)}
               </span>
