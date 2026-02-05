@@ -78,7 +78,7 @@ export function Sidebar() {
   const [isProjectsOpen, setIsProjectsOpen] = useState(location.pathname.startsWith('/projects'));
   const [isTasksOpen, setIsTasksOpen] = useState(location.pathname.startsWith('/taskboard'));
   const [isAdminOpen, setIsAdminOpen] = useState(location.pathname.startsWith('/admin'));
-  const [isCreateTeamOpen, setIsCreateTeamOpen] = useState(false);
+  const [isTeamsOpen, setIsTeamsOpen] = useState(location.pathname.startsWith('/admin/teams'));
   const showAdmin = user?.role && ADMIN_ROLES.includes(user.role);
   const { data: projectsData } = useQuery({
     queryKey: ['projects'],
@@ -273,12 +273,12 @@ export function Sidebar() {
         {showAdmin && (
           <div className="space-y-1">
             <div
-              onClick={() => setIsAdminOpen(!isAdminOpen)}
-              className={cn('flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium cursor-pointer transition-colors',
+              className={cn('flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors cursor-pointer',
                 location.pathname.startsWith('/admin') ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-accent',
                 !isExpanded && "justify-center px-0")}
+              onClick={() => setIsAdminOpen(!isAdminOpen)}
             >
-              <Crown className="h-5 w-5 shrink-0" />
+              <Users className="h-5 w-5 shrink-0" />
               {isExpanded && (
                 <>
                   <span className="flex-1">Team Management</span>
@@ -286,85 +286,48 @@ export function Sidebar() {
                 </>
               )}
             </div>
+
             {isExpanded && isAdminOpen && (
               <div className="ml-4 border-l pl-2 space-y-1 animate-in slide-in-from-left-2">
-                {/* Create Team Accordion */}
+                {/* Teams Sub-Accordion */}
                 <div className="space-y-1">
                   <div
-                    className={cn(
-                      "flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs transition-colors cursor-pointer",
-                      location.pathname.startsWith('/admin/create-team') || location.pathname.startsWith('/admin/teams')
-                        ? "bg-primary/10 text-primary font-medium"
-                        : "text-muted-foreground hover:text-primary"
-                    )}
-                    onClick={() => {
-                      navigate('/admin/create-team');
-                      setIsCreateTeamOpen(true);
-                    }}
+                    className={cn("flex items-center justify-between rounded-lg px-3 py-1.5 text-xs font-medium cursor-pointer hover:bg-accent",
+                      location.pathname === '/admin/teams' ? "text-primary" : "text-muted-foreground")}
+                    onClick={() => navigate('/admin/teams')}
                   >
-                    <UserPlus className="h-3.5 w-3.5" />
-                    <span className="flex-1">Create Team</span>
-                    <div
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsCreateTeamOpen(!isCreateTeamOpen);
-                      }}
-                    >
-                      {isCreateTeamOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                    <div className="flex items-center gap-2">
+                      <Users className="h-3.5 w-3.5" /> Teams
+                    </div>
+                    <div onClick={(e) => { e.stopPropagation(); setIsTeamsOpen(!isTeamsOpen); }}>
+                      {isTeamsOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                     </div>
                   </div>
 
-                  {/* Teams inside Create Team */}
-                  {isCreateTeamOpen && teams.length > 0 && (
-                    <div className="ml-4 border-l pl-2 space-y-1 animate-in slide-in-from-left-2">
-                      {teams.map((team: any) => (
-                        <NavLink
-                          key={team.id}
-                          to={`/admin/teams/${team.id}`}
-                          className={({ isActive }) =>
-                            cn('flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors',
-                              isActive ? 'bg-primary/10 text-primary font-semibold' : 'text-muted-foreground hover:text-primary')
-                          }
-                        >
-                          <div 
-                            className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] text-white font-bold uppercase"
-                            style={{ backgroundColor: team.color || '#6366f1' }}
-                          >
-                            {team.name.charAt(0)}
-                          </div>
-                          <span className="truncate">{team.name}</span>
-                        </NavLink>
-                      ))}
+                  {isTeamsOpen && teams.filter((t: any) => t.is_favourite).map((team: any) => (
+                    <div
+                      key={team.id}
+                      className="ml-6 flex items-center gap-2 rounded-lg px-3 py-1 text-[11px] text-muted-foreground hover:text-primary cursor-pointer"
+                      onClick={() => navigate('/admin/teams')}
+                    >
+                      <div className="h-2 w-2 rounded-full" style={{ backgroundColor: team.color || '#6366f1' }} />
+                      <span className="truncate">{team.name}</span>
                     </div>
-                  )}
+                  ))}
                 </div>
 
-                {/* Roles */}
                 <NavLink
                   to="/admin/user-roles"
-                  className={({ isActive }) =>
-                    cn(
-                      "flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs transition-colors",
-                      isActive
-                        ? "bg-primary/10 text-primary font-medium"
-                        : "text-muted-foreground hover:text-primary"
-                    )
-                  }
+                  className={({ isActive }) => cn("flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs transition-colors",
+                    isActive ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-primary")}
                 >
-                  <Users className="h-3.5 w-3.5" /> Roles
+                  <UserPlus className="h-3.5 w-3.5" /> Roles
                 </NavLink>
 
-                {/* Performance */}
                 <NavLink
                   to="/admin/team-performance"
-                  className={({ isActive }) =>
-                    cn(
-                      "flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs transition-colors",
-                      isActive
-                        ? "bg-primary/10 text-primary font-medium"
-                        : "text-muted-foreground hover:text-primary"
-                    )
-                  }
+                  className={({ isActive }) => cn("flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs transition-colors",
+                    isActive ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-primary")}
                 >
                   <TrendingUp className="h-3.5 w-3.5" /> Performance
                 </NavLink>

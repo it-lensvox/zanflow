@@ -6,7 +6,7 @@ export { DocumentCreate } from './Documents/DocumentCreate';
 export { DocumentDetail } from './Documents/DocumentDetail';
 export { MyTask } from './MyTask/MyTask';
 export { CreateTask } from './MyTask/CreateTask'
-export { CreateTeam } from './TeamManagement/CreateTeam';
+export { Teams } from './TeamManagement/Teams';
 export { UserManagement } from './TeamManagement/UserManagement'
 export { TeamPerformance } from './TeamManagement/TeamPerformance';
 export { TaskDetails } from './TaskType/TaskDetails'
