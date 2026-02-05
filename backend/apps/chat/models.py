@@ -24,6 +24,7 @@ class ChatRoom(models.Model):
         GLOBAL = 'global', 'Global Chat'
         PROJECT = 'project', 'Project Chat'
         PRIVATE = 'private', 'Private Chat'
+        TEAM = 'team', 'Team Chat'
     
     id = models.UUIDField(
         primary_key=True,
@@ -40,6 +41,14 @@ class ChatRoom(models.Model):
         choices=RoomType.choices,
         default=RoomType.PRIVATE,
         db_index=True
+    )
+    team = models.ForeignKey(
+        'teams.Team',  # Replace with the actual path to your Team model
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='chat_rooms',
+        help_text="Associated team for team-type rooms"
     )
     
     # For project-based rooms - links to existing Project model
@@ -92,6 +101,8 @@ class ChatRoom(models.Model):
             return f"Global: {self.name}"
         elif self.room_type == self.RoomType.PROJECT:
             return f"Project: {self.project.name if self.project else 'Unknown'}"
+        elif self.room_type == self.RoomType.TEAM:  # <--- Add this check
+            return f"Team: {self.team.name if self.team else 'Unknown'}"
         return f"Private: {self.name}"
 
     def save(self, *args, **kwargs):
@@ -189,6 +200,7 @@ class ChatMessage(models.Model):
         IMAGE = 'image', 'Image'
         FILE = 'file', 'File Attachment'
         SYSTEM = 'system', 'System Message'
+        LINK = 'link', 'Link'
     
     id = models.UUIDField(
         primary_key=True,
@@ -229,7 +241,11 @@ class ChatMessage(models.Model):
         blank=True,
         help_text="Original filename of attachment"
     )
-    
+    metadata = models.JSONField(
+        default=dict, 
+        blank=True, 
+        help_text="Stores link preview data or file metadata"
+    )
     # Reply functionality
     reply_to = models.ForeignKey(
         'self',

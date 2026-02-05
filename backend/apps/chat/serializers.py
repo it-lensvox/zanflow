@@ -8,7 +8,8 @@ Provides serialization for:
 """
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-
+import boto3
+from django.conf import settings
 from .models import ChatRoom, ChatMessage, ChatRoomMembership, MessageReadStatus
 
 User = get_user_model()
@@ -52,12 +53,13 @@ class ChatMessageSerializer(serializers.ModelSerializer):
     sender = UserMinimalSerializer(read_only=True)
     reply_to_preview = serializers.SerializerMethodField()
     is_own_message = serializers.SerializerMethodField()
+    attachment = serializers.SerializerMethodField()
     
     class Meta:
         model = ChatMessage
         fields = [
             'id', 'room', 'sender', 'message_type', 'content',
-            'attachment', 'attachment_name', 'reply_to', 'reply_to_preview',
+            'attachment', 'attachment_name', 'metadata','reply_to', 'reply_to_preview',
             'created_at', 'updated_at', 'is_deleted', 'is_own_message'
         ]
         read_only_fields = [
@@ -82,7 +84,46 @@ class ChatMessageSerializer(serializers.ModelSerializer):
         if request and request.user.is_authenticated:
             return obj.sender_id == request.user.id
         return False
+    def get_attachment(self, obj):
+        """
+        Generate a Presigned URL for S3 files.
+        This allows secure access to private S3 objects.
+        """
+        if not obj.attachment:
+            return None
 
+        # Check if we are using S3
+        if hasattr(settings, 'USE_S3') and settings.USE_S3:
+            try:
+                s3_client = boto3.client(
+                    's3',
+                    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+                    region_name=settings.AWS_S3_REGION_NAME
+                )
+                
+                # Generate the signed URL
+                url = s3_client.generate_presigned_url(
+                    'get_object',
+                    Params={
+                        'Bucket': settings.AWS_STORAGE_BUCKET_NAME,
+                        'Key': obj.attachment.name,
+                        'ResponseContentDisposition': 'inline', # Helps images display in browser
+                        'ResponseContentType': 'application/octet-stream' # Default fallback
+                    },
+                    ExpiresIn=3600  # Link expires in 1 hour
+                )
+                return url
+            except Exception as e:
+                # Log the error and fall back to the default URL if signing fails
+                print(f"Error signing S3 URL: {e}")
+                return obj.attachment.url
+
+        # Fallback for local development (SQLite/Local files)
+        if hasattr(obj.attachment, 'url'):
+            return obj.attachment.url
+            
+        return None
 
 class ChatMessageCreateSerializer(serializers.ModelSerializer):
     """
