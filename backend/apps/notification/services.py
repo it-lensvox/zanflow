@@ -225,31 +225,21 @@ def bulk_create_notifications(
 
 def _get_task_involved_users(task) -> List[User]:
     """
-    Get ALL users who are actually involved with a task.
-    
-    Involved means:
-      1. Users directly assigned to the task  (assigned_to)
-      2. The user who created/assigned the task (assigned_by)
-      3. If task belongs to a project → all members of THAT project only
-    
-    This NEVER fetches all admins/managers globally.
-    A manager only gets notified if they are a member of the task's project
-    or are directly assigned to the task.
+    Get ONLY the users directly involved with a specific task.
+    Modified: No longer notifies all project members by default.
     """
     recipients = []
     
-    # 1. Users assigned to this task
+    # 1. Users directly assigned to this task (e.g., Ram)
     assigned_users = list(task.assigned_to.all())
     recipients.extend(assigned_users)
     
-    # 2. Task creator (the manager/admin who created it)
+    # 2. The user who created/assigned the task (so they can track progress)
     if task.assigned_by:
         recipients.append(task.assigned_by)
     
-    # 3. If task belongs to a project, get that project's members ONLY
-    if task.project:
-        project_members = list(task.project.members.all())
-        recipients.extend(project_members)
+    # 3. Removed: task.project.members.all() 
+    # This prevents Shyam (who is in the project but not the task) from being notified.
     
     return recipients
 
@@ -496,19 +486,33 @@ def get_unread_count(user: User) -> int:
     ).count()
 
 
-def delete_old_notifications(days: int = 30) -> int:
+def delete_expired_notifications() -> Dict[str, int]:
     """
-    Delete notifications older than specified days.
-    Useful for cleanup tasks/cron jobs.
-    Returns count of deleted notifications.
+    Delete notifications based on expiry rules:
+    - Read notifications: Delete after 7 days
+    - Unread notifications: Delete after 15 days
     """
     from django.utils import timezone
     from datetime import timedelta
     
-    cutoff_date = timezone.now() - timedelta(days=days)
-    deleted_count, _ = Notification.objects.filter(
-        created_at__lt=cutoff_date,
-        is_read=True
+    now = timezone.now()
+    
+    # 1. Delete Read notifications older than 7 days
+    read_cutoff = now - timedelta(days=7)
+    read_deleted, _ = Notification.objects.filter(
+        is_read=True,
+        read_at__lt=read_cutoff  # Using read_at is safer for read notifications
     ).delete()
     
-    return deleted_count
+    # 2. Delete Unread notifications older than 15 days
+    unread_cutoff = now - timedelta(days=15)
+    unread_deleted, _ = Notification.objects.filter(
+        is_read=False,
+        created_at__lt=unread_cutoff
+    ).delete()
+    
+    return {
+        'read_deleted': read_deleted,
+        'unread_deleted': unread_deleted,
+        'total_deleted': read_deleted + unread_deleted
+    }
