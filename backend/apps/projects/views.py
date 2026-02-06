@@ -52,6 +52,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
     search_fields = ["name", "description"]
     ordering_fields = ["name", "created_at", "updated_at"]
     ordering = ["-created_at"]
+    pagination_class = None
     
     def get_serializer_class(self):
         if self.action == "create":
@@ -81,6 +82,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         # ====================================================================
         # Get the assigned members from the serializer context
         assigned_members = list(project.members.all())
+        serializer.save(created_by=self.request.user)
         if assigned_members:
             notify_project_created(
                 project=project,
@@ -187,12 +189,23 @@ class ProjectViewSet(viewsets.ModelViewSet):
             )
         # ====================================================================
     def perform_destroy(self, instance):
-        # Check if the requesting user is the creator of the project
-        if instance.created_by != self.request.user:
-            raise PermissionDenied("You do not have permission to delete this project. Only the creator can delete it.")
+        user = self.request.user
 
-        # If the check passes, proceed with logging and deletion
-        log_action(instance, "delete", old_value=ProjectSerializer(instance).data)
+        # 1. Check if user is the stored creator
+        is_creator = instance.created_by == user
+
+        # 2. Fallback: Check 'owner' role in the intermediate membership table
+        # We use 'instance.members.through' to access the ProjectMembership model safely
+        is_owner_member = instance.members.through.objects.filter(
+            project=instance, 
+            user=user, 
+            role='owner'
+        ).exists()
+
+        if not (is_creator or is_owner_member):
+             raise PermissionDenied("You do not have permission to delete this project. Only the project owner can delete it.")
+
+        # Proceed with deletion
         instance.delete()
 
     # --- Custom Methods (Mapped explicitly in urls.py) ---
