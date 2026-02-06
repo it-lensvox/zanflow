@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { usersApi, chatApi, ChatWebSocketService, GlobalChatWebSocketService } from '@/services/api';
 import type { ChatRoom, ChatMessage, ChatRoomMessagesResponse, ToastNotification, WebSocketGlobalMessage, ProjectChatRoom, TeamChatRoom, User } from '@/types';
-
+import { CreateTeamModal } from '@/pages/TeamManagement/Createteammodal';
 
 // User status type
 type UserStatus = 'online' | 'away' | 'busy' | 'offline';
@@ -46,6 +46,7 @@ export function TeamChatModern() {
   const [isChatSectionOpen, setIsChatSectionOpen] = useState(true);
   const [isProjectsSectionOpen, setIsProjectsSectionOpen] = useState(false);
   const [isTeamsSectionOpen, setIsTeamsSectionOpen] = useState(false);
+  const [isCreateTeamModalOpen, setIsCreateTeamModalOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -659,7 +660,11 @@ export function TeamChatModern() {
             <button className="p-2 hover:bg-gray-100 rounded transition-colors">
               <Filter className="h-4 w-4 text-gray-600" />
             </button>
-            <button className="p-2 hover:bg-gray-100 rounded transition-colors">
+            <button
+              onClick={() => setIsCreateTeamModalOpen(true)}
+              className="p-2 hover:bg-gray-100 rounded transition-colors"
+              title="Create Team"
+            >
               <Plus className="h-4 w-4 text-gray-600" />
             </button>
           </div>
@@ -1238,6 +1243,17 @@ export function TeamChatModern() {
           </div>
         )}
       </div>
+      {/* Create Team Modal */}
+      {isCreateTeamModalOpen && (
+        <CreateTeamModal
+          isOpen={isCreateTeamModalOpen}
+          onClose={() => setIsCreateTeamModalOpen(false)}
+          onSuccess={() => {
+            setIsCreateTeamModalOpen(false);
+            queryClient.invalidateQueries({ queryKey: ['team-chat-rooms'] });
+          }}
+        />
+      )}
     </div >
   );
 }

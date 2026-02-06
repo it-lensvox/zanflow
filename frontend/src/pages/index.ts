@@ -1,7 +1,6 @@
 export { Dashboard } from './Dashboard';
 export { Login } from './Login';
 export { Projects } from './Project/Projects';
-export { ProjectCreate } from './Project/ProjectCreate';
 export { DocumentCreate } from './Documents/DocumentCreate';
 export { DocumentDetail } from './Documents/DocumentDetail';
 export { MyTask } from './MyTask/MyTask';
