@@ -82,7 +82,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         # ====================================================================
         # Get the assigned members from the serializer context
         assigned_members = list(project.members.all())
-        serializer.save(created_by=self.request.user)
+        
         if assigned_members:
             notify_project_created(
                 project=project,
