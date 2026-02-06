@@ -86,10 +86,12 @@ export const AITask: React.FC<AITaskProps> = ({ onClose, onGenerate, fixedProjec
             setIsDataLoading(true);
             try {
                 const projectData = await projectsApi.list();
-                setAllProjectOptions(projectData.results);
+                const results = projectData?.results || projectData || [];
+                setAllProjectOptions(Array.isArray(results) ? results : []);
             } catch (err) {
                 console.error("Failed to load projects:", err);
-                setError("Failed to load projects. Please try refreshing.");
+                setError("Failed to load projects.");
+                setAllProjectOptions([]); 
             } finally {
                 setIsDataLoading(false);
             }

@@ -1,22 +1,23 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Plus, FolderKanban, Bell } from 'lucide-react';
+import { FolderKanban, Bell } from 'lucide-react';
 import { Button, Card, CardContent } from '@/components/common';
 import { notificationsApi, projectsApi } from '@/services/api';
 import type { Project } from '@/types';
 import { ViewToggle, DualView, useViewMode, } from '@/components/layout/DualView';
 import {
-  getProjectsTableColumns,
-  ProjectGridCard,
+  getProjectsTableColumns, ProjectGridCard,
 } from '@/components/layout/DualView/projectsConfig';
 import { useTableFilters, ColumnFilterConfig } from '@/hooks/useTableFilters';
 import { SearchFilter, FilterHeaderWrapper } from '@/components/layout/DualView/FilterComponents';
 import { useOutletContext } from 'react-router-dom';
+import { CreateProjectModal } from './CreateProjectModal';
 
 export function Projects() {
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<string>('');
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const { viewMode, setViewMode } = useViewMode({
     defaultMode: 'table',
     storageKey: 'projects-view-mode',
@@ -104,12 +105,9 @@ export function Projects() {
         <p className="text-muted-foreground mb-4">
           Create your first project to get started
         </p>
-        <Link to="/projects/new">
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            New Project
-          </Button>
-        </Link>
+        <Button onClick={() => setIsCreateModalOpen(true)}>
+          New Project
+        </Button>
       </CardContent>
     </Card>
   );
@@ -125,11 +123,9 @@ export function Projects() {
         </div>
         <div className="flex items-center gap-3">
           <ViewToggle viewMode={viewMode} onViewModeChange={setViewMode} />
-          <Link to="/projects/new">
-            <Button>
-              New Project
-            </Button>
-          </Link>
+          <Button onClick={() => setIsCreateModalOpen(true)}>
+            New Project
+          </Button>
           <Button
             className="relative"
             onClick={() => setIsActivityOpen(!isActivityOpen)}
@@ -190,12 +186,16 @@ export function Projects() {
           rowClassName: () => 'group',
           onSort: handleSort,
           onFilter: (key: string) => {
-            // Only allow filter on 'name' column
             if (key === 'name') {
               handleFilter(key);
             }
           },
         }}
+      />
+      <CreateProjectModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        navigateOnSuccess={false}
       />
     </div>
   );

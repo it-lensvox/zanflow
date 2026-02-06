@@ -9,7 +9,7 @@ import { projectsApi } from '@/services/api';
 import { TaskDetails } from '@/pages/TaskType/TaskDetails';
 import { APITesting } from '@/pages/TaskType/APITesting';
 import {
-  Dashboard, Login, Projects, ProjectCreate, DocumentCreate, DocumentDetail, Documents, ProjectSettings,
+  Dashboard, Login, Projects, DocumentCreate, DocumentDetail, Documents, ProjectSettings,
   Teams, UserManagement, MyTask, CreateTask, TeamPerformance, Calendar, NotificationsPage, Profile, ResetPassword, TeamChatModern,
 } from '@/pages';
 import { TaskDetailPage } from '@/pages/MyTask/TaskDetailPage';
@@ -112,7 +112,6 @@ function AppRoutes() {
         <Route path="/profile" element={<Profile />} />
         <Route path="/resetPassword" element={<ResetPassword />} />
         <Route path="/projects" element={<Projects />} />
-        <Route path="/projects/new" element={<ProjectCreate />} />
         <Route path="/projects/:id" element={<ProjectDetailWrapper />} />
         <Route path="/projects/:id/api-testing" element={<APITesting />} />
         <Route path="/projects/:projectId/documents/new" element={<DocumentCreate />} />
