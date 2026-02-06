@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { usersApi, chatApi, ChatWebSocketService, GlobalChatWebSocketService } from '@/services/api';
 import type { ChatRoom, ChatMessage, ChatRoomMessagesResponse, ToastNotification, WebSocketGlobalMessage, ProjectChatRoom, TeamChatRoom, User } from '@/types';
+import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { CreateTeamModal } from '@/pages/TeamManagement/Createteammodal';
 
 // User status type
@@ -33,6 +34,8 @@ export function TeamChatModern() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
 
   // Unread tracking & notifications
   const [unreadCounts, setUnreadCounts] = useState<Map<string, number>>(new Map());
@@ -481,6 +484,36 @@ export function TeamChatModern() {
       queryClient.invalidateQueries({ queryKey: ['chat-messages', teamRoom.id], refetchType: 'none' });
     });
   };
+  // Add these new handler functions
+  const handleEmojiClick = (emojiData: EmojiClickData) => {
+    setMessageInput((prev) => prev + emojiData.emoji);
+    setShowEmojiPicker(false);
+  };
+
+  const toggleEmojiPicker = () => {
+    setShowEmojiPicker((prev) => !prev);
+  };
+
+  // Close emoji picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        emojiPickerRef.current &&
+        !emojiPickerRef.current.contains(event.target as Node)
+      ) {
+        setShowEmojiPicker(false);
+      }
+    };
+
+    if (showEmojiPicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showEmojiPicker]);
+
 
   // Send Message
   const handleSendMessage = async () => {
@@ -657,9 +690,6 @@ export function TeamChatModern() {
         <div className="h-14 px-4 flex items-center justify-between bg-white border-b border-gray-200">
           <h2 className="font-semibold text-base text-gray-900">Chat</h2>
           <div className="flex items-center gap-1">
-            <button className="p-2 hover:bg-gray-100 rounded transition-colors">
-              <Filter className="h-4 w-4 text-gray-600" />
-            </button>
             <button
               onClick={() => setIsCreateTeamModalOpen(true)}
               className="p-2 hover:bg-gray-100 rounded transition-colors"
@@ -1111,7 +1141,7 @@ export function TeamChatModern() {
 
             {/* Message Input */}
             <div className="p-4 bg-white border-t border-gray-200">
-              <div className="flex items-end gap-2">
+              <div className="flex items-center gap-2">
                 {/* Attachment Button */}
                 <>
                   <input
@@ -1123,7 +1153,7 @@ export function TeamChatModern() {
                   />
                   <button
                     onClick={handleAttachmentClick}
-                    className="p-2 hover:bg-gray-100 rounded transition-colors"
+                    className="p-2 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
                   >
                     <Paperclip className="h-5 w-5 text-gray-600" />
                   </button>
@@ -1202,10 +1232,32 @@ export function TeamChatModern() {
                   />
 
                   {/* Right side buttons in input */}
-                  <div className="absolute right-2 bottom-2 flex items-center gap-1">
-                    <button className="p-1.5 hover:bg-gray-100 rounded transition-colors">
-                      <Smile className="h-4 w-4 text-gray-600" />
+                  <div className="absolute right-2 bottom-2 flex items-center gap-1" ref={emojiPickerRef}>
+                    <button
+                      onClick={toggleEmojiPicker}
+                      className={cn(
+                        "p-1.5 rounded transition-colors",
+                        showEmojiPicker ? "bg-blue-100" : "hover:bg-gray-100"
+                      )}
+                    >
+                      <Smile className={cn(
+                        "h-4 w-4",
+                        showEmojiPicker ? "text-blue-600" : "text-gray-600"
+                      )} />
                     </button>
+
+                    {/* Emoji Picker Popup */}
+                    {showEmojiPicker && (
+                      <div className="absolute bottom-full right-0 mb-2 z-50">
+                        <EmojiPicker
+                          onEmojiClick={handleEmojiClick}
+                          width={320}
+                          height={400}
+                          searchPlaceHolder="Search emoji..."
+                          previewConfig={{ showPreview: false }}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1214,7 +1266,7 @@ export function TeamChatModern() {
                   onClick={handleSendMessage}
                   disabled={!messageInput.trim() && !selectedFile}
                   className={cn(
-                    'p-2.5 rounded transition-colors',
+                    'p-2.5 rounded transition-colors flex-shrink-0',
                     (messageInput.trim() || selectedFile)
                       ? 'bg-blue-600 text-white hover:bg-blue-700'
                       : 'bg-gray-200 text-gray-400 cursor-not-allowed'
