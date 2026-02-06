@@ -587,9 +587,6 @@ export function Dashboard() {
               <div className="text-center py-8">
                 <FolderKanban className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
                 <p className="text-muted-foreground">No projects yet</p>
-                <Button onClick={() => setIsCreateProjectModalOpen(true)}>
-                  New Project
-                </Button>
               </div>
             )}
           </CardContent>
@@ -604,12 +601,14 @@ export function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 md:grid-cols-4">
-              <Link to="/projects/new">
-                <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
-                  <FolderKanban className="h-6 w-6" />
-                  <span>New Project</span>
-                </Button>
-              </Link>
+              <Button
+                variant="outline"
+                className="w-full h-auto py-4 flex flex-col gap-2"
+                onClick={() => setIsCreateProjectModalOpen(true)}
+              >
+                <FolderKanban className="h-6 w-6" />
+                <span>New Project</span>
+              </Button>
               <Link to="/documents">
                 <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
                   <FileText className="h-6 w-6" />
