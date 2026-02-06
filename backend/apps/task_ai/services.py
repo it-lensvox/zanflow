@@ -86,6 +86,7 @@ class TaskAIService:
     @staticmethod
     def generate_task_data_with_assignment(project_context, user_description, members_with_skills):
         # Initialize the client using settings.py values explicitly
+        
         client = boto3.client(
             "bedrock-runtime",
             aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
@@ -99,9 +100,24 @@ class TaskAIService:
         # Format members data for the prompt
         members_summary = []
         for member in members_with_skills:
-            skills_text = ", ".join([
-                f"{s['name']} ({s['proficiency']})" for s in member['skills']
-            ])
+            # --- FIX START: Handle both string and dict skills safely ---
+            formatted_skills = []
+            for s in member['skills']:
+                if isinstance(s, dict):
+                    # If skill is an object: {'name': 'Python', 'proficiency': 'Expert'}
+                    name = s.get('name', 'Unknown')
+                    prof = s.get('proficiency', 'N/A')
+                    formatted_skills.append(f"{name} ({prof})")
+                elif isinstance(s, str):
+                    # If skill is just a string: "Python"
+                    formatted_skills.append(s)
+                else:
+                    # Fallback for other types
+                    formatted_skills.append(str(s))
+                    
+            skills_text = ", ".join(formatted_skills)
+            # --- FIX END ---
+
             members_summary.append(
                 f"- {member['username']} (Role: {member['role']}, ID: {member['id']}): {skills_text}"
             )
