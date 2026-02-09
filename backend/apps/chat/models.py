@@ -10,7 +10,9 @@ import uuid
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
-
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from apps.teams.models import Team
 
 class ChatRoom(models.Model):
     """
@@ -339,3 +341,15 @@ class MessageReadStatus(models.Model):
 
     def __str__(self):
         return f"{self.user.username} read {self.message_id}"
+    @receiver(post_save, sender=Team)
+    def sync_chat_with_team_deletion(sender, instance, created, **kwargs):
+        """
+        When a Team is soft-deleted (deleted_at is set), 
+        we hide the associated ChatRoom by setting is_active=False.
+        """
+        # Check if the team has just been soft-deleted
+        if instance.deleted_at is not None:
+            from .models import ChatRoom
+            
+            # Disable the chat room immediately
+            ChatRoom.objects.filter(team=instance).update(is_active=False)
