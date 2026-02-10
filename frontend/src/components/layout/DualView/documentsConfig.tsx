@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
 import { FileText, Trash2, CheckCircle, Clock, File } from 'lucide-react';
-import { Badge, Button, Card, CardContent } from '@/components/common';
-import { formatRelativeTime, getStatusColor } from '@/lib/utils';
+import { TablePopover } from '@/components/common';
+import { formatRelativeTime } from '@/lib/utils';
 import type { Document, DocumentStatus } from '@/types';
 import type { TableColumn } from '../DualView';
 import { documentsApi } from '@/services/api';
@@ -66,26 +65,8 @@ const statusOptions: { value: DocumentStatus; label: string; icon: any }[] = [
 export const createDocumentsTableColumns = ({ onDeleteClick }: DocumentTableColumnsProps): TableColumn<Document>[] => {
   const StatusDropdown = ({ doc }: { doc: Document }) => {
     const [activeDropdown, setActiveDropdown] = useState(false);
-    const dropdownRef = useRef<HTMLDivElement>(null);
     const queryClient = useQueryClient();
     const statusConfig = getDocumentStatusConfig(doc.status);
-
-    // Handle outside click to close dropdown
-    useEffect(() => {
-      const handleClickOutside = (event: MouseEvent) => {
-        if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-          setActiveDropdown(false);
-        }
-      };
-
-      if (activeDropdown) {
-        document.addEventListener('mousedown', handleClickOutside);
-      }
-
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
-      };
-    }, [activeDropdown]);
 
     const handleStatusChange = async (newStatus: DocumentStatus) => {
       try {
@@ -97,43 +78,46 @@ export const createDocumentsTableColumns = ({ onDeleteClick }: DocumentTableColu
       }
     };
 
-    return (
-      <div ref={dropdownRef} className="relative" onClick={(e) => e.stopPropagation()}>
-        <div
-          className={`jira-status-badge ${statusConfig.bg} ${statusConfig.text} cursor-pointer hover:opacity-80 transition-opacity flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-medium`}
-          onClick={() => setActiveDropdown(!activeDropdown)}
-        >
-          <span>{statusConfig.label}</span>
-        </div>
-
-        {activeDropdown && (
-          <div
-            className="absolute z-50 mt-1 left-0 min-w-[140px] max-h-[200px] overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg py-1"
-            onWheel={(e) => e.stopPropagation()}
-          >
-            {statusOptions.map((option) => {
-              const optionConfig = getDocumentStatusConfig(option.value);
-              return (
-                <div
-                  key={option.value}
-                  className="px-3 py-2 hover:bg-gray-50 cursor-pointer text-[12px] flex items-center gap-2"
-                  onClick={() => handleStatusChange(option.value)}
-                >
-                  {React.createElement(option.icon, { className: `w-3.5 h-3.5 ${optionConfig.text}` })}
-                  <span className={doc.status === option.value ? "font-bold text-blue-600" : ""}>
-                    {option.label}
-                  </span>
-                  {doc.status === option.value && (
-                    <svg className="w-3.5 h-3.5 text-blue-600 ml-auto" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+    const trigger = (
+      <div
+        className={`jira-status-badge ${statusConfig.bg} ${statusConfig.text} cursor-pointer hover:opacity-80 transition-opacity flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-medium`}
+      >
+        <span>{statusConfig.label}</span>
       </div>
+    );
+
+    return (
+      <TablePopover
+        trigger={trigger}
+        width="min-w-[140px]"
+        estimatedHeight={200}
+        open={activeDropdown}
+        onOpen={() => setActiveDropdown(true)}
+        onClose={() => setActiveDropdown(false)}
+      >
+        <div className="max-h-[200px] overflow-y-auto py-1">
+          {statusOptions.map((option) => {
+            const optionConfig = getDocumentStatusConfig(option.value);
+            return (
+              <div
+                key={option.value}
+                className="px-3 py-2 hover:bg-gray-50 cursor-pointer text-[12px] flex items-center gap-2"
+                onClick={() => handleStatusChange(option.value)}
+              >
+                {React.createElement(option.icon, { className: `w-3.5 h-3.5 ${optionConfig.text}` })}
+                <span className={doc.status === option.value ? "font-bold text-blue-600" : ""}>
+                  {option.label}
+                </span>
+                {doc.status === option.value && (
+                  <svg className="w-3.5 h-3.5 text-blue-600 ml-auto" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </TablePopover>
     );
   };
 
