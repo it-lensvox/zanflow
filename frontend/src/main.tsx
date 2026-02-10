@@ -24,8 +24,8 @@ onlineManager.setEventListener(() => {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: Infinity,           
-      gcTime: 1000 * 60 * 60,        
+      staleTime: Infinity,
+      gcTime: Infinity,               // Prevent cache garbage collection from triggering mass re-fetches
       refetchOnWindowFocus: false,   
       refetchOnMount: false, 
       refetchOnReconnect: false,     
