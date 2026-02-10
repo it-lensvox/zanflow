@@ -37,6 +37,7 @@ jobs:
             VITE_API_URL=https://zanflow.lensvox.com/api/v1
             VITE_API_BASE_URL=https://zanflow.lensvox.com
             VITE_WS_URL=wss://zanflow.lensvox.com
+            VITE_WS_GATEWAY_URL=wss://zanflow.lensvox.com/ws/gateway
             EOF
             
             echo "🔍 Validating docker-compose.yml..."
