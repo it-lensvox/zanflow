@@ -8,9 +8,11 @@ from typing import TYPE_CHECKING, List, Optional
 from django.db import transaction
 from django.core.exceptions import ValidationError, PermissionDenied
 from django.contrib.auth import get_user_model
-
+from apps.chat.services import ChatRoomService
+from apps.chat.models import ChatRoom
+import logging
 from .models import Team, TeamMember, TeamRole, TeamType, TeamColor
-
+logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from apps.users.models import User as UserType
 
@@ -123,6 +125,27 @@ class TeamService:
             
             if members_to_add:
                 TeamMember.objects.bulk_create(members_to_add)
+            try:
+                # 1. Find the room (created by the Team signal)
+                room = ChatRoom.objects.filter(
+                    room_type=ChatRoom.RoomType.TEAM, 
+                    team=team
+                ).first()
+                
+                # 2. If signal failed to create room, create it now
+                if not room:
+                    room = ChatRoomService.create_team_room(team, creator)
+
+                # 3. Add the members we just bulk_created
+                # (Loop through the list we just sent to bulk_create)
+                if members_to_add:
+                    for member in members_to_add:
+                        # member.user is already attached in your code above
+                        ChatRoomService.add_participant(room, member.user)
+                        
+            except Exception as e:
+                # Log error but don't stop the team creation
+                logger.error(f"Failed to sync team members to chat: {e}")
         
         return team
     

@@ -7,7 +7,8 @@ from typing import List, Optional, Union, Dict, Any
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.db.models import Model
-
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 from apps.users.models import User
 from .models import Notification, NotificationPreference
 
@@ -43,6 +44,45 @@ def should_notify(user: User, notification_type: str) -> bool:
     preference_field = type_to_preference.get(notification_type, 'system_notifications')
     return getattr(preferences, preference_field, True)
 
+def _send_notification_signal(notification_id: int, recipient_id: int):
+    """
+    Sends a lightweight WebSocket signal to the user.
+    Executed only after the DB transaction commits successfully.
+    """
+    try:
+        channel_layer = get_channel_layer()
+        # This group name MUST match what we set in GatewayConsumer.connect()
+        group_name = f"user_{recipient_id}_global"
+
+        # We fetch the fresh count so the Red Dot is always accurate
+        unread_count = Notification.objects.filter(
+            recipient_id=recipient_id, 
+            is_read=False
+        ).count()
+        
+        # Optional: Fetch basic details for the Toast (title, etc.)
+        notification = Notification.objects.get(id=notification_id)
+
+        # The Payload: A simple "Trigger" + Metadata
+        payload = {
+            "type": "gateway_signal",       # Calls gateway_signal() in Consumer
+            "event": "NEW_NOTIFICATION",    # The Event Name
+            "data": {
+                "id": notification.id,
+                "title": notification.title,
+                "unread_count": unread_count,
+                # Context for the frontend to know where to redirect (e.g., Task ID)
+                "related_object": {
+                    "type": notification.content_type.model,
+                    "id": notification.object_id
+                } if notification.content_type else None
+            }
+        }
+
+        async_to_sync(channel_layer.group_send)(group_name, payload)
+    except Exception as e:
+        # We catch errors so a socket failure doesn't crash the whole request
+        print(f"WebSocket Signal Error: {e}")
 
 def create_notification(
     recipient: User,
@@ -52,7 +92,7 @@ def create_notification(
     actor: Optional[User] = None,
     priority: str = Notification.Priority.MEDIUM,
     related_object: Optional[Model] = None,
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: Optional[Dict[str, Any]] = None,
 ) -> Optional[Notification]:
     """
     Create a single notification for a user.
@@ -85,7 +125,6 @@ def create_notification(
     if not should_notify(recipient, notification_type):
         return None
     
-    # Don't notify the actor about their own actions
     if actor and actor.id == recipient.id:
         return None
     
@@ -99,12 +138,22 @@ def create_notification(
         'metadata': metadata or {},
     }
     
-    # Add generic relation if related_object is provided
     if related_object:
         notification_data['content_type'] = ContentType.objects.get_for_model(related_object)
         notification_data['object_id'] = str(related_object.pk)
     
-    return Notification.objects.create(**notification_data)
+    # --- MODIFIED SECTION STARTS HERE ---
+    
+    # 1. Save to DB (Your existing code)
+    notification = Notification.objects.create(**notification_data)
+
+    # 2. Trigger the WebSocket Signal (The new "Wire")
+    # We use a lambda to pass the IDs to the helper function
+    transaction.on_commit(
+        lambda: _send_notification_signal(notification.id, recipient.id)
+    )
+    
+    return notification
 
 
 def notify(
