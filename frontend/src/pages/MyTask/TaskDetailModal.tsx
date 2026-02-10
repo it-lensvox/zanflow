@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { getStatusConfig } from '@/components/layout/DualView/taskConfig';
 import { Task, TaskAttachment, TaskLink } from '@/types';
+import { RichTextEditor } from '@/components/common/RichTextEditor';
 
 const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A';
@@ -529,14 +530,29 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
                             </div>
 
                             {isEditingDescription ? (
-                                <textarea
+                                <RichTextEditor
                                     value={editableDescription}
-                                    onChange={(e) => {
-                                        setEditableDescription(e.target.value);
+                                    onChange={(html) => {
+                                        setEditableDescription(html);
                                         setHasUnsavedChanges(true);
                                     }}
-                                    className="w-full min-h-[120px] p-3 text-sm text-gray-600 border border-gray-200 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none resize-y transition-all"
                                     placeholder="Enter task description..."
+                                    minHeight="150px"
+                                    maxHeight="400px"
+                                    features={{
+                                        bold: true,
+                                        italic: true,
+                                        underline: true,
+                                        strikethrough: true,
+                                        link: true,
+                                        bulletList: true,
+                                        orderedList: true,
+                                        blockquote: true,
+                                        code: true,
+                                        codeBlock: true,
+                                        heading: true,
+                                        table: true,
+                                    }}
                                 />
                             ) : (
                                 <div

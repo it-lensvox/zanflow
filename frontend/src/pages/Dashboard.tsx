@@ -77,8 +77,16 @@ export function Dashboard() {
   });
 
   // Data Processing
-  const projects = (projectsData?.results || []) as Project[];
-  const documents = (documentsData?.results || []) as Document[];
+const projects = (() => {
+  if (!projectsData) return [];
+  if (Array.isArray(projectsData)) return projectsData;
+  if (projectsData.results && Array.isArray(projectsData.results)) {
+    return projectsData.results;
+  }
+  return [];
+})() as Project[];
+
+const documents = (documentsData?.results || []) as Document[];
 
   const allTasks: Task[] = React.useMemo(() => {
     if (!tasksResponse) {
@@ -176,11 +184,8 @@ export function Dashboard() {
 
 
   const recentProjects = Array.isArray(projects)
-    ? projects.filter(p =>
-      p.is_favourite &&
-      p.members?.some(member => member.user.id === user?.id)
-    ).slice(0, 5)
-    : [];
+  ? projects.filter(p => p.is_favourite).slice(0, 6)
+  : [];
   const recentDocuments = Array.isArray(documents) ? documents.slice(0, 5) : [];
 
   // Fetch unread count for the badge

@@ -3,23 +3,13 @@ import type {
   AuthTokens, User as AppUser, PaginatedResponse, PaginatedProjectsResponse, GetUploadUrlPayload, GetUploadUrlResponse, ConfirmUploadResponse, GetDownloadUrlPayload, ConfirmUploadPayload,
   GetDownloadUrlResponse, TaskComment, CreateTaskCommentPayload, AITaskSuggestionResponse, AITaskSuggestionPayload, APICollection,
   APIEndpoint, AuthCredential, ExecutionRun, ExecutionResult, APITestingDashboard, CreateCollectionPayload, CreateEndpointPayload, CreateCredentialPayload, RunCollectionPayload, ProjectCreatePayload,
-  Label, DocumentStatus, ChatMessage, ChatRoom, ChatRoomMessagesResponse, CreatePrivateChatPayload, WebSocketSendMessagePayload, WebSocketGlobalMessage, RefineTextPayload, RefineTextResponse, TeamTypeChoicesResponse,
+  Label, DocumentStatus, ChatMessage, ChatRoom, ChatRoomMessagesResponse, CreatePrivateChatPayload, GatewaySendMessagePayload, GatewayIncomingMessage, GatewayConnectedEvent, RefineTextPayload, RefineTextResponse, TeamTypeChoicesResponse,
   CreateTeamPayload, ProjectChatRoom, TeamChatRoom, Team
 } from '@/types';
-
-
-
-//const API_URL = import.meta.env.VITE_API_URL || 'http://192.168.1.12:8000/api/v1';
-//const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://192.168.1.12:8001/';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-
-//const API_URL = import.meta.env.VITE_API_URL || 'http://192.168.1.18:8000/api/v1';
-//const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://192.168.1.12:8001/';
-
-//const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.18:8000/api/v1';
-const WS_URL = (import.meta as any).env.VITE_WS_URL || 'ws://192.168.1.18:8000';
-
+const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
+const WS_GATEWAY_URL = import.meta.env.VITE_WS_GATEWAY_URL || 'ws://localhost:8000/ws/gateway';
 
 export const api = axios.create({
   baseURL: API_URL,
@@ -47,20 +37,10 @@ export const clearTokens = (): void => {
 // Request interceptor to add auth token
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    // 🚫 Do NOT attach token for login/register/refresh
-    if (
-      config.url?.includes('/auth/login/') ||
-      config.url?.includes('/auth/register/') ||
-      config.url?.includes('/auth/refresh/')
-    ) {
-      return config;
-    }
-
     const tokens = getTokens();
     if (tokens?.access) {
       config.headers.Authorization = `Bearer ${tokens.access}`;
     }
-
     return config;
   },
   (error) => Promise.reject(error)
@@ -108,19 +88,14 @@ api.interceptors.response.use(
 // Auth API
 export const authApi = {
   login: async (username: string, password: string) => {
-  clearTokens(); // 🧹 remove old tokens
-
-  const response = await api.post<AuthTokens>('/auth/login/', {
-    username,
-    password,
-  });
-
-  setTokens(response.data);
-  api.defaults.headers.common['Authorization'] =
-    `Bearer ${response.data.access}`;
-
-  return response.data;
-},
+    const response = await api.post<AuthTokens>('/auth/login/', {
+      username,
+      password,
+    });
+    setTokens(response.data);
+    api.defaults.headers.common['Authorization'] = `Bearer ${response.data.access}`;
+    return response.data;
+  },
 
   logout: () => {
     clearTokens();
@@ -631,156 +606,99 @@ export const chatApi = {
   },
 };
 
-// WebSocket Service for Real-time Chat
-export class ChatWebSocketService {
+
+// Gateway  WebSocket Service - Receives all messages across all rooms
+export class GatewayWebSocketService {
   private ws: WebSocket | null = null;
-  private messageCallback: ((msg: ChatMessage) => void) | null = null;
-
-  connect(roomId: string) {
-    const tokens = getTokens();
-    if (!tokens?.access) {
-      console.error("No access token available for WebSocket");
-      return;
-    }
-
-    // Construct WS URL with Token
-
-    //const wsUrl = `ws://192.168.1.12:8000/ws/chat/${roomId}/?token=${tokens.access}`;
-    //const wsUrl = `ws://localhost:8000/ws/chat/${roomId}/?token=${tokens.access}`;
-
-    //const wsUrl = `ws://192.168.1.18:8000/ws/chat/${roomId}/?token=${tokens.access}`;
-    const wsUrl = `${WS_URL}/ws/chat/${roomId}/?token=${tokens.access}`;
-
-
-    this.ws = new WebSocket(wsUrl);
-
-    this.ws.onopen = () => {
-      console.log(`Connected to Chat Room: ${roomId}`);
-    };
-
-    this.ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-
-        // Handle incoming chat message
-        if (data.type === 'chat_message' && data.message && this.messageCallback) {
-          this.messageCallback(data.message);
-        }
-      } catch (err) {
-        console.error('WS Message Parse Error', err);
-      }
-    };
-
-    this.ws.onerror = (error) => {
-      console.error('WebSocket Error', error);
-    };
-
-    this.ws.onclose = () => {
-      console.log('Disconnected from Chat WS');
-    };
-  }
-
-  // Send message via WebSocket
-  sendMessage(content: string) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      const payload: WebSocketSendMessagePayload = {
-        type: 'chat_message',
-        content: content
-      };
-      this.ws.send(JSON.stringify(payload));
-    } else {
-      console.error("WebSocket is not open. Cannot send message.");
-    }
-  }
-
-  // Register callback for UI updates
-  onMessage(callback: (msg: ChatMessage) => void) {
-    this.messageCallback = callback;
-  }
-
-  disconnect() {
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-      this.messageCallback = null;
-    }
-  }
-}
-
-// Global WebSocket Service - Receives all messages across all rooms
-export class GlobalChatWebSocketService {
-  private ws: WebSocket | null = null;
-  private messageCallback: ((msg: WebSocketGlobalMessage) => void) | null = null;
+  private messageCallback: ((msg: GatewayIncomingMessage) => void) | null = null;
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
+  private userId: number | null = null;
 
   connect() {
     // Prevent multiple connections
     if (this.ws && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) {
-      console.log('⚠️ Global WebSocket already connected/connecting');
+      console.log('⚠️ Gateway WebSocket already connected/connecting');
       return;
     }
 
     const tokens = getTokens();
     if (!tokens?.access) {
-      console.error("No access token available for Global WebSocket");
+      console.error("No access token available for Gateway WebSocket");
       return;
     }
 
-    // Global WebSocket URL - listens to ALL rooms for this user
-
-    //const wsUrl = `ws://192.168.1.12:8000/ws/chat/global/?token=${tokens.access}`;
-    //const wsUrl = `ws://localhost:8000/ws/chat/global/?token=${tokens.access}`;
-
-    const wsUrl = `${WS_URL}/ws/chat/global/?token=${tokens.access}`;
+    // New Gateway WebSocket URL
+    const wsUrl = `${WS_GATEWAY_URL}/?token=${tokens.access}`;
 
     this.ws = new WebSocket(wsUrl);
 
     this.ws.onopen = () => {
-      console.log('🌍 Connected to Global Chat WebSocket');
+      console.log('🌍 Connected to WebSocket Gateway');
       this.reconnectAttempts = 0;
     };
 
     this.ws.onmessage = (event) => {
       try {
-        const data: WebSocketGlobalMessage = JSON.parse(event.data);
+        const data: GatewayIncomingMessage = JSON.parse(event.data);
 
+        // Handle connection acknowledgement
+        if (data.type === 'GATEWAY_CONNECTED') {
+          this.userId = data.user_id || null;
+        }
+
+        // Forward all messages to callback
         if (this.messageCallback) {
           this.messageCallback(data);
         }
       } catch (err) {
-        console.error('Global WS Message Parse Error', err);
+        console.error('Gateway WS Message Parse Error', err);
       }
     };
 
     this.ws.onerror = (error) => {
-      console.error('Global WebSocket Error', error);
+      console.error('Gateway WebSocket Error', error);
     };
 
     this.ws.onclose = () => {
-      console.log('❌ Global WebSocket Disconnected');
-      // this.attemptReconnect();
+      console.log('❌ Gateway WebSocket Disconnected');
+      this.attemptReconnect();
     };
   }
 
   private attemptReconnect() {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('Max reconnection attempts reached for Global WebSocket');
+      console.error('Max reconnection attempts reached for Gateway WebSocket');
       return;
     }
 
     this.reconnectAttempts++;
     const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
 
-    console.log(`Reconnecting Global WebSocket in ${delay}ms... (Attempt ${this.reconnectAttempts})`);
+    console.log(`Reconnecting Gateway WebSocket in ${delay}ms... (Attempt ${this.reconnectAttempts})`);
 
     this.reconnectTimeout = setTimeout(() => {
       this.connect();
     }, delay);
   }
 
-  onMessage(callback: (msg: WebSocketGlobalMessage) => void) {
+  // Send message using new command structure
+  sendMessage(roomId: string, content: string) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      const payload: GatewaySendMessagePayload = {
+        command: 'send_message',
+        room_id: roomId,
+        content: content
+      };
+      this.ws.send(JSON.stringify(payload));
+      console.log(`📤 Message sent to room ${roomId}`);
+    } else {
+      console.error("Gateway WebSocket is not open. Cannot send message.");
+    }
+  }
+
+  onMessage(callback: (msg: GatewayIncomingMessage) => void) {
     this.messageCallback = callback;
   }
 
@@ -795,16 +713,20 @@ export class GlobalChatWebSocketService {
       this.ws.close();
       this.ws = null;
       this.messageCallback = null;
+      this.userId = null;
     }
   }
 
   isConnected(): boolean {
     return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
   }
-}
 
+  getUserId(): number | null {
+    return this.userId;
+  }
+}
 // Export singleton instance for global use (optional)
-export const globalChatSocket = new GlobalChatWebSocketService();
+export const gatewaySocket = new GatewayWebSocketService();
 
 // API Testing Platform API
 export const apiTestingApi = {
