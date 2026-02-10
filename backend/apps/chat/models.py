@@ -341,15 +341,15 @@ class MessageReadStatus(models.Model):
 
     def __str__(self):
         return f"{self.user.username} read {self.message_id}"
-    @receiver(post_save, sender=Team)
-    def sync_chat_with_team_deletion(sender, instance, created, **kwargs):
-        """
-        When a Team is soft-deleted (deleted_at is set), 
-        we hide the associated ChatRoom by setting is_active=False.
-        """
-        # Check if the team has just been soft-deleted
-        if instance.deleted_at is not None:
-            from .models import ChatRoom
+    # @receiver(post_save, sender=Team)
+    # def sync_chat_with_team_deletion(sender, instance, created, **kwargs):
+    #     """
+    #     When a Team is soft-deleted (deleted_at is set), 
+    #     we hide the associated ChatRoom by setting is_active=False.
+    #     """
+        # # Check if the team has just been soft-deleted
+        # if instance.deleted_at is not None:
+        #     from .models import ChatRoom
             
-            # Disable the chat room immediately
-            ChatRoom.objects.filter(team=instance).update(is_active=False)
+        #     # Disable the chat room immediately
+        #     ChatRoom.objects.filter(team=instance).update(is_active=False)

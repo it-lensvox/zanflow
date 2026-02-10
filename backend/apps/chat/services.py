@@ -302,29 +302,8 @@ class ChatMessageService:
     
     @staticmethod
     @transaction.atomic
-    def create_message(
-        room: ChatRoom,
-        sender,
-        content: str,
-        message_type: str = 'text',
-        attachment=None,
-        attachment_name: str = '',
-        reply_to_id: Optional[UUID] = None
-    ) -> ChatMessage:
-        """
-        Create a new chat message and broadcast it via WebSocket.
-        """
-        metadata = {}
-
-        # LOGIC: If it's a link, fetch preview data
-        if message_type == 'link':
-            # content should be the URL
-            metadata = fetch_link_preview(content)
-        
-        # LOGIC: If text message contains a URL (optional auto-detection)
-        elif message_type == 'text' and content.startswith('http'):
-            # You could auto-convert text to link here if you wanted
-            pass
+    def create_message(room, sender, content, message_type='text', attachment=None, attachment_name='', reply_to_id=None):
+        # 1. Save the message to the Database
         message = ChatMessage.objects.create(
             room=room,
             sender=sender,
@@ -332,32 +311,20 @@ class ChatMessageService:
             message_type=message_type,
             attachment=attachment,
             attachment_name=attachment_name,
-            reply_to_id=reply_to_id,
-            metadata=metadata
+            reply_to_id=reply_to_id
         )
-        
-        # 2. Update room's updated_at timestamp
-        room.updated_at = timezone.now()
-        room.save(update_fields=['updated_at'])
-        
-        # 3. Broadcast to WebSocket Group (Real-time update)
-        # We do this AFTER creation so the S3 URL is generated
+
+        # 2. BROADCAST TO WEBSOCKET (This is the missing part!)
         channel_layer = get_channel_layer()
-        if channel_layer:
-            from .serializers import ChatMessageSerializer
-            serialized_data = ChatMessageSerializer(message).data
-            async_to_sync(channel_layer.group_send)(
-            room.channel_group_name,
+        
+        # We broadcast to "chat_{slug}" because that is what the Gateway subscribes to
+        async_to_sync(channel_layer.group_send)(
+            f"chat_{room.slug}",  
             {
-                'type': 'chat_message',
-                'message': serialized_data 
+                'type': 'chat_message',    # Calls GatewayConsumer.chat_message()
+                'message': message.to_websocket_dict()
             }
         )
-        
-        logger.debug(f"Message created in room {room.id} by user {sender.id}")
-        
-        # 4. Trigger notification (async)
-        ChatMessageService._send_notification(message)
         
         return message
 
