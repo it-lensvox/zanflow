@@ -24,6 +24,7 @@ export interface TableViewProps<T> {
   columns: TableColumn<T>[];
   rowKey: (item: T) => string | number;
   onRowClick?: (item: T) => void;
+  onRowMouseEnter?: (item: T) => void;
   onSort?: (key: string) => void;
   onFilter?: (key: string) => void;
   activeFilterKey?: string | null;
@@ -39,6 +40,7 @@ export function TableView<T>({
   columns,
   rowKey,
   onRowClick,
+  onRowMouseEnter,
   onSort,
   onFilter,
   activeFilterKey,
@@ -105,6 +107,7 @@ export function TableView<T>({
               <tr
                 key={rowKey(item)}
                 onClick={() => onRowClick?.(item)}
+                onMouseEnter={() => onRowMouseEnter?.(item)}
                 className={`group border-b border-[#f4f5f7] last:border-b-0 hover:bg-[#f4f5f7] transition-colors cursor-pointer relative hover:z-[50] ${rowClassName ? rowClassName(item) : ''}`}
               >
                 {columns.map((column) => (
