@@ -4,12 +4,11 @@ import type {
   GetDownloadUrlResponse, TaskComment, CreateTaskCommentPayload, AITaskSuggestionResponse, AITaskSuggestionPayload, APICollection,
   APIEndpoint, AuthCredential, ExecutionRun, ExecutionResult, APITestingDashboard, CreateCollectionPayload, CreateEndpointPayload, CreateCredentialPayload, RunCollectionPayload, ProjectCreatePayload,
   Label, DocumentStatus, ChatMessage, ChatRoom, ChatRoomMessagesResponse, CreatePrivateChatPayload, WebSocketSendMessagePayload, WebSocketGlobalMessage, RefineTextPayload, RefineTextResponse, TeamTypeChoicesResponse,
-  CreateTeamPayload, Team
+  CreateTeamPayload, ProjectChatRoom, TeamChatRoom, Team
 } from '@/types';
 
-export const API_URL = import.meta.env.VITE_API_URL || 'http://192.168.1.12:8000/api/v1';
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://192.168.1.12:8001/';
-
+export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.18:8000/api/v1';
+const WS_URL = (import.meta as any).env.VITE_WS_URL || 'ws://192.168.1.18:8000';
 
 export const api = axios.create({
   baseURL: API_URL,
@@ -594,6 +593,36 @@ export const chatApi = {
     });
     return response.data;
   },
+
+  // Send a message with attachment via HTTP POST (for file uploads)
+  sendMessageWithAttachment: async (roomId: string, data: { content: string; attachment: File }) => {
+    const formData = new FormData();
+    formData.append('content', data.content);
+    formData.append('attachment', data.attachment);
+
+    const response = await api.post<ChatMessage>(`/chat/rooms/${roomId}/send/`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  // Team Chat Project Render list
+  getProjectRooms: async () => {
+    const response = await api.get<ProjectChatRoom[]>('/chat/rooms/', {
+      params: { type: 'project' }
+    });
+    return response.data;
+  },
+
+  //Team and Channels Render list  
+  getTeamRooms: async () => {
+    const response = await api.get<TeamChatRoom[]>('/chat/rooms/', {
+      params: { type: 'team' }
+    });
+    return response.data;
+  },
 };
 
 // WebSocket Service for Real-time Chat
@@ -609,7 +638,7 @@ export class ChatWebSocketService {
     }
 
     // Construct WS URL with Token
-    const wsUrl = `ws://192.168.1.18:8000/ws/chat/${roomId}/?token=${tokens.access}`;
+    const wsUrl = `${WS_URL}/ws/chat/${roomId}/?token=${tokens.access}`;
 
     this.ws = new WebSocket(wsUrl);
 
@@ -666,8 +695,6 @@ export class ChatWebSocketService {
   }
 }
 
-// Add this new class after the ChatWebSocketService class (after line 667 in api.ts)
-
 // Global WebSocket Service - Receives all messages across all rooms
 export class GlobalChatWebSocketService {
   private ws: WebSocket | null = null;
@@ -677,6 +704,12 @@ export class GlobalChatWebSocketService {
   private maxReconnectAttempts = 5;
 
   connect() {
+    // Prevent multiple connections
+    if (this.ws && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) {
+      console.log('⚠️ Global WebSocket already connected/connecting');
+      return;
+    }
+
     const tokens = getTokens();
     if (!tokens?.access) {
       console.error("No access token available for Global WebSocket");
@@ -684,7 +717,7 @@ export class GlobalChatWebSocketService {
     }
 
     // Global WebSocket URL - listens to ALL rooms for this user
-    const wsUrl = `ws://192.168.1.12:8000/ws/chat/global/?token=${tokens.access}`;
+    const wsUrl = `${WS_URL}/ws/chat/global/?token=${tokens.access}`;
 
     this.ws = new WebSocket(wsUrl);
 
@@ -711,7 +744,7 @@ export class GlobalChatWebSocketService {
 
     this.ws.onclose = () => {
       console.log('❌ Global WebSocket Disconnected');
-      this.attemptReconnect();
+      // this.attemptReconnect();
     };
   }
 
@@ -738,9 +771,11 @@ export class GlobalChatWebSocketService {
   disconnect() {
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
     }
-
+    this.reconnectAttempts = 0;
     if (this.ws) {
+      this.ws.onclose = null;
       this.ws.close();
       this.ws = null;
       this.messageCallback = null;

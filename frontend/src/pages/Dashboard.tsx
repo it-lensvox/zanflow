@@ -1,29 +1,11 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import React from 'react';
+import { useState } from 'react';
 import {
-  FolderKanban,
-  FileText,
-  CheckCircle,
-  Clock,
-  AlertCircle,
-  Plus,
-  ArrowRight,
-  TrendingUp,
-  Filter,
-  ChevronDown,
-  Calendar,
-  Users,
-  Bell, 
+  FolderKanban, FileText, CheckCircle, Clock, ArrowRight, ChevronDown, Calendar, Users, Bell,
 } from 'lucide-react';
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Badge,
-} from '@/components/common';
+import { Button, Card, CardContent, CardHeader, CardTitle } from '@/components/common';
 import { projectsApi, documentsApi, taskApi, notificationsApi, } from '@/services/api';
 import { formatRelativeTime, getStatusColor } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -32,6 +14,7 @@ import { getStatusConfig } from '@/components/layout/DualView/taskConfig';
 import { NotificationsPage } from './NotificationsPage';
 import { ProjectGridCard } from '@/components/layout/DualView/projectsConfig';
 import { useOutletContext } from 'react-router-dom';
+import { CreateProjectModal } from '@/pages/Project/CreateProjectModal';
 
 // Type Definitions
 type TaskStatus = 'pending' | 'backlog' | 'in_progress' | 'completed' | 'deployed' | 'deferred' | 'review';
@@ -60,9 +43,9 @@ export function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { isActivityOpen, setIsActivityOpen } = useOutletContext<{
-  isActivityOpen: boolean;
-  setIsActivityOpen: (open: boolean) => void;
-}>();
+    isActivityOpen: boolean;
+    setIsActivityOpen: (open: boolean) => void;
+  }>();
 
 
   // State Management
@@ -75,6 +58,7 @@ export function Dashboard() {
   const [dropdownPos, setDropdownPos] = React.useState<{ top: number; left: number } | null>(null);
   const [openDocDropdownId, setOpenDocDropdownId] = React.useState<string | null>(null);
   const [docDropdownPos, setDocDropdownPos] = React.useState<{ top: number; left: number } | null>(null);
+  const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
 
   // Data Fetching
   const { data: projectsData, isLoading: projectsLoading } = useQuery({
@@ -93,8 +77,16 @@ export function Dashboard() {
   });
 
   // Data Processing
-  const projects = (projectsData?.results || []) as Project[];
-  const documents = (documentsData?.results || []) as Document[];
+const projects = (() => {
+  if (!projectsData) return [];
+  if (Array.isArray(projectsData)) return projectsData;
+  if (projectsData.results && Array.isArray(projectsData.results)) {
+    return projectsData.results;
+  }
+  return [];
+})() as Project[];
+
+const documents = (documentsData?.results || []) as Document[];
 
   const allTasks: Task[] = React.useMemo(() => {
     if (!tasksResponse) {
@@ -192,11 +184,8 @@ export function Dashboard() {
 
 
   const recentProjects = Array.isArray(projects)
-    ? projects.filter(p =>
-      p.is_favourite &&
-      p.members?.some(member => member.user.id === user?.id)
-    ).slice(0, 5)
-    : [];
+  ? projects.filter(p => p.is_favourite).slice(0, 6)
+  : [];
   const recentDocuments = Array.isArray(documents) ? documents.slice(0, 5) : [];
 
   // Fetch unread count for the badge
@@ -254,11 +243,11 @@ export function Dashboard() {
               </Button>
             </Link>
 
-            <Link to="/projects/new">
-              <Button>
-                New Project
-              </Button>
-            </Link>
+            <Button
+              onClick={() => setIsCreateProjectModalOpen(true)}
+            >
+              New Project
+            </Button>
             <Button
               className="relative"
               onClick={() => setIsActivityOpen(!isActivityOpen)}
@@ -603,11 +592,6 @@ export function Dashboard() {
               <div className="text-center py-8">
                 <FolderKanban className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
                 <p className="text-muted-foreground">No projects yet</p>
-                <Link to="/projects/new">
-                  {/* <Button variant="outline" size="sm" className="mt-2">
-                    Create Project
-                  </Button> */}
-                </Link>
               </div>
             )}
           </CardContent>
@@ -622,12 +606,14 @@ export function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 md:grid-cols-4">
-              <Link to="/projects/new">
-                <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
-                  <FolderKanban className="h-6 w-6" />
-                  <span>New Project</span>
-                </Button>
-              </Link>
+              <Button
+                variant="outline"
+                className="w-full h-auto py-4 flex flex-col gap-2"
+                onClick={() => setIsCreateProjectModalOpen(true)}
+              >
+                <FolderKanban className="h-6 w-6" />
+                <span>New Project</span>
+              </Button>
               <Link to="/documents">
                 <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
                   <FileText className="h-6 w-6" />
@@ -650,6 +636,11 @@ export function Dashboard() {
           </CardContent>
         </Card>
       </div>
+      <CreateProjectModal
+        isOpen={isCreateProjectModalOpen}
+        onClose={() => setIsCreateProjectModalOpen(false)}
+        navigateOnSuccess={true}
+      />
     </div>
   );
 }
