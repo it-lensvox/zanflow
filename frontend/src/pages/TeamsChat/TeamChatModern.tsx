@@ -1,13 +1,14 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  MessageSquare, Search, Send, Paperclip, Smile, Phone, Video, Plus, Info, Filter,
-  Image, X, ChevronRight, ChevronDown, Users as UsersIcon, Briefcase
+  MessageSquare, Search, Send, Paperclip, Smile, Phone, Video, Plus, Info,
+  X, ChevronRight, ChevronDown, Users as UsersIcon, Briefcase, MoreVertical,
+  Reply, Forward, Link2, Bookmark, Trash2, Pin, MailOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
-import { usersApi, chatApi, ChatWebSocketService, GlobalChatWebSocketService } from '@/services/api';
-import type { ChatRoom, ChatMessage, ChatRoomMessagesResponse, ToastNotification, WebSocketGlobalMessage, ProjectChatRoom, TeamChatRoom, User } from '@/types';
+import { usersApi, chatApi, GatewayWebSocketService } from '@/services/api';
+import type { ChatRoom, ChatMessage, ChatRoomMessagesResponse, ToastNotification, GatewayIncomingMessage, ProjectChatRoom, TeamChatRoom, User } from '@/types';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { CreateTeamModal } from '@/pages/TeamManagement/Createteammodal';
 
@@ -36,6 +37,11 @@ export function TeamChatModern() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const [hoveredMessageId, setHoveredMessageId] = useState<string | number | null>(null);
+  const [openMenuMessageId, setOpenMenuMessageId] = useState<string | number | null>(null);
+  const [showReactionPicker, setShowReactionPicker] = useState<string | number | null>(null);
+  const [messageReactions, setMessageReactions] = useState<Map<string | number, Map<string, number>>>(new Map());
+  const menuRef = useRef<HTMLDivElement>(null);
 
   // Unread tracking & notifications
   const [unreadCounts, setUnreadCounts] = useState<Map<string, number>>(new Map());
@@ -54,12 +60,9 @@ export function TeamChatModern() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // WebSocket References
-  const socketRef = useRef<ChatWebSocketService | null>(null);
-  const globalSocketRef = useRef<GlobalChatWebSocketService | null>(null);
-  const isGlobalSocketInitialized = useRef(false);
+  const gatewaySocketRef = useRef<GatewayWebSocketService | null>(null);
+  const isGatewayInitialized = useRef(false);
   const activeRoomRef = useRef<ChatRoom | null>(null);
-  const projectSocketRef = useRef<ChatWebSocketService | null>(null);
-  const teamSocketRef = useRef<ChatWebSocketService | null>(null);
 
   // 1. Fetch Users List
   const { data: usersData, isLoading: isLoadingUsers } = useQuery({
@@ -81,27 +84,79 @@ export function TeamChatModern() {
   });
 
   const teamRooms = teamRoomsData || [];
-  const projectRooms = projectRoomsData || [];
 
-  // 2. Initialize Global WebSocket ONCE on Mount
+  // Map project rooms to ensure name field exists
+  const normalizedProjectRooms = useMemo(() => {
+    return (projectRoomsData || []).map(room => ({
+      ...room,
+      name: room.name || (room as any).project_name || (room as any).title || 'Unnamed Project'
+    }));
+  }, [projectRoomsData]);
+  const projectRooms = normalizedProjectRooms;
+
+
+
+  // Debug: Log project rooms data
   useEffect(() => {
-    if (!currentUser || isGlobalSocketInitialized.current) {
+    if (projectRoomsData) {
+    }
+  }, [projectRoomsData]);
+
+  // Initialize Gateway WebSocket ONCE on Mount
+  useEffect(() => {
+    if (!currentUser || isGatewayInitialized.current) {
       return;
     }
 
-    console.log('🔌 Initializing Global WebSocket for user:', currentUser.username);
-    isGlobalSocketInitialized.current = true;
+    isGatewayInitialized.current = true;
 
-    const globalSocket = new GlobalChatWebSocketService();
-    globalSocket.connect();
-    globalSocketRef.current = globalSocket;
+    const gateway = new GatewayWebSocketService();
+    gateway.connect();
+    gatewaySocketRef.current = gateway;
 
-    globalSocket.onMessage((data: WebSocketGlobalMessage) => {
-      const { type, message, room_id } = data;
-      const actualRoomId = room_id || message?.room;
+    gateway.onMessage((data: GatewayIncomingMessage) => {
 
-      if (type === 'chat_message' && message && actualRoomId) {
+      // Handle connection acknowledgement
+      if (data.type === 'GATEWAY_CONNECTED') {
+        return;
+      }
+
+      // Handle presence events
+      if (data.type === 'PRESENCE') {
+        return;
+      }
+
+      // Handle room creation events for real-time rendering
+      if (data.type === 'room_created') {
+        const newRoom = data.room || (data as any).data;
+
+        if (newRoom?.room_type === 'project') {
+          queryClient.invalidateQueries({
+            queryKey: ['project-chat-rooms'],
+            refetchType: 'active'
+          });
+        } else if (newRoom?.room_type === 'team') {
+          queryClient.invalidateQueries({
+            queryKey: ['team-chat-rooms'],
+            refetchType: 'active'
+          });
+        }
+        return;
+      }
+
+      const message = (data as any).data;
+      const actualRoomId = message?.room_id || message?.room;
+
+
+      if (data.type === 'CHAT_MESSAGE' && message && actualRoomId) {
         const isOwnMessage = message.sender.id === currentUser?.id;
+
+        // Add is_own_message field if not present
+        const enrichedMessage: ChatMessage = {
+          ...message,
+          is_own_message: isOwnMessage,
+          room: actualRoomId
+        };
 
         // 1. Update last messages for the sidebar
         let chatListUserId: number | null = null;
@@ -109,57 +164,89 @@ export function TeamChatModern() {
           const roomData = queryClient.getQueryData<ChatRoom>(['chat-room', actualRoomId]);
           chatListUserId = roomData?.participants?.find(p => p.id !== currentUser?.id)?.id || null;
         } else {
-          chatListUserId = message.sender.id;
+          chatListUserId = enrichedMessage.sender.id;
         }
 
         if (chatListUserId) {
           setLastMessages(prev => {
             const newMap = new Map(prev);
-            newMap.set(chatListUserId!, { content: message.content, timestamp: message.created_at });
+            newMap.set(chatListUserId!, { content: enrichedMessage.content, timestamp: enrichedMessage.created_at });
             setChatListVersion(v => v + 1);
             return newMap;
           });
         }
 
-        // 2. Update the specific room's message cache
+        // 2. Get current cache before update
+        const beforeUpdate = queryClient.getQueryData<ChatRoomMessagesResponse>(['chat-messages', actualRoomId]);
+
+        // 3. Update the specific room's message cache
         queryClient.setQueryData(['chat-messages', actualRoomId], (oldData: ChatRoomMessagesResponse | undefined) => {
           const existingMessages = oldData?.messages || [];
-          if (existingMessages.some(m => m.id === message.id)) return oldData;
 
-          const updatedMessages = [...existingMessages, message].sort((a, b) =>
+          // Check for duplicate
+          const isDuplicate = existingMessages.some(m => m.id === enrichedMessage.id);
+          if (isDuplicate) {
+            console.warn('⚠️ [CACHE] Duplicate message detected, skipping:', enrichedMessage.id);
+            return oldData;
+          }
+
+          const updatedMessages = [...existingMessages, enrichedMessage].sort((a, b) =>
             new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
           );
 
-          return { ...oldData, messages: updatedMessages, count: updatedMessages.length, has_more: oldData?.has_more ?? false };
+          return {
+            ...oldData,
+            messages: updatedMessages,
+            count: updatedMessages.length,
+            has_more: oldData?.has_more ?? false
+          };
         });
 
-        // 3. Trigger immediate UI update if it's the active room
-        if (actualRoomId === activeRoomRef.current?.id) {
-          queryClient.invalidateQueries({ queryKey: ['chat-messages', actualRoomId], refetchType: 'none' });
-        } else {
+        // 4. Verify cache update
+        const afterUpdate = queryClient.getQueryData<ChatRoomMessagesResponse>(['chat-messages', actualRoomId]);
+
+        // 5. Check if this is the active room
+        const isActiveRoom = actualRoomId === activeRoomRef.current?.id;
+
+        // 6. Force re-render by invalidating query
+        queryClient.invalidateQueries({
+          queryKey: ['chat-messages', actualRoomId],
+          refetchType: 'none'
+        });
+
+        // 7. Additional check - verify query state
+        setTimeout(() => {
+          const finalState = queryClient.getQueryData<ChatRoomMessagesResponse>(['chat-messages', actualRoomId]);
+        }, 100);
+
+
+        // 8. Handle unread counts and notifications for non-active rooms
+        if (!isActiveRoom) {
           setUnreadCounts(prev => {
             const newMap = new Map(prev);
             newMap.set(actualRoomId, (newMap.get(actualRoomId) || 0) + 1);
             return newMap;
           });
 
+
           const toast: ToastNotification = {
             id: `${Date.now()}`,
             room_id: actualRoomId,
-            sender_name: message.sender.full_name || message.sender.username,
-            message_preview: message.content,
-            timestamp: message.created_at
+            sender_name: enrichedMessage.sender.full_name || enrichedMessage.sender.username,
+            message_preview: enrichedMessage.content,
+            timestamp: enrichedMessage.created_at
           };
           setToastNotifications(prev => [...prev, toast]);
+        } else {
         }
       }
+
     });
 
     // Cleanup on unmount
     return () => {
-      console.log('🧹 Cleaning up Global WebSocket');
-      globalSocket.disconnect();
-      isGlobalSocketInitialized.current = false;
+      gateway.disconnect();
+      isGatewayInitialized.current = false;
     };
   }, [currentUser?.id, queryClient]);
 
@@ -167,11 +254,8 @@ export function TeamChatModern() {
   const createRoomMutation = useMutation({
     mutationFn: (userId: number) => chatApi.createPrivateRoom(userId),
     onSuccess: (roomData, userId) => {
-      console.log('✅ Room created/retrieved:', roomData.id);
       setActiveRoom(roomData);
       activeRoomRef.current = roomData;
-
-      // Cache the room data for later participant lookup
       queryClient.setQueryData(['chat-room', roomData.id], roomData);
 
 
@@ -190,7 +274,7 @@ export function TeamChatModern() {
       });
     },
     onError: (error) => {
-      console.error("Failed to load chat room", error);
+      console.error("[ROOM ERROR] Failed to load chat room", error);
     }
   });
 
@@ -203,57 +287,39 @@ export function TeamChatModern() {
         : Promise.resolve({ messages: [], count: 0, has_more: false });
     },
     enabled: !!(activeRoom || selectedProjectRoom || selectedTeamRoom),
+    staleTime: 0,
+    refetchOnMount: true,
   });
 
   // 5. Room-specific WebSocket
   useEffect(() => {
     if (!activeRoom?.id) return;
 
-    console.log('🔌 Connecting to room-specific WebSocket:', activeRoom.id);
-
-    const socket = new ChatWebSocketService();
-    socket.connect(activeRoom.id);
-    socketRef.current = socket;
-
-    // Clear unread count when opening a room
     setUnreadCounts(prev => {
       const newMap = new Map(prev);
       newMap.delete(activeRoom.id);
       return newMap;
     });
-
-    socket.onMessage((newMessage) => {
-      queryClient.setQueryData(['chat-messages', activeRoom.id], (old: ChatRoomMessagesResponse | undefined) => {
-        if (!old) return { messages: [newMessage], count: 1, has_more: false };
-        if (old.messages.some(m => m.id === newMessage.id)) return old;
-
-        return {
-          ...old,
-          messages: [...old.messages, newMessage].sort((a, b) =>
-            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-          ),
-          count: old.messages.length + 1
-        };
-      });
-
-      // Explicitly notify the query to re-render
-      queryClient.invalidateQueries({ queryKey: ['chat-messages', activeRoom.id], refetchType: 'none' });
-    });
-
-    return () => {
-      console.log('🧹 Disconnecting from room WebSocket:', activeRoom.id);
-      socket.disconnect();
-    };
-  }, [activeRoom?.id, queryClient]);
+  }, [activeRoom?.id]);
 
   const messages = useMemo(() => {
-    if (!messagesData?.messages) return [];
+    if (!messagesData?.messages) {
+      return [];
+    }
 
-    // Always sort messages by timestamp 
-    return [...messagesData.messages].sort((a, b) =>
+    const sortedMessages = [...messagesData.messages].sort((a, b) =>
       new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     );
+    return sortedMessages;
   }, [messagesData?.messages]);
+
+  // Log when messages array changes
+  useEffect(() => {
+  }, [messages]);
+
+  // Monitor active room changes for debugging
+  useEffect(() => {
+  }, [activeRoom, selectedProjectRoom, selectedTeamRoom, selectedUserId]);
 
   // Filter and sort users with activity
   const users = useMemo(() => {
@@ -333,162 +399,129 @@ export function TeamChatModern() {
   const handleUserSelect = (userId: number) => {
     if (selectedUserId === userId) return;
 
-    console.log('👤 User selected:', userId);
-
-    // Clean up project and team sockets when switching to chat
-    if (projectSocketRef.current) {
-      console.log('🧹 Cleaning up Project WebSocket (switching to chat)');
-      projectSocketRef.current.disconnect();
-      projectSocketRef.current = null;
-    }
-    if (teamSocketRef.current) {
-      console.log('🧹 Cleaning up Team WebSocket (switching to chat)');
-      teamSocketRef.current.disconnect();
-      teamSocketRef.current = null;
-    }
-
     // Reset project/team selections
     setSelectedProjectRoom(null);
     setSelectedTeamRoom(null);
-
     setSelectedUserId(userId);
     setActiveRoom(null);
     activeRoomRef.current = null;
+    queryClient.resetQueries({ queryKey: ['chat-messages'] });
+
     createRoomMutation.mutate(userId);
   };
 
   // Handler for project room click
   const handleProjectClick = async (projectRoom: ProjectChatRoom) => {
-    console.log('📂 Project room selected:', projectRoom.name, projectRoom.id);
-
-    // Clean up existing sockets
-    if (socketRef.current) {
-      socketRef.current.disconnect();
-      socketRef.current = null;
-    }
-    if (projectSocketRef.current) {
-      projectSocketRef.current.disconnect();
-      projectSocketRef.current = null;
-    }
-    if (teamSocketRef.current) {
-      teamSocketRef.current.disconnect();
-      teamSocketRef.current = null;
-    }
-
-    // Reset states
     setSelectedUserId(null);
     setSelectedTeamRoom(null);
-    setSelectedProjectRoom(projectRoom);
     setActiveRoom(null);
 
-    // Clear unread count for this room
+    // Set project room
+    setSelectedProjectRoom(projectRoom);
+    activeRoomRef.current = { id: projectRoom.id } as ChatRoom;
     setUnreadCounts(prev => {
       const newMap = new Map(prev);
       newMap.set(projectRoom.id, 0);
       return newMap;
     });
-
-    // Fetch messages for this project room
+    queryClient.resetQueries({ queryKey: ['chat-messages'] });
     queryClient.invalidateQueries({ queryKey: ['chat-messages', projectRoom.id] });
-
-    // Initialize WebSocket for project room
-    const projectSocket = new ChatWebSocketService();
-    projectSocket.connect(projectRoom.id);
-    projectSocketRef.current = projectSocket;
-
-    // Register message callback
-    projectSocket.onMessage((newMessage: ChatMessage) => {
-      console.log('📩 Project WS received:', newMessage);
-      queryClient.setQueryData(
-        ['chat-messages', projectRoom.id],
-        (oldData: ChatRoomMessagesResponse | undefined) => {
-          const existingMessages = oldData?.messages || [];
-          if (existingMessages.some(m => m.id === newMessage.id)) return oldData;
-
-          const updatedMessages = [...existingMessages, newMessage].sort(
-            (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-          );
-
-          return {
-            ...oldData,
-            messages: updatedMessages,
-            count: updatedMessages.length,
-            has_more: oldData?.has_more ?? false,
-          };
-        }
-      );
-      queryClient.invalidateQueries({ queryKey: ['chat-messages', projectRoom.id], refetchType: 'none' });
-    });
   };
 
   // Handler for team room click
   const handleTeamClick = async (teamRoom: TeamChatRoom) => {
-    console.log('🏢 Team room selected:', teamRoom.name, teamRoom.id);
-
-    // Clean up existing sockets
-    if (socketRef.current) {
-      socketRef.current.disconnect();
-      socketRef.current = null;
-    }
-    if (projectSocketRef.current) {
-      projectSocketRef.current.disconnect();
-      projectSocketRef.current = null;
-    }
-    if (teamSocketRef.current) {
-      teamSocketRef.current.disconnect();
-      teamSocketRef.current = null;
-    }
-
-    // Reset states
     setSelectedUserId(null);
     setSelectedProjectRoom(null);
-    setSelectedTeamRoom(teamRoom);
     setActiveRoom(null);
 
-    // Clear unread count for this room
+    // Set team room
+    setSelectedTeamRoom(teamRoom);
+    activeRoomRef.current = { id: teamRoom.id } as ChatRoom;
     setUnreadCounts(prev => {
       const newMap = new Map(prev);
       newMap.set(teamRoom.id, 0);
       return newMap;
     });
 
-    // Fetch messages for this team room
+    // CRITICAL FIX: Reset previous messages and fetch new ones
+    queryClient.resetQueries({ queryKey: ['chat-messages'] });
     queryClient.invalidateQueries({ queryKey: ['chat-messages', teamRoom.id] });
-
-    // Initialize WebSocket for team room
-    const teamSocket = new ChatWebSocketService();
-    teamSocket.connect(teamRoom.id);
-    teamSocketRef.current = teamSocket;
-
-    // Register message callback
-    teamSocket.onMessage((newMessage: ChatMessage) => {
-      console.log('📩 Team WS received:', newMessage);
-      queryClient.setQueryData(
-        ['chat-messages', teamRoom.id],
-        (oldData: ChatRoomMessagesResponse | undefined) => {
-          const existingMessages = oldData?.messages || [];
-          if (existingMessages.some(m => m.id === newMessage.id)) return oldData;
-
-          const updatedMessages = [...existingMessages, newMessage].sort(
-            (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-          );
-
-          return {
-            ...oldData,
-            messages: updatedMessages,
-            count: updatedMessages.length,
-            has_more: oldData?.has_more ?? false,
-          };
-        }
-      );
-      queryClient.invalidateQueries({ queryKey: ['chat-messages', teamRoom.id], refetchType: 'none' });
-    });
   };
-  // Add these new handler functions
+
+
+  // handler for emoji click
   const handleEmojiClick = (emojiData: EmojiClickData) => {
     setMessageInput((prev) => prev + emojiData.emoji);
     setShowEmojiPicker(false);
   };
+
+  // Handle quick emoji reaction
+  const handleQuickReaction = (messageId: string | number, emoji: string) => {
+    setMessageReactions(prev => {
+      const newMap = new Map(prev);
+      const messageReactionMap = newMap.get(messageId) || new Map();
+      const currentCount = messageReactionMap.get(emoji) || 0;
+      messageReactionMap.set(emoji, currentCount + 1);
+      newMap.set(messageId, messageReactionMap);
+      return newMap;
+    });
+  };
+
+  // Handle reaction from picker
+  const handleReactionFromPicker = (messageId: string | number, emojiData: EmojiClickData) => {
+    handleQuickReaction(messageId, emojiData.emoji);
+    setShowReactionPicker(null);
+  };
+
+  // Handle message actions
+  const handleReplyWithQuote = (message: ChatMessage) => {
+    setMessageInput(`> ${message.content}\n\n`);
+    setOpenMenuMessageId(null);
+  };
+
+  const handleForward = (message: ChatMessage) => {
+    setOpenMenuMessageId(null);
+  };
+
+  const handleCopyLink = (message: ChatMessage) => {
+    setOpenMenuMessageId(null);
+  };
+
+  const handleSaveMessage = (message: ChatMessage) => {
+    setOpenMenuMessageId(null);
+  };
+
+  const handleDeleteMessage = (message: ChatMessage) => {
+    if (confirm('Are you sure you want to delete this message?')) {
+      setOpenMenuMessageId(null);
+    }
+  };
+
+  const handlePinMessage = (message: ChatMessage) => {
+    setOpenMenuMessageId(null);
+  };
+
+  const handleMarkAsUnread = (message: ChatMessage) => {
+    setOpenMenuMessageId(null);
+  };
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setOpenMenuMessageId(null);
+        setShowReactionPicker(null);
+      }
+    };
+
+    if (openMenuMessageId || showReactionPicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [openMenuMessageId, showReactionPicker]);
 
   const toggleEmojiPicker = () => {
     setShowEmojiPicker((prev) => !prev);
@@ -513,84 +546,6 @@ export function TeamChatModern() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showEmojiPicker]);
-
-
-  // Send Message
-  const handleSendMessage = async () => {
-    const content = messageInput.trim();
-    const hasFile = selectedFile !== null;
-
-    if (!content && !hasFile) return;
-
-    const roomId = selectedProjectRoom?.id || selectedTeamRoom?.id || activeRoom?.id;
-
-    // If there's a file attachment, use HTTP POST
-    if (hasFile && roomId) {
-      try {
-        const response = await chatApi.sendMessageWithAttachment(roomId, {
-          content: content || 'Sent an attachment',
-          attachment: selectedFile!
-        });
-
-        // Update messages in cache
-        queryClient.setQueryData(
-          ['chat-messages', roomId],
-          (oldData: ChatRoomMessagesResponse | undefined) => {
-            const existingMessages = oldData?.messages || [];
-            const updatedMessages = [...existingMessages, response].sort(
-              (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-            );
-
-            return {
-              ...oldData,
-              messages: updatedMessages,
-              count: updatedMessages.length,
-              has_more: oldData?.has_more ?? false,
-            };
-          }
-        );
-
-        queryClient.invalidateQueries({ queryKey: ['chat-messages', roomId], refetchType: 'none' });
-
-        // Reset states
-        setMessageInput('');
-        setSelectedFile(null);
-        if (filePreviewUrl) {
-          URL.revokeObjectURL(filePreviewUrl);
-          setFilePreviewUrl(null);
-        }
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
-      } catch (error) {
-        console.error('Failed to send message with attachment:', error);
-      }
-      return;
-    }
-
-    // Otherwise use WebSocket for text-only messages
-    setMessageInput('');
-
-    // Send via Project WebSocket if project room is selected
-    if (selectedProjectRoom && projectSocketRef.current) {
-      projectSocketRef.current.sendMessage(content);
-      return;
-    }
-
-    // Send via Team WebSocket if team room is selected
-    if (selectedTeamRoom && teamSocketRef.current) {
-      teamSocketRef.current.sendMessage(content);
-      return;
-    }
-
-    // Send via Chat WebSocket for private rooms
-    if (activeRoom && socketRef.current) {
-      socketRef.current.sendMessage(content);
-    } else {
-      console.error('No active WebSocket connection');
-    }
-  };
-
 
   // Send on Enter key
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -639,6 +594,85 @@ export function TeamChatModern() {
     };
   }, [filePreviewUrl]);
 
+  // Send Message
+  const handleSendMessage = async () => {
+    const content = messageInput.trim();
+    const hasFile = selectedFile !== null;
+
+    if (!content && !hasFile) {
+      return;
+    }
+
+    const roomId = selectedProjectRoom?.id || selectedTeamRoom?.id || activeRoom?.id;
+
+    // If there's a file attachment, use HTTP POST
+    if (hasFile && roomId) {
+      try {
+        const response = await chatApi.sendMessageWithAttachment(roomId, {
+          content: content || 'Sent an attachment',
+          attachment: selectedFile!
+        });
+
+        // Update messages in cache
+        queryClient.setQueryData(
+          ['chat-messages', roomId],
+          (oldData: ChatRoomMessagesResponse | undefined) => {
+            const existingMessages = oldData?.messages || [];
+            const updatedMessages = [...existingMessages, response].sort(
+              (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            );
+
+            return {
+              ...oldData,
+              messages: updatedMessages,
+              count: updatedMessages.length,
+              has_more: oldData?.has_more ?? false,
+            };
+          }
+        );
+
+        // Trigger re-render without refetch
+        queryClient.invalidateQueries({ queryKey: ['chat-messages', roomId], refetchType: 'none' });
+
+        // Reset states
+        setMessageInput('');
+        setSelectedFile(null);
+        if (filePreviewUrl) {
+          URL.revokeObjectURL(filePreviewUrl);
+          setFilePreviewUrl(null);
+        }
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      } catch (error) {
+        console.error('❌ [SEND ERROR] Failed to send message with attachment:', error);
+      }
+      return;
+    }
+
+    // Otherwise use WebSocket for text-only messages
+    setMessageInput('');
+
+    // Send via Gateway WebSocket if project room is selected
+    if (selectedProjectRoom && gatewaySocketRef.current) {
+      gatewaySocketRef.current.sendMessage(selectedProjectRoom.id, content);
+      return;
+    }
+
+    // Send via Gateway WebSocket if team room is selected
+    if (selectedTeamRoom && gatewaySocketRef.current) {
+      gatewaySocketRef.current.sendMessage(selectedTeamRoom.id, content);
+      return;
+    }
+
+    // Send via Gateway WebSocket for private rooms
+    if (activeRoom && gatewaySocketRef.current) {
+      gatewaySocketRef.current.sendMessage(activeRoom.id, content);
+    } else {
+      console.error('❌ [SEND ERROR] No active Gateway WebSocket connection');
+    }
+  };
+
   // Status Indicator Dot
   const StatusIndicator = ({ status }: { status: UserStatus }) => {
     const statusColors = {
@@ -683,7 +717,6 @@ export function TeamChatModern() {
           <ToastNotificationComponent key={toast.id} toast={toast} />
         ))}
       </div>
-
       {/* Left Sidebar */}
       <div className="w-80 bg-[#f3f2f1] border-r border-gray-200 flex flex-col">
         {/* Sidebar Header */}
@@ -703,109 +736,94 @@ export function TeamChatModern() {
         {/* Search Bar */}
         <div className="px-3 py-3 bg-white border-b border-gray-200">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 text-sm bg-gray-100 border-0 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Search"
+              className="w-full pl-9 pr-3 py-2 text-sm bg-[#f3f2f1] rounded border-none focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
         </div>
 
-        {/* Collapsible Sections */}
+        {/* Scrollable User/Project/Team Lists */}
         <div className="flex-1 overflow-y-auto">
-          {/* Chat Section */}
-          <div className="border-b border-gray-200">
+          {/* Chats Section */}
+          <div className="bg-white">
             <button
               onClick={() => setIsChatSectionOpen(!isChatSectionOpen)}
-              className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-100 transition-colors"
+              className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
             >
               <div className="flex items-center gap-2">
-                {isChatSectionOpen ? (
-                  <ChevronDown className="h-4 w-4 text-gray-600" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 text-gray-600" />
-                )}
                 <MessageSquare className="h-4 w-4 text-gray-600" />
-                <span className="text-sm font-semibold text-gray-900">Chats</span>
+                <span className="text-sm font-medium text-gray-900">Chats</span>
+                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                  {filteredUsers.length}
+                </span>
               </div>
-              <span className="text-xs text-gray-500">{users.length}</span>
+              {isChatSectionOpen ? (
+                <ChevronDown className="h-4 w-4 text-gray-600" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-gray-600" />
+              )}
             </button>
 
             {isChatSectionOpen && (
-              <div className="bg-white">
+              <div className="border-t border-gray-100">
                 {isLoadingUsers ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                  <div className="p-4 text-center">
+                    <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
                   </div>
-                ) : users.length === 0 ? (
-                  <div className="text-center py-8 px-4">
-                    <MessageSquare className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                    <p className="text-sm text-gray-500">No users available</p>
-                  </div>
+                ) : filteredUsers.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-gray-500">No users found</div>
                 ) : (
-                  users.map((user) => {
-                    const isActive = selectedUserId === user.id;
-                    const roomId = userRoomMap.get(user.id);
-                    const unreadCount = roomId ? unreadCounts.get(roomId) || 0 : 0;
-                    const lastMsg = lastMessages.get(user.id);
+                  filteredUsers.map(user => {
+                    const isSelected = selectedUserId === user.id;
+                    const unreadCount = getUserUnreadCount(user.id);
+                    const status = getUserStatus(user.id);
 
                     return (
-                      <div
+                      <button
                         key={user.id}
                         onClick={() => handleUserSelect(user.id)}
                         className={cn(
-                          "flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors relative",
-                          isActive
-                            ? "bg-blue-50 border-l-3 border-l-blue-600"
-                            : "hover:bg-gray-50"
+                          "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
+                          isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
                         )}
                       >
                         <div className="relative flex-shrink-0">
-                          <div className="h-9 w-9 rounded-full bg-blue-100 flex items-center justify-center font-semibold text-blue-700 text-sm">
+                          <div className={cn(
+                            "h-10 w-10 rounded-full flex items-center justify-center font-semibold text-sm",
+                            isSelected ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-700"
+                          )}>
                             {user.username.charAt(0).toUpperCase()}
                           </div>
-                          <StatusIndicator status={getUserStatus(user.id)} />
+                          <StatusIndicator status={status} />
                         </div>
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 text-left">
                           <div className="flex items-center justify-between mb-0.5">
-                            <p className={cn(
-                              "text-sm truncate",
-                              isActive ? "font-semibold text-gray-900" : "font-medium text-gray-900"
-                            )}>
-                              {user.first_name || user.last_name
-                                ? `${user.first_name} ${user.last_name}`.trim()
-                                : user.username}
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {user.first_name || user.username}
                             </p>
-                            {lastMsg && (
+                            {user.lastMessageTime && (
                               <span className="text-[10px] text-gray-500 ml-2 flex-shrink-0">
-                                {new Date(lastMsg.timestamp).toLocaleTimeString([], {
-                                  hour: '2-digit',
-                                  minute: '2-digit'
-                                })}
+                                {new Date(user.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                               </span>
                             )}
                           </div>
                           <div className="flex items-center justify-between">
-                            {lastMsg ? (
-                              <p className="text-xs text-gray-600 truncate">
-                                {lastMsg.content}
-                              </p>
-                            ) : (
-                              <p className="text-xs text-gray-500 truncate">
-                                {user.email}
-                              </p>
-                            )}
+                            <p className="text-xs text-gray-600 truncate">
+                              {user.lastMessageContent || 'No messages yet'}
+                            </p>
                             {unreadCount > 0 && (
-                              <span className="ml-2 flex-shrink-0 h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                              <span className="ml-2 flex-shrink-0 h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
                                 {unreadCount}
                               </span>
                             )}
                           </div>
                         </div>
-                      </div>
+                      </button>
                     );
                   })
                 )}
@@ -814,76 +832,62 @@ export function TeamChatModern() {
           </div>
 
           {/* Projects Section */}
-          <div className="border-b border-gray-200">
+          <div className="bg-white mt-1">
             <button
               onClick={() => setIsProjectsSectionOpen(!isProjectsSectionOpen)}
-              className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-100 transition-colors"
+              className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
             >
               <div className="flex items-center gap-2">
-                {isProjectsSectionOpen ? (
-                  <ChevronDown className="h-4 w-4 text-gray-600" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 text-gray-600" />
-                )}
                 <Briefcase className="h-4 w-4 text-gray-600" />
-                <span className="text-sm font-semibold text-gray-900">Projects</span>
+                <span className="text-sm font-medium text-gray-900">Projects</span>
+                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                  {projectRooms.length}
+                </span>
               </div>
-              <span className="text-xs text-gray-500">{projectRooms.length}</span>
+              {isProjectsSectionOpen ? (
+                <ChevronDown className="h-4 w-4 text-gray-600" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-gray-600" />
+              )}
             </button>
 
             {isProjectsSectionOpen && (
-              <div className="bg-white">
+              <div className="border-t border-gray-100">
                 {isLoadingProjects ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                  <div className="p-4 text-center">
+                    <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
                   </div>
                 ) : projectRooms.length === 0 ? (
-                  <div className="text-center py-8 px-4">
-                    <Briefcase className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                    <p className="text-sm text-gray-500">No project rooms available</p>
-                  </div>
+                  <div className="p-4 text-center text-sm text-gray-500">No projects</div>
                 ) : (
-                  projectRooms.map((room: ProjectChatRoom) => {
-                    const isActive = activeRoom?.id === room.id;
+                  projectRooms.map(project => {
+                    const isSelected = selectedProjectRoom?.id === project.id;
+                    const unreadCount = unreadCounts.get(project.id) || 0;
 
                     return (
-                      <div
-                        key={room.id}
-                        onClick={() => handleProjectClick(room)}
+                      <button
+                        key={project.id}
+                        onClick={() => handleProjectClick(project)}
                         className={cn(
-                          "flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors relative",
-                          isActive
-                            ? "bg-blue-50 border-l-3 border-l-blue-600"
-                            : "hover:bg-gray-50"
+                          "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
+                          isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
                         )}
                       >
-                        <div className="relative flex-shrink-0">
-                          <div className={cn(
-                            "h-9 w-9 rounded bg-purple-100 flex items-center justify-center font-semibold text-sm",
-                            isActive ? "bg-purple-600 text-white" : "text-purple-700"
-                          )}>
-                            {room.name.charAt(0).toUpperCase()}
-                          </div>
+                        <div className="h-10 w-10 rounded bg-purple-100 flex items-center justify-center font-semibold text-purple-700 text-sm flex-shrink-0">
+                          {project.name.charAt(0).toUpperCase()}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-0.5">
-                            <p className={cn(
-                              "text-sm truncate",
-                              isActive ? "font-semibold text-gray-900" : "font-medium text-gray-900"
-                            )}>
-                              {room.name}
-                            </p>
-                          </div>
-                          <p className="text-xs text-gray-500 truncate">
-                            {room.participant_count} {room.participant_count === 1 ? 'member' : 'members'}
+                        <div className="flex-1 min-w-0 text-left">
+                          <p className="text-sm font-medium text-gray-900 truncate">{project.name}</p>
+                          <p className="text-xs text-gray-600 truncate">
+                            {project.last_message?.content_preview || 'No messages yet'}
                           </p>
                         </div>
-                        {room.unread_count > 0 && (
-                          <span className="ml-2 flex-shrink-0 h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                            {room.unread_count}
+                        {unreadCount > 0 && (
+                          <span className="ml-2 flex-shrink-0 h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
+                            {unreadCount}
                           </span>
                         )}
-                      </div>
+                      </button>
                     );
                   })
                 )}
@@ -891,77 +895,61 @@ export function TeamChatModern() {
             )}
           </div>
 
-          {/* Teams & Channels Section */}
-          <div className="border-b border-gray-200">
+          {/* Teams Section */}
+          <div className="bg-white mt-1">
             <button
               onClick={() => setIsTeamsSectionOpen(!isTeamsSectionOpen)}
-              className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-100 transition-colors"
+              className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
             >
               <div className="flex items-center gap-2">
-                {isTeamsSectionOpen ? (
-                  <ChevronDown className="h-4 w-4 text-gray-600" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 text-gray-600" />
-                )}
                 <UsersIcon className="h-4 w-4 text-gray-600" />
-                <span className="text-sm font-semibold text-gray-900">Teams & Channels</span>
+                <span className="text-sm font-medium text-gray-900">Teams</span>
+                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                  {teamRooms.length}
+                </span>
               </div>
-              <span className="text-xs text-gray-500">{teamRooms.length}</span>
+              {isTeamsSectionOpen ? (
+                <ChevronDown className="h-4 w-4 text-gray-600" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-gray-600" />
+              )}
             </button>
 
             {isTeamsSectionOpen && (
-              <div className="bg-white">
+              <div className="border-t border-gray-100">
                 {isLoadingTeams ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                  <div className="p-4 text-center">
+                    <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
                   </div>
                 ) : teamRooms.length === 0 ? (
-                  <div className="text-center py-8 px-4">
-                    <UsersIcon className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                    <p className="text-sm text-gray-500">No teams available</p>
-                  </div>
+                  <div className="p-4 text-center text-sm text-gray-500">No teams</div>
                 ) : (
-                  teamRooms.map((room: TeamChatRoom) => {
-                    const isActive = activeRoom?.id === room.id;
+                  teamRooms.map(team => {
+                    const isSelected = selectedTeamRoom?.id === team.id;
+                    const unreadCount = unreadCounts.get(team.id) || 0;
 
                     return (
-                      <div
-                        key={room.id}
-                        onClick={() => handleTeamClick(room)}
+                      <button
+                        key={team.id}
+                        onClick={() => handleTeamClick(team)}
                         className={cn(
-                          "flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors relative",
-                          isActive
-                            ? "bg-blue-50 border-l-3 border-l-blue-600"
-                            : "hover:bg-gray-50"
+                          "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
+                          isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
                         )}
                       >
-                        <div className="relative flex-shrink-0">
-                          <div className={cn(
-                            "h-9 w-9 rounded bg-green-100 flex items-center justify-center font-semibold text-sm",
-                            isActive ? "bg-green-600 text-white" : "text-green-700"
-                          )}>
-                            {room.name.charAt(0).toUpperCase()}
-                          </div>
+                        <div className="h-10 w-10 rounded bg-green-100 flex items-center justify-center font-semibold text-green-700 text-sm flex-shrink-0">
+                          {team.name.charAt(0).toUpperCase()}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-0.5">
-                            <p className={cn(
-                              "text-sm truncate",
-                              isActive ? "font-semibold text-gray-900" : "font-medium text-gray-900"
-                            )}>
-                              {room.name}
-                            </p>
-                          </div>
-                          <p className="text-xs text-gray-500 truncate">
-                            {room.participant_count} {room.participant_count === 1 ? 'member' : 'members'}
-                          </p>
+                        <div className="flex-1 min-w-0 text-left">
+                          <p className="text-sm font-medium text-gray-900 truncate">{team.name}</p>
+                          <p className="text-xs text-gray-600 truncate">Team Chat</p>
                         </div>
-                        {room.unread_count > 0 && (
-                          <span className="ml-2 flex-shrink-0 h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                            {room.unread_count}
+                        {unreadCount > 0 && (
+                          <span className="ml-2 flex-shrink-0 h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
+                            {unreadCount}
                           </span>
                         )}
-                      </div>
+                      </button>
                     );
                   })
                 )}
@@ -971,55 +959,52 @@ export function TeamChatModern() {
         </div>
       </div>
 
-      {/* Right Side */}
+      {/* Right Panel - Chat View */}
       <div className="flex-1 flex flex-col bg-white">
-        {(selectedUser || selectedProjectRoom || selectedTeamRoom) ? (
+        {(activeRoom || selectedProjectRoom || selectedTeamRoom) ? (
           <>
             {/* Chat Header */}
-            <div className="h-14 px-4 flex items-center justify-between bg-white border-b border-gray-200">
+            <div className="h-14 px-6 flex items-center justify-between bg-white border-b border-gray-200">
               <div className="flex items-center gap-3">
                 <div className="relative">
-                  {selectedUser ? (
+                  {selectedProjectRoom ? (
+                    <div className="h-10 w-10 rounded bg-purple-100 flex items-center justify-center font-semibold text-purple-700 text-sm">
+                      {selectedProjectRoom.name.charAt(0).toUpperCase()}
+                    </div>
+                  ) : selectedTeamRoom ? (
+                    <div className="h-10 w-10 rounded bg-green-100 flex items-center justify-center font-semibold text-green-700 text-sm">
+                      {selectedTeamRoom.name.charAt(0).toUpperCase()}
+                    </div>
+                  ) : selectedUser ? (
                     <>
-                      <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center font-semibold text-blue-700 text-sm">
+                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center font-semibold text-blue-700 text-sm">
                         {selectedUser.username.charAt(0).toUpperCase()}
                       </div>
                       <StatusIndicator status={getUserStatus(selectedUser.id)} />
                     </>
-                  ) : selectedProjectRoom ? (
-                    <div className="h-8 w-8 rounded bg-purple-100 flex items-center justify-center font-semibold text-purple-700 text-sm">
-                      {selectedProjectRoom?.name.charAt(0).toUpperCase()}
-                    </div>
-                  ) : selectedTeamRoom ? (
-                    <div className="h-8 w-8 rounded bg-green-100 flex items-center justify-center font-semibold text-green-700 text-sm">
-                      {selectedTeamRoom?.name.charAt(0).toUpperCase()}
-                    </div>
                   ) : null}
                 </div>
                 <div>
                   <h3 className="font-semibold text-sm text-gray-900">
-                    {selectedUser
-                      ? (selectedUser.first_name || selectedUser.last_name
-                        ? `${selectedUser.first_name} ${selectedUser.last_name}`.trim()
-                        : selectedUser.username)
-                      : selectedProjectRoom?.name || selectedTeamRoom?.name
-                    }
+                    {selectedProjectRoom?.name || selectedTeamRoom?.name || (selectedUser ? `${selectedUser.first_name || selectedUser.username}` : '')}
                   </h3>
-                  <p className="text-xs text-gray-600 capitalize">
-                    {selectedUser
-                      ? `${getUserStatus(selectedUser.id)} • ${selectedUser.role}`
-                      : `${selectedProjectRoom?.participant_count || selectedTeamRoom?.participant_count} members`
-                    }
-                  </p>
+                  {selectedUser && (
+                    <p className="text-xs text-gray-500 capitalize">{getUserStatus(selectedUser.id)}</p>
+                  )}
+                  {selectedProjectRoom && (
+                    <p className="text-xs text-gray-500">Project Chat</p>
+                  )}
+                  {selectedTeamRoom && (
+                    <p className="text-xs text-gray-500">Team Chat</p>
+                  )}
                 </div>
               </div>
-
               <div className="flex items-center gap-1">
                 <button className="p-2 hover:bg-gray-100 rounded transition-colors">
-                  <Video className="h-4 w-4 text-gray-600" />
+                  <Phone className="h-4 w-4 text-gray-600" />
                 </button>
                 <button className="p-2 hover:bg-gray-100 rounded transition-colors">
-                  <Phone className="h-4 w-4 text-gray-600" />
+                  <Video className="h-4 w-4 text-gray-600" />
                 </button>
                 <button className="p-2 hover:bg-gray-100 rounded transition-colors">
                   <Info className="h-4 w-4 text-gray-600" />
@@ -1028,109 +1013,248 @@ export function TeamChatModern() {
             </div>
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 bg-[#f3f2f1]">
-              {createRoomMutation.isPending ? (
-                <div className="h-full flex items-center justify-center">
+            <div className="flex-1 overflow-y-auto bg-[#efeae2] p-6">
+              {isLoadingMessages ? (
+                <div className="flex items-center justify-center h-full">
                   <div className="animate-spin h-8 w-8 border-2 border-blue-600 border-t-transparent rounded-full"></div>
                 </div>
               ) : messages.length === 0 ? (
-                <div className="h-full flex items-center justify-center">
+                <div className="flex items-center justify-center h-full">
                   <div className="text-center">
-                    <MessageSquare className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                    <p className="text-base font-medium text-gray-600">Start the conversation</p>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {selectedUser
-                        ? `Say hi to ${selectedUser?.first_name || selectedUser?.username}`
-                        : selectedProjectRoom
-                          ? `Start discussing ${selectedProjectRoom.name}`
-                          : selectedTeamRoom
-                            ? `Start chatting in ${selectedTeamRoom.name}`
-                            : 'Start the conversation'
-                      }
-                    </p>
+                    <MessageSquare className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                    <p className="text-sm text-gray-500">No messages yet</p>
+                    <p className="text-xs text-gray-400 mt-1">Start the conversation!</p>
                   </div>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {messages.map((msg: ChatMessage) => {
-                    const isMe = msg.is_own_message ?? (msg.sender.id === currentUser?.id);
+                <div className="space-y-3">
+                  {messages.map((message, index) => {
+                    const isOwn = message.is_own_message;
+                    const showAvatar = index === 0 || messages[index - 1].sender.id !== message.sender.id;
+                    const isHovered = hoveredMessageId === message.id;
+                    const menuOpen = openMenuMessageId === message.id;
+                    const reactions = messageReactions.get(message.id);
 
                     return (
                       <div
-                        key={msg.id}
-                        className={cn(
-                          "flex items-start gap-2",
-                          isMe ? "justify-end" : "justify-start"
-                        )}
+                        key={message.id}
+                        className={cn("flex gap-2 group relative", isOwn ? "flex-row-reverse" : "")}
+                        onMouseEnter={() => setHoveredMessageId(message.id)}
+                        onMouseLeave={() => setHoveredMessageId(null)}
                       >
-                        {/* Avatar on left for receiver, right for sender */}
-                        {!isMe && (
-                          <div className="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center font-semibold text-gray-700 text-xs flex-shrink-0 mt-1">
-                            {msg.sender.username.charAt(0).toUpperCase()}
-                          </div>
-                        )}
-
-                        <div className={cn(
-                          "max-w-[70%] rounded-lg p-3",
-                          isMe
-                            ? "bg-blue-600 text-white"
-                            : "bg-white text-gray-900 shadow-sm border border-gray-200"
-                        )}>
-                          {!isMe && (
-                            <p className="text-[10px] font-semibold text-gray-600 mb-1">
-                              {msg.sender.full_name || msg.sender.username}
-                            </p>
-                          )}
-
-                          {/* Display attachment if present */}
-                          {msg.attachment && msg.message_type === 'image' && (
-                            <div className="mb-2">
-                              <img
-                                src={msg.attachment}
-                                alt={msg.attachment_name || 'Attachment'}
-                                className="max-w-full rounded cursor-pointer"
-                                style={{ maxHeight: '300px' }}
-                                onClick={() => window.open(msg.attachment!, '_blank')}
-                              />
+                        {/* Avatar */}
+                        <div className="flex-shrink-0">
+                          {showAvatar ? (
+                            <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center font-semibold text-white text-sm shadow-sm">
+                              {message.sender.username.charAt(0).toUpperCase()}
                             </div>
+                          ) : (
+                            <div className="h-9 w-9" />
                           )}
-
-                          {msg.attachment && msg.message_type !== 'image' && (
-                            <a
-                              href={msg.attachment}
-
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className={cn(
-                                "flex items-center gap-2 mb-2 p-2 rounded",
-                                isMe ? "bg-blue-700" : "bg-gray-100"
-                              )}
-                            >
-                              <Paperclip className="h-4 w-4" />
-                              <span className="text-xs truncate max-w-[200px]">
-                                {msg.attachment_name || 'Download'}
-                              </span>
-                            </a>
-                          )}
-
-                          {msg.content && <p className="text-sm break-words">{msg.content}</p>}
-
-                          <span className={cn(
-                            "text-[10px] block mt-1",
-                            isMe ? "text-blue-100 text-right" : "text-gray-500 text-left"
-                          )}>
-                            {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
                         </div>
 
-                        {/* Avatar on right for sender */}
-                        {
-                          isMe && (
-                            <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center font-semibold text-white text-xs flex-shrink-0 mt-1">
-                              {currentUser?.username.charAt(0).toUpperCase()}
+                        {/* Message Content */}
+                        <div className={cn("flex-1 max-w-[65%]", isOwn ? "flex flex-col items-end" : "flex flex-col items-start")}>
+                          {showAvatar && (
+                            <div className={cn("flex items-baseline gap-2 mb-1", isOwn ? "flex-row-reverse" : "")}>
+                              <span className={cn(
+                                "text-xs font-medium",
+                                isOwn ? "text-gray-700" : "text-gray-900"
+                              )}>
+                                {message.sender.full_name || message.sender.username}
+                              </span>
+                              <span className="text-[11px] text-gray-400 font-normal">
+                                {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
                             </div>
-                          )
-                        }
+                          )}
+
+                          <div className="relative">
+                            <div
+                              className={cn(
+                                "px-3 py-2 rounded-lg text-sm break-words shadow-sm max-w-full",
+                                isOwn
+                                  ? "bg-[#005c4b] text-white rounded-br-none"
+                                  : "bg-white text-gray-900 border border-gray-100 rounded-bl-none"
+                              )}
+                              style={{
+                                minWidth: '60px',
+                                wordBreak: 'break-word',
+                                overflowWrap: 'break-word'
+                              }}
+                            >
+                              {message.content}
+
+                              {/* Attachment */}
+                              {message.attachment && (
+                                <div className="mt-2 pt-2 border-t border-blue-500">
+                                  <a
+                                    href={message.attachment}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-2 text-xs hover:underline"
+                                  >
+                                    <Paperclip className="h-3 w-3" />
+                                    {message.attachment_name || 'Attachment'}
+                                  </a>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Quick Actions on Hover */}
+                            {(isHovered || menuOpen) && (
+                              <div
+                                className={cn(
+                                  "absolute top-0 flex items-center gap-0.5 bg-white border border-gray-200 rounded-lg shadow-sm px-1 py-0.5",
+                                  isOwn ? "right-full mr-2" : "left-full ml-2"
+                                )}
+                              >
+                                {/* Quick Emoji Reactions */}
+                                <button
+                                  onClick={() => handleQuickReaction(message.id, '👍')}
+                                  className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                  title="Like"
+                                >
+                                  <span className="text-xs">👍</span>
+                                </button>
+                                <button
+                                  onClick={() => handleQuickReaction(message.id, '❤️')}
+                                  className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                  title="Love"
+                                >
+                                  <span className="text-xs">❤️</span>
+                                </button>
+                                <button
+                                  onClick={() => handleQuickReaction(message.id, '😊')}
+                                  className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                  title="Smile"
+                                >
+                                  <span className="text-xs">😊</span>
+                                </button>
+
+                                <div className="h-4 w-px bg-gray-200 mx-0.5" />
+
+                                {/* More Reactions Button */}
+                                <button
+                                  onClick={() => setShowReactionPicker(showReactionPicker === message.id ? null : message.id)}
+                                  className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                  title="More reactions"
+                                >
+                                  <Smile className="h-3.5 w-3.5 text-gray-600" />
+                                </button>
+
+                                {/* More Options Menu */}
+                                <button
+                                  onClick={() => setOpenMenuMessageId(menuOpen ? null : message.id)}
+                                  className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                  title="More options"
+                                >
+                                  <MoreVertical className="h-3.5 w-3.5 text-gray-600" />
+                                </button>
+
+                                {/* Emoji Picker Popup */}
+                                {showReactionPicker === message.id && (
+                                  <div
+                                    className={cn(
+                                      "absolute top-full mt-1 z-50",
+                                      isOwn ? "right-0" : "left-0"
+                                    )}
+                                  >
+                                    <EmojiPicker
+                                      onEmojiClick={(emojiData) => handleReactionFromPicker(message.id, emojiData)}
+                                      width={280}
+                                      height={350}
+                                      searchPlaceHolder="Search emoji..."
+                                      previewConfig={{ showPreview: false }}
+                                    />
+                                  </div>
+                                )}
+
+                                {/* Dropdown Menu */}
+                                {menuOpen && (
+                                  <div
+                                    ref={menuRef}
+                                    className={cn(
+                                      "absolute top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-48 z-50",
+                                      isOwn ? "right-0" : "left-0"
+                                    )}
+                                  >
+                                    <button
+                                      onClick={() => handleReplyWithQuote(message)}
+                                      className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                    >
+                                      <Reply className="h-4 w-4" />
+                                      Reply
+                                    </button>
+                                    <button
+                                      onClick={() => handleForward(message)}
+                                      className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                    >
+                                      <Forward className="h-4 w-4" />
+                                      Forward
+                                    </button>
+                                    <button
+                                      onClick={() => handleCopyLink(message)}
+                                      className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                    >
+                                      <Link2 className="h-4 w-4" />
+                                      Copy link
+                                    </button>
+                                    <button
+                                      onClick={() => handlePinMessage(message)}
+                                      className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                    >
+                                      <Pin className="h-4 w-4" />
+                                      Pin message
+                                    </button>
+                                    <button
+                                      onClick={() => handleSaveMessage(message)}
+                                      className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                    >
+                                      <Bookmark className="h-4 w-4" />
+                                      Save
+                                    </button>
+                                    <button
+                                      onClick={() => handleMarkAsUnread(message)}
+                                      className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                    >
+                                      <MailOpen className="h-4 w-4" />
+                                      Mark as unread
+                                    </button>
+                                    <div className="h-px bg-gray-200 my-1" />
+                                    {isOwn && (
+                                      <button
+                                        onClick={() => handleDeleteMessage(message)}
+                                        className="w-full px-3 py-2 text-left text-sm hover:bg-red-50 flex items-center gap-2 text-red-600"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                        Delete
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Display Reactions */}
+                            {reactions && reactions.size > 0 && (
+                              <div className={cn(
+                                "flex gap-1 mt-1",
+                                isOwn ? "justify-end" : ""
+                              )}>
+                                {Array.from(reactions.entries()).map(([emoji, count]) => (
+                                  <span
+                                    key={emoji}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-white border border-gray-200 rounded-full text-xs"
+                                  >
+                                    <span>{emoji}</span>
+                                    <span className="text-gray-600">{count}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     );
                   })}
@@ -1149,7 +1273,7 @@ export function TeamChatModern() {
                     type="file"
                     onChange={handleFileSelect}
                     className="hidden"
-                    accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt"
+                    accept="*"
                   />
                   <button
                     onClick={handleAttachmentClick}
@@ -1295,17 +1419,21 @@ export function TeamChatModern() {
           </div>
         )}
       </div>
-      {/* Create Team Modal */}
-      {isCreateTeamModalOpen && (
-        <CreateTeamModal
-          isOpen={isCreateTeamModalOpen}
-          onClose={() => setIsCreateTeamModalOpen(false)}
-          onSuccess={() => {
-            setIsCreateTeamModalOpen(false);
-            queryClient.invalidateQueries({ queryKey: ['team-chat-rooms'] });
-          }}
-        />
-      )}
+      {
+        isCreateTeamModalOpen && (
+          <CreateTeamModal
+            isOpen={isCreateTeamModalOpen}
+            onClose={() => setIsCreateTeamModalOpen(false)}
+            onSuccess={() => {
+              setIsCreateTeamModalOpen(false);
+              queryClient.invalidateQueries({
+                queryKey: ['team-chat-rooms'],
+                refetchType: 'active'
+              });
+            }}
+          />
+        )
+      }
     </div >
   );
 }

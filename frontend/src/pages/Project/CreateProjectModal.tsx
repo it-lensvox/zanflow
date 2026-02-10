@@ -6,6 +6,7 @@ import { Button, Input, } from '@/components/common';
 import { projectsApi, usersApi } from '@/services/api';
 import type { User as AppUser, ProjectCreatePayload } from '@/types';
 import { cn, getProjectTypeColor } from '@/lib/utils';
+import { RichTextEditor } from '@/components/common/RichTextEditor';
 
 
 const TASK_TYPES = [
@@ -110,11 +111,18 @@ export function CreateProjectModal({ isOpen, onClose, navigateOnSuccess = false 
     };
 
     const handleChange = (
-        e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+        e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
     ) => {
         setFormData((prev) => ({
             ...prev,
             [e.target.name]: e.target.value,
+        }));
+    };
+
+    const handleDescriptionChange = (html: string) => {
+        setFormData((prev) => ({
+            ...prev,
+            description: html,
         }));
     };
 
@@ -224,14 +232,24 @@ export function CreateProjectModal({ isOpen, onClose, navigateOnSuccess = false 
                         <label htmlFor="description" className="text-sm font-medium">
                             Description
                         </label>
-                        <textarea
-                            id="description"
-                            name="description"
+                        <RichTextEditor
                             value={formData.description}
-                            onChange={handleChange}
+                            onChange={handleDescriptionChange}
                             placeholder="Enter project description (optional)"
-                            rows={3}
-                            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            minHeight="120px"
+                            maxHeight="250px"
+                            features={{
+                                bold: true,
+                                italic: true,
+                                underline: true,
+                                link: true,
+                                bulletList: true,
+                                orderedList: true,
+                                heading: true,
+                                table: false,
+                                image: false,
+                                codeBlock: false,
+                            }}
                         />
                     </div>
 

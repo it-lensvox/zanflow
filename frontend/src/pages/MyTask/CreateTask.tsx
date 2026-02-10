@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { taskApi, usersApi, projectsApi } from '@/services/api';
 import { ProjectMinimal, AITaskSuggestionResponse, Label } from '@/types';
 import { AITask } from './AITask';
+import { RichTextEditor } from '@/components/common/RichTextEditor';
 
 interface UserOption {
     value: string;
@@ -64,32 +65,8 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
     const [highlightedUserIndex, setHighlightedUserIndex] = useState(0);
     const [isTitleRefining, setIsTitleRefining] = useState(false);
     const [isDescRefining, setIsDescRefining] = useState(false);
-    const editorRef = useRef<HTMLDivElement>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
     const projectSearchInputRef = useRef<HTMLInputElement>(null);
 
-    const execCommand = (command: string, value: string | undefined = undefined) => {
-        document.execCommand(command, false, value);
-        editorRef.current?.focus();
-    };
-
-    const handleEditorInput = () => {
-        if (editorRef.current) {
-            setDescription(editorRef.current.innerHTML);
-        }
-    };
-
-    const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file && file.type.startsWith('image/')) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const img = `<img src="${event.target?.result}" style="max-width: 100%; height: auto;" />`;
-                document.execCommand('insertHTML', false, img);
-            };
-            reader.readAsDataURL(file);
-        }
-    };
     const handleDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         let val = e.target.value;
         const isDeleting = (e.nativeEvent as any).inputType === 'deleteContentBackward';
@@ -134,38 +111,6 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
         };
         fetchLabels();
     }, [selectedProjects]);
-
-    const insertTable = () => {
-        const table = `
-        <table border="1" style="border-collapse: collapse; width: 100%; margin: 10px 0;">
-            <tr>
-                <td style="padding: 8px; border: 1px solid #ddd;">Cell 1</td>
-                <td style="padding: 8px; border: 1px solid #ddd;">Cell 2</td>
-            </tr>
-            <tr>
-                <td style="padding: 8px; border: 1px solid #ddd;">Cell 3</td>
-                <td style="padding: 8px; border: 1px solid #ddd;">Cell 4</td>
-            </tr>
-        </table>
-    `;
-        document.execCommand('insertHTML', false, table);
-        editorRef.current?.focus();
-    };
-
-    const insertList = (ordered: boolean) => {
-        execCommand(ordered ? 'insertOrderedList' : 'insertUnorderedList');
-    };
-
-    const insertLink = () => {
-        const url = prompt('Enter URL:');
-        if (url) {
-            execCommand('createLink', url);
-        }
-    };
-
-    const toggleAlignment = (align: string) => {
-        execCommand(`justify${align.charAt(0).toUpperCase() + align.slice(1)}`);
-    };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
@@ -317,34 +262,14 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                 setSelectedProjects([aiGeneratedTask.project]);
             }
 
-            // Handle description for contentEditable div
+            // Handle description - now works directly with HTML state
             if (aiGeneratedTask.description) {
-                const desc = aiGeneratedTask.description;
-                setDescription(desc);
-                const updateEditor = (attempt = 0) => {
-                    if (editorRef.current) {
-                        editorRef.current.innerHTML = desc;
-                        editorRef.current.dispatchEvent(new Event('input', { bubbles: true }));
-                    } else if (attempt < 5) {
-                        setTimeout(() => updateEditor(attempt + 1), 100);
-                    } else {
-                        console.error('❌ Failed to update editor after 5 attempts');
-                    }
-                };
-
-                updateEditor();
+                setDescription(aiGeneratedTask.description);
             }
 
             navigate(location.pathname, { replace: true, state: {} });
         }
     }, [location.state, navigate, location.pathname]);
-
-    useEffect(() => {
-        if (editorRef.current && description && editorRef.current.innerHTML !== description) {
-            editorRef.current.innerHTML = description;
-        }
-    }, [description]);
-
 
     // For Task Title and Description AI refined 
     const handleRefineTitle = async () => {
@@ -367,8 +292,14 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
     };
 
     const handleRefineDescription = async () => {
-        // Check current content (stripping HTML for empty check)
-        const currentText = editorRef.current?.innerText || '';
+        // Extract text content from HTML description
+        const stripHtml = (html: string) => {
+            const temp = document.createElement('div');
+            temp.innerHTML = html;
+            return temp.textContent || temp.innerText || '';
+        };
+        
+        const currentText = stripHtml(description);
         const isEmpty = !currentText.trim();
 
         // If empty, we need a title to generate from
@@ -387,12 +318,8 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
             const response = await taskApi.refineText(payload);
 
             if (response.refined_text) {
-                const newText = response.refined_text;
-                setDescription(newText);
-                // Update editor visually
-                if (editorRef.current) {
-                    editorRef.current.innerHTML = newText;
-                }
+                // Set the description with the refined HTML
+                setDescription(response.refined_text);
             }
         } catch (error) {
             console.error("Failed to refine description", error);
@@ -657,180 +584,44 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                             <div>
                                 <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
                                     Description
+                                    <button
+                                        type="button"
+                                        onClick={handleRefineDescription}
+                                        disabled={isDescRefining}
+                                        className="ml-auto p-1.5 hover:bg-purple-50 text-purple-600 rounded transition-colors flex items-center gap-1"
+                                        title="Refine/Generate Description with AI"
+                                    >
+                                        {isDescRefining ? (
+                                            <div className="w-3.5 h-3.5 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
+                                        ) : (
+                                            <Sparkles className="w-4 h-4" />
+                                        )}
+                                    </button>
                                 </label>
-                                <div className="border border-gray-300 rounded-md overflow-hidden focus-within:ring-1 focus-within:ring-blue-500 focus-within:border-blue-500">
-                                    <div className="flex items-center gap-1 px-2 py-1.5 border-b border-gray-200 bg-white">
-                                        {/* Bold */}
-                                        <button
-                                            type="button"
-                                            onClick={() => execCommand('bold')}
-                                            className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-                                            title="Bold"
-                                        >
-                                            <strong className="text-sm font-semibold">B</strong>
-                                        </button>
-
-                                        {/* Italic */}
-                                        <button
-                                            type="button"
-                                            onClick={() => execCommand('italic')}
-                                            className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-                                            title="Italic"
-                                        >
-                                            <em className="text-sm">I</em>
-                                        </button>
-
-                                        {/* Underline */}
-                                        <button
-                                            type="button"
-                                            onClick={() => execCommand('underline')}
-                                            className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-                                            title="Underline"
-                                        >
-                                            <span className="text-sm underline">U</span>
-                                        </button>
-
-                                        {/* Strikethrough */}
-                                        <button
-                                            type="button"
-                                            onClick={() => execCommand('strikeThrough')}
-                                            className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-                                            title="Strikethrough"
-                                        >
-                                            <span className="text-sm line-through">S</span>
-                                        </button>
-
-                                        {/* Link */}
-                                        <button
-                                            type="button"
-                                            onClick={insertLink}
-                                            className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-                                            title="Insert Link"
-                                        >
-                                            <span className="text-sm">🔗</span>
-                                        </button>
-
-                                        <div className="w-px h-4 bg-gray-300 mx-1" />
-
-                                        {/* Bulleted List */}
-                                        <button
-                                            type="button"
-                                            onClick={() => insertList(false)}
-                                            className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-                                            title="Bulleted List"
-                                        >
-                                            <span className="text-sm">☰</span>
-                                        </button>
-
-                                        {/* Numbered List */}
-                                        <button
-                                            type="button"
-                                            onClick={() => insertList(true)}
-                                            className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-                                            title="Numbered List"
-                                        >
-                                            <span className="text-sm">≡</span>
-                                        </button>
-
-                                        <div className="w-px h-4 bg-gray-300 mx-1" />
-
-                                        {/* Align Left */}
-                                        <button
-                                            type="button"
-                                            onClick={() => toggleAlignment('left')}
-                                            className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-                                            title="Align Left"
-                                        >
-                                            <span className="text-sm">⊣</span>
-                                        </button>
-
-                                        {/* Align Center */}
-                                        <button
-                                            type="button"
-                                            onClick={() => toggleAlignment('center')}
-                                            className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-                                            title="Align Center"
-                                        >
-                                            <span className="text-sm">≡</span>
-                                        </button>
-
-                                        {/* Align Right */}
-                                        <button
-                                            type="button"
-                                            onClick={() => toggleAlignment('right')}
-                                            className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-                                            title="Align Right"
-                                        >
-                                            <span className="text-sm">⊢</span>
-                                        </button>
-
-                                        <div className="w-px h-4 bg-gray-300 mx-1" />
-
-                                        {/* Code Block */}
-                                        <button
-                                            type="button"
-                                            onClick={() => execCommand('formatBlock', '<pre>')}
-                                            className="p-1.5 hover:bg-gray-100 rounded transition-colors font-mono text-xs"
-                                            title="Code Block"
-                                        >
-                                            {'</>'}
-                                        </button>
-
-                                        <div className="w-px h-4 bg-gray-300 mx-1" />
-                                        <input
-                                            ref={fileInputRef}
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={handleImageFile}
-                                            className="hidden"
-                                        />
-
-                                        {/* Table */}
-                                        <button
-                                            type="button"
-                                            onClick={insertTable}
-                                            className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-                                            title="Insert Table"
-                                        >
-                                            <span className="text-sm">⊞</span>
-                                        </button>
-
-                                        {/* Sparkels */}
-                                        <button
-                                            type="button"
-                                            onClick={handleRefineDescription}
-                                            disabled={isDescRefining}
-                                            className="p-1.5 hover:bg-purple-50 text-purple-600 rounded transition-colors ml-auto flex items-center gap-1"
-                                            title="Refine/Generate Description with AI"
-                                        >
-                                            {isDescRefining ? (
-                                                <div className="w-3.5 h-3.5 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
-                                            ) : (
-                                                <Sparkles className="w-4 h-4" />
-                                            )}
-                                        </button>
-                                    </div>
-
-                                    {/* ContentEditable Editor */}
-                                    <div
-                                        ref={editorRef}
-                                        contentEditable
-                                        onInput={handleEditorInput}
-                                        className="w-full p-3 text-sm text-gray-700 outline-none min-h-[120px] bg-[#fdfdfd]"
-                                        data-placeholder="Type @ to mention a teammate and notify them about this work item."
-                                        style={{
-                                            whiteSpace: 'pre-wrap',
-                                            wordWrap: 'break-word'
-                                        }}
-                                    />
-                                </div>
-                                <style>{`
-                                        div[contenteditable]:empty:before {
-                                        content: attr(data-placeholder);
-                                        color: #9ca3af;
-                                        pointer-events: none;
-                                        }
-                               `}</style>
+                                <RichTextEditor
+                                    value={description}
+                                    onChange={setDescription}
+                                    placeholder="Type @ to mention a teammate and notify them about this work item."
+                                    minHeight="200px"
+                                    maxHeight="400px"
+                                    features={{
+                                        bold: true,
+                                        italic: true,
+                                        underline: true,
+                                        strikethrough: true,
+                                        code: true,
+                                        codeBlock: true,
+                                        link: true,
+                                        bulletList: true,
+                                        orderedList: true,
+                                        blockquote: true,
+                                        horizontalRule: true,
+                                        table: true,
+                                        image: true,
+                                        heading: true,
+                                        textAlign: true,
+                                    }}
+                                />
                             </div>
 
                             {/* Link Field */}

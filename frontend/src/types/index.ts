@@ -67,8 +67,8 @@ export type TaskType =
   | 'internal'
   | 'content-creation'
   | 'ideas'
-   
-  // Create New Project payload
+
+// Create New Project payload
 export interface ProjectCreatePayload {
   name: string;
   description?: string;
@@ -679,7 +679,7 @@ export interface ChatUserMinimal {
 }
 
 export interface ChatRoomMembership {
-  id: string; 
+  id: string;
   user: ChatUserMinimal;
   joined_at: string;
   last_read_at: string | null;
@@ -711,7 +711,7 @@ export interface ChatMessage {
   room: string;
   sender: ChatUserMinimal;
   content: string;
-  created_at: string; 
+  created_at: string;
   is_own_message: boolean;
   message_type: string;
   attachment: string | null;
@@ -721,7 +721,7 @@ export interface ChatMessage {
   updated_at: string;
   is_deleted: boolean;
   is_read?: boolean;
-  attachments?: any[]; 
+  attachments?: any[];
 }
 
 export interface ChatRoomMessagesResponse {
@@ -738,12 +738,25 @@ export interface ProjectChatRoom {
   slug: string;
   project: number;
   participant_count: number;
-  last_message: string | null;
+  last_message: {
+    id: string;
+    sender_username: string;
+    content_preview: string;
+    created_at: string;
+  } | null;
   unread_count: number;
   is_member: boolean;
   created_at: string;
   updated_at: string;
   is_active: boolean;
+}
+
+// Paginated Project Chat Rooms Response
+export interface PaginatedProjectChatRoomsResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: ProjectChatRoom[];
 }
 
 //Team and Channels Render list
@@ -767,32 +780,34 @@ export interface CreatePrivateChatPayload {
   user_id: number;
 }
 
-// Payload sent TO the server
-export interface WebSocketSendMessagePayload {
-  type: 'chat_message';
+// WebSocket Gateway types
+export interface GatewayConnectedEvent {
+  type: 'GATEWAY_CONNECTED';
+  user_id: number;
+}
+
+export interface GatewaySendMessagePayload {
+  command: 'send_message';
+  room_id: string;
   content: string;
 }
 
-// Payload received FROM the server
-export interface WebSocketIncomingMessage {
-  type: 'chat_message' | 'connection_established';
-  message?: ChatMessage; // The actual message object
+export interface GatewayIncomingMessage {
+  type: 'CHAT_MESSAGE' | 'notification' | 'GATEWAY_CONNECTED' | 'PRESENCE' | 'room_created';
+  message?: ChatMessage;
+  data?: ChatMessage; 
   room_id?: string;
-  sender?: ChatUserMinimal;
+  user_id?: number;
+  notification?: any;
+  status?: 'online' | 'offline';
+  username?: string;
+  room?: any;
 }
 
 // Global WebSocket types for cross-room messaging
 export interface UnreadCount {
   room_id: string;
   count: number;
-}
-
-export interface WebSocketGlobalMessage {
-  type: 'chat_message' | 'user_joined' | 'user_left' | 'typing' | 'unread_update';
-  message?: ChatMessage; 
-  room_id: string;
-  sender?: ChatUserMinimal;
-  unread_counts?: UnreadCount[];
 }
 
 export interface ToastNotification {

@@ -3,8 +3,7 @@ import { X, Briefcase, Sparkles, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { projectsApi, taskApi } from '@/services/api';
 import { ProjectMinimal, AITaskSuggestionPayload } from '@/types';
-
-
+import { RichTextEditor } from '@/components/common/RichTextEditor';
 
 interface AITaskProps {
     onClose: () => void;
@@ -22,64 +21,7 @@ export const AITask: React.FC<AITaskProps> = ({ onClose, onGenerate, fixedProjec
     const [isDataLoading, setIsDataLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
-    const editorRef = useRef<HTMLDivElement>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
     const projectSearchInputRef = useRef<HTMLInputElement>(null);
-
-    const execCommand = (command: string, value: string | undefined = undefined) => {
-        document.execCommand(command, false, value);
-        editorRef.current?.focus();
-    };
-
-    const handleEditorInput = () => {
-        if (editorRef.current) {
-            setDescription(editorRef.current.innerHTML);
-        }
-    };
-
-    const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file && file.type.startsWith('image/')) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const img = `<img src="${event.target?.result}" style="max-width: 100%; height: auto;" />`;
-                document.execCommand('insertHTML', false, img);
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
-    const insertTable = () => {
-        const table = `
-        <table border="1" style="border-collapse: collapse; width: 100%; margin: 10px 0;">
-            <tr>
-                <td style="padding: 8px; border: 1px solid #ddd;">Cell 1</td>
-                <td style="padding: 8px; border: 1px solid #ddd;">Cell 2</td>
-            </tr>
-            <tr>
-                <td style="padding: 8px; border: 1px solid #ddd;">Cell 3</td>
-                <td style="padding: 8px; border: 1px solid #ddd;">Cell 4</td>
-            </tr>
-        </table>
-    `;
-        document.execCommand('insertHTML', false, table);
-        editorRef.current?.focus();
-    };
-
-    const insertList = (ordered: boolean) => {
-        execCommand(ordered ? 'insertOrderedList' : 'insertUnorderedList');
-    };
-
-    const insertLink = () => {
-        const url = prompt('Enter URL:');
-        if (url) {
-            execCommand('createLink', url);
-        }
-    };
-
-    const toggleAlignment = (align: string) => {
-        execCommand(`justify${align.charAt(0).toUpperCase() + align.slice(1)}`);
-    };
 
     useEffect(() => {
         const fetchProjects = async () => {
@@ -91,7 +33,7 @@ export const AITask: React.FC<AITaskProps> = ({ onClose, onGenerate, fixedProjec
             } catch (err) {
                 console.error("Failed to load projects:", err);
                 setError("Failed to load projects.");
-                setAllProjectOptions([]); 
+                setAllProjectOptions([]);
             } finally {
                 setIsDataLoading(false);
             }
@@ -319,177 +261,30 @@ export const AITask: React.FC<AITaskProps> = ({ onClose, onGenerate, fixedProjec
                             <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
                                 Description <span className="text-red-500">*</span>
                             </label>
-                            <div className="border border-gray-300 rounded-md overflow-hidden focus-within:ring-1 focus-within:ring-blue-500 focus-within:border-blue-500">
-                                <div className="flex items-center gap-1 px-2 py-1.5 border-b border-gray-200 bg-white">
-                                    {/* Bold */}
-                                    <button
-                                        type="button"
-                                        onClick={() => execCommand('bold')}
-                                        className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-                                        title="Bold"
-                                    >
-                                        <strong className="text-sm font-semibold">B</strong>
-                                    </button>
-
-                                    {/* Italic */}
-                                    <button
-                                        type="button"
-                                        onClick={() => execCommand('italic')}
-                                        className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-                                        title="Italic"
-                                    >
-                                        <em className="text-sm">I</em>
-                                    </button>
-
-                                    {/* Underline */}
-                                    <button
-                                        type="button"
-                                        onClick={() => execCommand('underline')}
-                                        className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-                                        title="Underline"
-                                    >
-                                        <span className="text-sm underline">U</span>
-                                    </button>
-
-                                    {/* Strikethrough */}
-                                    <button
-                                        type="button"
-                                        onClick={() => execCommand('strikeThrough')}
-                                        className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-                                        title="Strikethrough"
-                                    >
-                                        <span className="text-sm line-through">S</span>
-                                    </button>
-
-                                    {/* Link */}
-                                    <button
-                                        type="button"
-                                        onClick={insertLink}
-                                        className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-                                        title="Insert Link"
-                                    >
-                                        <span className="text-sm">🔗</span>
-                                    </button>
-
-                                    <div className="w-px h-4 bg-gray-300 mx-1" />
-
-                                    {/* Bulleted List */}
-                                    <button
-                                        type="button"
-                                        onClick={() => insertList(false)}
-                                        className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-                                        title="Bulleted List"
-                                    >
-                                        <span className="text-sm">☰</span>
-                                    </button>
-
-                                    {/* Numbered List */}
-                                    <button
-                                        type="button"
-                                        onClick={() => insertList(true)}
-                                        className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-                                        title="Numbered List"
-                                    >
-                                        <span className="text-sm">≡</span>
-                                    </button>
-
-                                    <div className="w-px h-4 bg-gray-300 mx-1" />
-
-                                    {/* Align Left */}
-                                    <button
-                                        type="button"
-                                        onClick={() => toggleAlignment('left')}
-                                        className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-                                        title="Align Left"
-                                    >
-                                        <span className="text-sm">⊣</span>
-                                    </button>
-
-                                    {/* Align Center */}
-                                    <button
-                                        type="button"
-                                        onClick={() => toggleAlignment('center')}
-                                        className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-                                        title="Align Center"
-                                    >
-                                        <span className="text-sm">≡</span>
-                                    </button>
-
-                                    {/* Align Right */}
-                                    <button
-                                        type="button"
-                                        onClick={() => toggleAlignment('right')}
-                                        className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-                                        title="Align Right"
-                                    >
-                                        <span className="text-sm">⊢</span>
-                                    </button>
-
-                                    <div className="w-px h-4 bg-gray-300 mx-1" />
-
-                                    {/* Code Block */}
-                                    <button
-                                        type="button"
-                                        onClick={() => execCommand('formatBlock', '<pre>')}
-                                        className="p-1.5 hover:bg-gray-100 rounded transition-colors font-mono text-xs"
-                                        title="Code Block"
-                                    >
-                                        {'</>'}
-                                    </button>
-
-                                    <div className="w-px h-4 bg-gray-300 mx-1" />
-                                    <input
-                                        ref={fileInputRef}
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={handleImageFile}
-                                        className="hidden"
-                                    />
-
-                                    {/* Table */}
-                                    <button
-                                        type="button"
-                                        onClick={insertTable}
-                                        className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-                                        title="Insert Table"
-                                    >
-                                        <span className="text-sm">⊞</span>
-                                    </button>
-
-                                    {/* Undo */}
-                                    <button
-                                        type="button"
-                                        onClick={() => execCommand('undo')}
-                                        className="p-1.5 hover:bg-gray-100 rounded transition-colors ml-auto"
-                                        title="Undo"
-                                    >
-                                        <span className="text-sm">↶</span>
-                                    </button>
-                                </div>
-
-                                {/* ContentEditable Editor */}
-                                <div
-                                    ref={editorRef}
-                                    contentEditable
-                                    onInput={handleEditorInput}
-                                    className="w-full p-3 text-sm text-gray-700 outline-none min-h-[150px] bg-[#fdfdfd]"
-                                    data-placeholder="Describe what you want the AI to generate. Be specific about requirements, deliverables, and any constraints..."
-                                    style={{
-                                        whiteSpace: 'pre-wrap',
-                                        wordWrap: 'break-word'
-                                    }}
-                                />
-                            </div>
-                            <style>{`
-                                div[contenteditable]:empty:before {
-                                    content: attr(data-placeholder);
-                                    color: #9ca3af;
-                                    pointer-events: none;
-                                }
-                            `}</style>
-                            <p className="text-xs text-gray-500 mt-2">
-                                💡 Tip: The more detailed your description, the better the AI-generated task will be.
-                            </p>
+                            <RichTextEditor
+                                value={description}
+                                onChange={setDescription}
+                                placeholder="Describe what you want the AI to generate. Be specific about requirements, deliverables, and any constraints..."
+                                minHeight="200px"
+                                maxHeight="400px"
+                                features={{
+                                    bold: true,
+                                    italic: true,
+                                    underline: true,
+                                    strikethrough: true,
+                                    code: true,
+                                    codeBlock: true,
+                                    link: true,
+                                    bulletList: true,
+                                    orderedList: true,
+                                    blockquote: true,
+                                    horizontalRule: true,
+                                    table: true,
+                                    image: true,
+                                    heading: true,
+                                    textAlign: true,
+                                }}
+                            />
                         </div>
                     </div>
 

@@ -5,6 +5,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { teamsApi, usersApi } from '@/services/api';
 import { useAuth } from '@/hooks/useAuth';
 import type { CreateTeamPayload } from '@/types';
+import { RichTextEditor } from '@/components/common/RichTextEditor';
 
 interface CreateTeamModalProps {
     isOpen: boolean;
@@ -297,12 +298,25 @@ export function CreateTeamModal({ isOpen, onClose, onSuccess }: CreateTeamModalP
                         {/* Description */}
                         <div>
                             <label className={labelClass}>Description</label>
-                            <textarea
+                            <RichTextEditor
                                 value={description}
-                                onChange={(e) => setDescription(e.target.value)}
+                                onChange={setDescription}
                                 placeholder="Enter team description..."
-                                className="w-full border rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all min-h-[100px] resize-none"
-                                disabled={isSubmitting}
+                                minHeight="120px"
+                                maxHeight="250px"
+                                readOnly={isSubmitting}
+                                features={{
+                                    bold: true,
+                                    italic: true,
+                                    underline: true,
+                                    link: true,
+                                    bulletList: true,
+                                    orderedList: true,
+                                    table: false,
+                                    image: false,
+                                    codeBlock: false,
+                                    heading: false,
+                                }}
                             />
                         </div>
 
