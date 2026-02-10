@@ -1,15 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Calendar, Users, CheckSquare, Clock, PlayCircle, Pause,
-  Eye, AlertCircle, CheckCircle, ListTodo, Plus
+  Eye, AlertCircle, CheckCircle, ListTodo
 } from 'lucide-react';
 import type { Task } from '@/types';
 import type { TableColumn } from '@/components/layout/DualView/TableView';
-import { taskApi, projectsApi } from '@/services/api';
+import { taskApi } from '@/services/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { formatRelativeTime } from '@/lib/utils';
+import { TablePopover } from '@/components/common';
 
 // Utility function to format dates
 const formatDate = (dateString: string) => {
@@ -227,22 +228,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
   // Status Dropdown Component
   const StatusDropdown = ({ task }: { task: Task }) => {
     const [activeDropdown, setActiveDropdown] = useState(false);
-    const dropdownRef = useRef<HTMLDivElement>(null);
     const statusConfig = getStatusConfig(task.status);
-
-    useEffect(() => {
-      const handleClickOutside = (event: MouseEvent) => {
-        if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-          setActiveDropdown(false);
-        }
-      };
-      if (activeDropdown) {
-        document.addEventListener('mousedown', handleClickOutside);
-      }
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
-      };
-    }, [activeDropdown]);
 
     const handleStatusChange = async (newStatus: string) => {
       try {
@@ -254,67 +240,55 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
       }
     };
 
-    return (
-      <div ref={dropdownRef} className="relative" onClick={(e) => e.stopPropagation()}>
-        <div
-          className={`px-2.5 py-1 rounded text-[11px] font-medium ${statusConfig.bg} ${statusConfig.text} cursor-pointer hover:opacity-80 transition-opacity flex items-center gap-1`}
-          onClick={() => setActiveDropdown(!activeDropdown)}
-        >
-          <span>{statusConfig.label}</span>
-        </div>
-
-        {activeDropdown && (
-          <div
-            className="absolute z-50 mt-1 left-0 min-w-[140px] max-h-[200px] overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg py-1"
-            onWheel={(e) => e.stopPropagation()}
-          >
-            {statusOptions.map((option) => {
-              const optionConfig = getStatusConfig(option.value);
-              const textColor = optionConfig.badge.split(' ').find(cls => cls.startsWith('text-')) || optionConfig.text;
-
-              return (
-                <div
-                  key={option.value}
-                  className="px-3 py-2 hover:bg-gray-50 cursor-pointer text-[12px] flex items-center gap-2"
-                  onClick={() => handleStatusChange(option.value)}
-                >
-                  {React.createElement(option.icon, { className: `w-3.5 h-3.5 ${textColor}` })}
-                  <span className={`${task.status === option.value ? "font-bold" : "font-medium"} ${textColor}`}>
-                    {option.label}
-                  </span>
-                  {task.status === option.value && (
-                    <svg className={`w-3.5 h-3.5 ml-auto ${textColor}`} fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+    const trigger = (
+      <div
+        className={`px-2.5 py-1 rounded text-[11px] font-medium ${statusConfig.bg} ${statusConfig.text} cursor-pointer hover:opacity-80 transition-opacity flex items-center gap-1`}
+      >
+        <span>{statusConfig.label}</span>
       </div>
+    );
+
+    return (
+      <TablePopover
+        trigger={trigger}
+        width="min-w-[140px]"
+        estimatedHeight={200}
+        open={activeDropdown}
+        onOpen={() => setActiveDropdown(true)}
+        onClose={() => setActiveDropdown(false)}
+      >
+        <div className="max-h-[200px] overflow-y-auto py-1">
+          {statusOptions.map((option) => {
+            const optionConfig = getStatusConfig(option.value);
+            const textColor = optionConfig.badge.split(' ').find(cls => cls.startsWith('text-')) || optionConfig.text;
+
+            return (
+              <div
+                key={option.value}
+                className="px-3 py-2 hover:bg-gray-50 cursor-pointer text-[12px] flex items-center gap-2"
+                onClick={() => handleStatusChange(option.value)}
+              >
+                {React.createElement(option.icon, { className: `w-3.5 h-3.5 ${textColor}` })}
+                <span className={`${task.status === option.value ? "font-bold" : "font-medium"} ${textColor}`}>
+                  {option.label}
+                </span>
+                {task.status === option.value && (
+                  <svg className={`w-3.5 h-3.5 ml-auto ${textColor}`} fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </TablePopover>
     );
   };
 
   // Priority Dropdown Component
   const PriorityDropdown = ({ task }: { task: Task }) => {
     const [activeDropdown, setActiveDropdown] = useState(false);
-    const dropdownRef = useRef<HTMLDivElement>(null);
     const priorityOption = priorityOptions.find(opt => opt.value === task.priority);
-
-    useEffect(() => {
-      const handleClickOutside = (event: MouseEvent) => {
-        if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-          setActiveDropdown(false);
-        }
-      };
-      if (activeDropdown) {
-        document.addEventListener('mousedown', handleClickOutside);
-      }
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
-      };
-    }, [activeDropdown]);
 
     const handlePriorityChange = async (newPriority: string) => {
       try {
@@ -326,33 +300,37 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
       }
     };
 
-    return (
-      <div ref={dropdownRef} className="relative" onClick={(e) => e.stopPropagation()}>
-        <div
-          className="flex items-center gap-1.5 text-gray-600 cursor-pointer hover:bg-gray-100 px-2 py-1 rounded transition-colors"
-          onClick={() => setActiveDropdown(!activeDropdown)}
-        >
-          <div className={`h-1 w-3 rounded-full ${priorityOption?.dotColor || 'bg-gray-400'}`} />
-          <span className="capitalize text-[12px]">{task.priority || 'None'}</span>
-        </div>
-
-        {activeDropdown && (
-          <div className="absolute z-50 mt-1 left-0 w-32 bg-white border border-gray-200 rounded-lg shadow-lg py-1">
-            {priorityOptions.map((option) => (
-              <div
-                key={option.value}
-                className="px-3 py-2 hover:bg-gray-50 cursor-pointer text-[12px] flex items-center gap-2"
-                onClick={() => handlePriorityChange(option.value)}
-              >
-                <span>{option.icon}</span>
-                <span className={task.priority === option.value ? "font-bold text-blue-600" : ""}>
-                  {option.label}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
+    const trigger = (
+      <div className="flex items-center gap-1.5 text-gray-600 cursor-pointer hover:bg-gray-100 px-2 py-1 rounded transition-colors">
+        <div className={`h-1 w-3 rounded-full ${priorityOption?.dotColor || 'bg-gray-400'}`} />
+        <span className="capitalize text-[12px]">{task.priority || 'None'}</span>
       </div>
+    );
+
+    return (
+      <TablePopover
+        trigger={trigger}
+        width="w-32"
+        estimatedHeight={180}
+        open={activeDropdown}
+        onOpen={() => setActiveDropdown(true)}
+        onClose={() => setActiveDropdown(false)}
+      >
+        <div className="py-1">
+          {priorityOptions.map((option) => (
+            <div
+              key={option.value}
+              className="px-3 py-2 hover:bg-gray-50 cursor-pointer text-[12px] flex items-center gap-2"
+              onClick={() => handlePriorityChange(option.value)}
+            >
+              <span>{option.icon}</span>
+              <span className={task.priority === option.value ? "font-bold text-blue-600" : ""}>
+                {option.label}
+              </span>
+            </div>
+          ))}
+        </div>
+      </TablePopover>
     );
   };
 
@@ -434,27 +412,63 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     key: 'assigned_to',
     label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Assignee</span>,
     width: '10%',
-    render: (task: Task) => (
-      <div className="flex -space-x-1.5">
-        {task.assigned_to_user_details.slice(0, 3).map((u) => (
-          <div
-            key={u.id}
-            className="w-6 h-6 rounded-full bg-[#8d87b5] text-white flex items-center justify-center text-[10px] font-semibold ring-1 ring-white"
-            title={`${u.first_name} ${u.last_name}`}
-          >
-            {u.first_name[0]}{u.last_name[0]}
+    render: (task: Task) => {
+      const trigger = (
+        <div className="flex -space-x-1.5 cursor-pointer hover:opacity-80">
+          {task.assigned_to_user_details.length > 0 ? (
+            <>
+              {task.assigned_to_user_details.slice(0, 3).map((u) => (
+                <div
+                  key={u.id}
+                  className="w-6 h-6 rounded-full bg-[#8d87b5] text-white flex items-center justify-center text-[10px] font-semibold ring-1 ring-white"
+                  title={`${u.first_name} ${u.last_name}`}
+                >
+                  {u.first_name[0]}{u.last_name[0]}
+                </div>
+              ))}
+              {task.assigned_to_user_details.length > 3 && (
+                <div
+                  className="w-6 h-6 rounded-full bg-gray-400 text-white flex items-center justify-center text-[10px] font-semibold ring-1 ring-white"
+                  title={`+${task.assigned_to_user_details.length - 3} more`}
+                >
+                  +{task.assigned_to_user_details.length - 3}
+                </div>
+              )}
+            </>
+          ) : (
+            <span className="text-gray-300 text-[11px] pl-1">—</span>
+          )}
+        </div>
+      );
+
+      return (
+        <TablePopover trigger={trigger}>
+          <div className="p-2 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-lg">
+            <span className="text-xs font-semibold text-gray-700">Assignees</span>
+            <span className="text-[10px] bg-gray-200 px-1.5 py-0.5 rounded text-gray-600">
+              {task.assigned_to_user_details.length}
+            </span>
           </div>
-        ))}
-        {task.assigned_to_user_details.length > 3 && (
-            <div
-              className="w-6 h-6 rounded-full bg-gray-400 text-white flex items-center justify-center text-[10px] font-semibold ring-1 ring-white"
-              title={`+${task.assigned_to_user_details.length - 3} more`}
-            >
-            +{task.assigned_to_user_details.length - 3}
+          <div className="max-h-48 overflow-y-auto p-1">
+            {task.assigned_to_user_details.length > 0 ? (
+              task.assigned_to_user_details.map((u) => (
+                <div key={u.id} className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded">
+                  <div className="w-6 h-6 rounded-full bg-[#8d87b5] text-white flex items-center justify-center text-[10px] font-semibold shrink-0">
+                    {u.first_name[0]}{u.last_name?.[0]}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-medium text-gray-700 truncate">{u.first_name} {u.last_name}</p>
+                    <p className="text-[10px] text-gray-400 truncate capitalize">{u.role}</p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="p-2 text-center text-xs text-gray-400 italic">No assignees</div>
+            )}
           </div>
-        )}
-      </div>
-    ),
+        </TablePopover>
+      );
+    },
   },
   {
     key: 'priority',
