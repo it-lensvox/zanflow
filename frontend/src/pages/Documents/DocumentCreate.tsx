@@ -110,7 +110,7 @@ export function DocumentCreate() {
       });
 
       console.log('[DocumentCreate] Step 3 Success: Confirm upload complete.', confirmResponse);
-      queryClient.invalidateQueries({ queryKey: ['documents', { project: projectId }] });
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
       queryClient.invalidateQueries({ queryKey: ['projects'] });
 
       // Navigate to the document detail page

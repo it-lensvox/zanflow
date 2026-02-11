@@ -931,7 +931,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                                         <Flag className="w-4 h-4 text-gray-400" />
                                         Labels
                                     </label>
-                                    <div className="relative">
+                                    <div className="relative" data-dropdown="label">
                                         <div
                                             className={`w-full p-2.5 rounded border border-gray-300 bg-white flex flex-wrap gap-2 min-h-[42px] transition-colors ${selectedProjects.length === 0 ? 'cursor-not-allowed bg-gray-50' : 'cursor-pointer hover:border-gray-400'}`}
                                             onClick={() => selectedProjects.length > 0 && setLabelDropdownOpen(!labelDropdownOpen)}

@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
-import { ArrowLeft, Loader2, Upload, FileText, List, Grid3X3, Plus, Settings } from 'lucide-react';
+import { ArrowLeft, Loader2, Upload, FileText, List, Grid3X3, Settings, MessageCircle } from 'lucide-react';
 import { projectsApi, taskApi, documentsApi } from '@/services/api';
 import { DualView } from '@/components/layout/DualView/DualView';
 import { TaskGridCard, createTasksTableColumns } from '@/components/layout/DualView/taskConfig';
@@ -249,8 +249,15 @@ export function TaskDetails() {
                         className="content-creation__tab content-creation__tab--create-task"
                         onClick={() => setIsCreateTaskModalOpen(true)}
                     >
-                        <Plus className="h-4 w-4" />
                         Create Task
+                    </button>
+
+                    <button
+                        onClick={() => navigate('/team-chat', { state: { projectId: Number(id) } })}
+                        className="p-2 hover:bg-gray-100 rounded-full transition-colors flex items-center gap-2 text-gray-600 hover:text-black"
+                        title="Team Chat"
+                    >
+                        <MessageCircle className="h-4 w-4" />
                     </button>
 
                     <button
@@ -258,13 +265,13 @@ export function TaskDetails() {
                         className="p-2 hover:bg-gray-100 rounded-full transition-colors flex items-center gap-2 text-gray-600 hover:text-black"
                         title="Project Settings"
                     >
-                        <Settings className="h-5 w-5" />
+                        <Settings className="h-4 w-4" />
                     </button>
                 </div>
                 <div className="content-creation__content">
                     {activeTab === 'tasks' && (
                         <div className="content-creation__tasks">
-                            {/* View Toggle Controls */}
+                             {/* View Toggle Controls */}
                             <div className="flex justify-end mb-2">
                                 <div className="flex items-center border border-gray-200 rounded-md bg-white p-1 gap-1">
                                     <button
@@ -436,7 +443,7 @@ export function TaskDetails() {
                                         <Upload className="content-creation__upload-icon" />
                                     )}
                                     <p className="content-creation__upload-text">
-                                        {isUploading ? 'Uploading to S3...' : 'Drop documents here or click to browse'}
+                                        {isUploading ? 'Uploading...' : 'Drop documents here or click to browse'}
                                     </p>
                                     <p className="content-creation__upload-subtext">All document types supported (Max 500MB)</p>
                                     {uploadError && <p className="text-destructive text-sm mt-2">{uploadError}</p>}
