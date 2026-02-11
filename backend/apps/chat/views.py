@@ -576,7 +576,34 @@ class RoomMessageDetailView(APIView):
         
         serializer = ChatMessageSerializer(message, context={'request': request})
         return Response(serializer.data)
+    # --- ADD THIS NEW METHOD BELOW ---
+    @extend_schema(summary="Delete a message")
+    def delete(self, request, room_id, message_id):
+        """Soft delete a message."""
+        room = get_object_or_404(ChatRoom, id=room_id, is_active=True)
+        
+        message = get_object_or_404(
+            ChatMessage, 
+            id=message_id, 
+            room=room
+        )
 
+        # Check permissions using your service
+        if not ChatPermissionService.can_delete_message(request.user, message):
+            return Response(
+                {'error': 'You do not have permission to delete this message'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        success = ChatMessageService.delete_message(message, request.user)
+
+        if success:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        
+        return Response(
+            {'error': 'Could not delete message'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
 class MarkReadView(APIView):
     """
@@ -718,3 +745,37 @@ class UnreadCountView(APIView):
             'rooms_with_unread': len(unread_by_room),
             'by_room': unread_by_room,
         })
+class DeleteMessageView(APIView):
+    """
+    Soft delete a message.
+    
+    DELETE /api/v1/chat/rooms/<room_id>/messages/<message_id>/
+    """
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(summary="Delete a message")
+    def delete(self, request, room_id, message_id):
+        room = get_object_or_404(ChatRoom, id=room_id, is_active=True)
+        
+        message = get_object_or_404(
+            ChatMessage, 
+            id=message_id, 
+            room=room
+        )
+
+        # Use existing Permission Service
+        if not ChatPermissionService.can_delete_message(request.user, message):
+            return Response(
+                {'error': 'You do not have permission to delete this message'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        success = ChatMessageService.delete_message(message, request.user)
+
+        if success:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        
+        return Response(
+            {'error': 'Could not delete message'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )

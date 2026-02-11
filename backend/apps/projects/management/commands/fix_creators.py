@@ -1,22 +1,11 @@
 from django.core.management.base import BaseCommand
-from apps.projects.models import Project
-from django.contrib.auth import get_user_model
+from apps.projects.models import Project, ProjectMembership
 
 class Command(BaseCommand):
-    help = 'Assigns a default creator to projects that have created_by=NULL'
+    help = 'Assigns the creator based on the existing OWNER role in members list'
 
     def handle(self, *args, **kwargs):
-        User = get_user_model()
-        
-        # CHANGE THIS ID if your admin ID on the server is different (e.g., 1 or 2)
-        ADMIN_ID = 1 
-        
-        try:
-            admin_user = User.objects.get(id=ADMIN_ID)
-        except User.DoesNotExist:
-            self.stdout.write(self.style.ERROR(f"User with ID {ADMIN_ID} not found!"))
-            return
-
+        # 1. Find all projects with NO creator
         projects = Project.objects.filter(created_by__isnull=True)
         count = projects.count()
         
@@ -24,11 +13,22 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS("No projects need fixing."))
             return
 
-        self.stdout.write(f"Found {count} projects with missing creator. Updating...")
+        self.stdout.write(f"Found {count} projects. analyzing owners...")
 
         for project in projects:
-            project.created_by = admin_user
-            project.save()
-            self.stdout.write(f" - Fixed: {project.name}")
+            # 2. Look for the member who has role='owner'
+            owner_membership = ProjectMembership.objects.filter(
+                project=project, 
+                role='owner'
+            ).first()
 
-        self.stdout.write(self.style.SUCCESS(f"Successfully updated {count} projects!"))
+            if owner_membership:
+                # 3. Assign THAT user as the creator
+                project.created_by = owner_membership.user
+                project.save()
+                self.stdout.write(self.style.SUCCESS(f" - Fixed: '{project.name}' -> Assigned to {owner_membership.user.username}"))
+            else:
+                # 4. Fallback (Only if NO owner exists at all)
+                self.stdout.write(self.style.WARNING(f" - Skipped: '{project.name}' (No owner found)"))
+
+        self.stdout.write(self.style.SUCCESS("Update complete!"))

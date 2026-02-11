@@ -75,7 +75,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         # The serializer.save() now handles role assignment internally
-        project = serializer.save()
+        project = serializer.save(created_by=self.request.user)
         log_action(project, "create", new_value=serializer.data)
         # ====================================================================
         # TRIGGER NOTIFICATION: Project Created
