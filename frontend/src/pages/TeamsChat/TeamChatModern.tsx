@@ -12,8 +12,6 @@ import type { ChatRoom, ChatMessage, ChatRoomMessagesResponse, ToastNotification
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { CreateTeamModal } from '@/pages/TeamManagement/Createteammodal';
 
-// User status type
-type UserStatus = 'online' | 'away' | 'busy' | 'offline';
 
 // Extended user type with last message info
 interface UserWithActivity extends User {
@@ -42,6 +40,7 @@ export function TeamChatModern() {
   const [showReactionPicker, setShowReactionPicker] = useState<string | number | null>(null);
   const [messageReactions, setMessageReactions] = useState<Map<string | number, Map<string, number>>>(new Map());
   const menuRef = useRef<HTMLDivElement>(null);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
 
   // Unread tracking & notifications
   const [unreadCounts, setUnreadCounts] = useState<Map<string, number>>(new Map());
@@ -390,10 +389,6 @@ export function TeamChatModern() {
     return getUserUnreadCount(userId) > 0;
   };
 
-  // Helper: Mock User Status 
-  const getUserStatus = (userId: number): UserStatus => {
-    return userId % 2 === 0 ? 'online' : 'offline';
-  };
 
   // Select User -> Create/Get Room
   const handleUserSelect = (userId: number) => {
@@ -491,10 +486,14 @@ export function TeamChatModern() {
     setOpenMenuMessageId(null);
   };
 
-  const handleDeleteMessage = (message: ChatMessage) => {
-    if (confirm('Are you sure you want to delete this message?')) {
-      setOpenMenuMessageId(null);
-    }
+  // Delete message handler
+  const handleDeleteMessage = (messageId: string | number) => {
+    if (!activeRoom?.id) return;
+
+    deleteMessageMutation.mutate({
+      roomId: activeRoom.id,
+      messageId: String(messageId),
+    });
   };
 
   const handlePinMessage = (message: ChatMessage) => {
@@ -596,6 +595,11 @@ export function TeamChatModern() {
 
   // Send Message
   const handleSendMessage = async () => {
+    // Prevent multiple submissions while uploading
+    if (isUploadingFile) {
+      return;
+    }
+
     const content = messageInput.trim();
     const hasFile = selectedFile !== null;
 
@@ -608,8 +612,9 @@ export function TeamChatModern() {
     // If there's a file attachment, use HTTP POST
     if (hasFile && roomId) {
       try {
+        setIsUploadingFile(true);
         const response = await chatApi.sendMessageWithAttachment(roomId, {
-          content: content || 'Sent an attachment',
+          content: content || '',
           attachment: selectedFile!
         });
 
@@ -646,11 +651,11 @@ export function TeamChatModern() {
         }
       } catch (error) {
         console.error('❌ [SEND ERROR] Failed to send message with attachment:', error);
+      } finally {
+        setIsUploadingFile(false);
       }
       return;
     }
-
-    // Otherwise use WebSocket for text-only messages
     setMessageInput('');
 
     // Send via Gateway WebSocket if project room is selected
@@ -673,22 +678,27 @@ export function TeamChatModern() {
     }
   };
 
-  // Status Indicator Dot
-  const StatusIndicator = ({ status }: { status: UserStatus }) => {
-    const statusColors = {
-      online: 'bg-green-500',
-      away: 'bg-yellow-500',
-      busy: 'bg-red-500',
-      offline: 'bg-gray-400'
-    };
+  // Delete Message Mutation
+  const deleteMessageMutation = useMutation({
+    mutationFn: ({ roomId, messageId }: { roomId: string; messageId: string }) =>
+      chatApi.deleteMessage(roomId, messageId),
+    onSuccess: (_, { roomId, messageId }) => {
+      queryClient.setQueryData(['chat-messages', roomId], (oldData: ChatRoomMessagesResponse | undefined) => {
+        if (!oldData) return oldData;
+        return {
+          ...oldData,
+          messages: oldData.messages.filter(msg => msg.id !== messageId),
+          count: oldData.count - 1,
+        };
+      });
+      setOpenMenuMessageId(null);
+    },
+    onError: (error) => {
+      console.error('Failed to delete message:', error);
+      alert('Failed to delete message. Please try again.');
+    },
+  });
 
-    return (
-      <div className={cn(
-        "absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white",
-        statusColors[status]
-      )} />
-    );
-  };
 
   // Toast Notification Component
   const ToastNotificationComponent = ({ toast }: { toast: ToastNotification }) => (
@@ -781,7 +791,6 @@ export function TeamChatModern() {
                   filteredUsers.map(user => {
                     const isSelected = selectedUserId === user.id;
                     const unreadCount = getUserUnreadCount(user.id);
-                    const status = getUserStatus(user.id);
 
                     return (
                       <button
@@ -799,7 +808,6 @@ export function TeamChatModern() {
                           )}>
                             {user.username.charAt(0).toUpperCase()}
                           </div>
-                          <StatusIndicator status={status} />
                         </div>
                         <div className="flex-1 min-w-0 text-left">
                           <div className="flex items-center justify-between mb-0.5">
@@ -980,7 +988,6 @@ export function TeamChatModern() {
                       <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center font-semibold text-blue-700 text-sm">
                         {selectedUser.username.charAt(0).toUpperCase()}
                       </div>
-                      <StatusIndicator status={getUserStatus(selectedUser.id)} />
                     </>
                   ) : null}
                 </div>
@@ -988,9 +995,6 @@ export function TeamChatModern() {
                   <h3 className="font-semibold text-sm text-gray-900">
                     {selectedProjectRoom?.name || selectedTeamRoom?.name || (selectedUser ? `${selectedUser.first_name || selectedUser.username}` : '')}
                   </h3>
-                  {selectedUser && (
-                    <p className="text-xs text-gray-500 capitalize">{getUserStatus(selectedUser.id)}</p>
-                  )}
                   {selectedProjectRoom && (
                     <p className="text-xs text-gray-500">Project Chat</p>
                   )}
@@ -1083,11 +1087,11 @@ export function TeamChatModern() {
                                 overflowWrap: 'break-word'
                               }}
                             >
-                              {message.content}
+                              {message.content && <div>{message.content}</div>}
 
                               {/* Attachment */}
                               {message.attachment && (
-                                <div className="mt-2 pt-2 border-t border-blue-500">
+                                <div className={message.content ? "mt-2 pt-2 border-t border-blue-500" : ""}>
                                   <a
                                     href={message.attachment}
                                     target="_blank"
@@ -1224,8 +1228,8 @@ export function TeamChatModern() {
                                     <div className="h-px bg-gray-200 my-1" />
                                     {isOwn && (
                                       <button
-                                        onClick={() => handleDeleteMessage(message)}
-                                        className="w-full px-3 py-2 text-left text-sm hover:bg-red-50 flex items-center gap-2 text-red-600"
+                                        onClick={() => handleDeleteMessage(message.id)}
+                                        className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
                                       >
                                         <Trash2 className="h-4 w-4" />
                                         Delete
@@ -1388,15 +1392,19 @@ export function TeamChatModern() {
                 {/* Send Button */}
                 <button
                   onClick={handleSendMessage}
-                  disabled={!messageInput.trim() && !selectedFile}
+                  disabled={(!messageInput.trim() && !selectedFile) || isUploadingFile}
                   className={cn(
                     'p-2.5 rounded transition-colors flex-shrink-0',
-                    (messageInput.trim() || selectedFile)
+                    (messageInput.trim() || selectedFile) && !isUploadingFile
                       ? 'bg-blue-600 text-white hover:bg-blue-700'
                       : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                   )}
                 >
-                  <Send className="h-4 w-4" />
+                  {isUploadingFile ? (
+                    <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
                 </button>
               </div>
             </div>

@@ -7,8 +7,8 @@ import type {
   CreateTeamPayload, ProjectChatRoom, TeamChatRoom, Team
 } from '@/types';
 
-export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.18:8000/api/v1';
-const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://192.168.1.12:8000/ws/gateway';
+export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.6:8000/api/v1';
+const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://192.168.1.6:8000/ws/gateway';
 
 export const api = axios.create({
   baseURL: API_URL,
@@ -621,6 +621,12 @@ export const chatApi = {
     const response = await api.get<TeamChatRoom[]>('/chat/rooms/', {
       params: { type: 'team' }
     });
+    return response.data;
+  },
+
+  // Team room chat Delete message
+  deleteMessage: async (roomId: string, messageId: string) => {
+    const response = await api.delete(`/chat/rooms/${roomId}/messages/${messageId}/`);
     return response.data;
   },
 };
