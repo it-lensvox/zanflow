@@ -459,15 +459,7 @@ class ChatMessageService:
     @staticmethod
     def delete_message(message: ChatMessage, user) -> bool:
         """
-        Soft delete a message.
-        Only sender or room admin can delete.
-        
-        Args:
-            message: ChatMessage to delete
-            user: User requesting deletion
-            
-        Returns:
-            Boolean indicating success
+        Soft delete a message and broadcast the event.
         """
         # Check permissions
         if message.sender_id != user.id:
@@ -475,9 +467,24 @@ class ChatMessageService:
             if not (hasattr(user, 'role') and user.role == 'admin'):
                 return False
         
+        # Perform the soft delete (defined in your models.py)
         message.soft_delete()
         logger.info(f"Message {message.id} deleted by user {user.id}")
-        
+
+        # --- NEW CODE: Broadcast deletion to WebSocket ---
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"chat_{message.room.slug}", 
+            {
+                'type': 'chat_message_delete', # This maps to a handler in consumers.py
+                'event_data': {
+                    'id': str(message.id),
+                    'room_id': str(message.room.id),
+                    'is_deleted': True,
+                    'content': '[Message deleted]' 
+                }
+            }
+        )
         return True
 
     @staticmethod

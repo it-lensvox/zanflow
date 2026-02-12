@@ -158,7 +158,15 @@ class GatewayConsumer(AsyncWebsocketConsumer):
         for slug in slugs:
             group_name = f"chat_{slug}"
             await self.channel_layer.group_add(group_name, self.channel_name)
-
+    # Add this method to handle the delete event sent from Service
+    async def chat_message_delete(self, event):
+        """
+        Handlers for 'chat_message_delete' type sent from channel_layer.
+        """
+        await self.send(text_data=json.dumps({
+            'type': 'message_deleted',
+            'data': event['event_data']
+        }))
     @database_sync_to_async
     def get_user_room_slugs(self):
         member_rooms = ChatRoomMembership.objects.filter(
