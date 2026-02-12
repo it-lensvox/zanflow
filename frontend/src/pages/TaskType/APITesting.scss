@@ -1,0 +1,1027 @@
+$primary: #2563eb;             
+$primary-foreground: #ffffff;
+
+$background: #f9fafb;
+$foreground: #111827;
+
+$card: #ffffff;
+$card-foreground: #1f2937;
+
+$border: #e5e7eb;
+
+$muted: #f3f4f6;
+$muted-foreground: #6b7280;
+
+$accent: #6366f1;              
+$accent-foreground: #ffffff;
+
+$destructive: #ef4444;
+
+$success: #49cc90;
+$warning: #fca130;
+$info: #61affe;
+
+$radius: 0.5rem;
+$radius-sm: 0.375rem;
+$radius-lg: 0.75rem;
+
+// ============================================
+// Main Container
+// ============================================
+.api-testing {
+  padding: 1.5rem;
+  min-height: calc(100vh - 4rem);
+  background: $background;
+
+  &__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    gap: 1rem;
+
+    @media (max-width: 640px) {
+      flex-direction: column;
+    }
+  }
+
+  &__header-info {
+    flex: 1;
+  }
+
+  &__title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: $foreground;
+    margin: 0 0 0.5rem 0;
+
+    svg {
+      color: $primary;
+    }
+  }
+
+  &__subtitle {
+    color: $muted-foreground;
+    font-size: 0.9rem;
+    margin: 0;
+  }
+
+  &__content {
+    position: relative;
+  }
+}
+
+// Buttons
+.api-testing__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  border-radius: $radius;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  white-space: nowrap;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  &--primary {
+    background: $primary;
+    color: $primary-foreground;
+
+    &:hover:not(:disabled) {
+      opacity: 0.9;
+    }
+  }
+
+  &--secondary {
+    background: $muted;
+    color: $foreground;
+    border-color: $border;
+
+    &:hover:not(:disabled) {
+      background: $accent;
+    }
+  }
+
+  &--success {
+    background: $success;
+    color: white;
+
+    &:hover:not(:disabled) {
+      background: darken($success, 5%);
+    }
+  }
+
+  &--danger {
+    background: $destructive;
+    color: white;
+
+    &:hover:not(:disabled) {
+      opacity: 0.9;
+    }
+  }
+
+  &--icon {
+    padding: 0.5rem;
+    background: transparent;
+    color: $muted-foreground;
+
+    &:hover:not(:disabled) {
+      background: $accent;
+      color: $foreground;
+    }
+
+    &.api-testing__btn--danger:hover {
+      background: rgba($destructive, 0.1);
+      color: $destructive;
+    }
+  }
+
+  &--small {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8rem;
+  }
+}
+
+// Form Elements
+.api-testing__input,
+.api-testing__select,
+.api-testing__textarea {
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid $border;
+  border-radius: $radius;
+  background: $background;
+  color: $foreground;
+  font-size: 0.875rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+
+  &:focus {
+    outline: none;
+    border-color: $primary;
+    box-shadow: 0 0 0 3px rgba($primary, 0.1);
+  }
+
+  &::placeholder {
+    color: $muted-foreground;
+  }
+}
+
+.api-testing__select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  background-size: 1.25rem;
+  padding-right: 2.5rem;
+
+  &--small {
+    padding: 0.375rem 2rem 0.375rem 0.625rem;
+    font-size: 0.8rem;
+    min-width: 120px;
+  }
+
+  &--method {
+    width: auto;
+    min-width: 100px;
+    font-weight: 600;
+    border-radius: $radius 0 0 $radius;
+    border-right: none;
+  }
+}
+
+.api-testing__textarea {
+  resize: vertical;
+  min-height: 80px;
+
+  &--code {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    background: #1e1e2e;
+    color: #cdd6f4;
+    border-color: #313244;
+  }
+}
+
+.api-testing__input-with-icon {
+  position: relative;
+
+  .api-testing__input {
+    padding-right: 2.5rem;
+  }
+
+  .api-testing__input-icon {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: $muted-foreground;
+    cursor: pointer;
+    padding: 0.25rem;
+
+    &:hover {
+      color: $foreground;
+    }
+  }
+}
+
+.api-testing__input--small {
+  padding: 0.375rem 0.625rem;
+  font-size: 0.8rem;
+}
+
+.api-testing__input--url {
+  flex: 1;
+  border-radius: 0 $radius $radius 0;
+}
+
+
+// URL Input Group
+.api-testing__url-input {
+  display: flex;
+  width: 100%;
+}
+// Form Groups
+
+.api-testing__form-group {
+  margin-bottom: 1.25rem;
+
+  label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: $foreground;
+    margin-bottom: 0.5rem;
+  }
+
+  &--flex {
+    flex: 1;
+  }
+}
+
+.api-testing__form-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+// Environment Variables
+.api-testing__env-vars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.api-testing__env-var {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: $muted;
+  border-radius: $radius-sm;
+
+  .api-testing__env-key {
+    font-weight: 600;
+    font-size: 0.8rem;
+    color: $info;
+  }
+
+  .api-testing__env-value {
+    flex: 1;
+    font-size: 0.8rem;
+    color: $muted-foreground;
+    font-family: monospace;
+  }
+
+  button {
+    background: none;
+    border: none;
+    color: $muted-foreground;
+    cursor: pointer;
+    padding: 0.25rem;
+
+    &:hover {
+      color: $destructive;
+    }
+  }
+}
+
+.api-testing__env-add {
+  display: flex;
+  gap: 0.5rem;
+}
+
+// Key-Value Lists (Headers, etc.)
+.api-testing__key-value-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.api-testing__key-value {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: $muted;
+  border-radius: $radius-sm;
+
+  .api-testing__kv-key {
+    font-weight: 500;
+    font-size: 0.8rem;
+    color: $foreground;
+    min-width: 120px;
+  }
+
+  .api-testing__kv-value {
+    flex: 1;
+    font-size: 0.8rem;
+    color: $muted-foreground;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  button {
+    background: none;
+    border: none;
+    color: $muted-foreground;
+    cursor: pointer;
+    padding: 0.25rem;
+    flex-shrink: 0;
+
+    &:hover {
+      color: $destructive;
+    }
+  }
+}
+
+.api-testing__key-value-add {
+  display: flex;
+  gap: 0.5rem;
+
+  .api-testing__input {
+    flex: 1;
+  }
+}
+
+// Method Badge
+.api-testing__method-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.625rem;
+  border-radius: $radius-sm;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+// Status Badge
+.api-testing__status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+// Collections
+.api-testing__collections {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.api-testing__collection {
+  background: $card;
+  border: 1px solid $border;
+  border-radius: $radius-lg;
+  overflow: hidden;
+  transition: box-shadow 0.2s;
+
+  &:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+
+  &--expanded {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  }
+}
+
+.api-testing__collection-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover {
+    background: $accent;
+  }
+}
+
+.api-testing__collection-toggle {
+  color: $muted-foreground;
+  flex-shrink: 0;
+}
+
+.api-testing__collection-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  background: rgba($primary, 0.1);
+  color: $primary;
+  border-radius: $radius;
+  flex-shrink: 0;
+}
+
+.api-testing__collection-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.api-testing__collection-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: $foreground;
+  margin: 0 0 0.25rem 0;
+}
+
+.api-testing__collection-meta {
+  font-size: 0.8rem;
+  color: $muted-foreground;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.api-testing__collection-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.api-testing__collection-content {
+  border-top: 1px solid $border;
+  padding: 1.25rem;
+  background: rgba($muted, 0.3);
+}
+
+// Sections within Collection
+.api-testing__section {
+  margin-bottom: 1.5rem;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.api-testing__section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: $foreground;
+  margin-bottom: 0.75rem;
+
+  svg {
+    color: $muted-foreground;
+  }
+
+  .api-testing__btn {
+    margin-left: auto;
+  }
+}
+
+// Credentials List
+.api-testing__credentials-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.api-testing__credential-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: $card;
+  border: 1px solid $border;
+  border-radius: $radius;
+}
+
+.api-testing__credential-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.api-testing__credential-name {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: $foreground;
+}
+
+.api-testing__credential-type {
+  font-size: 0.7rem;
+  color: $muted-foreground;
+  text-transform: capitalize;
+}
+
+// Endpoints List
+.api-testing__endpoints-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.api-testing__endpoint-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: $card;
+  border: 1px solid $border;
+  border-radius: $radius;
+  transition: border-color 0.2s;
+
+  &:hover {
+    border-color: $primary;
+  }
+}
+
+.api-testing__endpoint-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.api-testing__endpoint-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.api-testing__endpoint-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: $foreground;
+}
+
+.api-testing__endpoint-url {
+  font-size: 0.75rem;
+  color: $muted-foreground;
+  font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.api-testing__endpoint-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.api-testing__endpoint-status {
+  font-size: 0.75rem;
+  color: $muted-foreground;
+  padding: 0.25rem 0.5rem;
+  background: $muted;
+  border-radius: $radius-sm;
+}
+
+// Dropdown Menu
+.api-testing__dropdown {
+  position: relative;
+}
+
+.api-testing__dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 50;
+  min-width: 180px;
+  padding: 0.5rem;
+  background: $card;
+  border: 1px solid $border;
+  border-radius: $radius;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  margin-top: 0.25rem;
+
+  button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    background: none;
+    border: none;
+    border-radius: $radius-sm;
+    font-size: 0.875rem;
+    color: $foreground;
+    cursor: pointer;
+    text-align: left;
+
+    &:hover {
+      background: $accent;
+    }
+
+    svg {
+      color: $muted-foreground;
+    }
+  }
+
+  &-item--danger {
+    color: $destructive !important;
+
+    svg {
+      color: $destructive !important;
+    }
+
+    &:hover {
+      background: rgba($destructive, 0.1) !important;
+    }
+  }
+}
+
+// Modal
+.api-testing__modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 1rem;
+  backdrop-filter: blur(4px);
+}
+
+.api-testing__modal {
+  width: 100%;
+  max-width: 500px;
+  max-height: 90vh;
+  background: $card;
+  border-radius: $radius-lg;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+
+  &--large {
+    max-width: 700px;
+  }
+
+  &--xlarge {
+    max-width: 900px;
+  }
+}
+
+.api-testing__modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid $border;
+
+  h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: $foreground;
+    margin: 0;
+  }
+}
+
+.api-testing__modal-subtitle {
+  font-size: 0.8rem;
+  color: $muted-foreground;
+  margin: 0.25rem 0 0 0;
+}
+
+.api-testing__modal-close {
+  background: none;
+  border: none;
+  color: $muted-foreground;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: $radius-sm;
+
+  &:hover {
+    background: $accent;
+    color: $foreground;
+  }
+}
+
+.api-testing__modal-body {
+  padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.api-testing__modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1.25rem 1.5rem;
+  border-top: 1px solid $border;
+  background: $muted;
+}
+
+// ============================================
+// Execution Results
+// ============================================
+.api-testing__results-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+
+  @media (max-width: 640px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.api-testing__results-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem;
+  background: $muted;
+  border-radius: $radius;
+  text-align: center;
+
+  &-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 0.25rem;
+  }
+
+  &-label {
+    font-size: 0.75rem;
+    color: $muted-foreground;
+  }
+
+  &--total .api-testing__results-stat-value {
+    color: $foreground;
+  }
+
+  &--success .api-testing__results-stat-value {
+    color: $success;
+  }
+
+  &--failed .api-testing__results-stat-value {
+    color: $destructive;
+  }
+
+  &--rate .api-testing__results-stat-value {
+    color: $primary;
+  }
+}
+
+.api-testing__results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.api-testing__result-item {
+  padding: 1rem;
+  background: $card;
+  border: 1px solid $border;
+  border-radius: $radius;
+  border-left-width: 4px;
+
+  &--success {
+    border-left-color: $success;
+  }
+
+  &--failed,
+  &--error {
+    border-left-color: $destructive;
+  }
+
+  &--timeout {
+    border-left-color: $warning;
+  }
+
+  &--skipped {
+    border-left-color: $muted-foreground;
+  }
+}
+
+.api-testing__result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.api-testing__result-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.api-testing__result-name {
+  font-weight: 500;
+  color: $foreground;
+}
+
+.api-testing__result-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.api-testing__result-code {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  background: $muted;
+  border-radius: $radius-sm;
+}
+
+.api-testing__result-time {
+  font-size: 0.75rem;
+  color: $muted-foreground;
+}
+
+.api-testing__result-url {
+  font-size: 0.75rem;
+  color: $muted-foreground;
+  font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.api-testing__result-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: rgba($destructive, 0.1);
+  border-radius: $radius-sm;
+  font-size: 0.8rem;
+  color: $destructive;
+
+  svg {
+    flex-shrink: 0;
+    margin-top: 0.125rem;
+  }
+}
+
+.api-testing__results-empty {
+  text-align: center;
+  padding: 2rem;
+  color: $muted-foreground;
+}
+
+// ============================================
+// Empty State
+// ============================================
+.api-testing__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  text-align: center;
+}
+
+.api-testing__empty-icon {
+  width: 4rem;
+  height: 4rem;
+  color: $muted-foreground;
+  margin-bottom: 1rem;
+}
+
+.api-testing__empty-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: $foreground;
+  margin: 0 0 0.5rem 0;
+}
+
+.api-testing__empty-desc {
+  color: $muted-foreground;
+  margin: 0 0 1.5rem 0;
+}
+
+.api-testing__empty-inline {
+  padding: 1.5rem;
+  text-align: center;
+  color: $muted-foreground;
+
+  p {
+    margin: 0 0 0.75rem 0;
+  }
+}
+
+// ============================================
+// Loading States
+// ============================================
+.api-testing__loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  color: $muted-foreground;
+
+  p {
+    margin-top: 0.75rem;
+  }
+}
+
+.api-testing__loading-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  color: $muted-foreground;
+  font-size: 0.875rem;
+}
+
+// ============================================
+// Running Overlay
+// ============================================
+.api-testing__running-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  backdrop-filter: blur(4px);
+}
+
+.api-testing__running-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem;
+  background: $card;
+  border-radius: $radius-lg;
+  color: $foreground;
+
+  svg {
+    color: $primary;
+  }
+
+  p {
+    margin: 0;
+    font-weight: 500;
+  }
+}
+
+// ============================================
+// Error Message
+// ============================================
+.api-testing__error {
+  padding: 0.75rem 1rem;
+  background: rgba($destructive, 0.1);
+  border: 1px solid rgba($destructive, 0.2);
+  border-radius: $radius;
+  color: $destructive;
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+}

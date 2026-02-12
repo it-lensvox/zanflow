@@ -1,7 +1,14 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
-import type { AuthTokens } from '@/types';
+import type {
+  AuthTokens, User as AppUser, PaginatedResponse, PaginatedProjectsResponse, GetUploadUrlPayload, GetUploadUrlResponse, ConfirmUploadResponse, GetDownloadUrlPayload, ConfirmUploadPayload,
+  GetDownloadUrlResponse, TaskComment, CreateTaskCommentPayload, AITaskSuggestionResponse, AITaskSuggestionPayload, APICollection,
+  APIEndpoint, AuthCredential, ExecutionRun, ExecutionResult, APITestingDashboard, CreateCollectionPayload, CreateEndpointPayload, CreateCredentialPayload, RunCollectionPayload, ProjectCreatePayload,
+  Label, DocumentStatus, ChatMessage, ChatRoom, ChatRoomMessagesResponse, CreatePrivateChatPayload, GatewaySendMessagePayload, GatewayIncomingMessage, GatewayConnectedEvent, RefineTextPayload, RefineTextResponse, TeamTypeChoicesResponse,
+  CreateTeamPayload, ProjectChatRoom, TeamChatRoom, Team
+} from '@/types';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.18:8000/api/v1';
+const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://192.168.1.12:8000/ws/gateway';
 
 export const api = axios.create({
   baseURL: API_URL,
@@ -26,6 +33,10 @@ export const clearTokens = (): void => {
   localStorage.removeItem(TOKEN_KEY);
 };
 
+// Token refresh mutex - prevents race condition when multiple 401s fire simultaneously
+let isRefreshing = false;
+let refreshPromise: Promise<AuthTokens> | null = null;
+
 // Request interceptor to add auth token
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
@@ -38,7 +49,7 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor for token refresh
+// Response interceptor for token refresh with mutex to prevent race conditions
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
@@ -46,26 +57,49 @@ api.interceptors.response.use(
       _retry?: boolean;
     };
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Handle both 401 (Unauthorized) and 403 (Forbidden) for token refresh
+    if ((error.response?.status === 401 || error.response?.status === 403) && !originalRequest._retry) {
       originalRequest._retry = true;
 
       const tokens = getTokens();
       if (tokens?.refresh) {
+        // Use mutex: only the first 401 triggers a refresh call,
+        // all subsequent 401s wait for the same promise
+        if (!isRefreshing) {
+          isRefreshing = true;
+          refreshPromise = axios
+            .post<AuthTokens>(`${API_URL}/auth/refresh/`, {
+              refresh: tokens.refresh,
+            })
+            .then((res) => {
+              const newTokens = res.data;
+              setTokens(newTokens);
+              api.defaults.headers.common['Authorization'] = `Bearer ${newTokens.access}`;
+              return newTokens;
+            })
+            .catch((refreshError) => {
+              clearTokens();
+              window.dispatchEvent(new CustomEvent('auth:token-expired'));
+              throw refreshError;
+            })
+            .finally(() => {
+              isRefreshing = false;
+              refreshPromise = null;
+            });
+        }
+
         try {
-          const response = await axios.post<AuthTokens>(
-            `${API_URL}/auth/refresh/`,
-            { refresh: tokens.refresh }
-          );
-          setTokens(response.data);
-          originalRequest.headers.Authorization = `Bearer ${response.data.access}`;
+          const newTokens = await refreshPromise!;
+          originalRequest.headers.Authorization = `Bearer ${newTokens.access}`;
           return api(originalRequest);
         } catch {
-          clearTokens();
-          window.location.href = '/login';
+          return Promise.reject(error);
         }
+      } else {
+        clearTokens();
+        window.dispatchEvent(new CustomEvent('auth:token-expired'));
       }
     }
-
     return Promise.reject(error);
   }
 );
@@ -78,7 +112,6 @@ export const authApi = {
       password,
     });
     setTokens(response.data);
-    // Update the default header immediately for subsequent requests
     api.defaults.headers.common['Authorization'] = `Bearer ${response.data.access}`;
     return response.data;
   },
@@ -102,12 +135,80 @@ export const authApi = {
     const response = await api.get('/auth/me/');
     return response.data;
   },
+
+  // Skills API
+  updateSkills: async (skills: string[]) => {
+    const response = await api.patch('/auth/me/', { skills });
+    return response.data;
+  },
+
+  forgotPassword: async (email: string) => {
+    const response = await api.post('/auth/forgot-password/', { email });
+    return response.data;
+  },
+
+  verifyOTP: async (email: string, otp: string,) => {
+    const response = await api.post('/auth/verify-otp/', { email, otp });
+    return response.data;
+  },
+
+  setNewPassword: async (data: {
+    email: string;
+    reset_token: string;
+    password: string;
+    password_confirm: string;
+  }) => {
+    const response = await api.post('/auth/set-new-password/', data);
+    return response.data;
+  },
+
+  resetPassword: async (data: {
+    username: string;
+    old_password: string;
+    new_password: string;
+    confirm_new_password: string;
+  }) => {
+    const response = await api.post('/auth/reset-password/', data);
+    return response.data;
+  },
 };
+
+// Notification
+export const notificationsApi = {
+  list: async (params?: { limit?: number; offset?: number }) => {
+    const response = await api.get('/notification/', { params });
+    return response.data;
+  },
+
+  getSummary: async () => {
+    const response = await api.get('/notification/');
+    return {
+      total: response.data.total,
+      unread: response.data.unread_count
+    };
+  },
+
+  // Mark a notification as read
+  markAsRead: async (id: number) => {
+    const response = await api.post(`/notification/${id}/mark-read/`);
+    return response.data;
+  },
+
+  // Delete a specific notification
+  delete: async (id: number) => {
+    await api.delete(`/notification/${id}/`);
+  },
+
+  clearAll: async () => {
+    await api.post('/notification/clear_all/');
+  }
+};
+
 
 // Projects API
 export const projectsApi = {
   list: async (params?: { task_type?: string; is_active?: boolean }) => {
-    const response = await api.get('/projects/', { params });
+    const response = await api.get<PaginatedProjectsResponse>('/projects/', { params });
     return response.data;
   },
 
@@ -116,17 +217,12 @@ export const projectsApi = {
     return response.data;
   },
 
-  create: async (data: {
-    name: string;
-    description?: string;
-    task_type: string;
-    settings?: Record<string, unknown>;
-  }) => {
+  create: async (data: ProjectCreatePayload) => {
     const response = await api.post('/projects/', data);
     return response.data;
   },
 
-  update: async (id: number, data: Partial<{ name: string; description: string }>) => {
+  update: async (id: number, data: Partial<{ name: string; description: string; is_favourite: boolean }>) => {
     const response = await api.patch(`/projects/${id}/`, data);
     return response.data;
   },
@@ -140,7 +236,6 @@ export const projectsApi = {
     return response.data;
   },
 
-  // Add inside projectsApi object:
   createLabel: async (projectId: number, data: { name: string; color: string }) => {
     const response = await api.post(`/projects/${projectId}/labels/`, data);
     return response.data;
@@ -150,9 +245,18 @@ export const projectsApi = {
     const response = await api.delete(`/projects/${projectId}/labels/${labelId}/`);
     return response.data;
   },
+
+  getLabels: async (projectId: number) => {
+    const response = await api.get<PaginatedResponse<Label>>(`/projects/${projectId}/labels/`);
+    return response.data;
+  },
+  addMember: async (projectId: number, data: { user_id: number; role: string }) => {
+    const response = await api.post(`/projects/${projectId}/add-member/`, data);
+    return response.data;
+  },
 };
 
-// Documents API
+// Add Documents API in task type file
 export const documentsApi = {
   list: async (params?: {
     project?: number;
@@ -169,10 +273,61 @@ export const documentsApi = {
     return response.data;
   },
 
-  create: async (data: FormData) => {
-    const response = await api.post('/documents/', data, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+
+  getUploadUrl: async (projectId: number, data: GetUploadUrlPayload) => {
+    const response = await api.post<GetUploadUrlResponse>(
+      `/projects/${projectId}/get-upload-url/`,
+      data
+    );
+    return response.data;
+  },
+
+  uploadFileToS3: async (
+    s3Url: string,
+    fields: Record<string, string>,
+    file: File
+  ) => {
+    const formData = new FormData();
+    Object.keys(fields).forEach(key => {
+      formData.append(key, fields[key]);
     });
+    formData.append('file', file);
+    await axios.post(s3Url, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+
+  // This `create` now expects the final S3 file_key
+  create: async (data: {
+    project: number;
+    name: string;
+    description: string;
+    file_key: string;
+    initial_gt_data?: Record<string, unknown>;
+    file_type: string;
+    original_file_name: string;
+  }) => {
+    const response = await api.post('/documents/', data);
+    return response.data;
+  },
+
+  // 3rd API: Confirm Upload
+  confirmUpload: async (projectId: number, data: ConfirmUploadPayload) => {
+    const response = await api.post<ConfirmUploadResponse>(
+      `/projects/${projectId}/confirm-upload/`,
+      data
+    );
+    return response.data;
+  },
+
+  // 4th API: Get Download URL
+  getDownloadUrl: async (projectId: number, data: GetDownloadUrlPayload) => {
+    const response = await api.post<GetDownloadUrlResponse>(
+      `/projects/${projectId}/get-download-url/`,
+      data
+    );
     return response.data;
   },
 
@@ -181,51 +336,15 @@ export const documentsApi = {
     return response.data;
   },
 
+  // Update document status in documents page 
+  updateStatus: async (id: string, status: DocumentStatus) => {
+    const response = await api.patch(`/documents/${id}/`, { status });
+    return response.data;
+  },
+
+  // Document delete on documents page
   delete: async (id: string) => {
     await api.delete(`/documents/${id}/`);
-  },
-
-  uploadSource: async (id: string, file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    const response = await api.post(`/documents/${id}/upload-source/`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    return response.data;
-  },
-
-  getVersions: async (id: string) => {
-    const response = await api.get(`/documents/${id}/versions/`);
-    return response.data;
-  },
-
-  createVersion: async (id: string, data: { gt_data: Record<string, unknown>; change_summary?: string }) => {
-    const response = await api.post(`/documents/${id}/versions/`, data);
-    return response.data;
-  },
-
-  getVersionDiff: async (id: string, v1: string | number, v2: string | number) => {
-    const response = await api.get(`/documents/${id}/versions/diff/`, {
-      params: { v1, v2 },
-    });
-    return response.data;
-  },
-
-  submitForReview: async (id: string) => {
-    const response = await api.post(`/documents/${id}/submit-for-review/`);
-    return response.data;
-  },
-
-  approve: async (id: string, versionId?: string) => {
-    const response = await api.post(`/documents/${id}/approve/`, {
-      version_id: versionId,
-    });
-    return response.data;
-  },
-  // Add inside documentsApi object:
-  addLabel: async (documentId: string, labelId: number) => {
-    const response = await api.post(`/documents/${documentId}/labels/`, { label_id: labelId });
-    return response.data;
   },
 
   removeLabel: async (documentId: string, labelId: number) => {
@@ -234,58 +353,506 @@ export const documentsApi = {
   },
 };
 
-// Test Runs API
-export const testRunsApi = {
-  list: async (params?: { project?: number; status?: string }) => {
-    const response = await api.get('/test-runs/', { params });
+
+// Add New Task API
+export const taskApi = {
+  list: async () => {
+    const response = await api.get('/tasksite/');
+    const data = response.data;
+    if (data.tasks && Array.isArray(data.tasks)) {
+      data.tasks = data.tasks.map((task: any) => ({
+        ...task,
+        attachments: task.attachments || [],
+        labels: task.label_details || []
+      }));
+    }
+
+    return data;
+  },
+
+  get: async (taskId: number) => {
+    const response = await api.get(`/tasksite/${taskId}/`);
+    const data = response.data;
+    const task = data.task || data;
+    return {
+      ...data,
+      task: {
+        ...task,
+        attachments: task.attachments || [],
+        labels: task.label_details || task.labels || []
+      }
+    };
+  },
+
+  // Create a new task
+  create: async (formData: FormData) => {
+    const response = await api.post('/tasksite/', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    if (response.data?.task?.label_details) {
+      response.data.task.labels = response.data.task.label_details;
+    }
     return response.data;
   },
 
-  get: async (id: string) => {
-    const response = await api.get(`/test-runs/${id}/`);
+  update: async (taskId: number, data: Partial<{ status: string; priority: string; duration_time: string; labels: number[]; start_date: string; end_date: string; description: string; assigned_to: number[]; links: string[]; }>) => {
+    const response = await api.patch(`/tasksite/${taskId}/`, data);
     return response.data;
+  },
+
+  delete: async (taskId: number) => {
+    const response = await api.delete(`/tasksite/${taskId}/`);
+    return response.data;
+  },
+
+  getPerformance: async (userId: number) => {
+    const response = await api.get(`/tasksite/performance/${userId}/`);
+    const apiData = response.data;
+    const performanceMetrics = apiData.performance_metrics || {};
+
+    const mappedPerformance = {
+      completed_tasks_count: performanceMetrics.completed ?? 0,
+      in_progress_tasks_count: performanceMetrics.in_progress ?? 0,
+      pending_tasks_count: performanceMetrics.pending ?? 0,
+      total_tasks_count: performanceMetrics.total ?? 0,
+
+      performance_score: performanceMetrics.total
+        ? Math.round((performanceMetrics.completed / performanceMetrics.total) * 100)
+        : 0,
+    };
+
+    const taskHistory = apiData.task_history || [];
+    const projectDistributionMap: Record<string, { task_count: number }> = {};
+
+    taskHistory.forEach((task: any) => {
+      const projectName = task.project_name || 'Unassigned Project';
+      if (!projectDistributionMap[projectName]) {
+        projectDistributionMap[projectName] = { task_count: 0 };
+      }
+      projectDistributionMap[projectName].task_count += 1;
+    });
+
+    const projectDistribution = Object.keys(projectDistributionMap).map(name => ({
+      project_name: name,
+      task_count: projectDistributionMap[name].task_count,
+      total_project_tasks: apiData.performance_metrics.total,
+    }));
+
+    const recentActivity = taskHistory.map((task: any) => ({
+      task_name: task.heading,
+      project_name: task.project_name || 'Unassigned Project',
+      status: task.status,
+      timestamp: task.updated_at,
+    })).sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+
+    return {
+      ...mappedPerformance,
+      project_distribution: projectDistribution,
+      recent_activity: recentActivity,
+    };
+
+  },
+
+  // Get comments for a specific task
+  getComments: async (taskId: number) => {
+    const response = await api.get<any>(`/tasksite/${taskId}/comments/`);
+    return response.data.results || [];
+  },
+
+  // Post a new comment to a task
+  addComment: async (taskId: number, data: CreateTaskCommentPayload) => {
+    const response = await api.post<TaskComment>(`/tasksite/${taskId}/comments/`, data);
+    return response.data;
+  },
+
+  // Create AI-based task suggestion
+  suggestTask: async (data: AITaskSuggestionPayload) => {
+    const response = await api.post<AITaskSuggestionResponse>(
+      '/task-ai/suggest-task/',
+      data
+    );
+    return response.data;
+  },
+
+  //Create AI-refined inside TaskTitle and Description
+  refineText: async (data: RefineTextPayload) => {
+    const response = await api.post<RefineTextResponse>(
+      '/task-ai/refine-text/',
+      data
+    );
+    return response.data;
+  },
+
+};
+
+// Create Teams API
+export const teamsApi = {
+
+  // TeamType
+  getTeamTypeChoices: async () => {
+    const response = await api.get<TeamTypeChoicesResponse>('/teams/choices/');
+    return response.data;
+  },
+
+  // Save Team
+  create: async (data: CreateTeamPayload) => {
+    const response = await api.post<Team>('/teams/', data);
+    return response.data;
+  },
+
+  list: async () => {
+    const response = await api.get<PaginatedResponse<Team>>('/teams/');
+    return response.data;
+  },
+
+  // For favorite toggle
+  toggleFavorite: async (id: number, isFavourite: boolean) => {
+    const response = await api.post(`/teams/${id}/favorite/`, {
+      is_favourite: isFavourite
+    });
+    return response.data;
+  },
+
+  // Add member to team
+  addMember: async (teamId: number, data: { user_id: number; role: string }) => {
+    const response = await api.post(`/teams/${teamId}/members/`, data);
+    return response.data;
+  },
+
+  // Delete team
+  delete: async (id: number) => {
+    await api.delete(`/teams/${id}/`);
+  },
+};
+
+// User ManagementAPI
+export const usersApi = {
+  list: async () => {
+    const response = await api.get<PaginatedResponse<AppUser>>('/auth/users/');
+    return response.data;
+  },
+  listAll: async () => {
+    const response = await api.get<{ message: string, users: AppUser[] }>('/tasksite/all-users/');
+    return response.data.users;
   },
 
   create: async (data: {
-    project: number;
-    name?: string;
-    config?: Record<string, unknown>;
+    username: string;
+    email: string;
+    password: string;
+    password_confirm: string;
+    first_name: string;
+    last_name: string;
+    role: AppUser['role'];
   }) => {
-    const response = await api.post('/test-runs/', data);
+    const response = await api.post<AppUser>('/auth/create-user/', data);
+    return response.data;
+  },
+
+  updateRole: async (id: number, role: AppUser['role']) => {
+    const response = await api.patch<AppUser>(`/auth/update-role/${id}/`, { role });
+    return response.data;
+  },
+
+  delete: async (id: number) => {
+    await api.delete(`/auth/delete-user/${id}/`);
+  },
+};
+
+// Team Chat API
+export const chatApi = {
+  // 1. Create or Get Private Chat Room
+  createPrivateRoom: async (userId: number) => {
+    const response = await api.post<ChatRoom>('/chat/rooms/private/', {
+      user_id: userId
+    } as CreatePrivateChatPayload);
+    return response.data;
+  },
+
+  // 2. Fetch Messages for a specific Room
+  getRoomMessages: async (roomId: string, params?: { limit?: number; offset?: number }) => {
+    const response = await api.get<ChatRoomMessagesResponse>(`/chat/rooms/${roomId}/messages/`, { params });
+    return response.data;
+  },
+
+  // Send a message 
+  sendMessage: async (roomId: string, data: { content: string; attachment?: File }) => {
+    const formData = new FormData();
+    formData.append('content', data.content);
+    if (data.attachment) {
+      formData.append('attachment', data.attachment);
+    }
+
+    const response = await api.post(`/chat/rooms/${roomId}/messages/`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  // Send a message with attachment via HTTP POST (for file uploads)
+  sendMessageWithAttachment: async (roomId: string, data: { content: string; attachment: File }) => {
+    const formData = new FormData();
+    formData.append('content', data.content);
+    formData.append('attachment', data.attachment);
+
+    const response = await api.post<ChatMessage>(`/chat/rooms/${roomId}/send/`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  // Team Chat Project Render list
+  getProjectRooms: async () => {
+    const response = await api.get<ProjectChatRoom[]>('/chat/rooms/', {
+      params: { type: 'project' }
+    });
+    return response.data;
+  },
+
+  //Team and Channels Render list  
+  getTeamRooms: async () => {
+    const response = await api.get<TeamChatRoom[]>('/chat/rooms/', {
+      params: { type: 'team' }
+    });
     return response.data;
   },
 };
 
-// Issues API
-export const issuesApi = {
-  list: async (params?: {
-    project?: number;
-    status?: string;
-    priority?: string;
-    assignee?: number;
-  }) => {
-    const response = await api.get('/issues/', { params });
+
+// Gateway  WebSocket Service - Receives all messages across all rooms
+export class GatewayWebSocketService {
+  private ws: WebSocket | null = null;
+  private messageCallback: ((msg: GatewayIncomingMessage) => void) | null = null;
+  private reconnectTimeout: NodeJS.Timeout | null = null;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+  private userId: number | null = null;
+
+  connect() {
+    // Prevent multiple connections
+    if (this.ws && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) {
+      console.log('⚠️ Gateway WebSocket already connected/connecting');
+      return;
+    }
+
+    const tokens = getTokens();
+    if (!tokens?.access) {
+      console.error("No access token available for Gateway WebSocket");
+      return;
+    }
+
+    // New Gateway WebSocket URL
+    const wsUrl = `${WS_GATEWAY_URL}/?token=${tokens.access}`;
+
+    this.ws = new WebSocket(wsUrl);
+
+    this.ws.onopen = () => {
+      console.log('🌍 Connected to WebSocket Gateway');
+      this.reconnectAttempts = 0;
+    };
+
+    this.ws.onmessage = (event) => {
+      try {
+        const data: GatewayIncomingMessage = JSON.parse(event.data);
+
+        // Handle connection acknowledgement
+        if (data.type === 'GATEWAY_CONNECTED') {
+          this.userId = data.user_id || null;
+        }
+
+        // Forward all messages to callback
+        if (this.messageCallback) {
+          this.messageCallback(data);
+        }
+      } catch (err) {
+        console.error('Gateway WS Message Parse Error', err);
+      }
+    };
+
+    this.ws.onerror = (error) => {
+      console.error('Gateway WebSocket Error', error);
+    };
+
+    this.ws.onclose = () => {
+      console.log('❌ Gateway WebSocket Disconnected');
+      this.attemptReconnect();
+    };
+  }
+
+  private attemptReconnect() {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.error('Max reconnection attempts reached for Gateway WebSocket');
+      return;
+    }
+
+    this.reconnectAttempts++;
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+
+    console.log(`Reconnecting Gateway WebSocket in ${delay}ms... (Attempt ${this.reconnectAttempts})`);
+
+    this.reconnectTimeout = setTimeout(() => {
+      this.connect();
+    }, delay);
+  }
+
+  // Send message using new command structure
+  sendMessage(roomId: string, content: string) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      const payload: GatewaySendMessagePayload = {
+        command: 'send_message',
+        room_id: roomId,
+        content: content
+      };
+      this.ws.send(JSON.stringify(payload));
+      console.log(`📤 Message sent to room ${roomId}`);
+    } else {
+      console.error("Gateway WebSocket is not open. Cannot send message.");
+    }
+  }
+
+  onMessage(callback: (msg: GatewayIncomingMessage) => void) {
+    this.messageCallback = callback;
+  }
+
+  disconnect() {
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
+    this.reconnectAttempts = 0;
+    if (this.ws) {
+      this.ws.onclose = null;
+      this.ws.close();
+      this.ws = null;
+      this.messageCallback = null;
+      this.userId = null;
+    }
+  }
+
+  isConnected(): boolean {
+    return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
+  }
+
+  getUserId(): number | null {
+    return this.userId;
+  }
+}
+// Export singleton instance for global use (optional)
+export const gatewaySocket = new GatewayWebSocketService();
+
+// API Testing Platform API
+export const apiTestingApi = {
+  // Collections
+  listCollections: async (params?: { project_id?: number }) => {
+    const response = await api.get<PaginatedResponse<APICollection>>('/api-testing/collections/', { params });
     return response.data;
   },
 
-  get: async (id: string) => {
-    const response = await api.get(`/issues/${id}/`);
+  getCollection: async (id: string) => {
+    const response = await api.get<APICollection>(`/api-testing/collections/${id}/`);
     return response.data;
   },
 
-  create: async (data: {
-    project: number;
-    title: string;
-    description?: string;
-    priority?: string;
-    issue_type?: string;
-  }) => {
-    const response = await api.post('/issues/', data);
+  createCollection: async (data: CreateCollectionPayload) => {
+    const response = await api.post<APICollection>('/api-testing/collections/', data);
     return response.data;
   },
 
-  update: async (id: string, data: Partial<{ title: string; status: string; priority: string }>) => {
-    const response = await api.patch(`/issues/${id}/`, data);
+  updateCollection: async (id: string, data: Partial<CreateCollectionPayload>) => {
+    const response = await api.patch<APICollection>(`/api-testing/collections/${id}/`, data);
+    return response.data;
+  },
+
+  deleteCollection: async (id: string) => {
+    await api.delete(`/api-testing/collections/${id}/`);
+  },
+
+  runCollection: async (id: string, data?: RunCollectionPayload) => {
+    const response = await api.post<ExecutionRun>(`/api-testing/collections/${id}/run/`, data || {});
+    return response.data;
+  },
+
+  getCollectionHistory: async (id: string) => {
+    const response = await api.get<ExecutionRun[]>(`/api-testing/collections/${id}/history/`);
+    return response.data;
+  },
+
+  // Endpoints
+  listEndpoints: async (params?: { collection?: string }) => {
+    const response = await api.get<PaginatedResponse<APIEndpoint>>('/api-testing/endpoints/', { params });
+    return response.data;
+  },
+
+  getEndpoint: async (id: string) => {
+    const response = await api.get<APIEndpoint>(`/api-testing/endpoints/${id}/`);
+    return response.data;
+  },
+
+  createEndpoint: async (data: CreateEndpointPayload) => {
+    const response = await api.post<APIEndpoint>('/api-testing/endpoints/', data);
+    return response.data;
+  },
+
+  updateEndpoint: async (id: string, data: Partial<CreateEndpointPayload>) => {
+    const response = await api.patch<APIEndpoint>(`/api-testing/endpoints/${id}/`, data);
+    return response.data;
+  },
+
+  deleteEndpoint: async (id: string) => {
+    await api.delete(`/api-testing/endpoints/${id}/`);
+  },
+
+  runEndpoint: async (id: string, data?: { credential_id?: string; environment_overrides?: Record<string, string> }) => {
+    const response = await api.post<ExecutionResult>(`/api-testing/endpoints/${id}/run/`, data || {});
+    return response.data;
+  },
+
+  // Credentials
+  listCredentials: async (params?: { collection?: string }) => {
+    const response = await api.get<PaginatedResponse<AuthCredential>>('/api-testing/credentials/', { params });
+    return response.data;
+  },
+
+  getCredential: async (id: string) => {
+    const response = await api.get<AuthCredential>(`/api-testing/credentials/${id}/`);
+    return response.data;
+  },
+
+  createCredential: async (data: CreateCredentialPayload) => {
+    const response = await api.post<AuthCredential>('/api-testing/credentials/', data);
+    return response.data;
+  },
+
+  updateCredential: async (id: string, data: Partial<CreateCredentialPayload>) => {
+    const response = await api.patch<AuthCredential>(`/api-testing/credentials/${id}/`, data);
+    return response.data;
+  },
+
+  deleteCredential: async (id: string) => {
+    await api.delete(`/api-testing/credentials/${id}/`);
+  },
+
+  // Execution Runs
+  listRuns: async (params?: { collection?: string; status?: string }) => {
+    const response = await api.get<PaginatedResponse<ExecutionRun>>('/api-testing/runs/', { params });
+    return response.data;
+  },
+
+  getRun: async (id: string) => {
+    const response = await api.get<ExecutionRun>(`/api-testing/runs/${id}/`);
+    return response.data;
+  },
+
+  // Dashboard
+  getDashboard: async () => {
+    const response = await api.get<APITestingDashboard>('/api-testing/dashboard/');
     return response.data;
   },
 };

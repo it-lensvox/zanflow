@@ -1,0 +1,129 @@
+import React from 'react';
+
+export interface TableColumn<T> {
+  key: string;
+  label: React.ReactNode;
+  width?: string;
+  className?: string;
+  render?: (item: T, index: number) => React.ReactNode;
+  headerClassName?: string;
+}
+
+export type SortDirection = 'asc' | 'desc' | null;
+
+export interface FilterState {
+  [key: string]: string | string[];
+}
+export interface OpenFilter {
+  key: string;
+  type: 'search' | 'list' | 'date';
+}
+
+export interface TableViewProps<T> {
+  data: T[];
+  columns: TableColumn<T>[];
+  rowKey: (item: T) => string | number;
+  onRowClick?: (item: T) => void;
+  onRowMouseEnter?: (item: T) => void;
+  onSort?: (key: string) => void;
+  onFilter?: (key: string) => void;
+  activeFilterKey?: string | null;
+  emptyState?: React.ReactNode;
+  isLoading?: boolean;
+  className?: string;
+  rowClassName?: (item: T) => string;
+  maxHeight?: string | number;
+}
+
+export function TableView<T>({
+  data,
+  columns,
+  rowKey,
+  onRowClick,
+  onRowMouseEnter,
+  onSort,
+  onFilter,
+  activeFilterKey,
+  className = '',
+  rowClassName,
+  maxHeight = '70vh',
+}: TableViewProps<T>) {
+  return (
+    <div 
+      className={`bg-white border border-[#dfe1e6] rounded-md shadow-sm overflow-auto font-sans text-[13px] ${className}`}
+      style={{ 
+        maxHeight: typeof maxHeight === 'number' ? `${maxHeight}px` : maxHeight,
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      {/* Sticky Header - Always visible */}
+      <div className="flex-shrink-0 bg-[#fafbfc] border-b border-[#dfe1e6] sticky top-0 z-20">
+        <table className="w-full border-collapse table-fixed">
+          <thead>
+            <tr>
+              {columns.map((column) => (
+                <th
+                  key={column.key}
+                  className={`group/header text-left py-[10px] px-3 font-semibold text-[12px] text-[#5e6c84] border-r border-[#dfe1e6] last:border-r-0 whitespace-nowrap relative ${activeFilterKey === column.key ? 'z-[100]' : ''} ${column.headerClassName || ''}`}
+                  style={column.width ? { width: column.width } : undefined}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex-1 min-w-0">{column.label}</div>
+                    <div className="flex items-center gap-1 opacity-0 group-hover/header:opacity-100 transition-opacity">
+                      {onSort && (
+                        <button
+                          className="hover:bg-gray-200 p-0.5 rounded transition-colors"
+                          onClick={(e) => { e.stopPropagation(); onSort(column.key); }}
+                        >
+                          <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+                          </svg>
+                        </button>
+                      )}
+                      {onFilter && (
+                        <button
+                          className="hover:bg-gray-200 p-0.5 rounded transition-colors"
+                          onClick={(e) => { e.stopPropagation(); onFilter(column.key); }}
+                        >
+                          <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+        </table>
+      </div>
+      {/* Scrollable Body */}
+      <div className="flex-1 min-h-0">
+        <table className="w-full border-collapse table-fixed">
+          <tbody>
+            {data.map((item, index) => (
+              <tr
+                key={rowKey(item)}
+                onClick={() => onRowClick?.(item)}
+                onMouseEnter={() => onRowMouseEnter?.(item)}
+                className={`group border-b border-[#f4f5f7] last:border-b-0 hover:bg-[#f4f5f7] transition-colors cursor-pointer relative hover:z-[50] ${rowClassName ? rowClassName(item) : ''}`}
+              >
+                {columns.map((column) => (
+                  <td
+                    key={column.key}
+                    className={`py-2 px-3 h-12 align-middle text-[13px] border-r border-[#f4f5f7] group-hover:border-r-[#dfe1e6] last:border-r-0 relative ${column.className || ''}`}
+                    style={column.width ? { width: column.width } : undefined}
+                  >
+                    {column.render ? column.render(item, index) : (item as any)[column.key]}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
