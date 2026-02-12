@@ -1,7 +1,9 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+
+import { Link, useNavigate } from 'react-router-dom';
 import { FolderKanban, Bell } from 'lucide-react';
+
 import { Button, Card, CardContent } from '@/components/common';
 import { notificationsApi, projectsApi } from '@/services/api';
 import type { Project } from '@/types';
@@ -16,6 +18,7 @@ import { CreateProjectModal } from './CreateProjectModal';
 
 export function Projects() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [filter, setFilter] = useState<string>('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const { viewMode, setViewMode } = useViewMode({
@@ -91,6 +94,15 @@ export function Projects() {
     columns: filterConfig,
     globalSearchFields: ['name'],
   });
+
+  // Prefetch project data on hover for instant navigation
+  const handleRowHover = useCallback((project: any) => {
+    queryClient.prefetchQuery({
+      queryKey: ['project', String(project.id)],
+      queryFn: () => projectsApi.get(project.id),
+      staleTime: 1000 * 60 * 5,
+    });
+  }, [queryClient]);
 
   // Handle filter toggle
   const handleFilter = useCallback((key: string) => {
@@ -181,7 +193,8 @@ export function Projects() {
           })),
           rowKey: (project: any) => project.id,
           onRowClick: (project: any) =>
-            (window.location.href = `/projects/${project.id}`),
+            navigate(`/projects/${project.id}`),
+          onRowMouseEnter: handleRowHover,
           emptyState,
           rowClassName: () => 'group',
           onSort: handleSort,

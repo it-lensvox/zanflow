@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
-import { ArrowLeft, Plus, Upload, Search, Film, Loader2, X, Download, ChevronLeft, ChevronRight, FileText, FileJson, Settings, Maximize2, List, Grid3X3 } from 'lucide-react';
+import { ArrowLeft, Plus, Upload, Search, Film, Loader2, X, Download, ChevronLeft, ChevronRight, FileText, FileJson, Settings,
+     Maximize2, List, Grid3X3, MessageCircle} from 'lucide-react';
 import { projectsApi, taskApi, documentsApi } from '@/services/api';
 import type { Task } from '@/types'
 import { CreateTask } from '@/pages/MyTask/CreateTask';
@@ -593,6 +594,14 @@ export function ContentCreation() {
                             <Plus className="h-4 w-4" />
                             Create Task
                         </button>
+
+                         <button
+                        onClick={() => navigate('/team-chat', { state: { projectId: Number(id) } })}
+                        className="p-2 hover:bg-gray-100 rounded-full transition-colors flex items-center gap-2 text-gray-600 hover:text-black"
+                        title="Team Chat"
+                    >
+                        <MessageCircle className="h-4 w-4" />
+                    </button>
 
                         <button
                             onClick={() => navigate(`/projects/${id}/settings`)}

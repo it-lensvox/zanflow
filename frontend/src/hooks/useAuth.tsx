@@ -1,9 +1,10 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { authApi, getTokens, clearTokens } from '@/services/api';
+import axios from 'axios';
+import { authApi, getTokens, setTokens, API_URL } from '@/services/api';
 import { saveCredentials, clearCredentials } from '@/services/authStorage';
 
-import type { User } from '@/types';
+import type { User, AuthTokens } from '@/types';
 
 interface AuthContextType {
   user: User | null;
@@ -54,6 +55,72 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('auth:token-expired', handleTokenExpired);
     };
   }, [navigate]);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleTokenRefresh = useCallback(() => {
+    // Clear any existing timer
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = null;
+    }
+
+    const tokens = getTokens();
+    if (!tokens?.access) return;
+
+    try {
+      // Decode JWT payload to get expiry time
+      const payloadBase64 = tokens.access.split('.')[1];
+      const payload = JSON.parse(atob(payloadBase64));
+      const expiresAtMs = payload.exp * 1000;
+      const now = Date.now();
+
+      // Refresh 5 minutes before expiry
+      const REFRESH_BUFFER_MS = 5 * 60 * 1000;
+      const delay = expiresAtMs - now - REFRESH_BUFFER_MS;
+
+      if (delay <= 0) {
+        // Token is already about to expire or expired, refresh immediately
+        performTokenRefresh(tokens.refresh);
+        return;
+      }
+
+      refreshTimerRef.current = setTimeout(() => {
+        performTokenRefresh(tokens.refresh);
+      }, delay);
+    } catch {
+      // If JWT decoding fails, don't schedule (interceptor will handle it)
+    }
+  }, []);
+
+  const performTokenRefresh = useCallback(async (refreshToken: string) => {
+    try {
+      const response = await axios.post<AuthTokens>(`${API_URL}/auth/refresh/`, {
+        refresh: refreshToken,
+      });
+      const newTokens = response.data;
+      setTokens(newTokens);
+
+      // Schedule the next refresh for the new token
+      scheduleTokenRefresh();
+    } catch {
+      // Refresh failed silently - the response interceptor will handle it
+      // on the next API call
+    }
+  }, [scheduleTokenRefresh]);
+
+  // Schedule refresh whenever the user changes (login/logout)
+  useEffect(() => {
+    if (user) {
+      scheduleTokenRefresh();
+    }
+
+    return () => {
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
+        refreshTimerRef.current = null;
+      }
+    };
+  }, [user, scheduleTokenRefresh]);
 
   const login = async (username: string, password: string) => {
     await authApi.login(username, password);

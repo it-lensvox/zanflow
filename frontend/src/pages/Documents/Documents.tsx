@@ -1,7 +1,8 @@
+import React from 'react';
 import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useSearchParams, useNavigate, useOutletContext } from 'react-router-dom';
-import { FileText, Search, Filter, ChevronDown, Bell } from 'lucide-react';
+import { FileText, Search, Filter, ChevronDown, Bell, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button, Card, CardContent, Input } from '@/components/common';
 import { documentsApi, notificationsApi, projectsApi } from '@/services/api';
 import type { Document, Project } from '@/types';
@@ -91,25 +92,41 @@ export function Documents() {
   const statusFilter = searchParams.get('status') || '';
   const fileTypeFilter = searchParams.get('file_type') || '';
 
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Reset to page 1 when filters change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [projectFilter, fileTypeFilter, searchTerm]);
+
+  React.useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ['documents'] });
+  }, [queryClient]);
+
   const { data: projectsData } = useQuery({
     queryKey: ['projects'],
     queryFn: () => projectsApi.list(),
   });
 
   const { data: allDocumentsData, isLoading } = useQuery({
-    queryKey: ['documents', 'all', projectFilter, fileTypeFilter],
+    queryKey: ['documents', 'all', projectFilter, fileTypeFilter, currentPage],
     queryFn: () =>
       documentsApi.list({
         project: projectFilter ? Number(projectFilter) : undefined,
         file_type: fileTypeFilter || undefined,
+        page: currentPage,
       }),
-    enabled: true
+    enabled: true,
+    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: true,
   });
-
   const rawProjects = projectsData?.results || projectsData || [];
   const projects = (Array.isArray(rawProjects) ? rawProjects : []) as Project[];
 
   const allDocs = allDocumentsData?.results || allDocumentsData || [];
+  const totalCount = (allDocumentsData as any)?.count || 0;
+  const hasNextPage = !!(allDocumentsData as any)?.next;
+  const hasPreviousPage = !!(allDocumentsData as any)?.previous;
   const projectLookup = projects.reduce((acc: Record<number, string>, project: Project) => {
     acc[project.id] = project.name;
     return acc;
@@ -136,6 +153,7 @@ export function Documents() {
   const clearFilters = () => {
     setSearchParams({});
     setSearchTerm('');
+    setCurrentPage(1);
   };
 
   const hasActiveFilters =
@@ -169,6 +187,39 @@ export function Documents() {
           Clear Filters
         </Button>
       )}
+    </div>
+  );
+
+  const paginationControls = totalCount > 0 && (
+    <div className="flex items-center justify-between px-4 py-3 border-t bg-background">
+      <div className="text-sm text-muted-foreground">
+        Showing page {currentPage} of {Math.ceil(totalCount / 20)} ({totalCount} total documents)
+      </div>
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+          disabled={!hasPreviousPage}
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Previous
+        </Button>
+        <div className="flex items-center gap-1">
+          <span className="text-sm font-medium px-3 py-1 rounded bg-primary text-primary-foreground">
+            {currentPage}
+          </span>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setCurrentPage((prev) => prev + 1)}
+          disabled={!hasNextPage}
+        >
+          Next
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
     </div>
   );
 
@@ -270,33 +321,36 @@ export function Documents() {
               </div>
             </CardContent>
           </Card></div>
-          
+
           {/* Documents View */}
-          <div className="flex-1 overflow-hidden px-8 pb-8 pt-6 min-h-0">
-            <DualView
-              viewMode={viewMode}
-              isLoading={isLoading}
-              gridProps={{
-                data: displayedDocuments,
-                renderCard: (doc) => (
-                  <DocumentGridCard
-                    key={doc.id}
-                    document={doc}
-                    onDeleteClick={handleDeleteClick}
-                  />
-                ),
-                emptyState,
-                gridClassName: 'grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4',
-              }}
-              tableProps={{
-                data: displayedDocuments,
-                columns: createDocumentsTableColumns({ onDeleteClick: handleDeleteClick }),
-                rowKey: (doc) => doc.id,
-                onRowClick: (doc) => navigate(`/documents/${doc.id}`),
-                emptyState,
-                rowClassName: () => 'group',
-              }}
-            />
+          <div className="flex-1 overflow-hidden px-8 pb-8 pt-6 min-h-0 flex flex-col">
+            <div className="flex-1 overflow-hidden">
+              <DualView
+                viewMode={viewMode}
+                isLoading={isLoading}
+                gridProps={{
+                  data: displayedDocuments,
+                  renderCard: (doc) => (
+                    <DocumentGridCard
+                      key={doc.id}
+                      document={doc}
+                      onDeleteClick={handleDeleteClick}
+                    />
+                  ),
+                  emptyState,
+                  gridClassName: 'grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4',
+                }}
+                tableProps={{
+                  data: displayedDocuments,
+                  columns: createDocumentsTableColumns({ onDeleteClick: handleDeleteClick }),
+                  rowKey: (doc) => doc.id,
+                  onRowClick: (doc) => navigate(`/documents/${doc.id}`),
+                  emptyState,
+                  rowClassName: () => 'group',
+                }}
+              />
+            </div>
+            {paginationControls}
           </div>
         </div>
       </div>

@@ -1,81 +1,59 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Badge } from '@/components/common';
+import { Badge, TablePopover } from '@/components/common';
 import { teamsApi, usersApi } from '@/services/api';
 import type { Team } from '@/types';
 import type { TableColumn } from '@/components/layout/DualView';
 import { UserPlus } from 'lucide-react';
 
 const TeamMembersList = ({ team }: { team: Team }) => {
-    const [openMembersCard, setOpenMembersCard] = React.useState(false);
-
-    return (
-        <div className="relative inline-block">
-            <div
-                className="flex -space-x-1.5 items-center cursor-pointer hover:opacity-80"
-                onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setOpenMembersCard(!openMembersCard);
-                }}
-            >
-                {team.members && team.members.length > 0 ? (
-                    <>
-                        {team.members.slice(0, 3).map((member: any) => (
-                            <div
-                                key={member.id}
-                                className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-700 ring-1 ring-white z-10"
-                                title={member.user?.full_name || 'User'}
-                            >
-                                {member.user?.full_name?.charAt(0).toUpperCase() || 'U'}
-                            </div>
-                        ))}
-                        {team.members.length > 3 && (
-                            <div className="w-6 h-6 rounded-full bg-gray-400 flex items-center justify-center text-[10px] font-bold text-white ring-1 ring-white z-0">
-                                +{team.members.length - 3}
-                            </div>
-                        )}
-                    </>
-                ) : (
-                    <span className="text-gray-400 text-[11px] pl-1">—</span>
-                )}
-            </div>
-
-            {openMembersCard && (
+    const trigger = (
+        <div className="flex -space-x-1.5 items-center cursor-pointer hover:opacity-80">
+            {team.members && team.members.length > 0 ? (
                 <>
-                    <div
-                        className="fixed inset-0 z-[100]"
-                        onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            e.nativeEvent.stopImmediatePropagation();
-                            setOpenMembersCard(false);
-                        }}
-                    />
-                    <div className="absolute left-0 top-full mt-2 z-[999] w-64 bg-white border border-gray-200 rounded-lg shadow-xl text-left">
-                        <div className="p-2 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-lg">
-                            <span className="text-xs font-semibold text-gray-700">Team Members</span>
-                            <span className="text-[10px] bg-gray-200 px-1.5 py-0.5 rounded text-gray-600">
-                                {team.members?.length || 0}
-                            </span>
+                    {team.members.slice(0, 3).map((member: any) => (
+                        <div
+                            key={member.id}
+                            className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-700 ring-1 ring-white z-10"
+                            title={member.user?.full_name || 'User'}
+                        >
+                            {member.user?.full_name?.charAt(0).toUpperCase() || 'U'}
                         </div>
-                        <div className="max-h-48 overflow-y-auto p-1">
-                            {team.members?.map((member) => (
-                                <div key={member.id} className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded">
-                                    <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-700 shrink-0">
-                                        {member.user.full_name?.charAt(0) || 'U'}
-                                    </div>
-                                    <div className="min-w-0">
-                                        <p className="text-[11px] font-medium text-gray-700 truncate">{member.user.full_name}</p>
-                                        <p className="text-[10px] text-gray-400 truncate capitalize">{member.role.replace('_', ' ')}</p>
-                                    </div>
-                                </div>
-                            ))}
+                    ))}
+                    {team.members.length > 3 && (
+                        <div className="w-6 h-6 rounded-full bg-gray-400 flex items-center justify-center text-[10px] font-bold text-white ring-1 ring-white z-0">
+                            +{team.members.length - 3}
                         </div>
-                    </div>
+                    )}
                 </>
+            ) : (
+                <span className="text-gray-400 text-[11px] pl-1">—</span>
             )}
         </div>
+    );
+
+    return (
+        <TablePopover trigger={trigger}>
+            <div className="p-2 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-lg">
+                <span className="text-xs font-semibold text-gray-700">Team Members</span>
+                <span className="text-[10px] bg-gray-200 px-1.5 py-0.5 rounded text-gray-600">
+                    {team.members?.length || 0}
+                </span>
+            </div>
+            <div className="max-h-48 overflow-y-auto p-1">
+                {team.members?.map((member) => (
+                    <div key={member.id} className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded">
+                        <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-700 shrink-0">
+                            {member.user.full_name?.charAt(0) || 'U'}
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-[11px] font-medium text-gray-700 truncate">{member.user.full_name}</p>
+                            <p className="text-[10px] text-gray-400 truncate capitalize">{member.role.replace('_', ' ')}</p>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </TablePopover>
     );
 };
 

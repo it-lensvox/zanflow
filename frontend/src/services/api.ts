@@ -6,11 +6,15 @@ import type {
   Label, DocumentStatus, ChatMessage, ChatRoom, ChatRoomMessagesResponse, CreatePrivateChatPayload, GatewaySendMessagePayload, GatewayIncomingMessage, GatewayConnectedEvent, RefineTextPayload, RefineTextResponse, TeamTypeChoicesResponse,
   CreateTeamPayload, ProjectChatRoom, TeamChatRoom, Team
 } from '@/types';
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+
+export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
 const WS_GATEWAY_URL = import.meta.env.VITE_WS_GATEWAY_URL || 'ws://localhost:8000/ws/gateway';
 
+//export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.18:8000/api/v1';
+//const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://192.168.1.12:8000/ws/gateway';
+ 
 export const api = axios.create({
   baseURL: API_URL,
   headers: {
@@ -34,6 +38,10 @@ export const clearTokens = (): void => {
   localStorage.removeItem(TOKEN_KEY);
 };
 
+// Token refresh mutex - prevents race condition when multiple 401s fire simultaneously
+let isRefreshing = false;
+let refreshPromise: Promise<AuthTokens> | null = null;
+
 // Request interceptor to add auth token
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
@@ -46,7 +54,7 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor for token refresh
+// Response interceptor for token refresh with mutex to prevent race conditions
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
@@ -60,21 +68,37 @@ api.interceptors.response.use(
 
       const tokens = getTokens();
       if (tokens?.refresh) {
-        try {
-          const response = await axios.post<AuthTokens>(
-            `${API_URL}/auth/refresh/`,
-            { refresh: tokens.refresh }
-          );
+        // Use mutex: only the first 401 triggers a refresh call,
+        // all subsequent 401s wait for the same promise
+        if (!isRefreshing) {
+          isRefreshing = true;
+          refreshPromise = axios
+            .post<AuthTokens>(`${API_URL}/auth/refresh/`, {
+              refresh: tokens.refresh,
+            })
+            .then((res) => {
+              const newTokens = res.data;
+              setTokens(newTokens);
+              api.defaults.headers.common['Authorization'] = `Bearer ${newTokens.access}`;
+              return newTokens;
+            })
+            .catch((refreshError) => {
+              clearTokens();
+              window.dispatchEvent(new CustomEvent('auth:token-expired'));
+              throw refreshError;
+            })
+            .finally(() => {
+              isRefreshing = false;
+              refreshPromise = null;
+            });
+        }
 
-          const newTokens = response.data;
-          setTokens(newTokens);
-          api.defaults.headers.common['Authorization'] = `Bearer ${newTokens.access}`;
+        try {
+          const newTokens = await refreshPromise!;
           originalRequest.headers.Authorization = `Bearer ${newTokens.access}`;
           return api(originalRequest);
-        } catch (refreshError) {
-          clearTokens();
-          window.dispatchEvent(new CustomEvent('auth:token-expired'));
-          return Promise.reject(refreshError);
+        } catch {
+          return Promise.reject(error);
         }
       } else {
         clearTokens();

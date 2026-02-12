@@ -9,3 +9,4 @@ export {
   CardContent,
 } from './Card';
 export { Badge, badgeVariants } from './Badge';
+export { TablePopover } from './TablePopover';
