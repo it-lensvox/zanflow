@@ -793,12 +793,12 @@ export interface GatewaySendMessagePayload {
 }
 
 export interface GatewayIncomingMessage {
-  type: 'CHAT_MESSAGE' | 'notification' | 'GATEWAY_CONNECTED' | 'PRESENCE' | 'room_created';
+  type: 'CHAT_MESSAGE' | 'SIGNAL' | 'GATEWAY_CONNECTED' | 'PRESENCE' | 'room_created';
+  event?: 'NEW_NOTIFICATION';
   message?: ChatMessage;
-  data?: ChatMessage; 
+  data?: ChatMessage | NotificationData; 
   room_id?: string;
   user_id?: number;
-  notification?: any;
   status?: 'online' | 'offline';
   username?: string;
   room?: any;
@@ -809,6 +809,58 @@ export interface UnreadCount {
   room_id: string;
   count: number;
 }
+
+// WebSocket Notification System Types
+export interface NotificationRelatedObject {
+  type: 'task' | 'project' | 'message' | 'comment' | 'team';
+  id: string | number;
+}
+
+// Individual notification data structure
+export interface NotificationData {
+  id: number;
+  title: string;
+  message?: string;
+  notification_type?: string;
+  priority?: string;
+  actor_name?: string | null;
+  is_read: boolean;
+  metadata?: {
+    task_id?: number;
+    task_heading?: string;
+    project_id?: string | number;
+    project_name?: string;
+    old_status?: string;
+    new_status?: string;
+    priority?: string;
+    [key: string]: any;
+  };
+  related_object?: NotificationRelatedObject;
+  time_since?: string;
+  created_at?: string;
+  unread_count?: number;
+}
+
+// API response wrapper for notification list
+export interface NotificationListResponse {
+  message: string;
+  total: number;
+  unread_count: number;
+  limit: number;
+  offset: number;
+  notifications: NotificationData[];
+}
+
+// WebSocket notification event wrapper
+export interface WebSocketNotificationEvent {
+  type: 'SIGNAL';
+  event: 'NEW_NOTIFICATION';
+  data: NotificationData;
+}
+
+// Callback type for notification listeners
+export type NotificationCallback = (notification: NotificationData) => void;
+
 
 export interface ToastNotification {
   id: string;

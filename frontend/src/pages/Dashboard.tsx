@@ -6,7 +6,7 @@ import {
   FolderKanban, FileText, CheckCircle, Clock, ArrowRight, ChevronDown, Calendar, Users, Bell,
 } from 'lucide-react';
 import { Button, Card, CardContent, CardHeader, CardTitle } from '@/components/common';
-import { projectsApi, documentsApi, taskApi, notificationsApi, } from '@/services/api';
+import { projectsApi, documentsApi, taskApi } from '@/services/api';
 import { formatRelativeTime, getStatusColor } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import type { Project, Document } from '@/types';
@@ -15,6 +15,7 @@ import { NotificationsPage } from './NotificationsPage';
 import { ProjectGridCard } from '@/components/layout/DualView/projectsConfig';
 import { useOutletContext } from 'react-router-dom';
 import { CreateProjectModal } from '@/pages/Project/CreateProjectModal';
+import { useNotifications } from '@/hooks/useNotifications';
 
 // Type Definitions
 type TaskStatus = 'pending' | 'backlog' | 'in_progress' | 'completed' | 'deployed' | 'deferred' | 'review';
@@ -59,6 +60,7 @@ export function Dashboard() {
   const [openDocDropdownId, setOpenDocDropdownId] = React.useState<string | null>(null);
   const [docDropdownPos, setDocDropdownPos] = React.useState<{ top: number; left: number } | null>(null);
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
+  const { unreadCount } = useNotifications();
 
   // Data Fetching
   const { data: projectsData, isLoading: projectsLoading } = useQuery({
@@ -77,16 +79,16 @@ export function Dashboard() {
   });
 
   // Data Processing
-const projects = (() => {
-  if (!projectsData) return [];
-  if (Array.isArray(projectsData)) return projectsData;
-  if (projectsData.results && Array.isArray(projectsData.results)) {
-    return projectsData.results;
-  }
-  return [];
-})() as Project[];
+  const projects = (() => {
+    if (!projectsData) return [];
+    if (Array.isArray(projectsData)) return projectsData;
+    if (projectsData.results && Array.isArray(projectsData.results)) {
+      return projectsData.results;
+    }
+    return [];
+  })() as Project[];
 
-const documents = (documentsData?.results || []) as Document[];
+  const documents = (documentsData?.results || []) as Document[];
 
   const allTasks: Task[] = React.useMemo(() => {
     if (!tasksResponse) {
@@ -184,16 +186,9 @@ const documents = (documentsData?.results || []) as Document[];
 
 
   const recentProjects = Array.isArray(projects)
-  ? projects.filter(p => p.is_favourite).slice(0, 6)
-  : [];
+    ? projects.filter(p => p.is_favourite).slice(0, 6)
+    : [];
   const recentDocuments = Array.isArray(documents) ? documents.slice(0, 5) : [];
-
-  // Fetch unread count for the badge
-  const { data: summary } = useQuery({
-    queryKey: ['notifications-summary'],
-    queryFn: () => notificationsApi.getSummary(),
-    refetchInterval: 30000,
-  });
 
   const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A';
@@ -253,9 +248,9 @@ const documents = (documentsData?.results || []) as Document[];
               onClick={() => setIsActivityOpen(!isActivityOpen)}
             >
               <Bell className="h-5 w-5" />
-              {(summary?.unread ?? 0) > 0 && (
+              {unreadCount > 0 && (
                 <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                  {summary?.unread}
+                  {unreadCount}
                 </span>
               )}
             </Button>
@@ -636,6 +631,12 @@ const documents = (documentsData?.results || []) as Document[];
           </CardContent>
         </Card>
       </div>
+      {isActivityOpen && (
+        <NotificationsPage
+          onClose={() => setIsActivityOpen(false)}
+          defaultFilter="unread"
+        />
+      )}
       <CreateProjectModal
         isOpen={isCreateProjectModalOpen}
         onClose={() => setIsCreateProjectModalOpen(false)}

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { Layout } from '@/components/layout';
@@ -5,7 +6,7 @@ import type { User as AppUser } from '@/types';
 import { ContentCreation } from '@/pages/TaskType/ContentCreation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
-import { projectsApi } from '@/services/api';
+import { projectsApi, notificationSocket } from '@/services/api';
 import { TaskDetails } from '@/pages/TaskType/TaskDetails';
 import { APITesting } from '@/pages/TaskType/APITesting';
 import {
@@ -88,6 +89,8 @@ const AdminDashboard = () => (
   </AdminRoute>
 );
 
+
+
 function AppRoutes() {
   const { isAuthenticated } = useAuth();
 
@@ -158,10 +161,28 @@ function AppRoutes() {
   );
 }
 
+// Global WebSocket initializer component
+function WebSocketProvider({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuth();
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      notificationSocket.connect();
+      console.log('🌐 Global WebSocket initialized');
+      return () => {
+      };
+    }
+  }, [isAuthenticated]);
+
+  return <>{children}</>;
+}
+
 function App() {
   return (
     <AuthProvider>
-      <AppRoutes />
+      <WebSocketProvider>
+        <AppRoutes />
+      </WebSocketProvider>
     </AuthProvider>
   );
 }

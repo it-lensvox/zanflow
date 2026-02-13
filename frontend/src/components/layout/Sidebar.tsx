@@ -11,7 +11,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { projectsApi, teamsApi } from '@/services/api';
 import type { Project } from '@/types';
 import { getProjectTypeColor } from '@/lib/utils';
-import { notificationsApi } from '@/services/api';
+import { useNotifications } from '@/hooks/useNotifications';
 
 const ADMIN_ROLES = ['admin', 'manager', 'annotator'];
 
@@ -68,6 +68,7 @@ export function Sidebar() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const { unreadCount } = useNotifications();
 
   // Collapsible Logic
   const [isCollapsed, setIsCollapsed] = useState(true);
@@ -88,13 +89,6 @@ export function Sidebar() {
   const { data: teamsData } = useQuery({
     queryKey: ['teams'],
     queryFn: () => teamsApi.list(),
-  });
-
-  // Fetching notification
-  const { data: notifySummary } = useQuery({
-    queryKey: ['notifications-summary'],
-    queryFn: () => notificationsApi.getSummary(),
-    refetchInterval: 30000,
   });
 
   const projects = useMemo(() => {
@@ -132,11 +126,11 @@ export function Sidebar() {
               : "bg-primary text-primary-foreground hover:opacity-90"
           )}
         >
-          <span className="text-xl font-bold">Z</span>
+          <span className="text-xl font-bold">D</span>
         </button>
         {isExpanded && (
           <span className="ml-3 text-xl font-bold text-primary animate-in fade-in duration-300">
-            ZanFlow
+            DYUKSA
           </span>
         )}
       </div>

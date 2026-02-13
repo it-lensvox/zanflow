@@ -25,7 +25,7 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: Infinity,
-      gcTime: Infinity,               // Prevent cache garbage collection from triggering mass re-fetches
+      gcTime: Infinity,              
       refetchOnWindowFocus: false,   
       refetchOnMount: false, 
       refetchOnReconnect: false,     

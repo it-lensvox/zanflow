@@ -4,11 +4,12 @@ import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-quer
 import { useSearchParams, useNavigate, useOutletContext } from 'react-router-dom';
 import { FileText, Search, Filter, ChevronDown, Bell, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button, Card, CardContent, Input } from '@/components/common';
-import { documentsApi, notificationsApi, projectsApi } from '@/services/api';
+import { documentsApi, projectsApi } from '@/services/api';
 import type { Document, Project } from '@/types';
 import { ViewToggle, DualView, useViewMode, } from '@/components/layout/DualView';
 import { createDocumentsTableColumns, DocumentGridCard } from '@/components/layout/DualView/documentsConfig';
-
+import { useNotifications } from '@/hooks/useNotifications';
+import { NotificationsPage } from '../NotificationsPage';
 
 const FILE_TYPE_OPTIONS = [
   { value: '', label: 'All Types' },
@@ -76,6 +77,7 @@ function ConfirmationModal({
 
 export function Documents() {
   const queryClient = useQueryClient();
+  const { unreadCount } = useNotifications();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -163,11 +165,6 @@ export function Documents() {
     e.stopPropagation();
     setDeleteConfirm({ id: doc.id, name: doc.name });
   };
-  const { data: summary } = useQuery({
-    queryKey: ['notifications-summary'],
-    queryFn: () => notificationsApi.getSummary(),
-    refetchInterval: 30000,
-  });
 
   const { isActivityOpen, setIsActivityOpen } = useOutletContext<{
     isActivityOpen: boolean;
@@ -242,9 +239,9 @@ export function Documents() {
                 onClick={() => setIsActivityOpen(!isActivityOpen)}
               >
                 <Bell className="h-5 w-5" />
-                {(summary?.unread ?? 0) > 0 && (
+                {unreadCount > 0 && (
                   <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                    {summary?.unread}
+                    {unreadCount}
                   </span>
                 )}
               </Button>
@@ -371,6 +368,12 @@ export function Documents() {
           }
         }}
       />
+      {isActivityOpen && (
+        <NotificationsPage 
+          onClose={() => setIsActivityOpen(false)}
+          defaultFilter="unread"
+        />
+      )}
     </div>
   );
 }
