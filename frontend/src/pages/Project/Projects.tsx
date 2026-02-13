@@ -1,11 +1,9 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-
 import { Link, useNavigate } from 'react-router-dom';
 import { FolderKanban, Bell } from 'lucide-react';
-
 import { Button, Card, CardContent } from '@/components/common';
-import { notificationsApi, projectsApi } from '@/services/api';
+import { projectsApi } from '@/services/api';
 import type { Project } from '@/types';
 import { ViewToggle, DualView, useViewMode, } from '@/components/layout/DualView';
 import {
@@ -15,6 +13,7 @@ import { useTableFilters, ColumnFilterConfig } from '@/hooks/useTableFilters';
 import { SearchFilter, FilterHeaderWrapper } from '@/components/layout/DualView/FilterComponents';
 import { useOutletContext } from 'react-router-dom';
 import { CreateProjectModal } from './CreateProjectModal';
+import { useNotifications } from '@/hooks/useNotifications';
 
 export function Projects() {
   const queryClient = useQueryClient();
@@ -40,12 +39,7 @@ export function Projects() {
     }
   };
   const columns = getProjectsTableColumns(toggleFavorite);
-
-  const { data: summary } = useQuery({
-    queryKey: ['notifications-summary'],
-    queryFn: () => notificationsApi.getSummary(),
-    refetchInterval: 30000,
-  });
+  const { unreadCount } = useNotifications();
 
   const { isActivityOpen, setIsActivityOpen } = useOutletContext<{
     isActivityOpen: boolean;
@@ -143,9 +137,9 @@ export function Projects() {
             onClick={() => setIsActivityOpen(!isActivityOpen)}
           >
             <Bell className="h-5 w-5" />
-            {(summary?.unread ?? 0) > 0 && (
+            {unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                {summary?.unread}
+                {unreadCount}
               </span>
             )}
           </Button>

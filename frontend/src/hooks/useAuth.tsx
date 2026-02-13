@@ -80,22 +80,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (delay <= 0) {
         // Token is already about to expire or expired, refresh immediately
-        performTokenRefresh(tokens.refresh);
+        performTokenRefresh();
         return;
       }
 
+      // Don't capture refresh token in closure — read fresh from localStorage when timer fires
       refreshTimerRef.current = setTimeout(() => {
-        performTokenRefresh(tokens.refresh);
+        performTokenRefresh();
       }, delay);
     } catch {
       // If JWT decoding fails, don't schedule (interceptor will handle it)
     }
   }, []);
 
-  const performTokenRefresh = useCallback(async (refreshToken: string) => {
+  const performTokenRefresh = useCallback(async () => {
+    // Always read the LATEST tokens from localStorage to avoid using a stale/blacklisted refresh token
+    const currentTokens = getTokens();
+    if (!currentTokens?.refresh) return;
+
     try {
       const response = await axios.post<AuthTokens>(`${API_URL}/auth/refresh/`, {
-        refresh: refreshToken,
+        refresh: currentTokens.refresh,
       });
       const newTokens = response.data;
       setTokens(newTokens);

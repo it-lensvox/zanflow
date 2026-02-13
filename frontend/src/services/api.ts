@@ -4,13 +4,17 @@ import type {
   GetDownloadUrlResponse, TaskComment, CreateTaskCommentPayload, AITaskSuggestionResponse, AITaskSuggestionPayload, APICollection,
   APIEndpoint, AuthCredential, ExecutionRun, ExecutionResult, APITestingDashboard, CreateCollectionPayload, CreateEndpointPayload, CreateCredentialPayload, RunCollectionPayload, ProjectCreatePayload,
   Label, DocumentStatus, ChatMessage, ChatRoom, ChatRoomMessagesResponse, CreatePrivateChatPayload, GatewaySendMessagePayload, GatewayIncomingMessage, GatewayConnectedEvent, RefineTextPayload, RefineTextResponse, TeamTypeChoicesResponse,
-  CreateTeamPayload, ProjectChatRoom, TeamChatRoom, Team
+  CreateTeamPayload, ProjectChatRoom, TeamChatRoom, ChatUnreadResponse, NotificationData, NotificationCallback, WebSocketNotificationEvent, NotificationListResponse, Team
 } from '@/types';
 
 export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
 const WS_GATEWAY_URL = import.meta.env.VITE_WS_GATEWAY_URL || 'ws://localhost:8000/ws/gateway';
+
+//export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.6:8000/api/v1';
+//const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://192.168.1.6:8000/ws/gateway';
+
 
 //export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.18:8000/api/v1';
 //const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://192.168.1.12:8000/ws/gateway';
@@ -68,8 +72,6 @@ api.interceptors.response.use(
 
       const tokens = getTokens();
       if (tokens?.refresh) {
-        // Use mutex: only the first 401 triggers a refresh call,
-        // all subsequent 401s wait for the same promise
         if (!isRefreshing) {
           isRefreshing = true;
           refreshPromise = axios
@@ -178,36 +180,36 @@ export const authApi = {
   },
 };
 
-// Notification
-export const notificationsApi = {
-  list: async (params?: { limit?: number; offset?: number }) => {
-    const response = await api.get('/notification/', { params });
-    return response.data;
-  },
+// // Notification
+// export const notificationsApi = {
+//   list: async (params?: { limit?: number; offset?: number }) => {
+//     const response = await api.get('/notification/', { params });
+//     return response.data;
+//   },
 
-  getSummary: async () => {
-    const response = await api.get('/notification/');
-    return {
-      total: response.data.total,
-      unread: response.data.unread_count
-    };
-  },
+//   getSummary: async () => {
+//     const response = await api.get('/notification/');
+//     return {
+//       total: response.data.total,
+//       unread: response.data.unread_count
+//     };
+//   },
 
-  // Mark a notification as read
-  markAsRead: async (id: number) => {
-    const response = await api.post(`/notification/${id}/mark-read/`);
-    return response.data;
-  },
+//   // Mark a notification as read
+//   markAsRead: async (id: number) => {
+//     const response = await api.post(`/notification/${id}/mark-read/`);
+//     return response.data;
+//   },
 
-  // Delete a specific notification
-  delete: async (id: number) => {
-    await api.delete(`/notification/${id}/`);
-  },
+//   // Delete a specific notification
+//   delete: async (id: number) => {
+//     await api.delete(`/notification/${id}/`);
+//   },
 
-  clearAll: async () => {
-    await api.post('/notification/clear_all/');
-  }
-};
+//   clearAll: async () => {
+//     await api.post('/notification/clear_all/');
+//   }
+// };
 
 
 // Projects API
@@ -628,6 +630,18 @@ export const chatApi = {
     });
     return response.data;
   },
+
+  // Team room chat Delete message
+  deleteMessage: async (roomId: string, messageId: string) => {
+    const response = await api.delete(`/chat/rooms/${roomId}/messages/${messageId}/`);
+    return response.data;
+  },
+
+  // Get total unread count
+  getUnreadCount: async () => {
+    const response = await api.get<ChatUnreadResponse>('/chat/unread/');
+    return response.data;
+  },
 };
 
 
@@ -749,8 +763,188 @@ export class GatewayWebSocketService {
     return this.userId;
   }
 }
-// Export singleton instance for global use (optional)
+// Export singleton instance for global use
 export const gatewaySocket = new GatewayWebSocketService();
+
+// WebSocket Notification Service
+export class NotificationWebSocketService {
+  private ws: WebSocket | null = null;
+  private notificationCallbacks: Set<NotificationCallback> = new Set();
+  private chatUnreadCallbacks: Set<(data: { total_unread: number; room_id: string }) => void> = new Set();
+  private reconnectTimeout: NodeJS.Timeout | null = null;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+  private isConnecting = false;
+
+  // Connect to the WebSocket notification gateway
+  connect() {
+    if (this.isConnecting || (this.ws && this.ws.readyState === WebSocket.CONNECTING)) {
+      console.log('⚠️ Notification WebSocket already connecting');
+      return;
+    }
+
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      console.log('⚠️ Notification WebSocket already connected');
+      return;
+    }
+
+    const tokens = getTokens();
+    if (!tokens?.access) {
+      console.error('❌ No access token available for Notification WebSocket');
+      return;
+    }
+
+    this.isConnecting = true;
+
+    const wsUrl = `${WS_GATEWAY_URL}/?token=${tokens.access}`;
+
+    try {
+      this.ws = new WebSocket(wsUrl);
+
+      this.ws.onopen = () => {
+        console.log('🔔 Connected to Notification WebSocket Gateway');
+        this.reconnectAttempts = 0;
+        this.isConnecting = false;
+      };
+
+      this.ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+
+          // Check if this is a notification event
+          if (message.type === 'SIGNAL' && message.event === 'NEW_NOTIFICATION') {
+            const notificationData: NotificationData = message.data;
+
+            console.log('📬 New notification received:', notificationData);
+
+            // Notify all registered callbacks
+            this.notificationCallbacks.forEach(callback => {
+              try {
+                callback(notificationData);
+              } catch (err) {
+                console.error('Error in notification callback:', err);
+              }
+            });
+          }
+          // Check if this is a chat unread update event
+          if (message.type === 'SIGNAL' && message.event === 'CHAT_UNREAD_UPDATE') {
+            console.log('💬 Chat unread update received:', message.data);
+
+            // Notify all registered unread callbacks
+            this.chatUnreadCallbacks.forEach(callback => {
+              try {
+                callback(message.data);
+              } catch (err) {
+                console.error('Error in chat unread callback:', err);
+              }
+            });
+          }
+        } catch (err) {
+          console.error('❌ Failed to parse notification message:', err);
+        }
+      };
+
+      this.ws.onerror = (error) => {
+        console.error('❌ Notification WebSocket error:', error);
+        this.isConnecting = false;
+      };
+
+      this.ws.onclose = (event) => {
+        console.log('❌ Notification WebSocket disconnected', event.code, event.reason);
+        this.isConnecting = false;
+        this.attemptReconnect();
+      };
+
+    } catch (error) {
+      console.error('❌ Failed to create WebSocket connection:', error);
+      this.isConnecting = false;
+    }
+  }
+
+  // Attempt to reconnect with exponential backoff
+  private attemptReconnect() {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.error('❌ Max reconnection attempts reached for Notification WebSocket');
+      return;
+    }
+
+    this.reconnectAttempts++;
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+
+    console.log(`🔄 Reconnecting Notification WebSocket in ${delay}ms... (Attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+
+    this.reconnectTimeout = setTimeout(() => {
+      this.connect();
+    }, delay);
+  }
+
+  /**
+   * Register a callback to receive notifications
+   * @param callback 
+   * @returns 
+   */
+  onNotification(callback: NotificationCallback): () => void {
+    this.notificationCallbacks.add(callback);
+    return () => {
+      this.notificationCallbacks.delete(callback);
+    };
+  }
+  onChatUnreadUpdate(callback: (data: { total_unread: number; room_id: string }) => void): () => void {
+    this.chatUnreadCallbacks.add(callback);
+    return () => {
+      this.chatUnreadCallbacks.delete(callback);
+    };
+  }
+
+
+  // Disconnect from WebSocket
+  disconnect() {
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
+
+    this.reconnectAttempts = 0;
+    this.isConnecting = false;
+
+    if (this.ws) {
+      this.ws.onclose = null;
+      this.ws.close();
+      this.ws = null;
+    }
+
+    this.notificationCallbacks.clear();
+    this.chatUnreadCallbacks.clear();
+  }
+
+  //  Check if WebSocket is currently connected
+  isConnected(): boolean {
+    return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
+  }
+
+
+  // Get current connection state
+  getConnectionState(): 'CONNECTING' | 'OPEN' | 'CLOSING' | 'CLOSED' {
+    if (!this.ws) return 'CLOSED';
+
+    switch (this.ws.readyState) {
+      case WebSocket.CONNECTING: return 'CONNECTING';
+      case WebSocket.OPEN: return 'OPEN';
+      case WebSocket.CLOSING: return 'CLOSING';
+      case WebSocket.CLOSED: return 'CLOSED';
+      default: return 'CLOSED';
+    }
+  }
+}
+
+// Export singleton instance for global use
+export const notificationSocket = new NotificationWebSocketService();
+
+// Helper function to fetch notifications using existing auth
+export const fetchNotifications = async () => {
+  const response = await api.get('/notification/');
+  return response.data;
+};
 
 // API Testing Platform API
 export const apiTestingApi = {
