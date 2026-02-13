@@ -4,7 +4,7 @@ import type {
   GetDownloadUrlResponse, TaskComment, CreateTaskCommentPayload, AITaskSuggestionResponse, AITaskSuggestionPayload, APICollection,
   APIEndpoint, AuthCredential, ExecutionRun, ExecutionResult, APITestingDashboard, CreateCollectionPayload, CreateEndpointPayload, CreateCredentialPayload, RunCollectionPayload, ProjectCreatePayload,
   Label, DocumentStatus, ChatMessage, ChatRoom, ChatRoomMessagesResponse, CreatePrivateChatPayload, GatewaySendMessagePayload, GatewayIncomingMessage, GatewayConnectedEvent, RefineTextPayload, RefineTextResponse, TeamTypeChoicesResponse,
-  CreateTeamPayload, ProjectChatRoom, TeamChatRoom, NotificationData, NotificationCallback, WebSocketNotificationEvent, NotificationListResponse, Team
+  CreateTeamPayload, ProjectChatRoom, TeamChatRoom, ChatUnreadResponse, NotificationData, NotificationCallback, WebSocketNotificationEvent, NotificationListResponse, Team
 } from '@/types';
 
 export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.6:8000/api/v1';
@@ -627,6 +627,12 @@ export const chatApi = {
     const response = await api.delete(`/chat/rooms/${roomId}/messages/${messageId}/`);
     return response.data;
   },
+
+  // Get total unread count
+  getUnreadCount: async () => {
+    const response = await api.get<ChatUnreadResponse>('/chat/unread/');
+    return response.data;
+  },
 };
 
 
@@ -755,6 +761,7 @@ export const gatewaySocket = new GatewayWebSocketService();
 export class NotificationWebSocketService {
   private ws: WebSocket | null = null;
   private notificationCallbacks: Set<NotificationCallback> = new Set();
+  private chatUnreadCallbacks: Set<(data: { total_unread: number; room_id: string }) => void> = new Set();
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
@@ -798,7 +805,7 @@ export class NotificationWebSocketService {
           // Check if this is a notification event
           if (message.type === 'SIGNAL' && message.event === 'NEW_NOTIFICATION') {
             const notificationData: NotificationData = message.data;
-            
+
             console.log('📬 New notification received:', notificationData);
 
             // Notify all registered callbacks
@@ -807,6 +814,19 @@ export class NotificationWebSocketService {
                 callback(notificationData);
               } catch (err) {
                 console.error('Error in notification callback:', err);
+              }
+            });
+          }
+          // Check if this is a chat unread update event
+          if (message.type === 'SIGNAL' && message.event === 'CHAT_UNREAD_UPDATE') {
+            console.log('💬 Chat unread update received:', message.data);
+
+            // Notify all registered unread callbacks
+            this.chatUnreadCallbacks.forEach(callback => {
+              try {
+                callback(message.data);
+              } catch (err) {
+                console.error('Error in chat unread callback:', err);
               }
             });
           }
@@ -860,6 +880,12 @@ export class NotificationWebSocketService {
       this.notificationCallbacks.delete(callback);
     };
   }
+  onChatUnreadUpdate(callback: (data: { total_unread: number; room_id: string }) => void): () => void {
+    this.chatUnreadCallbacks.add(callback);
+    return () => {
+      this.chatUnreadCallbacks.delete(callback);
+    };
+  }
 
 
   // Disconnect from WebSocket
@@ -879,6 +905,7 @@ export class NotificationWebSocketService {
     }
 
     this.notificationCallbacks.clear();
+    this.chatUnreadCallbacks.clear();
   }
 
   //  Check if WebSocket is currently connected
@@ -890,7 +917,7 @@ export class NotificationWebSocketService {
   // Get current connection state
   getConnectionState(): 'CONNECTING' | 'OPEN' | 'CLOSING' | 'CLOSED' {
     if (!this.ws) return 'CLOSED';
-    
+
     switch (this.ws.readyState) {
       case WebSocket.CONNECTING: return 'CONNECTING';
       case WebSocket.OPEN: return 'OPEN';

@@ -1,5 +1,5 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   LayoutDashboard, FolderKanban, FileText, Settings, LogOut,
@@ -69,6 +69,7 @@ export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { unreadCount } = useNotifications();
+  const [chatUnreadCount, setChatUnreadCount] = useState<number>(0);
 
   // Collapsible Logic
   const [isCollapsed, setIsCollapsed] = useState(true);
@@ -104,6 +105,36 @@ export function Sidebar() {
     if ('results' in teamsData && Array.isArray(teamsData.results)) return teamsData.results;
     return [];
   }, [teamsData]);
+
+  // Fetch initial chat unread count and subscribe to real-time updates
+  useEffect(() => {
+    const fetchInitialUnread = async () => {
+      try {
+        const { chatApi, notificationSocket } = await import('@/services/api');
+        const data = await chatApi.getUnreadCount();
+        setChatUnreadCount(data.total_unread);
+
+        // Connect notification socket if not already connected
+        if (!notificationSocket.isConnected()) {
+          notificationSocket.connect();
+        }
+
+        // Subscribe to chat unread updates
+        const unsubscribe = notificationSocket.onChatUnreadUpdate((updateData) => {
+          console.log('📊 Sidebar received unread update:', updateData);
+          setChatUnreadCount(updateData.total_unread);
+        });
+
+        return () => {
+          unsubscribe();
+        };
+      } catch (error) {
+        console.error('Failed to fetch chat unread count:', error);
+      }
+    };
+
+    fetchInitialUnread();
+  }, []);
 
 
   return (
@@ -338,7 +369,14 @@ export function Sidebar() {
               !isExpanded && "justify-center px-0")
           }
         >
-          <MessageSquare className="h-5 w-5 shrink-0" />
+          <div className="relative">
+            <MessageSquare className="h-5 w-5 shrink-0" />
+            {chatUnreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
+              </span>
+            )}
+          </div>
           {isExpanded && <span>Team Chat</span>}
         </NavLink>
       </nav>

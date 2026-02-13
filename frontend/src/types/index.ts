@@ -861,6 +861,26 @@ export interface WebSocketNotificationEvent {
 // Callback type for notification listeners
 export type NotificationCallback = (notification: NotificationData) => void;
 
+// Team chat total badge unread_count
+export interface ChatUnreadResponse {
+  total_unread: number;
+  rooms_with_unread: number;
+  by_room: Record<string, {
+    name: string;
+    unread_count: number;
+    room_type: string;
+  }>;
+}
+
+// Chat unread update WebSocket event
+export interface ChatUnreadUpdateEvent {
+  type: 'SIGNAL';
+  event: 'CHAT_UNREAD_UPDATE';
+  data: {
+    total_unread: number;
+    room_id: string;
+  };
+}
 
 export interface ToastNotification {
   id: string;
