@@ -57,7 +57,14 @@ class ChatRoomService:
             logger.info(f"Global chat room created: {room.id}")
         
         return room
-
+    @staticmethod
+    def get_total_unread_count(user) -> int:
+        """
+        Helper to calculate total unread messages across all rooms.
+        """
+        # We reuse the existing logic to ensure consistency
+        rooms_data = ChatRoomService.get_user_rooms(user)
+        return sum(room['unread_count'] for room in rooms_data)
     @staticmethod
     @transaction.atomic
     def create_project_room(project, created_by) -> ChatRoom:
@@ -303,30 +310,82 @@ class ChatMessageService:
     @staticmethod
     @transaction.atomic
     def create_message(room, sender, content, message_type='text', attachment=None, attachment_name='', reply_to_id=None):
-        # 1. Save the message to the Database
-        message = ChatMessage.objects.create(
-            room=room,
-            sender=sender,
-            content=content,
-            message_type=message_type,
-            attachment=attachment,
-            attachment_name=attachment_name,
-            reply_to_id=reply_to_id
-        )
+        try:
+            # 1. Save to DB
+            message = ChatMessage.objects.create(
+                room=room,
+                sender=sender,
+                content=content,
+                message_type=message_type,
+                attachment=attachment,
+                attachment_name=attachment_name,
+                reply_to_id=reply_to_id
+            )
 
-        # 2. BROADCAST TO WEBSOCKET (This is the missing part!)
-        channel_layer = get_channel_layer()
-        
-        # We broadcast to "chat_{slug}" because that is what the Gateway subscribes to
-        async_to_sync(channel_layer.group_send)(
-            f"chat_{room.slug}",  
-            {
-                'type': 'chat_message',    # Calls GatewayConsumer.chat_message()
-                'message': message.to_websocket_dict()
-            }
-        )
-        
-        return message
+            # 2. Broadcast Message Content (Standard Chat)
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                f"chat_{room.slug}",  
+                {
+                    'type': 'chat_message',
+                    'message': message.to_websocket_dict()
+                }
+            )
+
+            # 3. Broadcast Unread Counts (Safe Version)
+            # We loop through all participants to update their badges
+            participants = room.participants.all()
+            
+            for member in participants:
+                # Skip the sender (they don't need an unread alert for their own msg)
+                if member.id == sender.id:
+                    continue 
+                
+                try:
+                    # A. Get Total Unread (Global)
+                    total_unread = ChatRoomService.get_total_unread_count(member)
+
+                    # B. Get Room Unread (Specific to this room)
+                    # We use 'filter' + 'first' to avoid crashing if membership is missing
+                    membership = ChatRoomMembership.objects.filter(room=room, user=member).first()
+                    
+                    room_unread = 0
+                    if membership:
+                        # Safety Check: If last_read_at is None, assume all messages are unread (or use a default)
+                        last_read_time = membership.last_read_at or membership.joined_at
+                        
+                        room_unread = room.messages.filter(
+                            is_deleted=False,
+                            created_at__gt=last_read_time
+                        ).exclude(sender=member).count()
+                    
+                    # C. Send Signal
+                    # Determine the group name (Ensure this matches your Consumer!)
+                    group_name = f"user_{member.id}_global"
+                    
+                    async_to_sync(channel_layer.group_send)(
+                        group_name,
+                        {
+                            "type": "gateway_signal", # Must match handler in GatewayConsumer
+                            "event": "CHAT_UNREAD_UPDATE",
+                            "data": {
+                                "room_id": str(room.id),
+                                "total_unread": total_unread,
+                                "room_unread": room_unread
+                            }
+                        }
+                    )
+                except Exception as inner_e:
+                    # Log error but DO NOT stop the loop or rollback the message
+                    print(f"Error sending signal to user {member.id}: {inner_e}")
+                    continue
+
+            return message
+
+        except Exception as e:
+            # This catches DB errors during message creation
+            print(f"CRITICAL ERROR in create_message: {e}")
+            raise e
 
     @staticmethod
     def _send_notification(message: ChatMessage):
@@ -420,40 +479,51 @@ class ChatMessageService:
         return [msg.to_websocket_dict() for msg in messages]
 
     @staticmethod
-    def mark_messages_as_read(room: ChatRoom, user) -> int:
+    def mark_messages_as_read(room, user) -> int:
         """
-        Mark all messages in a room as read by user.
-        
-        Args:
-            room: ChatRoom instance
-            user: User marking messages as read
-            
-        Returns:
-            Number of messages marked as read
+        Mark all messages in a room as read and BROADCAST the new count.
         """
-        # Update membership last_read_at
-        membership = ChatRoomMembership.objects.filter(
-            room=room,
-            user=user
-        ).first()
-        
+        # 1. Update DB (Your existing code)
+        membership = ChatRoomMembership.objects.filter(room=room, user=user).first()
         if membership:
             membership.mark_as_read()
         
-        # For detailed read receipts (optional)
+        # (Optional) Create detailed read receipts if you use them
         unread_messages = room.messages.filter(
             created_at__gt=membership.last_read_at if membership else timezone.now()
         ).exclude(sender=user)
         
-        # Create read statuses
         read_statuses = []
         for msg in unread_messages:
             if not MessageReadStatus.objects.filter(message=msg, user=user).exists():
                 read_statuses.append(MessageReadStatus(message=msg, user=user))
-        
         if read_statuses:
             MessageReadStatus.objects.bulk_create(read_statuses, ignore_conflicts=True)
-        
+
+        # 2. >>> NEW CODE: Broadcast New Unread Count <<<
+        # Since we just marked everything as read, this room's count is now 0.
+        try:
+            channel_layer = get_channel_layer()
+            
+            # Recalculate the global total for this user
+            total_unread = ChatRoomService.get_total_unread_count(user)
+            
+            # Send the signal to the User's Personal Group
+            async_to_sync(channel_layer.group_send)(
+                f"user_{user.id}_global",
+                {
+                    "type": "gateway_signal",
+                    "event": "CHAT_UNREAD_UPDATE",
+                    "data": {
+                        "room_id": str(room.id),
+                        "total_unread": total_unread,
+                        "room_unread": 0  # It is definitely 0 now!
+                    }
+                }
+            )
+        except Exception as e:
+            logger.error(f"Failed to broadcast read status: {e}")
+
         return len(read_statuses)
 
     @staticmethod

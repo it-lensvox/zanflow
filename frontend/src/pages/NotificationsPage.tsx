@@ -130,7 +130,7 @@ export function NotificationsPage({
       <div className="w-full max-w-md border border-white/10 rounded-[2rem] shadow-2xl flex flex-col max-h-[85vh] bg-white"
         onClick={(e) => e.stopPropagation()}>
 
-        {/* Header Section */}
+        {/* Header Section */} 
         <div className="px-6 py-5 border-b border-white/5 bg-white/10">
           <div className="flex items-center justify-between mb-4">
             {/* Left: Title (Hide when searching on small screens if needed) */}
