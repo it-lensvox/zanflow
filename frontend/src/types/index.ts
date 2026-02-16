@@ -698,7 +698,12 @@ export interface ChatRoom {
   created_by?: ChatUserMinimal;
   memberships?: ChatRoomMembership[];
   current_user_membership?: ChatRoomMembership;
-  last_message?: string | null;
+  last_message?: {
+    id: string;
+    sender_username: string;
+    content_preview: string;
+    created_at: string;
+  } | null;
   unread_count?: number;
   is_member?: boolean;
   created_at: string;
@@ -794,9 +799,9 @@ export interface GatewaySendMessagePayload {
 
 export interface GatewayIncomingMessage {
   type: 'CHAT_MESSAGE' | 'SIGNAL' | 'GATEWAY_CONNECTED' | 'PRESENCE' | 'room_created';
-  event?: 'NEW_NOTIFICATION';
+  event?: 'NEW_NOTIFICATION' | 'CHAT_UNREAD_UPDATE';
   message?: ChatMessage;
-  data?: ChatMessage | NotificationData; 
+  data?: ChatMessage | NotificationData | any;
   room_id?: string;
   user_id?: number;
   status?: 'online' | 'offline';
@@ -877,8 +882,9 @@ export interface ChatUnreadUpdateEvent {
   type: 'SIGNAL';
   event: 'CHAT_UNREAD_UPDATE';
   data: {
-    total_unread: number;
     room_id: string;
+    total_unread: number;
+    room_unread: number;
   };
 }
 

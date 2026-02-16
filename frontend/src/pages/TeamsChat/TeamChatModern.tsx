@@ -17,6 +17,8 @@ import { CreateTeamModal } from '@/pages/TeamManagement/Createteammodal';
 interface UserWithActivity extends User {
   lastMessageTime?: string;
   lastMessageContent?: string;
+  isUnread?: boolean;
+  activityTimestamp?: number;
 }
 
 export function TeamChatModern() {
@@ -47,8 +49,9 @@ export function TeamChatModern() {
   const [toastNotifications, setToastNotifications] = useState<ToastNotification[]>([]);
   const [roomUserMap, setRoomUserMap] = useState<Map<string, number>>(new Map());
   const [userRoomMap, setUserRoomMap] = useState<Map<number, string>>(new Map());
-  const [lastMessages, setLastMessages] = useState<Map<number, { content: string; timestamp: string }>>(new Map());
+  const [lastMessages, setLastMessages] = useState<Map<number, { content: string; timestamp: string; isUnread: boolean }>>(new Map());
   const [chatListVersion, setChatListVersion] = useState(0);
+  const [userLastActivity, setUserLastActivity] = useState<Map<number, number>>(new Map());
 
   // Sidebar section states
   const [isChatSectionOpen, setIsChatSectionOpen] = useState(true);
@@ -167,10 +170,24 @@ export function TeamChatModern() {
         }
 
         if (chatListUserId) {
+          // Determine if this message should be marked as unread
+          const shouldMarkUnread = !isOwnMessage && selectedUserId !== chatListUserId;
+
           setLastMessages(prev => {
             const newMap = new Map(prev);
-            newMap.set(chatListUserId!, { content: enrichedMessage.content, timestamp: enrichedMessage.created_at });
+            newMap.set(chatListUserId!, {
+              content: enrichedMessage.content,
+              timestamp: enrichedMessage.created_at,
+              isUnread: shouldMarkUnread
+            });
             setChatListVersion(v => v + 1);
+            return newMap;
+          });
+
+          // Update user activity timestamp for sorting
+          setUserLastActivity(prev => {
+            const newMap = new Map(prev);
+            newMap.set(chatListUserId!, Date.now());
             return newMap;
           });
         }
@@ -227,7 +244,6 @@ export function TeamChatModern() {
             return newMap;
           });
 
-
           const toast: ToastNotification = {
             id: `${Date.now()}`,
             room_id: actualRoomId,
@@ -237,6 +253,35 @@ export function TeamChatModern() {
           };
           setToastNotifications(prev => [...prev, toast]);
         } else {
+        }
+      }
+
+      // Handle chat unread updates from WebSocket SIGNAL
+      if (data.type === 'SIGNAL' && (data as any).event === 'CHAT_UNREAD_UPDATE') {
+        const unreadData = (data as any).data;
+        const roomId = unreadData.room_id;
+        const roomUnread = unreadData.room_unread || 0;
+
+        console.log('💬 Chat unread update received:', unreadData);
+
+        // Update unread counts for this specific room
+        setUnreadCounts(prev => {
+          const newMap = new Map(prev);
+          newMap.set(roomId, roomUnread);
+          return newMap;
+        });
+
+        // Find the user associated with this room and mark their last message as unread
+        const userId = roomUserMap.get(roomId);
+        if (userId && roomUnread > 0) {
+          setLastMessages(prev => {
+            const newMap = new Map(prev);
+            const existing = newMap.get(userId);
+            if (existing) {
+              newMap.set(userId, { ...existing, isUnread: true });
+            }
+            return newMap;
+          });
         }
       }
 
@@ -332,12 +377,15 @@ export function TeamChatModern() {
       return {
         ...user,
         lastMessageTime: lastMsg?.timestamp,
-        lastMessageContent: lastMsg?.content
-      };
+        lastMessageContent: lastMsg?.content,
+        isUnread: lastMsg?.isUnread || false,
+        activityTimestamp: userLastActivity.get(user.id) || 0
+      } as UserWithActivity;
     });
-  }, [users, lastMessages]);
+  }, [users, lastMessages, userLastActivity]);
 
   // unread first, then by last message time, then alphabetically
+  // WhatsApp-like sorting: unread first, then by activity time, then alphabetically
   const sortedUsers = useMemo(() => {
     return [...usersWithActivity].sort((a, b) => {
       // Get room IDs for both users
@@ -352,19 +400,22 @@ export function TeamChatModern() {
         return unreadB - unreadA;
       }
 
-      // Priority 2: Last message time
-      if (a.lastMessageTime && b.lastMessageTime) {
-        return new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime();
+      // Priority 2: User activity timestamp (most recent first)
+      const activityA = (a as any).activityTimestamp || 0;
+      const activityB = (b as any).activityTimestamp || 0;
+
+      if (activityA && activityB) {
+        return activityB - activityA;
       }
-      if (a.lastMessageTime) return -1;
-      if (b.lastMessageTime) return 1;
+      if (activityA) return -1;
+      if (activityB) return 1;
 
       // Priority 3: Alphabetical by name
       const nameA = a.first_name || a.username;
       const nameB = b.first_name || b.username;
       return nameA.localeCompare(nameB);
     });
-  }, [usersWithActivity, unreadCounts, userRoomMap, chatListVersion]);
+  }, [usersWithActivity, unreadCounts, userRoomMap, chatListVersion, userLastActivity]);
 
   const filteredUsers = useMemo(() => {
     if (!searchQuery) return sortedUsers;
@@ -398,6 +449,16 @@ export function TeamChatModern() {
     setSelectedProjectRoom(null);
     setSelectedTeamRoom(null);
     setSelectedUserId(userId);
+
+    // Clear unread status for this user
+    setLastMessages(prev => {
+      const newMap = new Map(prev);
+      const existing = newMap.get(userId);
+      if (existing) {
+        newMap.set(userId, { ...existing, isUnread: false });
+      }
+      return newMap;
+    });
     setActiveRoom(null);
     activeRoomRef.current = null;
     queryClient.resetQueries({ queryKey: ['chat-messages'] });
@@ -791,6 +852,7 @@ export function TeamChatModern() {
                   filteredUsers.map(user => {
                     const isSelected = selectedUserId === user.id;
                     const unreadCount = getUserUnreadCount(user.id);
+                    const hasUnreadMessages = (user as any).isUnread || unreadCount > 0;
 
                     return (
                       <button
@@ -811,17 +873,26 @@ export function TeamChatModern() {
                         </div>
                         <div className="flex-1 min-w-0 text-left">
                           <div className="flex items-center justify-between mb-0.5">
-                            <p className="text-sm font-medium text-gray-900 truncate">
+                            <p className={cn(
+                              "text-sm truncate",
+                              hasUnreadMessages ? "font-bold text-gray-900" : "font-medium text-gray-900"
+                            )}>
                               {user.first_name || user.username}
                             </p>
                             {user.lastMessageTime && (
-                              <span className="text-[10px] text-gray-500 ml-2 flex-shrink-0">
+                              <span className={cn(
+                                "text-[10px] ml-2 flex-shrink-0",
+                                hasUnreadMessages ? "text-blue-600 font-semibold" : "text-gray-500"
+                              )}>
                                 {new Date(user.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                               </span>
                             )}
                           </div>
                           <div className="flex items-center justify-between">
-                            <p className="text-xs text-gray-600 truncate">
+                            <p className={cn(
+                              "text-xs truncate",
+                              hasUnreadMessages ? "font-semibold text-gray-900" : "text-gray-600"
+                            )}>
                               {user.lastMessageContent || 'No messages yet'}
                             </p>
                             {unreadCount > 0 && (
