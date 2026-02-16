@@ -156,7 +156,8 @@ class ChatRoomListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'room_type', 'slug', 'project',
             'participant_count', 'last_message', 'unread_count',
-            'is_member', 'created_at', 'updated_at', 'is_active'
+            'is_member', 'created_at', 'updated_at', 'is_active',
+            'participants'
         ]
         read_only_fields = fields
 
@@ -214,19 +215,25 @@ class ChatRoomListSerializer(serializers.ModelSerializer):
 class ChatRoomDetailSerializer(serializers.ModelSerializer):
     """
     Detailed serializer for individual chat room.
-    Includes participant list.
+    Includes participant list and now includes last_message/unread_count.
     """
     participants = UserMinimalSerializer(many=True, read_only=True)
     created_by = UserMinimalSerializer(read_only=True)
     memberships = ChatRoomMembershipSerializer(many=True, read_only=True)
     current_user_membership = serializers.SerializerMethodField()
     
+    # --- ADDED FIELDS ---
+    last_message = serializers.SerializerMethodField()
+    unread_count = serializers.SerializerMethodField()
+    
     class Meta:
         model = ChatRoom
         fields = [
             'id', 'name', 'room_type', 'slug', 'project',
             'participants', 'created_by', 'memberships',
-            'current_user_membership', 'created_at', 'updated_at', 'is_active'
+            'current_user_membership', 'created_at', 'updated_at', 'is_active',
+            # --- ADD TO FIELDS LIST ---
+            'last_message', 'unread_count'
         ]
         read_only_fields = fields
 
@@ -243,6 +250,41 @@ class ChatRoomDetailSerializer(serializers.ModelSerializer):
         if membership:
             return ChatRoomMembershipSerializer(membership).data
         return None
+
+    # --- ADDED METHODS (Same logic as ChatRoomListSerializer) ---
+
+    def get_last_message(self, obj):
+        """Get last message in room."""
+        last_msg = obj.messages.filter(is_deleted=False).order_by('-created_at').first()
+        if last_msg:
+            return {
+                'id': str(last_msg.id),
+                'sender_username': last_msg.sender.username if last_msg.sender else 'System',
+                'content_preview': last_msg.content[:100] if last_msg.content else '[attachment]',
+                'created_at': last_msg.created_at.isoformat(),
+            }
+        return None
+
+    def get_unread_count(self, obj):
+        """Get unread message count for current user."""
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return 0
+        
+        if obj.room_type == ChatRoom.RoomType.GLOBAL:
+            return 0
+        
+        membership = ChatRoomMembership.objects.filter(
+            room=obj, user=request.user
+        ).first()
+        
+        if not membership:
+            return 0
+        
+        return obj.messages.filter(
+            is_deleted=False,
+            created_at__gt=membership.last_read_at
+        ).exclude(sender=request.user).count()
 
 
 class CreatePrivateRoomSerializer(serializers.Serializer):

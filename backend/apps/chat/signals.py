@@ -14,7 +14,8 @@ from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 
 from apps.projects.models import Project, ProjectMembership
-from apps.teams.models import Team, TeamMembership
+# from apps.teams.models import Team, TeamMembership
+from apps.teams.models import Team, TeamMember
 from .models import ChatRoom, ChatRoomMembership
 
 logger = logging.getLogger(__name__)
@@ -73,12 +74,13 @@ def sync_chat_with_team_deletion(sender, instance, **kwargs):
             logger.error(f"Failed to deactivate team chat room: {str(e)}", exc_info=True)
 
 
-@receiver(post_save, sender=TeamMembership)
+@receiver(post_save, sender=TeamMember)
 def add_user_to_team_chat(sender, instance, created, **kwargs):
     """Auto-add user to chat when they join a Team."""
     if created:
         try:
-            team = instance.team
+            # Note: In your models.py, the field is 'team', not 'team_id'
+            team = instance.team 
             user = instance.user
             
             room = ChatRoom.objects.filter(
@@ -121,7 +123,7 @@ def add_user_to_team_chat(sender, instance, created, **kwargs):
             logger.error(f"Failed to add user to team chat: {str(e)}", exc_info=True)
 
 
-@receiver(post_delete, sender=TeamMembership)
+@receiver(post_delete, sender=TeamMember)
 def remove_user_from_team_chat(sender, instance, **kwargs):
     """Auto-remove user from chat when they leave a Team."""
     try:
