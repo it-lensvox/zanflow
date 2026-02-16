@@ -321,7 +321,7 @@ class ChatMessageService:
                 attachment_name=attachment_name,
                 reply_to_id=reply_to_id
             )
-
+            room.save(update_fields=['updated_at'])
             # 2. Broadcast Message Content (Standard Chat)
             channel_layer = get_channel_layer()
             async_to_sync(channel_layer.group_send)(
