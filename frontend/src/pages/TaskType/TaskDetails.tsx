@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
@@ -40,7 +40,9 @@ export function TaskDetails() {
     // Upload & Media States
     const [isUploading, setIsUploading] = useState(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
+    const [isDragging, setIsDragging] = useState(false);
     const [selectedMedia, setSelectedMedia] = useState<any | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
 
     const { data: project, isLoading: isProjectLoading } = useQuery({
@@ -56,19 +58,51 @@ export function TaskDetails() {
     });
 
     // Fetch documents for the grid
-    const { data: documentsData, isLoading: isMediaLoading } = useQuery({
-        queryKey: ['documents', { project: id }],
-        queryFn: () => documentsApi.list({ project: (Number(id)) }),
-        enabled: !!id,
+    const [mediaPage, setMediaPage] = useState(1);
+    const [allMediaFiles, setAllMediaFiles] = useState<any[]>([]);
+    const [hasMoreMedia, setHasMoreMedia] = useState(true);
+    const mediaScrollRef = useRef<HTMLDivElement>(null);
+
+    const { data: documentsData, isLoading: isMediaLoading, isFetching: isMediaFetching } = useQuery({
+        queryKey: ['documents', { project: id, page: mediaPage }],
+        queryFn: () => documentsApi.list({ project: (Number(id)), page: mediaPage }),
+        enabled: !!id && hasMoreMedia,
         staleTime: 1000 * 60 * 5,
     });
 
-    const allResults = documentsData?.results || documentsData || [];
-    const mediaFiles = allResults.filter((file: any) => {
-        const hasGtMetadata = !!file.metadata?.gt_category;
-        return !hasGtMetadata;
-    });
+    // Update media files when new data arrives
+    useEffect(() => {
+        if (documentsData) {
+            const allResults = documentsData?.results || documentsData || [];
+            const newMediaFiles = allResults.filter((file: any) => {
+                const hasGtMetadata = !!file.metadata?.gt_category;
+                return !hasGtMetadata;
+            });
 
+            if (mediaPage === 1) {
+                setAllMediaFiles(newMediaFiles);
+            } else {
+                setAllMediaFiles(prev => [...prev, ...newMediaFiles]);
+            }
+
+            // Check if there are more pages
+            if (documentsData?.next === null || allResults.length === 0) {
+                setHasMoreMedia(false);
+            }
+        }
+    }, [documentsData, mediaPage]);
+
+    // Infinite scroll handler for media
+    const handleMediaScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+        const target = e.currentTarget;
+        const scrollPercentage = (target.scrollTop + target.clientHeight) / target.scrollHeight;
+
+        if (scrollPercentage > 0.8 && !isMediaFetching && hasMoreMedia) {
+            setMediaPage(prev => prev + 1);
+        }
+    }, [isMediaFetching, hasMoreMedia]);
+
+    const mediaFiles = allMediaFiles;
     const handleDeleteDocument = async (documentId: string) => {
         if (!id || !window.confirm('Are you sure you want to delete this file?')) return;
 
@@ -193,15 +227,66 @@ export function TaskDetails() {
                 await documentsApi.getDownloadUrl(projectIdNum, { document_id: confirmResponse.id });
             }
 
+            // Reset pagination state to show new document immediately
+            setMediaPage(1);
+            setHasMoreMedia(true);
+            setAllMediaFiles([]);
+
             queryClient.invalidateQueries({ queryKey: ['documents', { project: id }] });
             await queryClient.refetchQueries({
                 queryKey: ['documents'],
                 type: 'active'
             });
+
+            // Reset file input to close system dialog
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
         } catch (err: any) {
             setUploadError(err.message || 'Upload failed');
         } finally {
             setIsUploading(false);
+        }
+    };
+
+
+    // Drag and drop handlers - reuse existing upload logic
+    const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!isUploading) {
+            setIsDragging(true);
+        }
+    };
+
+    const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        // Only set to false if leaving the drop zone entirely
+        if (e.currentTarget === e.target) {
+            setIsDragging(false);
+        }
+    };
+
+    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+    };
+
+    const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+
+        if (isUploading) return;
+
+        const files = e.dataTransfer.files;
+        if (files && files.length > 0) {
+            const syntheticEvent = {
+                target: { files: files }
+            } as unknown as React.ChangeEvent<HTMLInputElement>;
+
+            await handleFileUpload(syntheticEvent);
         }
     };
 
@@ -271,7 +356,7 @@ export function TaskDetails() {
                 <div className="content-creation__content">
                     {activeTab === 'tasks' && (
                         <div className="content-creation__tasks">
-                             {/* View Toggle Controls */}
+                            {/* View Toggle Controls */}
                             <div className="flex justify-end mb-2">
                                 <div className="flex items-center border border-gray-200 rounded-md bg-white p-1 gap-1">
                                     <button
@@ -427,10 +512,17 @@ export function TaskDetails() {
                     )}
 
                     {activeTab === 'add_documents' && (
-                        <div className="content-creation__media">
+                        <div
+                            className="content-creation__media"
+                            onDragEnter={handleDragEnter}
+                            onDragLeave={handleDragLeave}
+                            onDragOver={handleDragOver}
+                            onDrop={handleDrop}
+                        >
                             <div className="content-creation__upload-area">
-                                <label className={`content-creation__upload-box ${isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                                <label className={`content-creation__upload-box ${isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${isDragging ? 'border-primary bg-primary/5 border-2' : ''}`}>
                                     <input
+                                        ref={fileInputRef}
                                         type="file"
                                         className="hidden"
                                         onChange={handleFileUpload}
@@ -440,39 +532,64 @@ export function TaskDetails() {
                                     {isUploading ? (
                                         <Loader2 className="content-creation__upload-icon animate-spin" />
                                     ) : (
-                                        <Upload className="content-creation__upload-icon" />
+                                        <Upload className={`content-creation__upload-icon ${isDragging ? 'text-primary' : ''}`} />
                                     )}
                                     <p className="content-creation__upload-text">
-                                        {isUploading ? 'Uploading...' : 'Drop documents here or click to browse'}
+                                        {isUploading ? 'Uploading...' : isDragging ? 'Drop document here' : 'Drop documents here or click to browse'}
                                     </p>
                                     <p className="content-creation__upload-subtext">All document types supported (Max 500MB)</p>
                                     {uploadError && <p className="text-destructive text-sm mt-2">{uploadError}</p>}
                                 </label>
                             </div>
 
-                            {isMediaLoading ? (
+                            {isMediaLoading && mediaPage === 1 ? (
                                 <div className="flex justify-center p-12">
                                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black" />
                                 </div>
                             ) : mediaFiles.length > 0 ? (
-                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-6">
-                                    {mediaFiles.map((file: any) => (
-                                        <div
-                                            key={file.id}
-                                            className="border rounded-lg p-2 bg-white text-center cursor-pointer hover:shadow-md transition-shadow"
-                                            onClick={() => setSelectedMedia(file)}
-                                        >
-                                            <div className="aspect-square bg-muted rounded flex items-center justify-center mb-2 overflow-hidden border relative">
-                                                <MediaThumbnail file={file} projectId={Number(id)} />
+                                <div
+                                    className="max-h-[600px] overflow-y-auto"
+                                    onScroll={handleMediaScroll}
+                                    ref={mediaScrollRef}
+                                >
+                                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-6 px-2">
+                                        {mediaFiles.map((file: any) => (
+                                            <div
+                                                key={file.id}
+                                                className="border rounded-lg p-2 bg-white text-center cursor-pointer hover:shadow-md transition-shadow"
+                                                onClick={() => setSelectedMedia(file)}
+                                            >
+                                                <div className="aspect-square bg-muted rounded flex items-center justify-center mb-2 overflow-hidden border relative">
+                                                    <MediaThumbnail file={file} projectId={Number(id)} />
+                                                </div>
+                                                <p className="text-xs font-medium truncate">{file.original_file_name || file.name}</p>
                                             </div>
-                                            <p className="text-xs font-medium truncate">{file.original_file_name || file.name}</p>
+                                        ))}
+                                    </div>
+                                    {isMediaFetching && mediaPage > 1 && (
+                                        <div className="flex justify-center py-4">
+                                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
                                         </div>
-                                    ))}
+                                    )}
+                                    {!hasMoreMedia && mediaFiles.length > 20 && (
+                                        <div className="text-center py-4 text-muted-foreground text-sm">
+                                            All documents loaded
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="content-creation__media-empty">
                                     <FileText className="content-creation__empty-media-icon" />
                                     <p className="content-creation__empty-text">No documents uploaded yet</p>
+                                </div>
+                            )}
+                            {/* Full-page drag overlay */}
+                            {isDragging && (
+                                <div className="fixed inset-0 bg-primary/10 border-4 border-dashed border-primary pointer-events-none z-50 flex items-center justify-center">
+                                    <div className="bg-white p-8 rounded-lg shadow-lg">
+                                        <Upload className="h-16 w-16 text-primary mx-auto mb-4" />
+                                        <p className="text-xl font-semibold text-primary">Drop document anywhere to upload</p>
+                                    </div>
                                 </div>
                             )}
                         </div>

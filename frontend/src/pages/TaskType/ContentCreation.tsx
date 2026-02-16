@@ -2,8 +2,10 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
-import { ArrowLeft, Plus, Upload, Search, Film, Loader2, X, Download, ChevronLeft, ChevronRight, FileText, FileJson, Settings,
-     Maximize2, List, Grid3X3, MessageCircle} from 'lucide-react';
+import {
+    ArrowLeft, Plus, Upload, Search, Film, Loader2, X, Download, ChevronLeft, ChevronRight, FileText, FileJson, Settings,
+    Maximize2, List, Grid3X3, MessageCircle
+} from 'lucide-react';
 import { projectsApi, taskApi, documentsApi } from '@/services/api';
 import type { Task } from '@/types'
 import { CreateTask } from '@/pages/MyTask/CreateTask';
@@ -379,6 +381,8 @@ export function ContentCreation() {
     const navigate = useNavigate();
     const [isUploading, setIsUploading] = useState(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
+    const [isDragging, setIsDragging] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const { data: tasksData, isLoading: isTasksLoading } = useQuery({
         queryKey: ['tasks'],
         queryFn: () => taskApi.list(),
@@ -447,13 +451,47 @@ export function ContentCreation() {
         }
     });
 
-    const { data: documentsData, isLoading: isMediaLoading } = useQuery({
-        queryKey: ['documents', { project: id }],
-        queryFn: () => documentsApi.list({ project: (Number(id)) }),
-        enabled: !!id,
+    const [mediaPage, setMediaPage] = useState(1);
+    const [allMediaFiles, setAllMediaFiles] = useState<any[]>([]);
+    const [hasMoreMedia, setHasMoreMedia] = useState(true);
+    const mediaScrollRef = useRef<HTMLDivElement>(null);
+
+    const { data: documentsData, isLoading: isMediaLoading, isFetching: isMediaFetching } = useQuery({
+        queryKey: ['documents', { project: id, page: mediaPage }],
+        queryFn: () => documentsApi.list({ project: (Number(id)), page: mediaPage }),
+        enabled: !!id && hasMoreMedia,
+        staleTime: 1000 * 60 * 5,
     });
 
-    const mediaFiles = documentsData?.results || documentsData || [];
+    // Update media files when new data arrives
+    useEffect(() => {
+        if (documentsData) {
+            const newFiles = documentsData?.results || documentsData || [];
+
+            if (mediaPage === 1) {
+                setAllMediaFiles(newFiles);
+            } else {
+                setAllMediaFiles(prev => [...prev, ...newFiles]);
+            }
+
+            // Check if there are more pages
+            if (documentsData?.next === null || newFiles.length === 0) {
+                setHasMoreMedia(false);
+            }
+        }
+    }, [documentsData, mediaPage]);
+
+    // Infinite scroll handler for media
+    const handleMediaScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+        const target = e.currentTarget;
+        const scrollPercentage = (target.scrollTop + target.clientHeight) / target.scrollHeight;
+
+        if (scrollPercentage > 0.8 && !isMediaFetching && hasMoreMedia) {
+            setMediaPage(prev => prev + 1);
+        }
+    }, [isMediaFetching, hasMoreMedia]);
+
+    const mediaFiles = allMediaFiles;
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -509,18 +547,70 @@ export function ContentCreation() {
                 await documentsApi.getDownloadUrl(projectIdNum, { document_id: confirmResponse.id });
             }
 
+            // Reset pagination state to show new document immediately
+            setMediaPage(1);
+            setHasMoreMedia(true);
+            setAllMediaFiles([]);
+
             // Refresh the media list
             queryClient.invalidateQueries({ queryKey: ['documents', { project: id }] });
             await queryClient.refetchQueries({
                 queryKey: ['documents'],
                 type: 'active'
             });
+
+            // Reset file input to close system dialog
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
         } catch (err: any) {
             setUploadError(err.message || 'Upload failed');
         } finally {
             setIsUploading(false);
         }
     };
+
+    // Drag and drop handlers
+    const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!isUploading) {
+            setIsDragging(true);
+        }
+    };
+
+    const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        // Only set to false if leaving the drop zone entirely
+        if (e.currentTarget === e.target) {
+            setIsDragging(false);
+        }
+    };
+
+    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+    };
+
+    const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+
+        if (isUploading) return;
+
+        const files = e.dataTransfer.files;
+        if (files && files.length > 0) {
+            // Create proper FileList-like object
+            const syntheticEvent = {
+                target: { files: files }
+            } as unknown as React.ChangeEvent<HTMLInputElement>;
+
+            await handleFileUpload(syntheticEvent);
+        }
+    };
+
     const handleTaskCreated = () => {
         setIsCreateTaskModalOpen(false);
         // This triggers the global refetch same as Taskboard
@@ -595,13 +685,13 @@ export function ContentCreation() {
                             Create Task
                         </button>
 
-                         <button
-                        onClick={() => navigate('/team-chat', { state: { projectId: Number(id) } })}
-                        className="p-2 hover:bg-gray-100 rounded-full transition-colors flex items-center gap-2 text-gray-600 hover:text-black"
-                        title="Team Chat"
-                    >
-                        <MessageCircle className="h-4 w-4" />
-                    </button>
+                        <button
+                            onClick={() => navigate('/team-chat', { state: { projectId: Number(id) } })}
+                            className="p-2 hover:bg-gray-100 rounded-full transition-colors flex items-center gap-2 text-gray-600 hover:text-black"
+                            title="Team Chat"
+                        >
+                            <MessageCircle className="h-4 w-4" />
+                        </button>
 
                         <button
                             onClick={() => navigate(`/projects/${id}/settings`)}
@@ -796,7 +886,13 @@ export function ContentCreation() {
                     )}
 
                     {activeTab === 'media' && (
-                        <div className="content-creation__media">
+                        <div
+                            className="content-creation__media"
+                            onDragEnter={handleDragEnter}
+                            onDragLeave={handleDragLeave}
+                            onDragOver={handleDragOver}
+                            onDrop={handleDrop}
+                        >
                             <div className="content-creation__search-bar">
                                 <Search className="content-creation__search-icon" />
                                 <input
@@ -809,8 +905,9 @@ export function ContentCreation() {
                             </div>
 
                             <div className="content-creation__upload-area">
-                                <label className={`content-creation__upload-box ${isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                                <label className={`content-creation__upload-box ${isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${isDragging ? 'border-primary bg-primary/5 border-2' : ''}`}>
                                     <input
+                                        ref={fileInputRef}
                                         type="file"
                                         className="hidden"
                                         onChange={handleFileUpload}
@@ -820,39 +917,64 @@ export function ContentCreation() {
                                     {isUploading ? (
                                         <Loader2 className="content-creation__upload-icon animate-spin" />
                                     ) : (
-                                        <Upload className="content-creation__upload-icon" />
+                                        <Upload className={`content-creation__upload-icon ${isDragging ? 'text-primary' : ''}`} />
                                     )}
                                     <p className="content-creation__upload-text">
-                                        {isUploading ? 'Uploading to S3...' : 'Drop files here or click to browse'}
+                                        {isUploading ? 'Uploading to S3...' : isDragging ? 'Drop file here' : 'Drop files here or click to browse'}
                                     </p>
                                     <p className="content-creation__upload-subtext">Videos, images, audio, PDFs (Max 500MB)</p>
                                     {uploadError && <p className="text-destructive text-sm mt-2">{uploadError}</p>}
                                 </label>
                             </div>
 
-                            {isMediaLoading ? (
+                            {isMediaLoading && mediaPage === 1 ? (
                                 <div className="flex justify-center p-12">
                                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black" />
                                 </div>
                             ) : mediaFiles.length > 0 ? (
-                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-6">
-                                    {mediaFiles.map((file: any) => (
-                                        <div
-                                            key={file.id}
-                                            className="border rounded-lg p-2 bg-white text-center cursor-pointer hover:shadow-md transition-shadow"
-                                            onClick={() => setSelectedMedia(file)}
-                                        >
-                                            <div className="aspect-square bg-muted rounded flex items-center justify-center mb-2 overflow-hidden border relative">
-                                                <MediaThumbnail file={file} projectId={Number(id)} />
+                                <div
+                                    className="max-h-[600px] overflow-y-auto"
+                                    onScroll={handleMediaScroll}
+                                    ref={mediaScrollRef}
+                                >
+                                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-6 px-2">
+                                        {mediaFiles.map((file: any) => (
+                                            <div
+                                                key={file.id}
+                                                className="border rounded-lg p-2 bg-white text-center cursor-pointer hover:shadow-md transition-shadow"
+                                                onClick={() => setSelectedMedia(file)}
+                                            >
+                                                <div className="aspect-square bg-muted rounded flex items-center justify-center mb-2 overflow-hidden border relative">
+                                                    <MediaThumbnail file={file} projectId={Number(id)} />
+                                                </div>
+                                                <p className="text-xs font-medium truncate">{file.original_file_name || file.name}</p>
                                             </div>
-                                            <p className="text-xs font-medium truncate">{file.original_file_name || file.name}</p>
+                                        ))}
+                                    </div>
+                                    {isMediaFetching && mediaPage > 1 && (
+                                        <div className="flex justify-center py-4">
+                                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
                                         </div>
-                                    ))}
+                                    )}
+                                    {!hasMoreMedia && mediaFiles.length > 20 && (
+                                        <div className="text-center py-4 text-muted-foreground text-sm">
+                                            All media loaded
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="content-creation__media-empty">
                                     <Film className="content-creation__empty-media-icon" />
                                     <p className="content-creation__empty-text">No media files yet</p>
+                                </div>
+                            )}
+                            {/* Full-page drag overlay */}
+                            {isDragging && (
+                                <div className="fixed inset-0 bg-primary/10 border-4 border-dashed border-primary pointer-events-none z-50 flex items-center justify-center">
+                                    <div className="bg-white p-8 rounded-lg shadow-lg">
+                                        <Upload className="h-16 w-16 text-primary mx-auto mb-4" />
+                                        <p className="text-xl font-semibold text-primary">Drop file anywhere to upload</p>
+                                    </div>
                                 </div>
                             )}
                         </div>
