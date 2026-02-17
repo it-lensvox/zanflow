@@ -345,7 +345,8 @@ class ChatMessageService:
                     # A. Get Total Unread (Global)
                     total_unread = ChatRoomService.get_total_unread_count(member)
 
-                    # B. Get Room Unread (Specific to this room)
+                    # B. Get Room Unr  
+                    # ead (Specific to this room)
                     # We use 'filter' + 'first' to avoid crashing if membership is missing
                     membership = ChatRoomMembership.objects.filter(room=room, user=member).first()
                     
