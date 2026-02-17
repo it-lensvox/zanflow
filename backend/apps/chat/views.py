@@ -727,15 +727,24 @@ class UnreadCountView(APIView):
     @extend_schema(summary="Get unread message counts")
     def get(self, request):
         """Get unread message counts per room and total."""
+        # This service already fetches last_message and updated_at
         rooms_data = ChatRoomService.get_user_rooms(request.user)
         
         unread_by_room = {}
         for room in rooms_data:
             if room['unread_count'] > 0:
+                # --- FIX: Determine the correct timestamp ---
+                # Prefer the actual message time, fallback to room update time
+                last_activity = room['updated_at']
+                if room.get('last_message') and room['last_message'].get('created_at'):
+                     last_activity = room['last_message']['created_at']
+
                 unread_by_room[room['id']] = {
                     'name': room['name'],
                     'unread_count': room['unread_count'],
                     'room_type': room['room_type'],
+                    # --- FIX: Include the timestamp ---
+                    'last_message_at': last_activity, 
                 }
         
         total_unread = sum(r['unread_count'] for r in unread_by_room.values())
