@@ -10,7 +10,7 @@ import { projectsApi, notificationSocket } from '@/services/api';
 import { TaskDetails } from '@/pages/TaskType/TaskDetails';
 import { APITesting } from '@/pages/TaskType/APITesting';
 import {
-  Dashboard, Login, Projects, DocumentCreate, DocumentDetail, Documents, ProjectSettings,
+  Dashboard, Login, Projects, DocumentCreate, Documents, ProjectSettings,
   Teams, UserManagement, MyTask, CreateTask, TeamPerformance, Calendar, NotificationsPage, Profile, ResetPassword, TeamChatModern,
 } from '@/pages';
 import { TaskDetailPage } from '@/pages/MyTask/TaskDetailPage';
@@ -121,7 +121,7 @@ function AppRoutes() {
         <Route path="/projects/:id/settings" element={<ProjectSettings />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/documents" element={<Documents />} />
-        <Route path="/documents/:id" element={<DocumentDetail />} />
+        {/* <Route path="/documents/:id" element={<DocumentDetail />} /> */}
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/team-chat" element={<TeamChatModern />} />
         <Route path="/settings" element={<div>Settings</div>} />

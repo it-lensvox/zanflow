@@ -874,6 +874,7 @@ export interface ChatUnreadResponse {
     name: string;
     unread_count: number;
     room_type: string;
+    last_message_at?: string;
   }>;
 }
 

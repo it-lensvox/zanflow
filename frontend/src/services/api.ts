@@ -8,6 +8,9 @@ import type {
 } from '@/types';
 
 
+//export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.14:8000/api/v1';
+//const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://192.168.1.14:8000/ws/gateway';
+
 export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
@@ -219,7 +222,7 @@ export const authApi = {
 
 // Projects API
 export const projectsApi = {
-  list: async (params?: { task_type?: string; is_active?: boolean }) => {
+  list: async (params?: { task_type?: string; is_active?: boolean; page?: number }) => {
     const response = await api.get<PaginatedProjectsResponse>('/projects/', { params });
     return response.data;
   },
@@ -606,7 +609,7 @@ export const chatApi = {
     return response.data;
   },
 
-  // Send a message with attachment via HTTP POST (for file uploads)
+  // Send a message with attachment via HTTP POST 
   sendMessageWithAttachment: async (roomId: string, data: { content: string; attachment: File }) => {
     const formData = new FormData();
     formData.append('content', data.content);
@@ -616,6 +619,14 @@ export const chatApi = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+    });
+    return response.data;
+  },
+
+  // Get Private Rooms 
+  getPrivateRooms: async () => {
+    const response = await api.get<ChatRoom[]>('/chat/rooms/', {
+      params: { type: 'private' }
     });
     return response.data;
   },

@@ -4,12 +4,13 @@ import {
     ArrowLeft, Trash2, Save, Edit3, Loader2, ChevronDown, FileText, Send,
     Clock, ListTodo, PlayCircle, CheckCircle, CheckSquare, Pause, Plus, Link as LinkIcon,
 } from 'lucide-react';
-import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { taskApi, usersApi, documentsApi } from '@/services/api';
 import { useAuth } from '@/hooks/useAuth';
 import { getStatusConfig } from '@/components/layout/DualView/taskConfig';
 import { Task, TaskAttachment, TaskLink } from '@/types';
 import { RichTextEditor } from '@/components/common/RichTextEditor';
+import { DocumentPreview, useDocumentPreviewKeyboard, DocumentThumbnail } from '@/components/common/DocumentPreview';
 
 const getInitialLinks = (taskLinks: TaskLink[] | undefined): string[] => {
     if (!taskLinks) return [];
@@ -55,6 +56,15 @@ export function TaskDetailPage() {
     const [linkInput, setLinkInput] = useState('');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
+    const [attachmentPage, setAttachmentPage] = useState(1);
+    const [loadingMoreAttachments, setLoadingMoreAttachments] = useState(false);
+    const [hasMoreAttachments, setHasMoreAttachments] = useState(true);
+    const attachmentContainerRef = React.useRef<HTMLDivElement>(null);
+    const [previewDocument, setPreviewDocument] = useState<{
+        url: string;
+        fileName: string;
+        fileType?: string;
+    } | null>(null);
     const [deleteAttachmentConfirm, setDeleteAttachmentConfirm] = useState<{
         id: string;
         name: string;
@@ -73,28 +83,49 @@ export function TaskDetailPage() {
         }
     }, [task]);
 
-    // Fetch task documents
-    const { data: taskDocuments } = useQuery({
+    // Fetch task documents with pagination
+    const { data: taskDocumentsData, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
         queryKey: ['task-documents', id],
-        queryFn: async () => {
+        queryFn: async ({ pageParam = 1 }) => {
             try {
                 const projectId = task?.project || (task as any)?.project_details?.id;
-                if (!projectId) return [];
+                if (!projectId) return { results: [], count: 0, next: null, previous: null };
 
-                const response = await documentsApi.list({ project: projectId });
+                const response = await documentsApi.list({ project: projectId, page: pageParam });
                 const allDocs = response.results || response.documents || [];
                 const taskDocs = allDocs.filter((doc: any) =>
                     doc.metadata?.task_id === Number(id) ||
                     doc.task_id === Number(id)
                 );
-                return taskDocs;
+
+                return {
+                    results: taskDocs,
+                    count: taskDocs.length,
+                    next: response.next,
+                    previous: response.previous,
+                };
             } catch (error) {
                 console.error('Failed to fetch task documents:', error);
-                return [];
+                return { results: [], count: 0, next: null, previous: null };
             }
         },
+        getNextPageParam: (lastPage) => {
+            if (lastPage.next) {
+                const url = new URL(lastPage.next);
+                const pageParam = url.searchParams.get('page');
+                return pageParam ? parseInt(pageParam) : undefined;
+            }
+            return undefined;
+        },
         enabled: !!task?.id,
+        initialPageParam: 1,
     });
+
+    // Flatten paginated documents
+    const taskDocuments = React.useMemo(() => {
+        if (!taskDocumentsData?.pages) return [];
+        return taskDocumentsData.pages.flatMap(page => page.results);
+    }, [taskDocumentsData]);
 
     // Fetch comments
     const { data: commentsData } = useQuery({
@@ -290,25 +321,34 @@ export function TaskDetailPage() {
     const handleAttachmentClick = async (attachment: TaskAttachment) => {
         if (!task) return;
         try {
-            if (attachment.file_url) {
-                window.open(attachment.file_url, '_blank');
-                return;
-            }
-            const projectIdNum = task.project || (task as any).project_details?.id;
-            if (!projectIdNum) {
-                alert('Unable to open attachment: Project information missing.');
-                return;
+            let fileUrl = attachment.file_url;
+
+            // If file_url is not available, fetch it from the API
+            if (!fileUrl) {
+                const projectIdNum = task.project || (task as any).project_details?.id;
+                if (!projectIdNum) {
+                    alert('Unable to open attachment: Project information missing.');
+                    return;
+                }
+
+                const downloadResponse = await documentsApi.getDownloadUrl(projectIdNum, {
+                    document_id: attachment.id.toString()
+                });
+
+                if (downloadResponse?.url) {
+                    fileUrl = downloadResponse.url;
+                } else {
+                    alert('Unable to open attachment: Download URL not available.');
+                    return;
+                }
             }
 
-            const downloadResponse = await documentsApi.getDownloadUrl(projectIdNum, {
-                document_id: attachment.id.toString()
+            // Open in-app preview
+            setPreviewDocument({
+                url: fileUrl,
+                fileName: attachment.file_name,
+                fileType: attachment.file_url?.split('.').pop() || ''
             });
-
-            if (downloadResponse?.url) {
-                window.open(downloadResponse.url, '_blank');
-            } else {
-                alert('Unable to open attachment: Download URL not available.');
-            }
         } catch (error) {
             console.error('Failed to open attachment:', error);
             alert('Failed to open attachment. Please try again.');
@@ -318,10 +358,25 @@ export function TaskDetailPage() {
     const handleDeleteAttachment = async (attachmentId: string) => {
         try {
             await documentsApi.delete(attachmentId);
-            queryClient.setQueryData(['task-documents', id], (oldDocs: any[] | undefined) => {
-                return (oldDocs || []).filter((doc) => doc.id.toString() !== attachmentId);
+            queryClient.setQueryData(['task-documents', id], (oldData: any) => {
+                if (!oldData?.pages) return oldData;
+
+                return {
+                    ...oldData,
+                    pages: oldData.pages.map((page: any) => ({
+                        ...page,
+                        results: page.results.filter((doc: any) => doc.id.toString() !== attachmentId),
+                        count: page.count - 1,
+                    })),
+                };
             });
+
+            // Invalidate related queries
+            queryClient.invalidateQueries({ queryKey: ['task-documents', id] });
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            queryClient.invalidateQueries({ queryKey: ['task', id] });
+            queryClient.invalidateQueries({ queryKey: ['documents'] });
+
             setDeleteAttachmentConfirm(null);
         } catch (error) {
             console.error('Failed to delete attachment:', error);
@@ -329,6 +384,33 @@ export function TaskDetailPage() {
             setDeleteAttachmentConfirm(null);
         }
     };
+
+    // Handle scroll for lazy loading attachments
+    const handleAttachmentScroll = React.useCallback(() => {
+        if (!attachmentContainerRef.current || isFetchingNextPage || !hasNextPage) return;
+
+        const container = attachmentContainerRef.current;
+        const scrollTop = container.scrollTop;
+        const scrollHeight = container.scrollHeight;
+        const clientHeight = container.clientHeight;
+
+        // Trigger load when user scrolls to 80% of container
+        if (scrollTop + clientHeight >= scrollHeight * 0.8) {
+            fetchNextPage();
+        }
+    }, [isFetchingNextPage, hasNextPage, fetchNextPage]);
+
+    // Attach scroll listener
+    React.useEffect(() => {
+        const container = attachmentContainerRef.current;
+        if (!container) return;
+
+        container.addEventListener('scroll', handleAttachmentScroll);
+        return () => container.removeEventListener('scroll', handleAttachmentScroll);
+    }, [handleAttachmentScroll]);
+
+    // Enable keyboard shortcuts for document preview
+    useDocumentPreviewKeyboard(() => setPreviewDocument(null));
 
     const statusOptions: Array<{ status: Task['status'], icon: React.ElementType, label: string }> = [
         { status: 'pending', icon: Clock, label: 'Pending' },
@@ -731,18 +813,25 @@ export function TaskDetailPage() {
                         </div>
                     </div>
 
-                    {/* Attachment Grid */}
+                    {/* Attachment Grid with Scroll Container */}
                     {displayAttachments && displayAttachments.length > 0 && (
-                        <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {displayAttachments.map((doc: TaskAttachment) => (
-                                <div
-                                    key={doc.id}
-                                    className="flex flex-col bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow group h-full cursor-pointer"
-                                    onClick={() => handleAttachmentClick(doc)}
-                                >
-                                    <div className="h-32 bg-gray-100 flex items-center justify-center border-b border-gray-100 relative">
-                                        <FileText className="w-10 h-10 text-gray-400" />
-                                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div
+                            ref={attachmentContainerRef}
+                            className="mt-6 max-h-[500px] overflow-y-auto pr-2"
+                        >
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {displayAttachments.map((doc: TaskAttachment) => (
+                                    <div key={doc.id} className="relative group">
+                                        <DocumentThumbnail
+                                            url={doc.file_url}
+                                            fileName={doc.file_name}
+                                            fileType={doc.file_url?.split('.').pop() || ''}
+                                            onClick={() => handleAttachmentClick(doc)}
+                                            showFileName={false}
+                                            className="h-full"
+                                        />
+                                        {/* Delete Button Overlay */}
+                                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                                             <button
                                                 className="p-1.5 bg-white/90 rounded-md shadow-sm text-gray-600 hover:text-red-600"
                                                 onClick={(e) => {
@@ -756,15 +845,31 @@ export function TaskDetailPage() {
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
                                         </div>
+                                        {/* File Info Below Thumbnail */}
+                                        <div className="p-3">
+                                            <p className="text-xs font-bold text-gray-900 truncate" title={doc.file_name}>{doc.file_name}</p>
+                                            <p className="text-[10px] text-gray-500 mt-1 font-medium italic">
+                                                {new Date(doc.uploaded_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toLowerCase()}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div className="p-3">
-                                        <p className="text-xs font-bold text-gray-900 truncate" title={doc.file_name}>{doc.file_name}</p>
-                                        <p className="text-[10px] text-gray-500 mt-1 font-medium italic">
-                                            {new Date(doc.uploaded_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toLowerCase()}
-                                        </p>
-                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Loading Indicator */}
+                            {isFetchingNextPage && (
+                                <div className="flex justify-center items-center py-6">
+                                    <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+                                    <span className="ml-2 text-sm text-gray-600">Loading more attachments...</span>
                                 </div>
-                            ))}
+                            )}
+
+                            {/* No More Attachments Indicator */}
+                            {!hasNextPage && displayAttachments.length > 20 && (
+                                <div className="flex justify-center py-4">
+                                    <span className="text-xs text-gray-500">All attachments loaded</span>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -841,6 +946,15 @@ export function TaskDetailPage() {
                         </div>
                     </div>
                 </div>
+            )}
+            {/* DOCUMENT PREVIEW */}
+            {previewDocument && (
+                <DocumentPreview
+                    url={previewDocument.url}
+                    fileName={previewDocument.fileName}
+                    fileType={previewDocument.fileType}
+                    onClose={() => setPreviewDocument(null)}
+                />
             )}
         </div>
     );
