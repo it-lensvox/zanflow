@@ -3,28 +3,24 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import {
-    ArrowLeft, Plus, Upload, Search, Film, Loader2, X, Download, ChevronLeft, ChevronRight, FileText, FileJson, Settings,
-    Maximize2, List, Grid3X3, MessageCircle
+    ArrowLeft, Plus, Upload, Search, Film, Loader2, FileText, FileJson, Settings,
+    List, Grid3X3, MessageCircle
 } from 'lucide-react';
 import { projectsApi, taskApi, documentsApi } from '@/services/api';
 import type { Task } from '@/types'
 import { CreateTask } from '@/pages/MyTask/CreateTask';
 import { DualView } from '@/components/layout/DualView/DualView';
 import { TaskGridCard, createTasksTableColumns } from '@/components/layout/DualView/taskConfig';
+import { DocumentPreview, useDocumentPreviewKeyboard } from '@/components/common/DocumentPreview';
 import { TaskDetailModal } from '../MyTask/TaskDetailModal';
 import { useTableFilters, ColumnFilterConfig } from '@/hooks/useTableFilters';
 import { SearchFilter, ListFilter, DateFilter, FilterHeaderWrapper } from '@/components/layout/DualView/FilterComponents';
 import { getStatusConfig, priorityOptions, statusOptions } from '@/components/layout/DualView/taskConfig';
-import { Document as PDFDocument, Page as PDFPage, pdfjs } from 'react-pdf';
+import { Document as PDFDocument, Page as PDFPage } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import './ContentCreation.scss';
 
-
-// pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-//   'pdfjs-dist/build/pdf.worker.min.mjs',
-//   import.meta.url
-// ).toString();
 
 type TabType = 'tasks' | 'calendar' | 'media';
 type MediaTag = 'final' | 'draft' | 'rawFootage' | 'approved' | 'wip' | 'reference';
@@ -38,281 +34,40 @@ export function MediaPreviewModal({
     projectId: number;
     onClose: () => void;
 }) {
-    const [numPages, setNumPages] = useState<number | null>(null);
-    const [pageNumber, setPageNumber] = useState(1);
-    const [fileError, setFileError] = useState<string | null>(null);
-    const [isFullscreen, setIsFullscreen] = useState(false);
-    const [pythonContent, setPythonContent] = useState<string>('');
-    const modalRef = useRef<HTMLDivElement>(null);
-
-    const { data: downloadUrl, isLoading } = useQuery({
-        queryKey: ['document-download-url', projectId, doc.id],
-        queryFn: () => documentsApi.getDownloadUrl(projectId, { document_id: doc.id }).then(res => res.url),
-        staleTime: 60 * 1000,
-    });
-
-    const fileExtension = (doc.original_file_name || doc.name).split('.').pop()?.toLowerCase() || '';
-
-    // File type categorization
-    const excelTypes = ['xls', 'xlsx', 'csv'];
-    const pythonTypes = ['py'];
-    const zipTypes = ['zip'];
-    const pptTypes = ['ppt', 'pptx'];
-    const docTypes = ['doc', 'docx'];
-    const xmlTypes = ['xml'];
-    const videoTypes = ['mp4', 'mov', 'avi', 'webm', 'mkv', 'flv', 'wmv'];
-
-    const toggleFullscreen = () => {
-        if (!document.fullscreenElement) {
-            modalRef.current?.requestFullscreen();
-            setIsFullscreen(true);
-        } else {
-            document.exitFullscreen();
-            setIsFullscreen(false);
-        }
-    };
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
     useEffect(() => {
-        const handleFullscreenChange = () => {
-            setIsFullscreen(!!document.fullscreenElement);
-        };
-        document.addEventListener('fullscreenchange', handleFullscreenChange);
-        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-    }, []);
-
-    // Handle Excel files
-    useEffect(() => {
-        if (excelTypes.includes(fileExtension) && downloadUrl) {
-            const hasOpened = sessionStorage.getItem(`opened-${doc.id}`);
-            if (!hasOpened) {
-                sessionStorage.setItem(`opened-${doc.id}`, 'true');
-                window.open(downloadUrl, '_blank');
+        const fetchUrl = async () => {
+            try {
+                const response = await documentsApi.getDownloadUrl(projectId, {
+                    document_id: doc.id
+                });
+                if (response?.url) {
+                    setPreviewUrl(response.url);
+                }
+            } catch (error) {
+                console.error('Failed to fetch download URL:', error);
                 onClose();
             }
-        }
-    }, [fileExtension, downloadUrl, onClose, doc.id]);
-
-    // Cleanup session storage on unmount
-    useEffect(() => {
-        return () => {
-            sessionStorage.removeItem(`opened-${doc.id}`);
         };
-    }, [doc.id]);
+        fetchUrl();
+    }, [doc.id, projectId, onClose]);
 
-    // Handle ZIP files 
-    const handleZipDownload = () => {
-        if (downloadUrl) {
-            const a = document.createElement('a');
-            a.href = downloadUrl;
-            a.download = doc.original_file_name || doc.name;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        }
-    };
-
-    // Render Python files as text
-    useEffect(() => {
-        if (pythonTypes.includes(fileExtension) && downloadUrl) {
-            fetch(downloadUrl)
-                .then(res => res.text())
-                .then(text => setPythonContent(text))
-                .catch(err => console.error('Failed to load Python file:', err));
-        }
-    }, [fileExtension, downloadUrl]);
+    if (!previewUrl) {
+        return (
+            <div className="fixed inset-0 z-[100] bg-black bg-opacity-90 flex items-center justify-center">
+                <Loader2 className="w-12 h-12 text-white animate-spin" />
+            </div>
+        );
+    }
 
     return (
-        <div className="content-creation__modal-overlay" onClick={onClose} ref={modalRef}>
-            <div className="content-creation__modal-container max-w-4xl w-full p-6 bg-white" onClick={e => e.stopPropagation()}>
-                <div className="flex items-center justify-between mb-4 border-b pb-4">
-                    <h3 className="text-xl font-bold truncate">{doc.original_file_name || doc.name}</h3>
-                    <div className="flex items-center gap-2">
-                        {downloadUrl && !zipTypes.includes(fileExtension) && (
-                            <>
-                                <button onClick={toggleFullscreen} className="p-2 hover:bg-gray-100 rounded-full" title="Fullscreen">
-                                    <Maximize2 className="h-5 w-5" />
-                                </button>
-                                <button
-                                    onClick={async () => {
-                                        try {
-                                            const response = await fetch(downloadUrl);
-                                            const blob = await response.blob();
-                                            const url = window.URL.createObjectURL(blob);
-                                            const a = document.createElement('a');
-                                            a.href = url;
-                                            a.download = doc.original_file_name || doc.name;
-                                            document.body.appendChild(a);
-                                            a.click();
-                                            document.body.removeChild(a);
-                                            window.URL.revokeObjectURL(url);
-                                        } catch (error) {
-                                            console.error('Download failed:', error);
-                                            window.open(downloadUrl, '_blank');
-                                        }
-                                    }}
-                                    className="p-2 hover:bg-gray-100 rounded-full"
-                                    title="Download"
-                                >
-                                    <Download className="h-5 w-5" />
-                                </button>
-                            </>
-                        )}
-                        <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full" title="Close">
-                            <X className="h-5 w-5" />
-                        </button>
-                    </div>
-                </div>
-
-                <div className="flex flex-col items-center justify-center min-h-[400px]">
-                    {isLoading ? (
-                        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                    ) : zipTypes.includes(fileExtension) ? (
-                        // ZIP files
-                        <div className="flex flex-col items-center gap-4">
-                            <FileText className="h-20 w-20 text-gray-400" />
-                            <p className="text-lg font-medium mt-4">ZIP Archive</p>
-                            <p className="text-sm text-gray-500 mb-6">No preview available for ZIP files</p>
-                            <button onClick={handleZipDownload} className="media-preview-download-btn">
-                                <Download className="h-5 w-5" />
-                                Download File
-                            </button>
-                        </div>
-                    ) : pythonTypes.includes(fileExtension) ? (
-                        // Code files
-                        <div className="w-full h-[70vh] overflow-auto bg-gray-900 rounded-lg p-4">
-                            <pre className="text-sm text-gray-100 font-mono whitespace-pre-wrap">
-                                <code>{pythonContent || 'Loading...'}</code>
-                            </pre>
-                        </div>
-                    ) : pptTypes.includes(fileExtension) || docTypes.includes(fileExtension) || xmlTypes.includes(fileExtension) ? (
-                        // PPT, DOC, XML - Open in new tab viewer
-                        <div className="flex flex-col items-center gap-4">
-                            <FileText className="h-20 w-20 text-gray-400" />
-                            <p className="text-lg font-medium mt-4">
-                                {pptTypes.includes(fileExtension) ? 'PowerPoint Presentation' :
-                                    docTypes.includes(fileExtension) ? 'Word Document' : 'XML File'}
-                            </p>
-                            <p className="text-sm text-gray-500 mb-6">
-                                This file will open in {pptTypes.includes(fileExtension) ? 'PowerPoint Online' :
-                                    docTypes.includes(fileExtension) ? 'Word Online' : 'a text editor'}
-                            </p>
-                            <button
-                                onClick={() => {
-                                    if (downloadUrl) {
-                                        // Use Microsoft Office Online viewer for PPT and DOC files
-                                        if (pptTypes.includes(fileExtension) || docTypes.includes(fileExtension)) {
-                                            const officeViewerUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(downloadUrl)}`;
-                                            window.open(officeViewerUrl, '_blank');
-                                        } else {
-                                            window.open(downloadUrl, '_blank');
-                                        }
-                                        onClose();
-                                    }
-                                }}
-                                className="media-preview-download-btn"
-                            >
-                                Open File
-                            </button>
-                        </div>
-                    ) : fileError ? (
-                        <div className="text-destructive">{fileError}</div>
-                    ) : doc.file_type === 'pdf' ? (
-                        <div className="w-full flex flex-col items-center overflow-auto max-h-[70vh]">
-                            <PDFDocument
-                                file={downloadUrl}
-                                onLoadSuccess={({ numPages }) => setNumPages(numPages)}
-                                onLoadError={(err) => setFileError(err.message)}
-                            >
-                                <PDFPage
-                                    pageNumber={pageNumber}
-                                    width={700}
-                                    renderTextLayer={true}
-                                    renderAnnotationLayer={true}
-                                />
-                            </PDFDocument>
-                            {numPages && numPages > 1 && (
-                                <div className="flex items-center gap-4 mt-4 bg-gray-100 p-2 rounded-lg">
-                                    <button
-                                        disabled={pageNumber <= 1}
-                                        onClick={() => setPageNumber(p => p - 1)}
-                                        className="disabled:opacity-30"
-                                    >
-                                        <ChevronLeft />
-                                    </button>
-                                    <span className="text-sm">Page {pageNumber} of {numPages}</span>
-                                    <button
-                                        disabled={pageNumber >= numPages}
-                                        onClick={() => setPageNumber(p => p + 1)}
-                                        className="disabled:opacity-30"
-                                    >
-                                        <ChevronRight />
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    ) : doc.file_type === 'image' ? (
-                        <img src={downloadUrl} alt="Preview" className="max-h-[70vh] rounded-lg shadow-md" />
-                    ) : (doc.file_type === 'video' || videoTypes.includes(fileExtension)) ? (
-                        // Video files 
-                        <div className="flex flex-col items-center gap-4">
-                            <Film className="h-20 w-20 text-blue-500" />
-                            <p className="text-lg font-medium mt-4">Video File</p>
-                            <p className="text-sm text-gray-500 mb-6">Click below to open the video in a new tab</p>
-                            <button
-                                onClick={() => {
-                                    if (downloadUrl) {
-                                        window.open(downloadUrl, '_blank');
-                                        onClose();
-                                    }
-                                }}
-                                className="media-preview-download-btn"
-                            >
-                                <Film className="h-5 w-5" />
-                                Open Video
-                            </button>
-                        </div>
-
-                    ) : doc.file_type === 'json' ? (
-                        <div className="flex flex-col items-center gap-4">
-                            <FileJson className="h-20 w-20 text-yellow-600" />
-                            <p>JSON File</p>
-                            <a href={downloadUrl} download target="_blank" rel="noopener noreferrer" className="media-preview-download-btn">
-                                <Download className="h-5 w-5" />
-                                Download to View
-                            </a>
-                        </div>
-                    ) : pptTypes.includes(fileExtension) ? (
-                        // PowerPoint files - Open in new tab
-                        <div className="flex flex-col items-center gap-4">
-                            <FileText className="h-20 w-20 text-orange-500" />
-                            <p className="text-lg font-medium mt-4">PowerPoint Presentation</p>
-                            <p className="text-sm text-gray-500 mb-6">This file will open in PowerPoint Online</p>
-                            <button
-                                onClick={() => {
-                                    if (downloadUrl) {
-                                        window.open(downloadUrl, '_blank');
-                                        onClose();
-                                    }
-                                }}
-                                className="media-preview-download-btn"
-                            >
-                                <FileText className="h-5 w-5" />
-                                Open PPT
-                            </button>
-                        </div>
-                    ) : (
-                        <div className="flex flex-col items-center gap-4">
-                            <FileText className="h-20 w-20 text-gray-300" />
-                            <p>No preview available for this file type.</p>
-                            <a href={downloadUrl} download target="_blank" rel="noopener noreferrer" className="media-preview-download-btn">
-                                <Download className="h-5 w-5" />
-                                Download to View
-                            </a>
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
+        <DocumentPreview
+            url={previewUrl}
+            fileName={doc.original_file_name || doc.name}
+            fileType={doc.file_type}
+            onClose={onClose}
+        />
     );
 }
 
@@ -383,6 +138,11 @@ export function ContentCreation() {
     const [uploadError, setUploadError] = useState<string | null>(null);
     const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [previewDocument, setPreviewDocument] = useState<{
+        url: string;
+        fileName: string;
+        fileType?: string;
+    } | null>(null);
     const { data: tasksData, isLoading: isTasksLoading } = useQuery({
         queryKey: ['tasks'],
         queryFn: () => taskApi.list(),
@@ -616,6 +376,30 @@ export function ContentCreation() {
         // This triggers the global refetch same as Taskboard
         queryClient.invalidateQueries({ queryKey: ['tasks'] });
     };
+
+    // Handle document preview
+    const handleDocumentPreview = async (doc: any) => {
+        try {
+            const projectIdNum = Number(id);
+            const downloadResponse = await documentsApi.getDownloadUrl(projectIdNum, {
+                document_id: doc.id
+            });
+
+            if (downloadResponse?.url) {
+                setPreviewDocument({
+                    url: downloadResponse.url,
+                    fileName: doc.original_file_name || doc.name,
+                    fileType: doc.file_type
+                });
+            }
+        } catch (error) {
+            console.error('Failed to open document:', error);
+            alert('Failed to open document. Please try again.');
+        }
+    };
+
+    // Enable keyboard shortcuts for document preview
+    useDocumentPreviewKeyboard(() => setPreviewDocument(null));
 
     const handleTaskUpdated = (updatedTask: any) => {
         queryClient.invalidateQueries({ queryKey: ['tasks'] });
@@ -942,7 +726,7 @@ export function ContentCreation() {
                                             <div
                                                 key={file.id}
                                                 className="border rounded-lg p-2 bg-white text-center cursor-pointer hover:shadow-md transition-shadow"
-                                                onClick={() => setSelectedMedia(file)}
+                                                onClick={() => handleDocumentPreview(file)}
                                             >
                                                 <div className="aspect-square bg-muted rounded flex items-center justify-center mb-2 overflow-hidden border relative">
                                                     <MediaThumbnail file={file} projectId={Number(id)} />
@@ -1010,6 +794,14 @@ export function ContentCreation() {
                     onClose={() => setSelectedTask(null)}
                     onDelete={handleDeleteTask}
                     onTaskUpdated={handleTaskUpdated}
+                />
+            )}
+            {previewDocument && (
+                <DocumentPreview
+                    url={previewDocument.url}
+                    fileName={previewDocument.fileName}
+                    fileType={previewDocument.fileType}
+                    onClose={() => setPreviewDocument(null)}
                 />
             )}
         </div>

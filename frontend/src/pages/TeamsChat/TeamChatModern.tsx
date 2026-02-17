@@ -43,12 +43,16 @@ export function TeamChatModern() {
   const [messageReactions, setMessageReactions] = useState<Map<string | number, Map<string, number>>>(new Map());
   const menuRef = useRef<HTMLDivElement>(null);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragCounter = useRef(0);
 
   // Unread tracking & notifications
   const [unreadCounts, setUnreadCounts] = useState<Map<string, number>>(new Map());
   const [toastNotifications, setToastNotifications] = useState<ToastNotification[]>([]);
   const [roomUserMap, setRoomUserMap] = useState<Map<string, number>>(new Map());
+  const roomUserMapRef = useRef<Map<string, number>>(new Map());
   const [userRoomMap, setUserRoomMap] = useState<Map<number, string>>(new Map());
+
   const [lastMessages, setLastMessages] = useState<Map<number, { content: string; timestamp: string; isUnread: boolean }>>(new Map());
   const [chatListVersion, setChatListVersion] = useState(0);
   const [userLastActivity, setUserLastActivity] = useState<Map<number, number>>(new Map());
@@ -72,7 +76,6 @@ export function TeamChatModern() {
     queryFn: () => usersApi.list(),
   });
 
-
   // 1b. Fetch Project Rooms
   const { data: projectRoomsData, isLoading: isLoadingProjects } = useQuery({
     queryKey: ['project-chat-rooms'],
@@ -85,24 +88,184 @@ export function TeamChatModern() {
     queryFn: () => chatApi.getTeamRooms(),
   });
 
-  const teamRooms = teamRoomsData || [];
+  // 1d. Fetch Private Rooms (Essential for History/Sorting)
+  const { data: privateRoomsData } = useQuery({
+    queryKey: ['private-chat-rooms'],
+    queryFn: () => chatApi.getPrivateRooms(),
+    refetchOnMount: 'always',
+  });
 
-  // Map project rooms to ensure name field exists
-  const normalizedProjectRooms = useMemo(() => {
-    return (projectRoomsData || []).map(room => ({
+  // 1e. Fetch Initial Unread Counts (MOVED UP: Must be declared before use in useMemo)
+  const { data: unreadData } = useQuery({
+    queryKey: ['chat-unread-counts'],
+    queryFn: () => chatApi.getUnreadCount(),
+    refetchOnMount: 'always',
+    staleTime: 0,
+  });
+
+  // Sort Teams by Last Message Time (Priority to Unread Data)
+  const teamRooms = useMemo(() => {
+    if (!teamRoomsData) return [];
+    return [...teamRoomsData].sort((a, b) => {
+      // 1. Get timestamp from Room object
+      let timeA = (a.last_message as any)?.created_at ? new Date((a.last_message as any).created_at).getTime() : 0;
+      let timeB = (b.last_message as any)?.created_at ? new Date((b.last_message as any).created_at).getTime() : 0;
+
+      // 2. Check if Unread API has fresher data
+      if (unreadData?.by_room) {
+        const unreadA = unreadData.by_room[a.id];
+        const unreadB = unreadData.by_room[b.id];
+
+        if (unreadA?.last_message_at) {
+          timeA = Math.max(timeA, new Date(unreadA.last_message_at).getTime());
+        }
+        if (unreadB?.last_message_at) {
+          timeB = Math.max(timeB, new Date(unreadB.last_message_at).getTime());
+        }
+      }
+      // Sort Descending (Newest first)
+      if (timeA !== timeB) return timeB - timeA;
+      // Fallback to Alphabetical
+      return a.name.localeCompare(b.name);
+    });
+  }, [teamRoomsData, unreadData]);
+
+  // Map AND Sort Project rooms by Last Message Time (Priority to Unread Data)
+  const projectRooms = useMemo(() => {
+    const normalized = (projectRoomsData || []).map(room => ({
       ...room,
       name: room.name || (room as any).project_name || (room as any).title || 'Unnamed Project'
     }));
-  }, [projectRoomsData]);
-  const projectRooms = normalizedProjectRooms;
 
+    return normalized.sort((a, b) => {
+      // 1. Get timestamp from Room object
+      let timeA = a.last_message?.created_at ? new Date(a.last_message.created_at).getTime() : 0;
+      let timeB = b.last_message?.created_at ? new Date(b.last_message.created_at).getTime() : 0;
+      // 2. Check if Unread API has fresher data
+      if (unreadData?.by_room) {
+        const unreadA = unreadData.by_room[a.id];
+        const unreadB = unreadData.by_room[b.id];
 
+        if (unreadA?.last_message_at) {
+          timeA = Math.max(timeA, new Date(unreadA.last_message_at).getTime());
+        }
+        if (unreadB?.last_message_at) {
+          timeB = Math.max(timeB, new Date(unreadB.last_message_at).getTime());
+        }
+      }
 
-  // Debug: Log project rooms data
+      // Sort Descending (Newest first)
+      if (timeA !== timeB) return timeB - timeA;
+      // Fallback to Alphabetical
+      return a.name.localeCompare(b.name);
+    });
+  }, [projectRoomsData, unreadData]);
+
+  // Sync unread API data with local state & Map Private Rooms to Users
   useEffect(() => {
-    if (projectRoomsData) {
+    if (unreadData?.by_room && usersData?.results && currentUser) {
+      let updatesNeeded = false;
+      const newUnreadMap = new Map(unreadCounts);
+      const newRoomUserMap = new Map(roomUserMap);
+      const newUserRoomMap = new Map(userRoomMap);
+      const newLastMessages = new Map(lastMessages);
+
+      Object.entries(unreadData.by_room).forEach(([roomId, data]) => {
+        // 1. Update unread counts
+        if (newUnreadMap.get(roomId) !== data.unread_count) {
+          newUnreadMap.set(roomId, data.unread_count);
+          updatesNeeded = true;
+        }
+
+        // 2. Dynamically map Private Room IDs to Users (based on Room Name)
+        if (data.room_type === 'private' && data.name.startsWith('Chat: ')) {
+          const names = data.name.replace('Chat: ', '').split(' & ');
+          const otherUsername = names.find(n => n !== currentUser.username);
+          if (otherUsername) {
+            const user = usersData.results.find(u => u.username === otherUsername);
+            if (user) {
+              if (!newRoomUserMap.has(roomId)) {
+                newRoomUserMap.set(roomId, user.id);
+                newUserRoomMap.set(user.id, roomId);
+                updatesNeeded = true;
+              }
+              // Force unread status on the user in the sidebar
+              if (data.unread_count > 0) {
+                const prevMsg = newLastMessages.get(user.id);
+                // Only update if not already marked unread
+                if (!prevMsg?.isUnread) {
+                  newLastMessages.set(user.id, {
+                    content: prevMsg?.content || 'Unread messages',
+                    timestamp: prevMsg?.timestamp || new Date().toISOString(),
+                    isUnread: true
+                  });
+                  updatesNeeded = true;
+                }
+              }
+            }
+          }
+        }
+      });
+
+      if (updatesNeeded) {
+        setUnreadCounts(newUnreadMap);
+        setRoomUserMap(newRoomUserMap);
+        roomUserMapRef.current = newRoomUserMap;
+        setUserRoomMap(newUserRoomMap);
+        setLastMessages(newLastMessages);
+        setChatListVersion(v => v + 1);
+      }
     }
-  }, [projectRoomsData]);
+  }, [unreadData, usersData, currentUser]);
+  useEffect(() => {
+    if (privateRoomsData && currentUser && usersData?.results) {
+      let updatesNeeded = false;
+      const newRoomUserMap = new Map(roomUserMap);
+      const newUserRoomMap = new Map(userRoomMap);
+      const newLastMessages = new Map(lastMessages);
+
+      privateRoomsData.forEach((room: any) => {
+        if (room.room_type === 'private') {
+          let otherUserId: number | undefined;
+          if (room.participants && Array.isArray(room.participants)) {
+            otherUserId = room.participants.find((id: number) => id !== currentUser.id);
+          }
+          // If ID found, map it
+          if (otherUserId) {
+            if (!newRoomUserMap.has(room.id)) {
+              newRoomUserMap.set(room.id, otherUserId);
+              newUserRoomMap.set(otherUserId, room.id);
+              updatesNeeded = true;
+            }
+
+            // Update Last Message Data
+            if (room.last_message) {
+              const currentMsg = newLastMessages.get(otherUserId);
+              const roomTime = new Date(room.last_message.created_at).getTime();
+              const existingTime = currentMsg ? new Date(currentMsg.timestamp).getTime() : 0;
+
+              // Only update if this data is newer or doesn't exist
+              if (roomTime > existingTime) {
+                newLastMessages.set(otherUserId, {
+                  content: room.last_message.content_preview || 'Sent a message',
+                  timestamp: room.last_message.created_at,
+                  isUnread: room.unread_count > 0
+                });
+                updatesNeeded = true;
+              }
+            }
+          }
+        }
+      });
+
+      if (updatesNeeded) {
+        setRoomUserMap(newRoomUserMap);
+        roomUserMapRef.current = newRoomUserMap;
+        setUserRoomMap(newUserRoomMap);
+        setLastMessages(newLastMessages);
+      }
+    }
+  }, [privateRoomsData, currentUser, usersData]);
 
   // Initialize Gateway WebSocket ONCE on Mount
   useEffect(() => {
@@ -262,26 +425,35 @@ export function TeamChatModern() {
         const roomId = unreadData.room_id;
         const roomUnread = unreadData.room_unread || 0;
 
-        console.log('💬 Chat unread update received:', unreadData);
-
-        // Update unread counts for this specific room
+        // Update unread counts
         setUnreadCounts(prev => {
           const newMap = new Map(prev);
           newMap.set(roomId, roomUnread);
           return newMap;
         });
 
-        // Find the user associated with this room and mark their last message as unread
-        const userId = roomUserMap.get(roomId);
-        if (userId && roomUnread > 0) {
-          setLastMessages(prev => {
-            const newMap = new Map(prev);
-            const existing = newMap.get(userId);
-            if (existing) {
-              newMap.set(userId, { ...existing, isUnread: true });
-            }
-            return newMap;
-          });
+        // Use Ref to get userId (bypasses stale closure)
+        const userId = roomUserMapRef.current.get(roomId);
+
+        if (userId) {
+          if (roomUnread > 0) {
+            setLastMessages(prev => {
+              const newMap = new Map(prev);
+              const existing = newMap.get(userId);
+              // Update existing or create placeholder if user is found
+              if (existing || newMap.has(userId)) {
+                newMap.set(userId, {
+                  content: existing?.content || 'Unread messages',
+                  timestamp: existing?.timestamp || new Date().toISOString(),
+                  isUnread: true
+                });
+              }
+              return newMap;
+            });
+          }
+        } else {
+          // Unknown room (new chat): Refetch API to get name/mapping
+          queryClient.invalidateQueries({ queryKey: ['chat-unread-counts'] });
         }
       }
 
@@ -384,8 +556,7 @@ export function TeamChatModern() {
     });
   }, [users, lastMessages, userLastActivity]);
 
-  // unread first, then by last message time, then alphabetically
-  // WhatsApp-like sorting: unread first, then by activity time, then alphabetically
+  // unread first, then by timestamp (Last Message), then alphabetically
   const sortedUsers = useMemo(() => {
     return [...usersWithActivity].sort((a, b) => {
       // Get room IDs for both users
@@ -400,15 +571,19 @@ export function TeamChatModern() {
         return unreadB - unreadA;
       }
 
-      // Priority 2: User activity timestamp (most recent first)
+      // Priority 2: Last Message Timestamp (Most recent first)
+      const timeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
+      const timeB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
       const activityA = (a as any).activityTimestamp || 0;
       const activityB = (b as any).activityTimestamp || 0;
 
-      if (activityA && activityB) {
-        return activityB - activityA;
+      // Use the absolute latest timestamp known for the user
+      const latestA = Math.max(timeA, activityA);
+      const latestB = Math.max(timeB, activityB);
+
+      if (latestA !== latestB) {
+        return latestB - latestA;
       }
-      if (activityA) return -1;
-      if (activityB) return 1;
 
       // Priority 3: Alphabetical by name
       const nameA = a.first_name || a.username;
@@ -621,21 +796,63 @@ export function TeamChatModern() {
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      setSelectedFile(file);
+      processFile(file);
+    }
+  };
 
-      // Generate preview URL for images
-      if (file.type.startsWith('image/')) {
-        const previewUrl = URL.createObjectURL(file);
-        setFilePreviewUrl(previewUrl);
-      } else {
-        setFilePreviewUrl(null);
-      }
+  // Process file (used by both file picker and drag-drop)
+  const processFile = (file: File) => {
+    setSelectedFile(file);
+
+    // Generate preview URL for images
+    if (file.type.startsWith('image/')) {
+      const previewUrl = URL.createObjectURL(file);
+      setFilePreviewUrl(previewUrl);
+    } else {
+      setFilePreviewUrl(null);
     }
   };
 
   // Handle attachment button click
   const handleAttachmentClick = () => {
     fileInputRef.current?.click();
+  };
+
+  // Drag and drop handlers
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current++;
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      setIsDragging(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current--;
+    if (dragCounter.current === 0) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    dragCounter.current = 0;
+
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      processFile(file);
+    }
   };
 
   // Auto-scroll to bottom when messages change
@@ -1088,7 +1305,22 @@ export function TeamChatModern() {
             </div>
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto bg-[#efeae2] p-6">
+            <div className="flex-1 overflow-y-auto bg-[#efeae2] p-6"
+              onDragEnter={handleDragEnter}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
+              {/* Drag Overlay */}
+              {isDragging && (
+                <div className="absolute inset-0 bg-blue-50 bg-opacity-90 border-4 border-dashed border-blue-400 rounded-lg z-50 flex items-center justify-center">
+                  <div className="text-center">
+                    <Paperclip className="h-16 w-16 text-blue-600 mx-auto mb-4" />
+                    <p className="text-xl font-semibold text-blue-600">Drop file to upload</p>
+                    <p className="text-sm text-blue-500 mt-2">Release to attach the file</p>
+                  </div>
+                </div>
+              )}
               {isLoadingMessages ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="animate-spin h-8 w-8 border-2 border-blue-600 border-t-transparent rounded-full"></div>
@@ -1339,7 +1571,12 @@ export function TeamChatModern() {
             </div>
 
             {/* Message Input */}
-            <div className="p-4 bg-white border-t border-gray-200">
+            <div className="p-4 bg-white border-t border-gray-200"
+              onDragEnter={handleDragEnter}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+            >
               <div className="flex items-center gap-2">
                 {/* Attachment Button */}
                 <>

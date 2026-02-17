@@ -10,6 +10,7 @@ import { ViewToggle, DualView, useViewMode, } from '@/components/layout/DualView
 import { createDocumentsTableColumns, DocumentGridCard } from '@/components/layout/DualView/documentsConfig';
 import { useNotifications } from '@/hooks/useNotifications';
 import { NotificationsPage } from '../NotificationsPage';
+import { DocumentPreview } from '@/components/common/DocumentPreview';
 
 const FILE_TYPE_OPTIONS = [
   { value: '', label: 'All Types' },
@@ -84,6 +85,11 @@ export function Documents() {
   const [deleteConfirm, setDeleteConfirm] = useState<{
     id: string;
     name: string;
+  } | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<{
+    url: string;
+    fileName: string;
+    fileType: string;
   } | null>(null);
   const navigate = useNavigate();
   const { viewMode, setViewMode } = useViewMode({
@@ -164,6 +170,21 @@ export function Documents() {
   const handleDeleteClick = (e: React.MouseEvent, doc: Document) => {
     e.stopPropagation();
     setDeleteConfirm({ id: doc.id, name: doc.name });
+  };
+
+  const handleDocumentClick = async (doc: Document) => {
+    try {
+      // Fetch download URL
+      const response = await documentsApi.getDownloadUrl(doc.project, { document_id: doc.id });
+      setPreviewDoc({
+        url: response.url,
+        fileName: doc.original_file_name || doc.name,
+        fileType: doc.file_type,
+      });
+    } catch (error) {
+      console.error('Failed to get download URL:', error);
+      navigate(`/documents/${doc.id}`);
+    }
   };
 
   const { isActivityOpen, setIsActivityOpen } = useOutletContext<{
@@ -328,11 +349,13 @@ export function Documents() {
                 gridProps={{
                   data: displayedDocuments,
                   renderCard: (doc) => (
-                    <DocumentGridCard
-                      key={doc.id}
-                      document={doc}
-                      onDeleteClick={handleDeleteClick}
-                    />
+                    <div onClick={() => handleDocumentClick(doc)}>
+                      <DocumentGridCard
+                        key={doc.id}
+                        document={doc}
+                        onDeleteClick={handleDeleteClick}
+                      />
+                    </div>
                   ),
                   emptyState,
                   gridClassName: 'grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4',
@@ -341,7 +364,7 @@ export function Documents() {
                   data: displayedDocuments,
                   columns: createDocumentsTableColumns({ onDeleteClick: handleDeleteClick }),
                   rowKey: (doc) => doc.id,
-                  onRowClick: (doc) => navigate(`/documents/${doc.id}`),
+                  onRowClick: (doc) => handleDocumentClick(doc),
                   emptyState,
                   rowClassName: () => 'group',
                 }}
@@ -369,9 +392,17 @@ export function Documents() {
         }}
       />
       {isActivityOpen && (
-        <NotificationsPage 
+        <NotificationsPage
           onClose={() => setIsActivityOpen(false)}
           defaultFilter="unread"
+        />
+      )}
+      {previewDoc && (
+        <DocumentPreview
+          url={previewDoc.url}
+          fileName={previewDoc.fileName}
+          fileType={previewDoc.fileType}
+          onClose={() => setPreviewDoc(null)}
         />
       )}
     </div>

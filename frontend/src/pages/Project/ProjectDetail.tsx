@@ -5,6 +5,7 @@ import {
   ArrowLeft, FileText, CheckCircle, Clock, AlertCircle, Plus, Settings, Sparkles,
 } from 'lucide-react';
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/common';
+import { DocumentPreview, useDocumentPreviewKeyboard } from '@/components/common/DocumentPreview';
 import { projectsApi, documentsApi } from '@/services/api';
 import { formatDate, getStatusColor } from '@/lib/utils';
 import type { Project, Document } from '@/types';
@@ -14,6 +15,11 @@ import { AITask } from '@/pages/MyTask/AITask';
 export function ProjectDetail() {
   const navigate = useNavigate();
   const [showAIModal, setShowAIModal] = useState(false);
+  const [previewDocument, setPreviewDocument] = useState<{
+    url: string;
+    fileName: string;
+    fileType?: string;
+  } | null>(null);
 
   const { id } = useParams<{ id: string }>();
 
@@ -62,6 +68,32 @@ export function ProjectDetail() {
       setDocumentPage(prev => prev + 1);
     }
   }, [isDocsFetching, hasMoreDocs]);
+
+  // Handle document preview
+  const handleDocumentPreview = async (doc: any) => {
+    try {
+      const projectIdNum = Number(id);
+      const downloadResponse = await documentsApi.getDownloadUrl(projectIdNum, {
+        document_id: doc.id
+      });
+
+      if (downloadResponse?.url) {
+        setPreviewDocument({
+          url: downloadResponse.url,
+          fileName: doc.original_file_name || doc.name,
+          fileType: doc.file_type
+        });
+      } else {
+        alert('Unable to open document: Download URL not available.');
+      }
+    } catch (error) {
+      console.error('Failed to open document:', error);
+      alert('Failed to open document. Please try again.');
+    }
+  };
+
+  // Enable keyboard shortcuts for document preview
+  useDocumentPreviewKeyboard(() => setPreviewDocument(null));
 
   const documents = allDocuments;
 
@@ -220,7 +252,13 @@ export function ProjectDetail() {
                     <tr
                       key={doc.id}
                       className="border-b hover:bg-muted/50 cursor-pointer"
-                      onClick={() => navigate(`/documents/${doc.id}`)}
+                      onClick={(e) => {
+                        if (e.ctrlKey || e.metaKey) {
+                          navigate(`/documents/${doc.id}`);
+                        } else {
+                          handleDocumentPreview(doc);
+                        }
+                      }}
                     >
                       <td className="py-3 px-4">
                         <div className="font-medium">
@@ -288,6 +326,14 @@ export function ProjectDetail() {
         <AITask
           onClose={() => setShowAIModal(false)}
           fixedProjectId={Number(id)}
+        />
+      )}
+      {previewDocument && (
+        <DocumentPreview
+          url={previewDocument.url}
+          fileName={previewDocument.fileName}
+          fileType={previewDocument.fileType}
+          onClose={() => setPreviewDocument(null)}
         />
       )}
     </div>

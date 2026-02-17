@@ -11,16 +11,12 @@ import { useTableFilters, ColumnFilterConfig } from '@/hooks/useTableFilters';
 import { SearchFilter, ListFilter, DateFilter, FilterHeaderWrapper } from '@/components/layout/DualView/FilterComponents';
 import { getStatusConfig, priorityOptions, statusOptions } from '@/components/layout/DualView/taskConfig';
 import { CreateTask } from '@/pages/MyTask/CreateTask';
-import { MediaPreviewModal, MediaThumbnail } from './ContentCreation';
-import { pdfjs, Document as PDFDocument, Page as PDFPage } from 'react-pdf';
+import { MediaThumbnail } from './ContentCreation';
+import { DocumentPreview, useDocumentPreviewKeyboard } from '@/components/common/DocumentPreview';
 import './TaskDetails.scss';
 import { APITesting } from './APITesting';
 import type { Task } from '@/types';
 
-// pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-//   'pdfjs-dist/build/pdf.worker.min.mjs',
-//   import.meta.url
-// ).toString();
 
 type TabType = 'tasks' | 'add_documents' | 'api_testing';
 
@@ -41,7 +37,11 @@ export function TaskDetails() {
     const [isUploading, setIsUploading] = useState(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
     const [isDragging, setIsDragging] = useState(false);
-    const [selectedMedia, setSelectedMedia] = useState<any | null>(null);
+    const [previewDocument, setPreviewDocument] = useState<{
+        url: string;
+        fileName: string;
+        fileType?: string;
+    } | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
 
@@ -300,6 +300,32 @@ export function TaskDetails() {
         }
     };
 
+    // Handle document preview
+    const handleDocumentClick = async (doc: any) => {
+        try {
+            const projectIdNum = Number(id);
+            const downloadResponse = await documentsApi.getDownloadUrl(projectIdNum, {
+                document_id: doc.id
+            });
+
+            if (downloadResponse?.url) {
+                setPreviewDocument({
+                    url: downloadResponse.url,
+                    fileName: doc.original_file_name || doc.name,
+                    fileType: doc.file_type
+                });
+            } else {
+                alert('Unable to open document: Download URL not available.');
+            }
+        } catch (error) {
+            console.error('Failed to open document:', error);
+            alert('Failed to open document. Please try again.');
+        }
+    };
+
+    // Enable keyboard shortcuts for document preview
+    useDocumentPreviewKeyboard(() => setPreviewDocument(null));
+
     if (isProjectLoading) return <div className="content-creation-loading"><Loader2 className="animate-spin" /></div>;
 
     return (
@@ -557,7 +583,7 @@ export function TaskDetails() {
                                             <div
                                                 key={file.id}
                                                 className="border rounded-lg p-2 bg-white text-center cursor-pointer hover:shadow-md transition-shadow"
-                                                onClick={() => setSelectedMedia(file)}
+                                                onClick={() => handleDocumentClick(file)}
                                             >
                                                 <div className="aspect-square bg-muted rounded flex items-center justify-center mb-2 overflow-hidden border relative">
                                                     <MediaThumbnail file={file} projectId={Number(id)} />
@@ -602,15 +628,14 @@ export function TaskDetails() {
                 </div>
             </div>
 
-            {
-                selectedMedia && (
-                    <MediaPreviewModal
-                        doc={selectedMedia}
-                        projectId={Number(id)}
-                        onClose={() => setSelectedMedia(null)}
-                    />
-                )
-            }
+            {previewDocument && (
+                <DocumentPreview
+                    url={previewDocument.url}
+                    fileName={previewDocument.fileName}
+                    fileType={previewDocument.fileType}
+                    onClose={() => setPreviewDocument(null)}
+                />
+            )}
 
             {
                 isCreateTaskModalOpen && (
