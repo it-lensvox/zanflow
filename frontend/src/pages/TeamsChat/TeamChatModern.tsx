@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import * as Tabs from '@radix-ui/react-tabs';
 import {
   MessageSquare, Search, Send, Paperclip, Smile, Phone, Video, Plus, Info,
   X, ChevronRight, ChevronDown, Users as UsersIcon, Briefcase, MoreVertical,
@@ -62,6 +63,8 @@ export function TeamChatModern() {
   const [isProjectsSectionOpen, setIsProjectsSectionOpen] = useState(false);
   const [isTeamsSectionOpen, setIsTeamsSectionOpen] = useState(false);
   const [isCreateTeamModalOpen, setIsCreateTeamModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('chats');
+  const [headerView, setHeaderView] = useState<'chat' | 'shared'>('chat');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -615,6 +618,24 @@ export function TeamChatModern() {
     return getUserUnreadCount(userId) > 0;
   };
 
+  // Unread users filter
+  const unreadUsers = useMemo(() => {
+    return filteredUsers.filter(user => {
+      const unreadCount = getUserUnreadCount(user.id);
+      return (user as any).isUnread || unreadCount > 0;
+    });
+  }, [filteredUsers, chatListVersion, unreadCounts]);
+
+  // Shared documents from messages
+  const sharedDocuments = useMemo(() => {
+    return messages.filter(msg => msg.attachment).map(msg => ({
+      id: msg.id,
+      name: msg.attachment_name || 'Attachment',
+      url: msg.attachment!,
+      sender: msg.sender,
+      created_at: msg.created_at,
+    }));
+  }, [messages]);
 
   // Select User -> Create/Get Room
   const handleUserSelect = (userId: number) => {
@@ -892,7 +913,7 @@ export function TeamChatModern() {
       try {
         setIsUploadingFile(true);
         const response = await chatApi.sendMessageWithAttachment(roomId, {
-          content: content || '',
+          content: content,
           attachment: selectedFile!
         });
 
@@ -998,7 +1019,7 @@ export function TeamChatModern() {
   );
 
   return (
-    <div className="flex h-screen bg-[#f3f2f1]">
+    <div className="flex h-screen bg-[#f3f2f1] overflow-hidden border-2 border-gray-800">
       {/* Toast Notifications Container */}
       <div className="fixed top-4 right-4 z-50 space-y-2">
         {toastNotifications.map(toast => (
@@ -1006,7 +1027,7 @@ export function TeamChatModern() {
         ))}
       </div>
       {/* Left Sidebar */}
-      <div className="w-80 bg-[#f3f2f1] border-r border-gray-200 flex flex-col">
+      <div className="w-80 bg-[#f3f2f1] border-r border-gray-200 flex flex-col h-full overflow-hidden">
         {/* Sidebar Header */}
         <div className="h-14 px-4 flex items-center justify-between bg-white border-b border-gray-200">
           <h2 className="font-semibold text-base text-gray-900">Chat</h2>
@@ -1035,261 +1056,397 @@ export function TeamChatModern() {
           </div>
         </div>
 
-        {/* Scrollable User/Project/Team Lists */}
-        <div className="flex-1 overflow-y-auto">
-          {/* Chats Section */}
-          <div className="bg-white">
-            <button
-              onClick={() => setIsChatSectionOpen(!isChatSectionOpen)}
-              className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
+        {/* Tab Navigation */}
+       <Tabs.Root value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+          <Tabs.List className="flex items-center gap-1 px-3 py-2 bg-white border-b border-gray-200">
+            <Tabs.Trigger
+              value="chats"
+              className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
             >
-              <div className="flex items-center gap-2">
-                <MessageSquare className="h-4 w-4 text-gray-600" />
-                <span className="text-sm font-medium text-gray-900">Chats</span>
-                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                  {filteredUsers.length}
-                </span>
-              </div>
-              {isChatSectionOpen ? (
-                <ChevronDown className="h-4 w-4 text-gray-600" />
-              ) : (
-                <ChevronRight className="h-4 w-4 text-gray-600" />
-              )}
-            </button>
+              Chats
+            </Tabs.Trigger>
+            <Tabs.Trigger
+              value="projects"
+              className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+            >
+              Projects
+            </Tabs.Trigger>
+            <Tabs.Trigger
+              value="teams"
+              className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+            >
+              Teams
+            </Tabs.Trigger>
+            <Tabs.Trigger
+              value="unread"
+              className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+            >
+              Unread
+            </Tabs.Trigger>
+          </Tabs.List>
 
-            {isChatSectionOpen && (
-              <div className="border-t border-gray-100">
-                {isLoadingUsers ? (
-                  <div className="p-4 text-center">
-                    <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+          {/* Scrollable Lists */}
+          <div className="flex-1 overflow-y-auto min-h-0">
+            <Tabs.Content value="chats">
+              {/* Chats Section */}
+              <div className="bg-white">
+                <button
+                  onClick={() => setIsChatSectionOpen(!isChatSectionOpen)}
+                  className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4 text-gray-600" />
+                    <span className="text-sm font-medium text-gray-900">Chats</span>
+                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                      {filteredUsers.length}
+                    </span>
                   </div>
-                ) : filteredUsers.length === 0 ? (
-                  <div className="p-4 text-center text-sm text-gray-500">No users found</div>
-                ) : (
-                  filteredUsers.map(user => {
-                    const isSelected = selectedUserId === user.id;
-                    const unreadCount = getUserUnreadCount(user.id);
-                    const hasUnreadMessages = (user as any).isUnread || unreadCount > 0;
+                  {isChatSectionOpen ? (
+                    <ChevronDown className="h-4 w-4 text-gray-600" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-gray-600" />
+                  )}
+                </button>
 
-                    return (
-                      <button
-                        key={user.id}
-                        onClick={() => handleUserSelect(user.id)}
-                        className={cn(
-                          "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
-                          isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
-                        )}
-                      >
-                        <div className="relative flex-shrink-0">
-                          <div className={cn(
-                            "h-10 w-10 rounded-full flex items-center justify-center font-semibold text-sm",
-                            isSelected ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-700"
-                          )}>
-                            {user.username.charAt(0).toUpperCase()}
-                          </div>
-                        </div>
-                        <div className="flex-1 min-w-0 text-left">
-                          <div className="flex items-center justify-between mb-0.5">
-                            <p className={cn(
-                              "text-sm truncate",
-                              hasUnreadMessages ? "font-bold text-gray-900" : "font-medium text-gray-900"
-                            )}>
-                              {user.first_name || user.username}
-                            </p>
-                            {user.lastMessageTime && (
-                              <span className={cn(
-                                "text-[10px] ml-2 flex-shrink-0",
-                                hasUnreadMessages ? "text-blue-600 font-semibold" : "text-gray-500"
-                              )}>
-                                {new Date(user.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </span>
+                {isChatSectionOpen && (
+                  <div className="border-t border-gray-100">
+                    {isLoadingUsers ? (
+                      <div className="p-4 text-center">
+                        <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                      </div>
+                    ) : filteredUsers.length === 0 ? (
+                      <div className="p-4 text-center text-sm text-gray-500">No users found</div>
+                    ) : (
+                      filteredUsers.map(user => {
+                        const isSelected = selectedUserId === user.id;
+                        const unreadCount = getUserUnreadCount(user.id);
+                        const hasUnreadMessages = (user as any).isUnread || unreadCount > 0;
+
+                        return (
+                          <button
+                            key={user.id}
+                            onClick={() => handleUserSelect(user.id)}
+                            className={cn(
+                              "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
+                              isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
                             )}
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <p className={cn(
-                              "text-xs truncate",
-                              hasUnreadMessages ? "font-semibold text-gray-900" : "text-gray-600"
-                            )}>
-                              {user.lastMessageContent || 'No messages yet'}
-                            </p>
+                          >
+                            <div className="relative flex-shrink-0">
+                              <div className={cn(
+                                "h-10 w-10 rounded-full flex items-center justify-center font-semibold text-sm",
+                                isSelected ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-700"
+                              )}>
+                                {user.username.charAt(0).toUpperCase()}
+                              </div>
+                            </div>
+                            <div className="flex-1 min-w-0 text-left">
+                              <div className="flex items-center justify-between mb-0.5">
+                                <p className={cn(
+                                  "text-sm truncate",
+                                  hasUnreadMessages ? "font-bold text-gray-900" : "font-medium text-gray-900"
+                                )}>
+                                  {user.first_name || user.username}
+                                </p>
+                                {user.lastMessageTime && (
+                                  <span className={cn(
+                                    "text-[10px] ml-2 flex-shrink-0",
+                                    hasUnreadMessages ? "text-blue-600 font-semibold" : "text-gray-500"
+                                  )}>
+                                    {new Date(user.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <p className={cn(
+                                  "text-xs truncate",
+                                  hasUnreadMessages ? "font-semibold text-gray-900" : "text-gray-600"
+                                )}>
+                                  {user.lastMessageContent || 'No messages yet'}
+                                </p>
+                                {unreadCount > 0 && (
+                                  <span className="ml-2 flex-shrink-0 h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
+                                    {unreadCount}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+            </Tabs.Content>
+
+            <Tabs.Content value="projects">
+
+              {/* Projects Section */}
+              <div className="bg-white">
+                <button
+                  onClick={() => setIsProjectsSectionOpen(!isProjectsSectionOpen)}
+                  className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Briefcase className="h-4 w-4 text-gray-600" />
+                    <span className="text-sm font-medium text-gray-900">Projects</span>
+                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                      {projectRooms.length}
+                    </span>
+                  </div>
+                  {isProjectsSectionOpen ? (
+                    <ChevronDown className="h-4 w-4 text-gray-600" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-gray-600" />
+                  )}
+                </button>
+
+                {isProjectsSectionOpen && (
+                  <div className="border-t border-gray-100">
+                    {isLoadingProjects ? (
+                      <div className="p-4 text-center">
+                        <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                      </div>
+                    ) : projectRooms.length === 0 ? (
+                      <div className="p-4 text-center text-sm text-gray-500">No projects</div>
+                    ) : (
+                      projectRooms.map(project => {
+                        const isSelected = selectedProjectRoom?.id === project.id;
+                        const unreadCount = unreadCounts.get(project.id) || 0;
+
+                        return (
+                          <button
+                            key={project.id}
+                            onClick={() => handleProjectClick(project)}
+                            className={cn(
+                              "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
+                              isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
+                            )}
+                          >
+                            <div className="h-10 w-10 rounded bg-purple-100 flex items-center justify-center font-semibold text-purple-700 text-sm flex-shrink-0">
+                              {project.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0 text-left">
+                              <p className="text-sm font-medium text-gray-900 truncate">{project.name}</p>
+                              <p className="text-xs text-gray-600 truncate">
+                                {project.last_message?.content_preview || 'No messages yet'}
+                              </p>
+                            </div>
                             {unreadCount > 0 && (
                               <span className="ml-2 flex-shrink-0 h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
                                 {unreadCount}
                               </span>
                             )}
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Projects Section */}
-          <div className="bg-white mt-1">
-            <button
-              onClick={() => setIsProjectsSectionOpen(!isProjectsSectionOpen)}
-              className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <Briefcase className="h-4 w-4 text-gray-600" />
-                <span className="text-sm font-medium text-gray-900">Projects</span>
-                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                  {projectRooms.length}
-                </span>
-              </div>
-              {isProjectsSectionOpen ? (
-                <ChevronDown className="h-4 w-4 text-gray-600" />
-              ) : (
-                <ChevronRight className="h-4 w-4 text-gray-600" />
-              )}
-            </button>
-
-            {isProjectsSectionOpen && (
-              <div className="border-t border-gray-100">
-                {isLoadingProjects ? (
-                  <div className="p-4 text-center">
-                    <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                          </button>
+                        );
+                      })
+                    )}
                   </div>
-                ) : projectRooms.length === 0 ? (
-                  <div className="p-4 text-center text-sm text-gray-500">No projects</div>
-                ) : (
-                  projectRooms.map(project => {
-                    const isSelected = selectedProjectRoom?.id === project.id;
-                    const unreadCount = unreadCounts.get(project.id) || 0;
-
-                    return (
-                      <button
-                        key={project.id}
-                        onClick={() => handleProjectClick(project)}
-                        className={cn(
-                          "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
-                          isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
-                        )}
-                      >
-                        <div className="h-10 w-10 rounded bg-purple-100 flex items-center justify-center font-semibold text-purple-700 text-sm flex-shrink-0">
-                          {project.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0 text-left">
-                          <p className="text-sm font-medium text-gray-900 truncate">{project.name}</p>
-                          <p className="text-xs text-gray-600 truncate">
-                            {project.last_message?.content_preview || 'No messages yet'}
-                          </p>
-                        </div>
-                        {unreadCount > 0 && (
-                          <span className="ml-2 flex-shrink-0 h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
-                            {unreadCount}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })
                 )}
               </div>
-            )}
-          </div>
+            </Tabs.Content>
 
-          {/* Teams Section */}
-          <div className="bg-white mt-1">
-            <button
-              onClick={() => setIsTeamsSectionOpen(!isTeamsSectionOpen)}
-              className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <UsersIcon className="h-4 w-4 text-gray-600" />
-                <span className="text-sm font-medium text-gray-900">Teams</span>
-                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                  {teamRooms.length}
-                </span>
-              </div>
-              {isTeamsSectionOpen ? (
-                <ChevronDown className="h-4 w-4 text-gray-600" />
-              ) : (
-                <ChevronRight className="h-4 w-4 text-gray-600" />
-              )}
-            </button>
+            <Tabs.Content value="teams">
 
-            {isTeamsSectionOpen && (
-              <div className="border-t border-gray-100">
-                {isLoadingTeams ? (
-                  <div className="p-4 text-center">
-                    <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+              {/* Teams Section */}
+              <div className="bg-white">
+                <button
+                  onClick={() => setIsTeamsSectionOpen(!isTeamsSectionOpen)}
+                  className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <UsersIcon className="h-4 w-4 text-gray-600" />
+                    <span className="text-sm font-medium text-gray-900">Teams</span>
+                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                      {teamRooms.length}
+                    </span>
                   </div>
-                ) : teamRooms.length === 0 ? (
-                  <div className="p-4 text-center text-sm text-gray-500">No teams</div>
-                ) : (
-                  teamRooms.map(team => {
-                    const isSelected = selectedTeamRoom?.id === team.id;
-                    const unreadCount = unreadCounts.get(team.id) || 0;
+                  {isTeamsSectionOpen ? (
+                    <ChevronDown className="h-4 w-4 text-gray-600" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-gray-600" />
+                  )}
+                </button>
 
-                    return (
-                      <button
-                        key={team.id}
-                        onClick={() => handleTeamClick(team)}
-                        className={cn(
-                          "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
-                          isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
-                        )}
-                      >
-                        <div className="h-10 w-10 rounded bg-green-100 flex items-center justify-center font-semibold text-green-700 text-sm flex-shrink-0">
-                          {team.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0 text-left">
-                          <p className="text-sm font-medium text-gray-900 truncate">{team.name}</p>
-                          <p className="text-xs text-gray-600 truncate">Team Chat</p>
-                        </div>
-                        {unreadCount > 0 && (
-                          <span className="ml-2 flex-shrink-0 h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
-                            {unreadCount}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })
+                {isTeamsSectionOpen && (
+                  <div className="border-t border-gray-100">
+                    {isLoadingTeams ? (
+                      <div className="p-4 text-center">
+                        <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                      </div>
+                    ) : teamRooms.length === 0 ? (
+                      <div className="p-4 text-center text-sm text-gray-500">No teams</div>
+                    ) : (
+                      teamRooms.map(team => {
+                        const isSelected = selectedTeamRoom?.id === team.id;
+                        const unreadCount = unreadCounts.get(team.id) || 0;
+
+                        return (
+                          <button
+                            key={team.id}
+                            onClick={() => handleTeamClick(team)}
+                            className={cn(
+                              "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
+                              isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
+                            )}
+                          >
+                            <div className="h-10 w-10 rounded bg-green-100 flex items-center justify-center font-semibold text-green-700 text-sm flex-shrink-0">
+                              {team.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0 text-left">
+                              <p className="text-sm font-medium text-gray-900 truncate">{team.name}</p>
+                              <p className="text-xs text-gray-600 truncate">Team Chat</p>
+                            </div>
+                            {unreadCount > 0 && (
+                              <span className="ml-2 flex-shrink-0 h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
+                                {unreadCount}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
                 )}
               </div>
-            )}
+            </Tabs.Content>
+
+           <Tabs.Content value="unread">
+              {/* Unread Section */}
+              <div className="bg-white">
+                <button
+                  onClick={() => setIsChatSectionOpen(!isChatSectionOpen)}
+                  className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <MailOpen className="h-4 w-4 text-gray-600" />
+                    <span className="text-sm font-medium text-gray-900">Unread Messages</span>
+                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                      {unreadUsers.length}
+                    </span>
+                  </div>
+                  {isChatSectionOpen ? (
+                    <ChevronDown className="h-4 w-4 text-gray-600" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-gray-600" />
+                  )}
+                </button>
+
+                {isChatSectionOpen && (
+                  <div className="border-t border-gray-100">
+                    {unreadUsers.length === 0 ? (
+                      <div className="p-4 text-center text-sm text-gray-500">No unread messages</div>
+                    ) : (
+                      unreadUsers.map(user => {
+                        const isSelected = selectedUserId === user.id;
+                        const unreadCount = getUserUnreadCount(user.id);
+
+                        return (
+                          <button
+                            key={user.id}
+                            onClick={() => handleUserSelect(user.id)}
+                            className={cn(
+                              "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
+                              isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
+                            )}
+                          >
+                            <div className="relative flex-shrink-0">
+                              <div className={cn(
+                                "h-10 w-10 rounded-full flex items-center justify-center font-semibold text-sm",
+                                isSelected ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-700"
+                              )}>
+                                {user.username.charAt(0).toUpperCase()}
+                              </div>
+                            </div>
+                            <div className="flex-1 min-w-0 text-left">
+                              <div className="flex items-center justify-between mb-0.5">
+                                <p className="text-sm font-bold text-gray-900 truncate">
+                                  {user.first_name || user.username}
+                                </p>
+                                {user.lastMessageTime && (
+                                  <span className="text-[10px] ml-2 flex-shrink-0 text-blue-600 font-semibold">
+                                    {new Date(user.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <p className="text-xs font-semibold text-gray-900 truncate">
+                                  {user.lastMessageContent || 'No messages yet'}
+                                </p>
+                                {unreadCount > 0 && (
+                                  <span className="ml-2 flex-shrink-0 h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
+                                    {unreadCount}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+            </Tabs.Content>
           </div>
-        </div>
+        </Tabs.Root>
       </div>
 
       {/* Right Panel - Chat View */}
-      <div className="flex-1 flex flex-col bg-white">
+      <div className="flex-1 flex flex-col bg-white h-full overflow-hidden">
         {(activeRoom || selectedProjectRoom || selectedTeamRoom) ? (
           <>
             {/* Chat Header */}
             <div className="h-14 px-6 flex items-center justify-between bg-white border-b border-gray-200">
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  {selectedProjectRoom ? (
-                    <div className="h-10 w-10 rounded bg-purple-100 flex items-center justify-center font-semibold text-purple-700 text-sm">
-                      {selectedProjectRoom.name.charAt(0).toUpperCase()}
-                    </div>
-                  ) : selectedTeamRoom ? (
-                    <div className="h-10 w-10 rounded bg-green-100 flex items-center justify-center font-semibold text-green-700 text-sm">
-                      {selectedTeamRoom.name.charAt(0).toUpperCase()}
-                    </div>
-                  ) : selectedUser ? (
-                    <>
-                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center font-semibold text-blue-700 text-sm">
-                        {selectedUser.username.charAt(0).toUpperCase()}
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    {selectedProjectRoom ? (
+                      <div className="h-10 w-10 rounded bg-purple-100 flex items-center justify-center font-semibold text-purple-700 text-sm">
+                        {selectedProjectRoom.name.charAt(0).toUpperCase()}
                       </div>
-                    </>
-                  ) : null}
+                    ) : selectedTeamRoom ? (
+                      <div className="h-10 w-10 rounded bg-green-100 flex items-center justify-center font-semibold text-green-700 text-sm">
+                        {selectedTeamRoom.name.charAt(0).toUpperCase()}
+                      </div>
+                    ) : selectedUser ? (
+                      <>
+                        <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center font-semibold text-blue-700 text-sm">
+                          {selectedUser.username.charAt(0).toUpperCase()}
+                        </div>
+                      </>
+                    ) : null}
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-sm text-gray-900">
+                      {selectedProjectRoom?.name || selectedTeamRoom?.name || (selectedUser ? `${selectedUser.first_name || selectedUser.username}` : '')}
+                    </h3>
+                    {selectedProjectRoom && (
+                      <p className="text-xs text-gray-500"></p>
+                    )}
+                    {selectedTeamRoom && (
+                      <p className="text-xs text-gray-500"></p>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-semibold text-sm text-gray-900">
-                    {selectedProjectRoom?.name || selectedTeamRoom?.name || (selectedUser ? `${selectedUser.first_name || selectedUser.username}` : '')}
-                  </h3>
-                  {selectedProjectRoom && (
-                    <p className="text-xs text-gray-500">Project Chat</p>
-                  )}
-                  {selectedTeamRoom && (
-                    <p className="text-xs text-gray-500">Team Chat</p>
-                  )}
-                </div>
+
+                {/* View Switcher */}
+                <Tabs.Root value={headerView} onValueChange={(value) => setHeaderView(value as 'chat' | 'shared')} className="flex items-center">
+                  <Tabs.List className="flex items-center gap-1 border-b-2 border-transparent">
+                    <Tabs.Trigger
+                      value="chat"
+                      className="px-3 py-1 text-sm font-medium transition-all border-b-2 -mb-[2px] data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=inactive]:border-transparent data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:text-gray-900"
+                    >
+                      Chat
+                    </Tabs.Trigger>
+                    <Tabs.Trigger
+                      value="shared"
+                      className="px-3 py-1 text-sm font-medium transition-all border-b-2 -mb-[2px] data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=inactive]:border-transparent data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:text-gray-900"
+                    >
+                      Shared
+                    </Tabs.Trigger>
+                  </Tabs.List>
+                </Tabs.Root>
               </div>
               <div className="flex items-center gap-1">
                 <button className="p-2 hover:bg-gray-100 rounded transition-colors">
@@ -1304,418 +1461,465 @@ export function TeamChatModern() {
               </div>
             </div>
 
-            {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto bg-[#efeae2] p-6"
-              onDragEnter={handleDragEnter}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-            >
-              {/* Drag Overlay */}
-              {isDragging && (
-                <div className="absolute inset-0 bg-blue-50 bg-opacity-90 border-4 border-dashed border-blue-400 rounded-lg z-50 flex items-center justify-center">
-                  <div className="text-center">
-                    <Paperclip className="h-16 w-16 text-blue-600 mx-auto mb-4" />
-                    <p className="text-xl font-semibold text-blue-600">Drop file to upload</p>
-                    <p className="text-sm text-blue-500 mt-2">Release to attach the file</p>
-                  </div>
-                </div>
-              )}
-              {isLoadingMessages ? (
-                <div className="flex items-center justify-center h-full">
-                  <div className="animate-spin h-8 w-8 border-2 border-blue-600 border-t-transparent rounded-full"></div>
-                </div>
-              ) : messages.length === 0 ? (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-center">
-                    <MessageSquare className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                    <p className="text-sm text-gray-500">No messages yet</p>
-                    <p className="text-xs text-gray-400 mt-1">Start the conversation!</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {messages.map((message, index) => {
-                    const isOwn = message.is_own_message;
-                    const showAvatar = index === 0 || messages[index - 1].sender.id !== message.sender.id;
-                    const isHovered = hoveredMessageId === message.id;
-                    const menuOpen = openMenuMessageId === message.id;
-                    const reactions = messageReactions.get(message.id);
+            {/* Content Area */}
+            {headerView === 'chat' ? (
+              <>
+                {/* Messages Area */}
+                <div
+                  className="flex-1 overflow-y-auto bg-[#efeae2] p-6"
+                  onDragEnter={handleDragEnter}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                >
 
-                    return (
-                      <div
-                        key={message.id}
-                        className={cn("flex gap-2 group relative", isOwn ? "flex-row-reverse" : "")}
-                        onMouseEnter={() => setHoveredMessageId(message.id)}
-                        onMouseLeave={() => setHoveredMessageId(null)}
-                      >
-                        {/* Avatar */}
-                        <div className="flex-shrink-0">
-                          {showAvatar ? (
-                            <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center font-semibold text-white text-sm shadow-sm">
-                              {message.sender.username.charAt(0).toUpperCase()}
-                            </div>
-                          ) : (
-                            <div className="h-9 w-9" />
-                          )}
-                        </div>
-
-                        {/* Message Content */}
-                        <div className={cn("flex-1 max-w-[65%]", isOwn ? "flex flex-col items-end" : "flex flex-col items-start")}>
-                          {showAvatar && (
-                            <div className={cn("flex items-baseline gap-2 mb-1", isOwn ? "flex-row-reverse" : "")}>
-                              <span className={cn(
-                                "text-xs font-medium",
-                                isOwn ? "text-gray-700" : "text-gray-900"
-                              )}>
-                                {message.sender.full_name || message.sender.username}
-                              </span>
-                              <span className="text-[11px] text-gray-400 font-normal">
-                                {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                            </div>
-                          )}
-
-                          <div className="relative">
-                            <div
-                              className={cn(
-                                "px-3 py-2 rounded-lg text-sm break-words shadow-sm max-w-full",
-                                isOwn
-                                  ? "bg-[#005c4b] text-white rounded-br-none"
-                                  : "bg-white text-gray-900 border border-gray-100 rounded-bl-none"
-                              )}
-                              style={{
-                                minWidth: '60px',
-                                wordBreak: 'break-word',
-                                overflowWrap: 'break-word'
-                              }}
-                            >
-                              {message.content && <div>{message.content}</div>}
-
-                              {/* Attachment */}
-                              {message.attachment && (
-                                <div className={message.content ? "mt-2 pt-2 border-t border-blue-500" : ""}>
-                                  <a
-                                    href={message.attachment}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-2 text-xs hover:underline"
-                                  >
-                                    <Paperclip className="h-3 w-3" />
-                                    {message.attachment_name || 'Attachment'}
-                                  </a>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Quick Actions on Hover */}
-                            {(isHovered || menuOpen) && (
-                              <div
-                                className={cn(
-                                  "absolute top-0 flex items-center gap-0.5 bg-white border border-gray-200 rounded-lg shadow-sm px-1 py-0.5",
-                                  isOwn ? "right-full mr-2" : "left-full ml-2"
-                                )}
-                              >
-                                {/* Quick Emoji Reactions */}
-                                <button
-                                  onClick={() => handleQuickReaction(message.id, '👍')}
-                                  className="p-1 hover:bg-gray-100 rounded transition-colors"
-                                  title="Like"
-                                >
-                                  <span className="text-xs">👍</span>
-                                </button>
-                                <button
-                                  onClick={() => handleQuickReaction(message.id, '❤️')}
-                                  className="p-1 hover:bg-gray-100 rounded transition-colors"
-                                  title="Love"
-                                >
-                                  <span className="text-xs">❤️</span>
-                                </button>
-                                <button
-                                  onClick={() => handleQuickReaction(message.id, '😊')}
-                                  className="p-1 hover:bg-gray-100 rounded transition-colors"
-                                  title="Smile"
-                                >
-                                  <span className="text-xs">😊</span>
-                                </button>
-
-                                <div className="h-4 w-px bg-gray-200 mx-0.5" />
-
-                                {/* More Reactions Button */}
-                                <button
-                                  onClick={() => setShowReactionPicker(showReactionPicker === message.id ? null : message.id)}
-                                  className="p-1 hover:bg-gray-100 rounded transition-colors"
-                                  title="More reactions"
-                                >
-                                  <Smile className="h-3.5 w-3.5 text-gray-600" />
-                                </button>
-
-                                {/* More Options Menu */}
-                                <button
-                                  onClick={() => setOpenMenuMessageId(menuOpen ? null : message.id)}
-                                  className="p-1 hover:bg-gray-100 rounded transition-colors"
-                                  title="More options"
-                                >
-                                  <MoreVertical className="h-3.5 w-3.5 text-gray-600" />
-                                </button>
-
-                                {/* Emoji Picker Popup */}
-                                {showReactionPicker === message.id && (
-                                  <div
-                                    className={cn(
-                                      "absolute top-full mt-1 z-50",
-                                      isOwn ? "right-0" : "left-0"
-                                    )}
-                                  >
-                                    <EmojiPicker
-                                      onEmojiClick={(emojiData) => handleReactionFromPicker(message.id, emojiData)}
-                                      width={280}
-                                      height={350}
-                                      searchPlaceHolder="Search emoji..."
-                                      previewConfig={{ showPreview: false }}
-                                    />
-                                  </div>
-                                )}
-
-                                {/* Dropdown Menu */}
-                                {menuOpen && (
-                                  <div
-                                    ref={menuRef}
-                                    className={cn(
-                                      "absolute top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-48 z-50",
-                                      isOwn ? "right-0" : "left-0"
-                                    )}
-                                  >
-                                    <button
-                                      onClick={() => handleReplyWithQuote(message)}
-                                      className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
-                                    >
-                                      <Reply className="h-4 w-4" />
-                                      Reply
-                                    </button>
-                                    <button
-                                      onClick={() => handleForward(message)}
-                                      className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
-                                    >
-                                      <Forward className="h-4 w-4" />
-                                      Forward
-                                    </button>
-                                    <button
-                                      onClick={() => handleCopyLink(message)}
-                                      className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
-                                    >
-                                      <Link2 className="h-4 w-4" />
-                                      Copy link
-                                    </button>
-                                    <button
-                                      onClick={() => handlePinMessage(message)}
-                                      className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
-                                    >
-                                      <Pin className="h-4 w-4" />
-                                      Pin message
-                                    </button>
-                                    <button
-                                      onClick={() => handleSaveMessage(message)}
-                                      className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
-                                    >
-                                      <Bookmark className="h-4 w-4" />
-                                      Save
-                                    </button>
-                                    <button
-                                      onClick={() => handleMarkAsUnread(message)}
-                                      className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
-                                    >
-                                      <MailOpen className="h-4 w-4" />
-                                      Mark as unread
-                                    </button>
-                                    <div className="h-px bg-gray-200 my-1" />
-                                    {isOwn && (
-                                      <button
-                                        onClick={() => handleDeleteMessage(message.id)}
-                                        className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                        Delete
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Display Reactions */}
-                            {reactions && reactions.size > 0 && (
-                              <div className={cn(
-                                "flex gap-1 mt-1",
-                                isOwn ? "justify-end" : ""
-                              )}>
-                                {Array.from(reactions.entries()).map(([emoji, count]) => (
-                                  <span
-                                    key={emoji}
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-white border border-gray-200 rounded-full text-xs"
-                                  >
-                                    <span>{emoji}</span>
-                                    <span className="text-gray-600">{count}</span>
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                  {/* Drag Overlay */}
+                  {isDragging && (
+                    <div className="absolute inset-0 bg-blue-50 bg-opacity-90 border-4 border-dashed border-blue-400 rounded-lg z-50 flex items-center justify-center">
+                      <div className="text-center">
+                        <Paperclip className="h-16 w-16 text-blue-600 mx-auto mb-4" />
+                        <p className="text-xl font-semibold text-blue-600">Drop file to upload</p>
+                        <p className="text-sm text-blue-500 mt-2">Release to attach the file</p>
                       </div>
-                    );
-                  })}
-                  <div ref={messagesEndRef} />
-                </div>
-              )}
-            </div>
-
-            {/* Message Input */}
-            <div className="p-4 bg-white border-t border-gray-200"
-              onDragEnter={handleDragEnter}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-            >
-              <div className="flex items-center gap-2">
-                {/* Attachment Button */}
-                <>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    onChange={handleFileSelect}
-                    className="hidden"
-                    accept="*"
-                  />
-                  <button
-                    onClick={handleAttachmentClick}
-                    className="p-2 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
-                  >
-                    <Paperclip className="h-5 w-5 text-gray-600" />
-                  </button>
-                </>
-
-                {/* Input Area */}
-                <div className="flex-1 relative">
-
-                  {/* File Preview */}
-                  {selectedFile && (
-                    <div className="absolute bottom-full left-0 mb-2 bg-white border border-gray-300 rounded-lg shadow-lg overflow-hidden max-w-[300px]">
-                      {filePreviewUrl ? (
-                        // Image Preview
-                        <div className="relative">
-                          <img
-                            src={filePreviewUrl}
-                            alt="Preview"
-                            className="w-full h-auto max-h-[200px] object-contain bg-gray-50"
-                          />
-                          <button
-                            onClick={() => {
-                              setSelectedFile(null);
-                              setFilePreviewUrl(null);
-                              if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
-                              if (fileInputRef.current) fileInputRef.current.value = '';
-                            }}
-                            className="absolute top-2 right-2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white rounded-full p-1.5 transition-all"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                          <div className="px-3 py-2 bg-gray-50 border-t border-gray-200">
-                            <p className="text-xs text-gray-700 truncate font-medium">
-                              {selectedFile.name}
-                            </p>
-                            <p className="text-[10px] text-gray-500">
-                              {(selectedFile.size / 1024).toFixed(1)} KB
-                            </p>
-                          </div>
-                        </div>
-                      ) : (
-                        // Non-Image File Preview
-                        <div className="p-3 flex items-center gap-3">
-                          <div className="bg-blue-100 p-2 rounded">
-                            <Paperclip className="h-5 w-5 text-blue-600" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs text-gray-900 font-medium truncate">
-                              {selectedFile.name}
-                            </p>
-                            <p className="text-[10px] text-gray-500">
-                              {(selectedFile.size / 1024).toFixed(1)} KB
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => {
-                              setSelectedFile(null);
-                              setFilePreviewUrl(null);
-                              if (fileInputRef.current) fileInputRef.current.value = '';
-                            }}
-                            className="text-gray-400 hover:text-gray-600 flex-shrink-0"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      )}
                     </div>
                   )}
-                  <textarea
-                    value={messageInput}
-                    onChange={(e) => setMessageInput(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    placeholder="Type a message"
-                    rows={1}
-                    className="w-full px-3 py-2 pr-24 text-sm border border-gray-300 rounded resize-none focus:outline-none focus:border-blue-500 max-h-32"
-                    style={{ fieldSizing: 'content' } as any}
-                  />
-
-                  {/* Right side buttons in input */}
-                  <div className="absolute right-2 bottom-2 flex items-center gap-1" ref={emojiPickerRef}>
-                    <button
-                      onClick={toggleEmojiPicker}
-                      className={cn(
-                        "p-1.5 rounded transition-colors",
-                        showEmojiPicker ? "bg-blue-100" : "hover:bg-gray-100"
-                      )}
-                    >
-                      <Smile className={cn(
-                        "h-4 w-4",
-                        showEmojiPicker ? "text-blue-600" : "text-gray-600"
-                      )} />
-                    </button>
-
-                    {/* Emoji Picker Popup */}
-                    {showEmojiPicker && (
-                      <div className="absolute bottom-full right-0 mb-2 z-50">
-                        <EmojiPicker
-                          onEmojiClick={handleEmojiClick}
-                          width={320}
-                          height={400}
-                          searchPlaceHolder="Search emoji..."
-                          previewConfig={{ showPreview: false }}
-                        />
+                  {isLoadingMessages ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="animate-spin h-8 w-8 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                    </div>
+                  ) : messages.length === 0 ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center">
+                        <MessageSquare className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                        <p className="text-sm text-gray-500">No messages yet</p>
+                        <p className="text-xs text-gray-400 mt-1">Start the conversation!</p>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {messages.map((message, index) => {
+                        const isOwn = message.is_own_message;
+                        const showAvatar = index === 0 || messages[index - 1].sender.id !== message.sender.id;
+                        const isHovered = hoveredMessageId === message.id;
+                        const menuOpen = openMenuMessageId === message.id;
+                        const reactions = messageReactions.get(message.id);
+
+                        return (
+                          <div
+                            key={message.id}
+                            className={cn("flex gap-2 group relative", isOwn ? "flex-row-reverse" : "")}
+                            onMouseEnter={() => setHoveredMessageId(message.id)}
+                            onMouseLeave={() => setHoveredMessageId(null)}
+                          >
+                            {/* Avatar */}
+                            <div className="flex-shrink-0">
+                              {showAvatar ? (
+                                <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center font-semibold text-white text-sm shadow-sm">
+                                  {message.sender.username.charAt(0).toUpperCase()}
+                                </div>
+                              ) : (
+                                <div className="h-9 w-9" />
+                              )}
+                            </div>
+
+                            {/* Message Content */}
+                            <div className={cn("flex-1 max-w-[65%]", isOwn ? "flex flex-col items-end" : "flex flex-col items-start")}>
+                              {showAvatar && (
+                                <div className={cn("flex items-baseline gap-2 mb-1", isOwn ? "flex-row-reverse" : "")}>
+                                  <span className={cn(
+                                    "text-xs font-medium",
+                                    isOwn ? "text-gray-700" : "text-gray-900"
+                                  )}>
+                                    {message.sender.full_name || message.sender.username}
+                                  </span>
+                                  <span className="text-[11px] text-gray-400 font-normal">
+                                    {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                </div>
+                              )}
+
+                              <div className="relative">
+                                <div
+                                  className={cn(
+                                    "px-3 py-2 rounded-lg text-sm break-words shadow-sm max-w-full",
+                                    isOwn
+                                      ? "bg-[#005c4b] text-white rounded-br-none"
+                                      : "bg-white text-gray-900 border border-gray-100 rounded-bl-none"
+                                  )}
+                                  style={{
+                                    minWidth: '60px',
+                                    wordBreak: 'break-word',
+                                    overflowWrap: 'break-word'
+                                  }}
+                                >
+                                  {message.content && <div>{message.content}</div>}
+
+                                  {/* Attachment */}
+                                  {message.attachment && (
+                                    <div className={message.content ? "mt-2 pt-2 border-t border-blue-500" : ""}>
+                                      <a
+                                        href={message.attachment}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-2 text-xs hover:underline"
+                                      >
+                                        <Paperclip className="h-3 w-3" />
+                                        {message.attachment_name || 'Attachment'}
+                                      </a>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Quick Actions on Hover */}
+                                {(isHovered || menuOpen) && (
+                                  <div
+                                    className={cn(
+                                      "absolute top-0 flex items-center gap-0.5 bg-white border border-gray-200 rounded-lg shadow-sm px-1 py-0.5",
+                                      isOwn ? "right-full mr-2" : "left-full ml-2"
+                                    )}
+                                  >
+                                    {/* Quick Emoji Reactions */}
+                                    <button
+                                      onClick={() => handleQuickReaction(message.id, '👍')}
+                                      className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                      title="Like"
+                                    >
+                                      <span className="text-xs">👍</span>
+                                    </button>
+                                    <button
+                                      onClick={() => handleQuickReaction(message.id, '❤️')}
+                                      className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                      title="Love"
+                                    >
+                                      <span className="text-xs">❤️</span>
+                                    </button>
+                                    <button
+                                      onClick={() => handleQuickReaction(message.id, '😊')}
+                                      className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                      title="Smile"
+                                    >
+                                      <span className="text-xs">😊</span>
+                                    </button>
+
+                                    <div className="h-4 w-px bg-gray-200 mx-0.5" />
+
+                                    {/* More Reactions Button */}
+                                    <button
+                                      onClick={() => setShowReactionPicker(showReactionPicker === message.id ? null : message.id)}
+                                      className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                      title="More reactions"
+                                    >
+                                      <Smile className="h-3.5 w-3.5 text-gray-600" />
+                                    </button>
+
+                                    {/* More Options Menu */}
+                                    <button
+                                      onClick={() => setOpenMenuMessageId(menuOpen ? null : message.id)}
+                                      className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                      title="More options"
+                                    >
+                                      <MoreVertical className="h-3.5 w-3.5 text-gray-600" />
+                                    </button>
+
+                                    {/* Emoji Picker Popup */}
+                                    {showReactionPicker === message.id && (
+                                      <div
+                                        className={cn(
+                                          "absolute top-full mt-1 z-50",
+                                          isOwn ? "right-0" : "left-0"
+                                        )}
+                                      >
+                                        <EmojiPicker
+                                          onEmojiClick={(emojiData) => handleReactionFromPicker(message.id, emojiData)}
+                                          width={280}
+                                          height={350}
+                                          searchPlaceHolder="Search emoji..."
+                                          previewConfig={{ showPreview: false }}
+                                        />
+                                      </div>
+                                    )}
+
+                                    {/* Dropdown Menu */}
+                                    {menuOpen && (
+                                      <div
+                                        ref={menuRef}
+                                        className={cn(
+                                          "absolute top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-48 z-50",
+                                          isOwn ? "right-0" : "left-0"
+                                        )}
+                                      >
+                                        <button
+                                          onClick={() => handleReplyWithQuote(message)}
+                                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                        >
+                                          <Reply className="h-4 w-4" />
+                                          Reply
+                                        </button>
+                                        <button
+                                          onClick={() => handleForward(message)}
+                                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                        >
+                                          <Forward className="h-4 w-4" />
+                                          Forward
+                                        </button>
+                                        <button
+                                          onClick={() => handleCopyLink(message)}
+                                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                        >
+                                          <Link2 className="h-4 w-4" />
+                                          Copy link
+                                        </button>
+                                        <button
+                                          onClick={() => handlePinMessage(message)}
+                                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                        >
+                                          <Pin className="h-4 w-4" />
+                                          Pin message
+                                        </button>
+                                        <button
+                                          onClick={() => handleSaveMessage(message)}
+                                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                        >
+                                          <Bookmark className="h-4 w-4" />
+                                          Save
+                                        </button>
+                                        <button
+                                          onClick={() => handleMarkAsUnread(message)}
+                                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                        >
+                                          <MailOpen className="h-4 w-4" />
+                                          Mark as unread
+                                        </button>
+                                        <div className="h-px bg-gray-200 my-1" />
+                                        {isOwn && (
+                                          <button
+                                            onClick={() => handleDeleteMessage(message.id)}
+                                            className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                            Delete
+                                          </button>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Display Reactions */}
+                                {reactions && reactions.size > 0 && (
+                                  <div className={cn(
+                                    "flex gap-1 mt-1",
+                                    isOwn ? "justify-end" : ""
+                                  )}>
+                                    {Array.from(reactions.entries()).map(([emoji, count]) => (
+                                      <span
+                                        key={emoji}
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-white border border-gray-200 rounded-full text-xs"
+                                      >
+                                        <span>{emoji}</span>
+                                        <span className="text-gray-600">{count}</span>
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <div ref={messagesEndRef} />
+                    </div>
+                  )}
                 </div>
 
-                {/* Send Button */}
-                <button
-                  onClick={handleSendMessage}
-                  disabled={(!messageInput.trim() && !selectedFile) || isUploadingFile}
-                  className={cn(
-                    'p-2.5 rounded transition-colors flex-shrink-0',
-                    (messageInput.trim() || selectedFile) && !isUploadingFile
-                      ? 'bg-blue-600 text-white hover:bg-blue-700'
-                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  )}
+                {/* Message Input */}
+                <div className="p-4 bg-white border-t border-gray-200"
+                  onDragEnter={handleDragEnter}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
                 >
-                  {isUploadingFile ? (
-                    <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <div className="flex items-center gap-2">
+                    {/* Attachment Button */}
+                    <>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                        accept="*"
+                      />
+                      <button
+                        onClick={handleAttachmentClick}
+                        className="p-2 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
+                      >
+                        <Paperclip className="h-5 w-5 text-gray-600" />
+                      </button>
+                    </>
+
+                    {/* Input Area */}
+                    <div className="flex-1 relative">
+
+                      {/* File Preview */}
+                      {selectedFile && (
+                        <div className="absolute bottom-full left-0 mb-2 bg-white border border-gray-300 rounded-lg shadow-lg overflow-hidden max-w-[300px]">
+                          {filePreviewUrl ? (
+                            // Image Preview
+                            <div className="relative">
+                              <img
+                                src={filePreviewUrl}
+                                alt="Preview"
+                                className="w-full h-auto max-h-[200px] object-contain bg-gray-50"
+                              />
+                              <button
+                                onClick={() => {
+                                  setSelectedFile(null);
+                                  setFilePreviewUrl(null);
+                                  if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
+                                  if (fileInputRef.current) fileInputRef.current.value = '';
+                                }}
+                                className="absolute top-2 right-2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white rounded-full p-1.5 transition-all"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                              <div className="px-3 py-2 bg-gray-50 border-t border-gray-200">
+                                <p className="text-xs text-gray-700 truncate font-medium">
+                                  {selectedFile.name}
+                                </p>
+                                <p className="text-[10px] text-gray-500">
+                                  {(selectedFile.size / 1024).toFixed(1)} KB
+                                </p>
+                              </div>
+                            </div>
+                          ) : (
+                            // Non-Image File Preview
+                            <div className="p-3 flex items-center gap-3">
+                              <div className="bg-blue-100 p-2 rounded">
+                                <Paperclip className="h-5 w-5 text-blue-600" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs text-gray-900 font-medium truncate">
+                                  {selectedFile.name}
+                                </p>
+                                <p className="text-[10px] text-gray-500">
+                                  {(selectedFile.size / 1024).toFixed(1)} KB
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  setSelectedFile(null);
+                                  setFilePreviewUrl(null);
+                                  if (fileInputRef.current) fileInputRef.current.value = '';
+                                }}
+                                className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      <textarea
+                        value={messageInput}
+                        onChange={(e) => setMessageInput(e.target.value)}
+                        onKeyPress={handleKeyPress}
+                        placeholder="Type a message"
+                        rows={1}
+                        className="w-full px-3 py-2 pr-24 text-sm border border-gray-300 rounded resize-none focus:outline-none focus:border-blue-500 max-h-32"
+                        style={{ fieldSizing: 'content' } as any}
+                      />
+
+                      {/* Right side buttons in input */}
+                      <div className="absolute right-2 bottom-2 flex items-center gap-1" ref={emojiPickerRef}>
+                        <button
+                          onClick={toggleEmojiPicker}
+                          className={cn(
+                            "p-1.5 rounded transition-colors",
+                            showEmojiPicker ? "bg-blue-100" : "hover:bg-gray-100"
+                          )}
+                        >
+                          <Smile className={cn(
+                            "h-4 w-4",
+                            showEmojiPicker ? "text-blue-600" : "text-gray-600"
+                          )} />
+                        </button>
+
+                        {/* Emoji Picker Popup */}
+                        {showEmojiPicker && (
+                          <div className="absolute bottom-full right-0 mb-2 z-50">
+                            <EmojiPicker
+                              onEmojiClick={handleEmojiClick}
+                              width={320}
+                              height={400}
+                              searchPlaceHolder="Search emoji..."
+                              previewConfig={{ showPreview: false }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Send Button */}
+                    <button
+                      onClick={handleSendMessage}
+                      disabled={(!messageInput.trim() && !selectedFile) || isUploadingFile}
+                      className={cn(
+                        'p-2.5 rounded transition-colors flex-shrink-0',
+                        (messageInput.trim() || selectedFile) && !isUploadingFile
+                          ? 'bg-blue-600 text-white hover:bg-blue-700'
+                          : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      )}
+                    >
+                      {isUploadingFile ? (
+                        <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              /* Shared Documents Panel */
+              <div className="flex-1 overflow-y-auto bg-[#f3f2f1] p-6">
+                <div className="max-w-4xl mx-auto">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Shared Documents</h3>
+                  {sharedDocuments.length === 0 ? (
+                    <div className="flex items-center justify-center h-64">
+                      <div className="text-center">
+                        <Paperclip className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                        <p className="text-sm text-gray-500">No shared documents</p>
+                        <p className="text-xs text-gray-400 mt-1">Documents shared in this chat will appear here</p>
+                      </div>
+                    </div>
                   ) : (
-                    <Send className="h-4 w-4" />
+                    <div className="grid grid-cols-1 gap-3">
+                      {sharedDocuments.map((doc) => (
+                        <a
+                          key={doc.id}
+                          href={doc.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-4 p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all group"
+                        >
+                          <div className="h-12 w-12 rounded bg-blue-100 flex items-center justify-center flex-shrink-0">
+                            <Paperclip className="h-6 w-6 text-blue-600" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate group-hover:text-blue-600">
+                              {doc.name}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Shared by {doc.sender.full_name || doc.sender.username} • {new Date(doc.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </a>
+                      ))}
+                    </div>
                   )}
-                </button>
+                </div>
               </div>
-            </div>
+            )}
           </>
         ) : (
           /* Empty State */
@@ -1750,6 +1954,6 @@ export function TeamChatModern() {
           />
         )
       }
-    </div >
+    </div>
   );
 }

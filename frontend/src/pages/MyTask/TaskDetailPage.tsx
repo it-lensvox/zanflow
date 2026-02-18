@@ -273,38 +273,10 @@ export function TaskDetailPage() {
         setUploadingDocs(true);
 
         try {
-            for (const file of fileArray) {
-                const projectIdNum = task.project || (task as any).project_details?.id;
+            // Upload files directly to task using PATCH multipart request
+            await taskApi.uploadFiles(task.id, fileArray);
 
-                if (!projectIdNum) {
-                    console.error("Project ID missing");
-                    continue;
-                }
-
-                const uploadUrlResponse = await documentsApi.getUploadUrl(projectIdNum, {
-                    file_name: file.name,
-                    file_type: file.type || 'application/octet-stream',
-                });
-
-                const { url: s3Url, fields: s3Fields, file_key } = uploadUrlResponse;
-
-                await documentsApi.uploadFileToS3(s3Url, s3Fields, file);
-                const ext = file.name.split('.').pop()?.toLowerCase() || '';
-                let mappedType = 'other';
-                if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'].includes(ext)) mappedType = 'image';
-                else if (ext === 'pdf') mappedType = 'pdf';
-                else if (ext === 'json') mappedType = 'json';
-                else if (['doc', 'docx', 'txt', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) mappedType = 'document';
-
-                await documentsApi.confirmUpload(projectIdNum, {
-                    file_key: file_key,
-                    file_name: file.name,
-                    file_type: mappedType,
-                    metadata: {
-                        task_id: task.id
-                    }
-                });
-            }
+            // Invalidate queries to refresh task data
             await queryClient.invalidateQueries({ queryKey: ['task-documents', id] });
             await queryClient.invalidateQueries({ queryKey: ['tasks'] });
             await queryClient.invalidateQueries({ queryKey: ['task', id] });
