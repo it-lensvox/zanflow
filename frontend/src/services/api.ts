@@ -3,7 +3,7 @@ import type {
   AuthTokens, User as AppUser, PaginatedResponse, PaginatedProjectsResponse, GetUploadUrlPayload, GetUploadUrlResponse, ConfirmUploadResponse, GetDownloadUrlPayload, ConfirmUploadPayload,
   GetDownloadUrlResponse, TaskComment, CreateTaskCommentPayload, AITaskSuggestionResponse, AITaskSuggestionPayload, APICollection,
   APIEndpoint, AuthCredential, ExecutionRun, ExecutionResult, APITestingDashboard, CreateCollectionPayload, CreateEndpointPayload, CreateCredentialPayload, RunCollectionPayload, ProjectCreatePayload,
-  Label, DocumentStatus, ChatMessage, ChatRoom, ChatRoomMessagesResponse, CreatePrivateChatPayload, GatewaySendMessagePayload, GatewayIncomingMessage, GatewayConnectedEvent, RefineTextPayload, RefineTextResponse, TeamTypeChoicesResponse,
+  Label, DocumentStatus, ChatMessage, ChatRoom, ChatRoomMessagesResponse, CreatePrivateChatPayload, GatewaySendMessagePayload, GatewayIncomingMessage, GatewayConnectedEvent, RefineTextPayload, RefineTextResponse, TaskResponse, TeamTypeChoicesResponse,
   CreateTeamPayload, ProjectChatRoom, TeamChatRoom, ChatUnreadResponse, NotificationData, NotificationCallback, WebSocketNotificationEvent, NotificationListResponse, Team
 } from '@/types';
 
@@ -33,7 +33,7 @@ export const clearTokens = (): void => {
   localStorage.removeItem(TOKEN_KEY);
 };
 
-// Token refresh mutex - prevents race condition when multiple 401s fire simultaneously
+// Token refresh mutex
 let isRefreshing = false;
 let refreshPromise: Promise<AuthTokens> | null = null;
 
@@ -484,6 +484,21 @@ export const taskApi = {
     return response.data;
   },
 
+   // Upload files directly to Exiting taskdetail
+  uploadFiles: async (taskId: number, files: File[]) => {
+    const formData = new FormData();
+    files.forEach((file) => {
+      formData.append('uploaded_files', file);
+    });
+    
+    const response = await api.patch<TaskResponse>(`/tasksite/${taskId}/`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
 };
 
 // Create Teams API
@@ -593,9 +608,9 @@ export const chatApi = {
   },
 
   // Send a message with attachment via HTTP POST 
-  sendMessageWithAttachment: async (roomId: string, data: { content: string; attachment: File }) => {
+  sendMessageWithAttachment: async (roomId: string, data: { content: string | ''; attachment: File }) => {
     const formData = new FormData();
-    formData.append('content', data.content);
+    formData.append('content', data.content || '');
     formData.append('attachment', data.attachment);
 
     const response = await api.post<ChatMessage>(`/chat/rooms/${roomId}/send/`, formData, {

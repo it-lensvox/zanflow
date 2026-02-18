@@ -1,207 +1,17 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
-  ArrowLeft, FileText, Download, Calendar, User, Loader2, File, Image as ImageIcon, FileJson,
-  Film, FileCode, ChevronLeft, ChevronRight, Info, X,
+  ArrowLeft, FileText, Download, Calendar, User, File, Info, X,
+  Loader2, Image as ImageIcon, FileJson, Film, FileCode,
 } from 'lucide-react';
 import { Button, Badge } from '@/components/common';
 import { documentsApi } from '@/services/api';
 import { formatDate, getStatusColor } from '@/lib/utils';
 import type { Document } from '@/types';
-import { Document as PDFDocument, Page as PDFPage, pdfjs } from 'react-pdf';
-import 'react-pdf/dist/Page/AnnotationLayer.css';
-import 'react-pdf/dist/Page/TextLayer.css';
 import React from 'react';
+import { DocumentPreview } from '@/components/common/DocumentPreview';
 
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url
-).toString();
-
-function useDownloadUrl(projectId: string | undefined, documentId: string | undefined) {
-  return useQuery({
-    queryKey: ['document-download-url', projectId, documentId],
-    queryFn: async () => {
-      if (!projectId || !documentId) return null;
-      const response = await documentsApi.getDownloadUrl(Number(projectId), { document_id: documentId });
-      return response.url;
-    },
-    enabled: !!projectId && !!documentId,
-    staleTime: 60 * 1000,
-  });
-}
-
-function DocumentViewer({ doc, downloadUrl }: { doc: Document; downloadUrl: string | null }) {
-  const [fileContent, setFileContent] = useState<string | null>(null);
-  const [numPages, setNumPages] = useState<number | null>(null);
-  const [pageNumber, setPageNumber] = useState(1);
-  const [isLoadingFile, setIsLoadingFile] = useState(false);
-  const [fileError, setFileError] = useState<string | null>(null);
-
-  // Fetch text content for JSON/Text files
-  React.useEffect(() => {
-    if (!downloadUrl) return;
-    if (doc.file_type === 'json' || doc.file_type === 'text') {
-      setIsLoadingFile(true);
-      fetch(downloadUrl)
-        .then((res) => res.text())
-        .then((text) => setFileContent(text))
-        .catch((err) => {
-          console.error('[DocumentViewer] Fetch error:', err);
-          setFileError('Failed to load file content.');
-        })
-        .finally(() => setIsLoadingFile(false));
-    }
-  }, [downloadUrl, doc.file_type]);
-
-  if (isLoadingFile) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full">
-        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-sm text-muted-foreground">Loading document...</p>
-      </div>
-    );
-  }
-
-  if (fileError || !downloadUrl) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full">
-        <FileText className="h-16 w-16 text-destructive/40 mb-4" />
-        <p className="text-lg font-semibold text-destructive">
-          {fileError || 'Unable to load document'}
-        </p>
-      </div>
-    );
-  }
-
-  // Render based on file type
-  if (doc.file_type === 'video') {
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-black rounded-lg">
-        <video controls className="max-w-full max-h-full">
-          <source src={downloadUrl} />
-          Your browser does not support the video tag.
-        </video>
-      </div>
-    );
-  }
-
-  if (doc.file_type === 'image') {
-    return (
-      <div className="w-full h-full flex items-center justify-center bg-muted/10 rounded-lg p-6">
-        <img
-          src={downloadUrl}
-          alt={doc.name}
-          className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
-        />
-      </div>
-    );
-  }
-
-  if (doc.file_type === 'json' || doc.file_type === 'text') {
-    return (
-      <div className="w-full h-full overflow-auto bg-slate-950 text-slate-50 rounded-lg p-6">
-        <pre className="text-sm font-mono whitespace-pre-wrap break-all leading-relaxed">
-          {fileContent}
-        </pre>
-      </div>
-    );
-  }
-
-  if (doc.file_type === 'pdf') {
-    return (
-      <div className="w-full h-full flex flex-col items-center justify-center space-y-4 overflow-auto py-6">
-        <div className="rounded-lg overflow-hidden shadow-2xl bg-white">
-          <PDFDocument
-            file={downloadUrl}
-            onLoadSuccess={({ numPages }) => setNumPages(numPages)}
-            onLoadError={(err) => {
-              console.error('[DocumentViewer] PDF Load Error:', err);
-              setFileError(`Failed to load PDF: ${err.message}`);
-            }}
-          >
-            <PDFPage
-              pageNumber={pageNumber}
-              width={Math.min(window.innerWidth * 0.7, 900)}
-              renderTextLayer={true}
-              renderAnnotationLayer={true}
-            />
-          </PDFDocument>
-        </div>
-        {numPages && numPages > 1 && (
-          <div className="flex items-center gap-3 bg-background/95 backdrop-blur-sm px-4 py-2.5 rounded-full border shadow-lg">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setPageNumber((p) => Math.max(1, p - 1))}
-              disabled={pageNumber <= 1}
-              className="h-8 w-8 p-0"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-sm font-semibold px-2 min-w-[100px] text-center">
-              {pageNumber} / {numPages}
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setPageNumber((p) => Math.min(numPages, p + 1))}
-              disabled={pageNumber >= numPages}
-              className="h-8 w-8 p-0"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // Check for office documents or other external opening types
-  const fileExtension = (doc.original_file_name || doc.name).split('.').pop()?.toLowerCase() || '';
-  const officeTypes = ['doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx'];
-
-  if (officeTypes.includes(fileExtension) || doc.file_type === 'other') {
-    return (
-      <div className="flex flex-col items-center justify-center h-full">
-        <FileText className="h-20 w-20 text-blue-500/40 mb-4" />
-        <p className="text-xl font-semibold text-muted-foreground">
-          {officeTypes.includes(fileExtension) ? 'Office Document' : 'External File'}
-        </p>
-        <p className="text-sm text-muted-foreground mt-2 mb-6 text-center">
-          This file type cannot be previewed directly but can be opened in a new tab.
-        </p>
-        <Button
-          onClick={() => {
-            if (downloadUrl) {
-              if (['doc', 'docx', 'ppt', 'pptx'].includes(fileExtension)) {
-                const officeViewerUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(downloadUrl)}`;
-                window.open(officeViewerUrl, '_blank');
-              } else {
-                window.open(downloadUrl, '_blank');
-              }
-            }
-          }}
-          className="gap-2"
-        >
-          <FileText className="h-4 w-4" />
-          Open File in New Tab
-        </Button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col items-center justify-center h-full">
-      <FileText className="h-20 w-20 text-muted-foreground/30 mb-4" />
-      <p className="text-xl font-semibold text-muted-foreground">Unsupported File Type</p>
-      <p className="text-sm text-muted-foreground mt-2">
-        Cannot preview "{doc.file_type}" files
-      </p>
-    </div>
-  );
-}
 
 export function DocumentDetail() {
   const { id } = useParams<{ id: string }>();
@@ -214,23 +24,17 @@ export function DocumentDetail() {
     enabled: !!id,
   });
 
-  const { data: downloadUrl, isLoading: isUrlLoading } = useDownloadUrl(
-    document?.project?.toString(),
-    document?.id
-  );
-
-  React.useEffect(() => {
-    if (document && downloadUrl && !isLoading && !isUrlLoading) {
-      const fileName = document.original_file_name || document.name || '';
-      const fileExtension = fileName.split('.').pop()?.toLowerCase();
-      if (fileExtension === 'docx') {
-        const officeViewerUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(downloadUrl)}`;
-        window.open(officeViewerUrl, '_blank');
-        navigate('/documents');
-      }
-    }
-  }, [document, downloadUrl, isLoading, isUrlLoading, navigate]);
-
+  // Fetch download URL
+  const { data: downloadUrl, isLoading: isUrlLoading } = useQuery({
+    queryKey: ['document-download-url', document?.project, document?.id],
+    queryFn: async () => {
+      if (!document?.project || !document?.id) return null;
+      const response = await documentsApi.getDownloadUrl(Number(document.project), { document_id: document.id });
+      return response.url;
+    },
+    enabled: !!document?.project && !!document?.id,
+    staleTime: 60 * 1000,
+  });
 
   const getFileIcon = (fileType: string) => {
     switch (fileType) {
@@ -354,12 +158,15 @@ export function DocumentDetail() {
 
       {/* Main Content Area */}
       <div className="flex-1 relative overflow-hidden">
-        {/* Document Viewer  */}
-        <div className="absolute inset-0 flex items-center justify-center p-8">
-          <div className="w-full h-full max-w-6xl">
-            <DocumentViewer doc={document as Document} downloadUrl={downloadUrl || null} />
-          </div>
-        </div>
+        {/* Document Preview  */}
+        {downloadUrl && (
+          <DocumentPreview
+            url={downloadUrl}
+            fileName={document.original_file_name || document.name}
+            fileType={document.file_type}
+            onClose={() => navigate('/documents')}
+          />
+        )}
 
         {/* Info Sidebar - Slide from right */}
         <div
