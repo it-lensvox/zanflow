@@ -133,12 +133,9 @@ class ChatMessageCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ChatMessage
         fields = ['content', 'message_type', 'attachment', 'attachment_name', 'reply_to']
-    
-    def validate_content(self, value):
-        """Validate message content."""
-        if not value or not value.strip():
-            raise serializers.ValidationError("Message content cannot be empty")
-        return value.strip()
+        extra_kwargs = {
+            'content': {'required': False, 'allow_blank': True}
+        }
 
 
 class ChatRoomListSerializer(serializers.ModelSerializer):

@@ -182,8 +182,22 @@ class TaskSerializer(serializers.ModelSerializer):
         return task
 
     def update(self, instance, validated_data):
+        # 1. Pop the new files out (so they don't break the standard Task update)
+        uploaded_files = validated_data.pop('uploaded_files', [])
+        uploaded_links = validated_data.pop('uploaded_links', [])
         validated_data.pop('assigned_by', None)
-        return super().update(instance, validated_data)
+
+        # 2. Update the standard Task fields (Status, Heading, etc.)
+        instance = super().update(instance, validated_data)
+
+        # 3. ADD NEW ATTACHMENTS (The Missing Logic!)
+        for file in uploaded_files:
+            TaskAttachment.objects.create(task=instance, file=file)
+            
+        for url in uploaded_links:
+            TaskLink.objects.create(task=instance, url=url)
+
+        return instance
 
 class TaskStatusUpdateSerializer(serializers.ModelSerializer):
     class Meta:
