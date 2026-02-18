@@ -161,6 +161,10 @@ class ChatRoomMembership(models.Model):
         default=False,
         help_text="If true, user won't receive notifications"
     )
+    is_favourite = models.BooleanField(
+        default=False,
+        help_text="If true, this room is pinned or marked as favorite by the user"
+    )
     
     # Role within the room (optional for moderation)
     class RoomRole(models.TextChoices):

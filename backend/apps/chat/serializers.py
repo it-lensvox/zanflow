@@ -41,7 +41,7 @@ class ChatRoomMembershipSerializer(serializers.ModelSerializer):
         model = ChatRoomMembership
         fields = [
             'id', 'user', 'joined_at', 'last_read_at',
-            'is_muted', 'room_role'
+            'is_muted', 'room_role','is_favourite'
         ]
         read_only_fields = ['id', 'user', 'joined_at']
 
@@ -147,6 +147,7 @@ class ChatRoomListSerializer(serializers.ModelSerializer):
     last_message = serializers.SerializerMethodField()
     unread_count = serializers.SerializerMethodField()
     is_member = serializers.SerializerMethodField()
+    is_favourite = serializers.SerializerMethodField()
     
     class Meta:
         model = ChatRoom
@@ -154,7 +155,7 @@ class ChatRoomListSerializer(serializers.ModelSerializer):
             'id', 'name', 'room_type', 'slug', 'project',
             'participant_count', 'last_message', 'unread_count',
             'is_member', 'created_at', 'updated_at', 'is_active',
-            'participants'
+            'participants', 'is_favourite'
         ]
         read_only_fields = fields
 
@@ -208,7 +209,18 @@ class ChatRoomListSerializer(serializers.ModelSerializer):
         
         return obj.participants.filter(id=request.user.id).exists()
 
-
+    def get_is_favourite(self, obj):
+        """Check if room is favourited by current user."""
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
+        
+        # We can optimize this using prefetch_related in the View if needed
+        membership = ChatRoomMembership.objects.filter(
+            room=obj, user=request.user
+        ).first()
+        
+        return membership.is_favourite if membership else False
 class ChatRoomDetailSerializer(serializers.ModelSerializer):
     """
     Detailed serializer for individual chat room.
@@ -350,6 +362,7 @@ class RoomSettingsSerializer(serializers.Serializer):
     Serializer for updating room membership settings.
     """
     is_muted = serializers.BooleanField(required=False)
+    is_favourite = serializers.BooleanField(required=False)
 
 
 class MessageSearchSerializer(serializers.Serializer):

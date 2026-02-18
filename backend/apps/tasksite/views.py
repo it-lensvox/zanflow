@@ -11,7 +11,7 @@ from rest_framework import serializers
 from apps.users.auth import StaticTokenAuthentication
 # Ensure this import matches your project structure
 from apps.users.models import User
-from .models import Task, TaskComment
+from .models import Task, TaskComment, TaskAttachment
 from .serializers import TaskSerializer, TaskStatusUpdateSerializer, UserManagementSerializer, TaskCommentSerializer
 from apps.notification.services import (
     notify_task_created,
@@ -264,3 +264,36 @@ class TaskCommentListCreateView(ListCreateAPIView):
         notify_task_comment(task=task, comment=comment, actor=self.request.user)
         # ====================================================================
         serializer.save(user=self.request.user, task=task)
+
+class TaskAttachmentDeleteView(APIView):
+    authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        # 1. Get the attachment
+        attachment = get_object_or_404(TaskAttachment, id=pk)
+        task = attachment.task
+
+        # 2. Permission Check (Same as Task Update logic)
+        # Allow if Manager OR Superuser OR if assigned to the task
+        is_authorized = (
+            request.user.is_manager or 
+            request.user.is_superuser or 
+            task.assigned_to.filter(id=request.user.id).exists() or
+            task.assigned_by == request.user
+        )
+
+        if not is_authorized:
+            return Response(
+                {"detail": "You do not have permission to delete this file."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # 3. Delete the file (This deletes from S3 AND Database)
+        attachment.file.delete() # Deletes from S3
+        attachment.delete()      # Deletes from DB
+
+        return Response(
+            {"message": "Attachment deleted successfully"}, 
+            status=status.HTTP_204_NO_CONTENT
+        )
