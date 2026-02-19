@@ -335,7 +335,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         Add a member to the project.
         """
         project = self.get_object()
-        serializer = ProjectMembershipSerializer(data=request.data)
+        serializer = ProjectMembershipSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         
         membership, created = ProjectMembership.objects.get_or_create(
@@ -409,4 +409,3 @@ class LabelViewSet(viewsets.ModelViewSet):
             project_id=project_id,
             created_by=self.request.user,
         )
-

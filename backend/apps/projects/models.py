@@ -4,17 +4,19 @@ Project management models for ZanFlow.
 from django.conf import settings as django_settings
 from django.db import models
 from core.models import UserStampedModel
+from apps.organizations.models import TenantModel
 
 
-class Project(UserStampedModel):
+class Project(TenantModel, UserStampedModel):
     """
     Project containing documents, ground truth, and test runs.
+
+    Inherits from:
+      - TenantModel  → adds `organization` FK + auto-filtered `objects` manager
+      - UserStampedModel → adds `created_by`, `updated_by`, timestamps
     """
+
     class TaskType(models.TextChoices):
-        # KEY_VALUE_EXTRACTION = "key_value", "Key-Value Extraction"
-        # TABLE_EXTRACTION = "table", "Table Extraction"
-        # DOCUMENT_CLASSIFICATION = "classification", "Document Classification"
-        # OCR = "ocr", "OCR"
         Client = "client", "Client"
         Internal = "internal", "Internal"
         CONTENT_CREATION = "content_creation", "Content Creation",
@@ -34,16 +36,6 @@ class Project(UserStampedModel):
     )    
     # Project settings (JSON)
     project_settings = models.JSONField(default=dict, blank=True)
-    # Example settings:
-    # {
-    #     "metrics": ["accuracy", "precision", "recall", "f1"],
-    #     "comparison_rules": {
-    #         "ignore_whitespace": true,
-    #         "case_sensitive": false,
-    #         "numeric_tolerance": 0.01
-    #     },
-    #     "required_fields": ["field1", "field2"]
-    # }
     
     # Default labels for this project
     default_labels = models.JSONField(default=list, blank=True)
@@ -75,6 +67,7 @@ class Project(UserStampedModel):
 class ProjectMembership(models.Model):
     """
     Project membership with role-based access.
+    NOTE: Not tenant-scoped directly — scoped implicitly via the Project FK.
     """
     
     class Role(models.TextChoices):
@@ -87,17 +80,15 @@ class ProjectMembership(models.Model):
         DEVOPS = "devops", "DevOps Engineer"
         SOCIAL_MEDIA = "social_media", "Social Media"
         VIEWER = "viewer", "Viewer"
-        # If you still want a general 'Member' role, add it back:
         MEMBER = "member", "Member" 
     
     project = models.ForeignKey(Project, on_delete=models.CASCADE)
     user = models.ForeignKey(django_settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     
-    # Ensure the default here exists in the Role class above
     role = models.CharField(
         max_length=20, 
         choices=Role.choices, 
-        default=Role.VIEWER  # Changed from MEMBER to VIEWER or another valid choice
+        default=Role.VIEWER
     )
     
     joined_at = models.DateTimeField(auto_now_add=True)
@@ -110,7 +101,7 @@ class ProjectMembership(models.Model):
         return f"{self.user} - {self.project} ({self.role})"
 
 
-class Label(UserStampedModel):
+class Label(TenantModel, UserStampedModel):
     """
     Labels for categorizing documents, issues, etc.
     """
@@ -131,4 +122,3 @@ class Label(UserStampedModel):
     
     def __str__(self):
         return f"{self.name} ({self.project.name})"
-    

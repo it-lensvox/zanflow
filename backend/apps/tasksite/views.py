@@ -31,6 +31,9 @@ class AllUsersListView(APIView):
             )
 
         users = User.objects.all().order_by('username')
+        # Scope to current user's organization
+        if request.user.organization_id:
+            users = users.filter(organization_id=request.user.organization_id)
         serializer = UserManagementSerializer(users, many=True)
         return Response({
             "message": "All users retrieved successfully",

@@ -1,6 +1,7 @@
 """
 Notification models for ZanFlow.
 Centralized notification system for in-app notifications.
+Now with multi-tenant support.
 """
 from django.conf import settings
 from django.db import models
@@ -9,7 +10,10 @@ from django.contrib.contenttypes.models import ContentType
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
 
-class Notification(models.Model):
+from apps.organizations.models import TenantModel
+
+
+class Notification(TenantModel):
     """
     Notification model for storing in-app notifications.
     Uses GenericForeignKey to link to any model (Task, Project, etc.)
@@ -82,15 +86,8 @@ class Notification(models.Model):
     object_id = models.CharField(max_length=255, null=True, blank=True)
     content_object = GenericForeignKey('content_type', 'object_id')
     
-    # Additional metadata (JSON field for flexibility)
+    # Additional metadata
     metadata = models.JSONField(default=dict, blank=True)
-    # Example metadata:
-    # {
-    #     "old_status": "pending",
-    #     "new_status": "in_progress",
-    #     "project_name": "Marketing Campaign",
-    #     "task_heading": "Design Logo"
-    # }
     
     # Status tracking
     is_read = models.BooleanField(default=False)
@@ -131,7 +128,7 @@ class Notification(models.Model):
 class NotificationPreference(models.Model):
     """
     User notification preferences.
-    Allows users to customize which notifications they receive.
+    NOT tenant-scoped — one-to-one with User (implicitly scoped via User's org).
     """
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
@@ -161,13 +158,10 @@ class NotificationPreference(models.Model):
     @receiver(post_delete)
     def delete_related_notifications(sender, instance, **kwargs):
         """
-        Automatically delete notifications when the related object (Task, Project, etc.) is deleted.
+        Automatically delete notifications when the related object is deleted.
         """
-        # Get the ContentType for the model being deleted
         content_type = ContentType.objects.get_for_model(instance)
-        
-        # Filter and delete all notifications pointing to this specific object
-        Notification.objects.filter(
+        Notification.original_objects.filter(
             content_type=content_type,
             object_id=instance.pk
         ).delete()

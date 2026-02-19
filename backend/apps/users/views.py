@@ -39,12 +39,14 @@ class IsAdminRole(permissions.BasePermission):
 class UserCreateView(generics.CreateAPIView):
     """
     Admin-only view to create new users/employees.
-    Only users with is_staff/is_superuser can access this.
+    Auto-assigns the new user to the creator's organization.
     """
     queryset = User.objects.all()
     serializer_class = UserCreateSerializer
-    # Change permission from AllowAny to IsAdminUser
     permission_classes = [IsAdminRole]
+
+    def perform_create(self, serializer):
+        serializer.save(organization=self.request.user.organization)
 
 class MeView(APIView):
     """
@@ -71,11 +73,19 @@ class IsAdminRole(permissions.BasePermission):
 class UserListView(generics.ListAPIView):
     """
     List all users (for assignments, etc.)
+    Automatically scoped to the current user's organization.
     """
-    queryset = User.objects.filter(is_active=True)
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
     search_fields = ["username", "email", "first_name", "last_name"]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = User.objects.filter(is_active=True)
+        # Scope to current user's organization
+        if user.organization_id:
+            qs = qs.filter(organization_id=user.organization_id)
+        return qs
 
 class ChangeUserRoleView(APIView):
     """
@@ -86,7 +96,11 @@ class ChangeUserRoleView(APIView):
 
     def patch(self, request, user_id):
         user = request.user
-        target_user = get_object_or_404(User, id=user_id)
+        # Only allow changing roles for users in the same organization
+        qs = User.objects.all()
+        if user.organization_id:
+            qs = qs.filter(organization_id=user.organization_id)
+        target_user = get_object_or_404(qs, id=user_id)
         new_role = request.data.get('role')
 
         # 1. SECURITY: Prevent any user from changing their own role
@@ -133,11 +147,18 @@ class ChangeUserRoleView(APIView):
 class UserDeleteView(generics.DestroyAPIView):
     """
     Admin-only view to delete a user.
+    Scoped to the current user's organization.
     """
-    queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [permissions.IsAdminUser] # Ensures only Staff/Superusers access this
+    permission_classes = [permissions.IsAdminUser]
     lookup_field = 'id'
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = User.objects.all()
+        if user.organization_id:
+            qs = qs.filter(organization_id=user.organization_id)
+        return qs
 
     def delete(self, request, *args, **kwargs):
         user_to_delete = self.get_object()

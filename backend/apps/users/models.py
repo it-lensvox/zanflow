@@ -4,6 +4,8 @@ from datetime import timedelta
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 import uuid
+
+
 class User(AbstractUser):
     """
     Custom User model with role-based access control.
@@ -14,6 +16,7 @@ class User(AbstractUser):
         MANAGER = "manager", "Manager"
         ANNOTATOR = "annotator", "Annotator"
         VIEWER = "viewer", "Viewer"
+
     role = models.CharField(
         max_length=20,
         choices=Role.choices,
@@ -23,6 +26,17 @@ class User(AbstractUser):
 
     # NEW: Store skills as a list of strings
     skills = models.JSONField(default=list, blank=True)
+
+    # ── MULTI-TENANCY ─────────────────────────────────────────────────────
+    organization = models.ForeignKey(
+        "organizations.Organization",
+        on_delete=models.SET_NULL,
+        related_name="users",
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    # ──────────────────────────────────────────────────────────────────────
     
     class Meta:
         db_table = "users"
@@ -58,7 +72,8 @@ class User(AbstractUser):
     @property
     def can_annotate(self):
         return self.role in [self.Role.ADMIN, self.Role.MANAGER, self.Role.ANNOTATOR]
-    
+
+
 class PasswordResetOTP(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="password_otps")
     otp_hash = models.CharField(max_length=128)
@@ -69,10 +84,12 @@ class PasswordResetOTP(models.Model):
 
     def is_expired(self):
         return timezone.now() > self.expires_at
+
     def generate_reset_token(self):
         self.token = str(uuid.uuid4())
         self.save()
         return self.token
+
     @staticmethod
     def hash_otp(otp):
         return hashlib.sha256(str(otp).encode()).hexdigest()
