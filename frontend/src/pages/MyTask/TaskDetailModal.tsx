@@ -45,6 +45,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
     const [selectedStatus, setSelectedStatus] = useState<Task['status']>(task.status);
     const [isEditingStatus, setIsEditingStatus] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [showNotAdminPopup, setShowNotAdminPopup] = useState(false);
     const [assignedMembersOpen, setAssignedMembersOpen] = useState(true);
     const [showAddDocuments, setShowAddDocuments] = useState(false);
     const [uploadingDocs, setUploadingDocs] = useState(false);
@@ -348,7 +349,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
 
     const handleDeleteAttachment = async (attachmentId: string) => {
         try {
-            await documentsApi.delete(attachmentId);
+            await taskApi.deleteAttachment(attachmentId);
             queryClient.setQueryData(['task-documents', task.id], (oldData: any) => {
                 if (!oldData?.pages) return oldData;
 
@@ -471,11 +472,21 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
                         >
                             <Maximize2 className="w-5 h-5" />
                         </button>
-                        {(user?.role === 'admin' || task.assigned_by === user?.id) && (
-                            <button onClick={() => setShowDeleteConfirm(true)} className="p-2 text-gray-400 hover:text-red-600 rounded-lg">
-                                <Trash2 className="w-5 h-5" />
-                            </button>
-                        )}
+                        <button
+                            onClick={() => {
+                                if (user?.id === task.assigned_by) {
+                                    console.log('→ User is task creator — opening delete confirm popup');
+                                    setShowDeleteConfirm(true);
+                                } else {
+                                    console.log('→ User is NOT task creator — opening permission denied popup');
+                                    setShowNotAdminPopup(true);
+                                }
+                            }}
+                            className="p-2 text-gray-400 hover:text-red-600 rounded-lg"
+                            title="Delete Task"
+                        >
+                            <Trash2 className="w-5 h-5" />
+                        </button>
                         <button onClick={onClose} className="p-2 text-gray-400 hover:text-black rounded-lg"><X className="w-5 h-5" /></button>
                     </div>
                 </div>
@@ -616,6 +627,13 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
                         <div className="project-assignees bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
                             <div className="flex items-center justify-between mb-3 cursor-pointer" onClick={() => setAssignedMembersOpen(!assignedMembersOpen)}>
                                 <label className="text-sm font-semibold text-gray-700 block mb-4">Assignees</label>
+                                {task.assigned_by_user_details && (
+                                    <span className="text-xs text-gray-500">
+                                        Created by {task.assigned_by_user_details.first_name && task.assigned_by_user_details.last_name
+                                            ? `${task.assigned_by_user_details.first_name} ${task.assigned_by_user_details.last_name}`.trim()
+                                            : task.assigned_by_user_details.username}
+                                    </span>
+                                )}
                             </div>
 
                             {assignedMembersOpen && (
@@ -906,6 +924,29 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
                             <button onClick={() => setShowDeleteConfirm(false)} className="px-4 py-2 rounded-lg bg-gray-200">No</button>
                             <button onClick={() => deleteMutation.mutate(task.id)} className="px-4 py-2 rounded-lg bg-red-600 text-white">Yes, Delete</button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* NOT ADMIN POPUP */}
+            {showNotAdminPopup && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 flex flex-col items-center text-center">
+                        <div className="flex items-center justify-center w-14 h-14 rounded-full bg-yellow-100 mb-4">
+                            <svg className="w-7 h-7 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                            </svg>
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Permission Denied</h3>
+                        <p className="text-sm text-gray-500 mb-6">
+                            You can't delete this task.<br />Only the <span className="font-semibold text-gray-700">person who created it</span> can delete it.
+                        </p>
+                        <button
+                            onClick={() => setShowNotAdminPopup(false)}
+                            className="w-full px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-700 transition-colors"
+                        >
+                            OK, Got it
+                        </button>
                     </div>
                 </div>
             )}

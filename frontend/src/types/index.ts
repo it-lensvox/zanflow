@@ -685,6 +685,7 @@ export interface ChatRoomMembership {
   last_read_at: string | null;
   is_muted: boolean;
   room_role: 'owner' | 'admin' | 'member';
+  is_favourite: boolean;
 }
 
 export interface ChatRoom {

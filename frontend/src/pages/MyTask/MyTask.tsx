@@ -158,7 +158,7 @@ export const MyTask: React.FC = () => {
                                                     className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
                                                 >
                                                     <Plus className="w-4 h-4 mr-2" />
-                                                    Add New
+                                                    Create Task
                                                 </button>
 
                                                 <button
