@@ -12,6 +12,14 @@ import { projectsApi, teamsApi } from '@/services/api';
 import type { Project } from '@/types';
 import { getProjectTypeColor } from '@/lib/utils';
 import { useNotifications } from '@/hooks/useNotifications';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/common/diaog';
 
 const ADMIN_ROLES = ['admin', 'manager', 'annotator'];
 
@@ -70,6 +78,7 @@ export function Sidebar() {
   const navigate = useNavigate();
   const { unreadCount } = useNotifications();
   const [chatUnreadCount, setChatUnreadCount] = useState<number>(0);
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
   // Collapsible Logic
   const [isCollapsed, setIsCollapsed] = useState(true);
@@ -403,12 +412,44 @@ export function Sidebar() {
             <button onClick={() => navigate('/settings')} className="flex flex-1 items-center justify-center gap-2 rounded-lg border p-2 text-muted-foreground hover:bg-accent">
               <Settings className="h-4 w-4" /> Settings
             </button>
-            <button onClick={logout} className="flex flex-1 items-center justify-center gap-2 rounded-lg border p-2 text-muted-foreground hover:bg-accent text-destructive">
+            <button
+              onClick={() => setShowLogoutDialog(true)}
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border p-2 text-muted-foreground hover:bg-accent text-destructive"
+            >
               <LogOut className="h-4 w-4" /> Logout
             </button>
           </div>
         )}
       </div>
+
+      {/* Logout Confirmation Dialog */}
+      <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-destructive/10 mx-auto mb-2">
+              <LogOut className="h-6 w-6 text-destructive" />
+            </div>
+            <DialogTitle className="text-center text-lg">Log Out?</DialogTitle>
+            <DialogDescription className="text-center text-sm text-muted-foreground">
+              Are you sure you want to log out? You'll need to sign in again to access your workspace.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-row gap-2 sm:flex-row mt-2">
+            <button
+              onClick={() => setShowLogoutDialog(false)}
+              className="flex-1 rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-accent transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => { setShowLogoutDialog(false); logout(); }}
+              className="flex-1 rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-white hover:bg-destructive/90 transition-colors"
+            >
+              Yes, Log Out
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

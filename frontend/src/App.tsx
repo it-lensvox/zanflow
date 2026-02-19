@@ -11,7 +11,7 @@ import { TaskDetails } from '@/pages/TaskType/TaskDetails';
 import { APITesting } from '@/pages/TaskType/APITesting';
 import {
   Dashboard, Login, Projects, DocumentCreate, Documents, ProjectSettings,
-  Teams, UserManagement, MyTask, CreateTask, TeamPerformance, Calendar, NotificationsPage, Profile, ResetPassword, TeamChatModern,
+  Teams, UserManagement, MyTask, CreateTask, TeamPerformance, Calendar, NotificationsPage, Profile, ResetPassword, TeamChatModern, Settings,
 } from '@/pages';
 import { TaskDetailPage } from '@/pages/MyTask/TaskDetailPage';
 
@@ -124,7 +124,7 @@ function AppRoutes() {
         {/* <Route path="/documents/:id" element={<DocumentDetail />} /> */}
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/team-chat" element={<TeamChatModern />} />
-        <Route path="/settings" element={<div>Settings</div>} />
+        <Route path="/settings" element={<Settings />} />
         {/* Task Detail Page (full-page view) */}
         <Route path="/tasks/:id" element={<TaskDetailPage />} />
 

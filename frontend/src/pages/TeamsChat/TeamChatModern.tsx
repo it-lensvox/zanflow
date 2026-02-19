@@ -1019,7 +1019,7 @@ export function TeamChatModern() {
   );
 
   return (
-    <div className="flex h-screen bg-[#f3f2f1] overflow-hidden border-2 border-gray-800">
+    <div className="flex h-screen bg-[#f3f2f1] overflow-hidden border-2 border-gray-200">
       {/* Toast Notifications Container */}
       <div className="fixed top-4 right-4 z-50 space-y-2">
         {toastNotifications.map(toast => (
@@ -1057,7 +1057,7 @@ export function TeamChatModern() {
         </div>
 
         {/* Tab Navigation */}
-       <Tabs.Root value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+       <Tabs.Root value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0 bg-white">
           <Tabs.List className="flex items-center gap-1 px-3 py-2 bg-white border-b border-gray-200">
             <Tabs.Trigger
               value="chats"
