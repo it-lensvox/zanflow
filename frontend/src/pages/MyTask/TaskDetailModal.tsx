@@ -348,7 +348,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
 
     const handleDeleteAttachment = async (attachmentId: string) => {
         try {
-            await documentsApi.delete(attachmentId);
+            await taskApi.deleteAttachment(attachmentId);
             queryClient.setQueryData(['task-documents', task.id], (oldData: any) => {
                 if (!oldData?.pages) return oldData;
 
@@ -616,6 +616,13 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
                         <div className="project-assignees bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
                             <div className="flex items-center justify-between mb-3 cursor-pointer" onClick={() => setAssignedMembersOpen(!assignedMembersOpen)}>
                                 <label className="text-sm font-semibold text-gray-700 block mb-4">Assignees</label>
+                                {task.assigned_by_user_details && (
+                                    <span className="text-xs text-gray-500">
+                                        Created by {task.assigned_by_user_details.first_name && task.assigned_by_user_details.last_name
+                                            ? `${task.assigned_by_user_details.first_name} ${task.assigned_by_user_details.last_name}`.trim()
+                                            : task.assigned_by_user_details.username}
+                                    </span>
+                                )}
                             </div>
 
                             {assignedMembersOpen && (
