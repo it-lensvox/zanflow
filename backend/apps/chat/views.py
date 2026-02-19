@@ -419,10 +419,10 @@ class AddParticipantView(APIView):
 
 class RoomSettingsView(APIView):
     """
-    Update room settings for current user (mute/unmute).
+    Update room settings for current user (mute/unmute, favorite/unfavorite).
     
     PATCH /api/v1/chat/rooms/<room_id>/settings/
-    Body: { "is_muted": true/false }
+    Body: { "is_muted": boolean, "is_favourite": boolean }
     """
     permission_classes = [IsAuthenticated]
 
@@ -431,7 +431,7 @@ class RoomSettingsView(APIView):
         request=RoomSettingsSerializer
     )
     def patch(self, request, room_id):
-        """Update user's room settings (e.g., mute notifications)."""
+        """Update user's room settings."""
         room = get_object_or_404(ChatRoom, id=room_id, is_active=True)
         
         membership = ChatRoomMembership.objects.filter(
@@ -448,14 +448,25 @@ class RoomSettingsView(APIView):
         serializer = RoomSettingsSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
+        updated_fields = []
+
         if 'is_muted' in serializer.validated_data:
             membership.is_muted = serializer.validated_data['is_muted']
-            membership.save(update_fields=['is_muted'])
+            updated_fields.append('is_muted')
+
+        # --- ADD THIS BLOCK ---
+        if 'is_favourite' in serializer.validated_data:
+            membership.is_favourite = serializer.validated_data['is_favourite']
+            updated_fields.append('is_favourite')
+        
+        if updated_fields:
+            membership.save(update_fields=updated_fields)
         
         return Response({
             'message': 'Settings updated successfully',
             'room_id': str(room.id),
             'is_muted': membership.is_muted,
+            'is_favourite': membership.is_favourite, # <--- Return new status
         })
 
 

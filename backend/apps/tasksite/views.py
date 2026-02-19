@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.generics import ListCreateAPIView
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from apps.groundtruth.models import Document
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.shortcuts import get_object_or_404
 from django.db.models import Count, Q
@@ -11,7 +12,7 @@ from rest_framework import serializers
 from apps.users.auth import StaticTokenAuthentication
 # Ensure this import matches your project structure
 from apps.users.models import User
-from .models import Task, TaskComment
+from .models import Task, TaskComment, TaskAttachment
 from .serializers import TaskSerializer, TaskStatusUpdateSerializer, UserManagementSerializer, TaskCommentSerializer
 from apps.notification.services import (
     notify_task_created,
@@ -30,6 +31,9 @@ class AllUsersListView(APIView):
             )
 
         users = User.objects.all().order_by('username')
+        # Scope to current user's organization
+        if request.user.organization_id:
+            users = users.filter(organization_id=request.user.organization_id)
         serializer = UserManagementSerializer(users, many=True)
         return Response({
             "message": "All users retrieved successfully",
@@ -264,3 +268,92 @@ class TaskCommentListCreateView(ListCreateAPIView):
         notify_task_comment(task=task, comment=comment, actor=self.request.user)
         # ====================================================================
         serializer.save(user=self.request.user, task=task)
+
+class TaskAttachmentDeleteView(APIView):
+    authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        # 1. Get the attachment
+        attachment = get_object_or_404(TaskAttachment, id=pk)
+        task = attachment.task
+
+        # 2. Permission Check (Same as Task Update logic)
+        # Allow if Manager OR Superuser OR if assigned to the task
+        is_authorized = (
+            request.user.is_manager or 
+            request.user.is_superuser or 
+            task.assigned_to.filter(id=request.user.id).exists() or
+            task.assigned_by == request.user
+        )
+
+        if not is_authorized:
+            return Response(
+                {"detail": "You do not have permission to delete this file."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # 3. Delete the file (This deletes from S3 AND Database)
+        attachment.file.delete() # Deletes from S3
+        attachment.delete()      # Deletes from DB
+
+        return Response(
+            {"message": "Attachment deleted successfully"}, 
+            status=status.HTTP_204_NO_CONTENT
+        )
+class ProjectAllDocumentsView(APIView):
+    # Add your standard authentication here
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, project_id):
+        # 1. Fetch Project-Level Documents
+        project_docs = Document.objects.filter(project_id=project_id)
+        # serialize project_docs here using your DocumentSerializer
+        # project_data = DocumentSerializer(project_docs, many=True).data
+        
+        # (Placeholder for project data format)
+        project_data = [] 
+        for doc in project_docs:
+            # 1. Safely get the filename (fallback to doc.name if no file is attached)
+            filename = doc.source_file.name.split('/')[-1] if doc.source_file else doc.name
+
+            # 2. Safely get the URL (fallback to external source_file_url if it exists)
+            file_url = doc.source_file.url if doc.source_file else doc.source_file_url
+
+            project_data.append({
+                "id": doc.id,
+                "file_name": filename, 
+                "file_url": file_url, 
+                "uploaded_at": doc.created_at, # Your model uses UserStampedModel which provides created_at
+                "source": "Project",
+                "task_id": None,
+                "task_heading": None
+            })
+
+        # 2. Fetch Task-Level Attachments for this Project
+        # The magic lookup: task__project_id
+        task_attachments = TaskAttachment.objects.filter(task__project_id=project_id)
+        
+        task_data = []
+        for attachment in task_attachments:
+            task_data.append({
+                "id": attachment.id,
+                "file_name": attachment.file.name.split('/')[-1],
+                "file_url": attachment.file.url, # Or your presigned URL logic
+                "uploaded_at": attachment.uploaded_at,
+                "source": "Task",
+                "task_id": attachment.task.id,
+                "task_heading": attachment.task.heading # Helps the UI show which task it belongs to
+            })
+
+        # 3. Merge and Sort the Lists
+        all_documents = project_data + task_data
+        
+        # Optional: Sort by upload date (newest first)
+        all_documents.sort(key=lambda x: x['uploaded_at'], reverse=True)
+
+        return Response({
+            "message": "All project and task documents retrieved",
+            "total_files": len(all_documents),
+            "documents": all_documents
+        })

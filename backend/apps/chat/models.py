@@ -5,6 +5,9 @@ Models:
 - ChatRoom: Represents chat rooms (global, project-based, or private)
 - ChatMessage: Stores individual chat messages
 - ChatRoomMembership: Tracks room membership and read status
+- MessageReadStatus: Tracks read receipts
+
+Now with multi-tenant support.
 """
 import uuid
 from django.conf import settings
@@ -12,14 +15,15 @@ from django.db import models
 from django.utils import timezone
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+
+from apps.organizations.models import TenantModel
 from apps.teams.models import Team
 
-class ChatRoom(models.Model):
+
+class ChatRoom(TenantModel):
     """
-    Chat room model supporting three types:
-    - GLOBAL: All users can participate
-    - PROJECT: Project-specific group chat
-    - PRIVATE: One-to-one direct messages
+    Chat room model supporting multiple types.
+    Tenant-scoped via TenantModel.
     """
     
     class RoomType(models.TextChoices):
@@ -45,7 +49,7 @@ class ChatRoom(models.Model):
         db_index=True
     )
     team = models.ForeignKey(
-        'teams.Team',  # Replace with the actual path to your Team model
+        'teams.Team',
         on_delete=models.CASCADE,
         null=True,
         blank=True,
@@ -53,7 +57,7 @@ class ChatRoom(models.Model):
         help_text="Associated team for team-type rooms"
     )
     
-    # For project-based rooms - links to existing Project model
+    # For project-based rooms
     project = models.ForeignKey(
         'projects.Project',
         on_delete=models.CASCADE,
@@ -63,7 +67,7 @@ class ChatRoom(models.Model):
         help_text="Associated project for project-type rooms"
     )
     
-    # Room participants (for private and project chats)
+    # Room participants
     participants = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         through='ChatRoomMembership',
@@ -82,7 +86,6 @@ class ChatRoom(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
     
-    # For generating unique channel names
     slug = models.SlugField(
         max_length=100,
         unique=True,
@@ -103,7 +106,7 @@ class ChatRoom(models.Model):
             return f"Global: {self.name}"
         elif self.room_type == self.RoomType.PROJECT:
             return f"Project: {self.project.name if self.project else 'Unknown'}"
-        elif self.room_type == self.RoomType.TEAM:  # <--- Add this check
+        elif self.room_type == self.RoomType.TEAM:
             return f"Team: {self.team.name if self.team else 'Unknown'}"
         return f"Private: {self.name}"
 
@@ -115,27 +118,21 @@ class ChatRoom(models.Model):
 
     @property
     def channel_group_name(self):
-        """
-        Generate unique channel layer group name.
-        Used by Django Channels for broadcasting messages.
-        """
         return f"chat_{self.slug}"
 
     def get_participant_ids(self):
-        """Return list of participant user IDs."""
         return list(self.participants.values_list('id', flat=True))
 
     def is_participant(self, user):
-        """Check if user is a participant in this room."""
         if self.room_type == self.RoomType.GLOBAL:
-            return True  # Everyone can access global chat
+            return True
         return self.participants.filter(id=user.id).exists()
 
 
 class ChatRoomMembership(models.Model):
     """
     Tracks user membership in chat rooms.
-    Stores read status and notification preferences.
+    NOT directly tenant-scoped — implicitly scoped via ChatRoom FK.
     """
     
     id = models.UUIDField(
@@ -161,8 +158,11 @@ class ChatRoomMembership(models.Model):
         default=False,
         help_text="If true, user won't receive notifications"
     )
+    is_favourite = models.BooleanField(
+        default=False,
+        help_text="If true, this room is pinned or marked as favorite by the user"
+    )
     
-    # Role within the room (optional for moderation)
     class RoomRole(models.TextChoices):
         MEMBER = 'member', 'Member'
         MODERATOR = 'moderator', 'Moderator'
@@ -186,15 +186,14 @@ class ChatRoomMembership(models.Model):
         return f"{self.user.username} in {self.room.name}"
 
     def mark_as_read(self):
-        """Update last_read_at timestamp."""
         self.last_read_at = timezone.now()
         self.save(update_fields=['last_read_at'])
 
 
-class ChatMessage(models.Model):
+class ChatMessage(TenantModel):
     """
     Individual chat message model.
-    Supports text messages with optional file attachments.
+    Tenant-scoped via TenantModel.
     """
     
     class MessageType(models.TextChoices):
@@ -232,7 +231,7 @@ class ChatMessage(models.Model):
         help_text="Message text content"
     )
     
-    # File attachment (optional)
+    # File attachment
     attachment = models.FileField(
         upload_to='chat_attachments/%Y/%m/%d/',
         blank=True,
@@ -248,6 +247,7 @@ class ChatMessage(models.Model):
         blank=True, 
         help_text="Stores link preview data or file metadata"
     )
+
     # Reply functionality
     reply_to = models.ForeignKey(
         'self',
@@ -281,16 +281,11 @@ class ChatMessage(models.Model):
         return f"{sender_name}: {content_preview}"
 
     def soft_delete(self):
-        """Soft delete the message."""
         self.is_deleted = True
         self.deleted_at = timezone.now()
         self.save(update_fields=['is_deleted', 'deleted_at'])
 
     def to_websocket_dict(self):
-        """
-        Convert message to dictionary for WebSocket transmission.
-        This is the format sent to connected clients.
-        """
         return {
             'id': str(self.id),
             'room_id': str(self.room_id),
@@ -311,8 +306,8 @@ class ChatMessage(models.Model):
 
 class MessageReadStatus(models.Model):
     """
-    Tracks which users have read which messages.
-    Used for read receipts in private chats.
+    Tracks read receipts.
+    NOT directly tenant-scoped — implicitly scoped via ChatMessage FK.
     """
     
     id = models.UUIDField(
@@ -341,15 +336,3 @@ class MessageReadStatus(models.Model):
 
     def __str__(self):
         return f"{self.user.username} read {self.message_id}"
-    # @receiver(post_save, sender=Team)
-    # def sync_chat_with_team_deletion(sender, instance, created, **kwargs):
-    #     """
-    #     When a Team is soft-deleted (deleted_at is set), 
-    #     we hide the associated ChatRoom by setting is_active=False.
-    #     """
-        # # Check if the team has just been soft-deleted
-        # if instance.deleted_at is not None:
-        #     from .models import ChatRoom
-            
-        #     # Disable the chat room immediately
-        #     ChatRoom.objects.filter(team=instance).update(is_active=False)

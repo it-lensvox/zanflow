@@ -37,6 +37,17 @@ class ProjectMembershipSerializer(serializers.ModelSerializer):
         fields = ["id", "user", "user_id", "role", "joined_at"]
         read_only_fields = ["id", "joined_at"]
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Scope user_id dropdown to the current user's organization
+        request = self.context.get("request")
+        if request and hasattr(request, "user") and request.user.is_authenticated:
+            org_id = getattr(request.user, "organization_id", None)
+            if org_id:
+                self.fields["user_id"].queryset = User.objects.filter(
+                    organization_id=org_id, is_active=True
+                )
+
 
 class ProjectSerializer(serializers.ModelSerializer):
     """
@@ -140,9 +151,18 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
             defaults={"role": ProjectMembership.Role.OWNER}
         )
         
-        # Add the dynamic roles from your Postman body
+        # Add the dynamic roles — only allow users from the same organization
+        org_id = getattr(user, "organization_id", None)
         for member_data in assigned_members_data:
             if member_data['user_id'] != user.id:
+                # Verify user belongs to same org
+                if org_id:
+                    member_exists = User.objects.filter(
+                        id=member_data['user_id'],
+                        organization_id=org_id
+                    ).exists()
+                    if not member_exists:
+                        continue  # Skip users from other orgs
                 ProjectMembership.objects.create(
                     project=project,
                     user_id=member_data['user_id'],

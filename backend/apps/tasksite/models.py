@@ -1,13 +1,15 @@
 # models.py
 from django.db import models
 from apps.users.models import User
-
-# --- IMPORT YOUR EXISTING PROJECT MODEL ---
-# CAUTION: Check this path. It might be 'apps.projects.models' or similar
-# based on where your "Marketing Campaign 2025" model is defined.
 from apps.projects.models import Project, Label
+from apps.organizations.models import TenantModel
 
-class Task(models.Model):
+
+class Task(TenantModel):
+    """
+    Task model — now tenant-scoped via TenantModel.
+    """
+
     STATUS_CHOICES = (
         ('pending', 'Pending'),
         ('in_progress', 'In Progress'),
@@ -16,7 +18,6 @@ class Task(models.Model):
         ('deployed', 'Deployed'),
         ('deferred', 'Deferred'),
         ('backlog', 'Backlog')
-       
     )
 
     PRIORITY_CHOICES = (
@@ -25,7 +26,6 @@ class Task(models.Model):
         ('high', 'High'),
         ('critical', 'Critical'),
     )
-
 
     heading = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
@@ -44,8 +44,6 @@ class Task(models.Model):
         related_name='tasks'
     )
 
-    # --- UPDATED: LINK TO EXISTING PROJECT ---
-    # We removed 'project_name' and added a ForeignKey to 'Project'
     project = models.ForeignKey(
         Project,
         on_delete=models.SET_NULL, 
@@ -53,7 +51,6 @@ class Task(models.Model):
         blank=True,
         related_name='tasks'
     )
-    # ----------------------------------------
 
     assigned_to = models.ManyToManyField(User, related_name='assigned_tasks')
     assigned_by = models.ForeignKey(
@@ -74,11 +71,13 @@ class Task(models.Model):
 
     def __str__(self):
         return self.heading
-    
+
+
 class TaskLink(models.Model):
+    """Not directly tenant-scoped — implicitly scoped via Task FK."""
     task = models.ForeignKey(
         Task, 
-        related_name='links',  # Access links via task.links.all()
+        related_name='links',
         on_delete=models.CASCADE
     )
     url = models.URLField(max_length=500)
@@ -86,11 +85,13 @@ class TaskLink(models.Model):
 
     def __str__(self):
         return self.url
-    
+
+
 class TaskAttachment(models.Model):
+    """Not directly tenant-scoped — implicitly scoped via Task FK."""
     task = models.ForeignKey(
         Task, 
-        related_name='attachments',  # This name is crucial for the serializer
+        related_name='attachments',
         on_delete=models.CASCADE
     )
     file = models.FileField(upload_to='task_documents/')
@@ -98,8 +99,10 @@ class TaskAttachment(models.Model):
 
     def __str__(self):
         return f"File for task {self.task_id}"
-    
+
+
 class TaskComment(models.Model):
+    """Not directly tenant-scoped — implicitly scoped via Task FK."""
     task = models.ForeignKey(
         Task, 
         related_name='comments', 
