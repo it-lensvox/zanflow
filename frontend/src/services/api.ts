@@ -490,13 +490,13 @@ export const taskApi = {
     return response.data;
   },
 
-   // Upload files directly to Exiting taskdetail
+  // Upload files directly to Exiting taskdetail
   uploadFiles: async (taskId: number, files: File[]) => {
     const formData = new FormData();
     files.forEach((file) => {
       formData.append('uploaded_files', file);
     });
-    
+
     const response = await api.patch<TaskResponse>(`/tasksite/${taskId}/`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -504,6 +504,13 @@ export const taskApi = {
     });
     return response.data;
   },
+
+  // Delete taskdetail  attachment
+  deleteAttachment: async (attachmentId: string) => {
+    const response = await api.delete(`/tasksite/attachments/${attachmentId}/`);
+    return response.data;
+  },
+
 
 };
 
@@ -662,6 +669,24 @@ export const chatApi = {
     const response = await api.get<ChatUnreadResponse>('/chat/unread/');
     return response.data;
   },
+
+  // Mark messages as read in a room
+  markAsRead: async (roomId: string) => {
+    const response = await api.post(`/chat/rooms/${roomId}/mark-read/`);
+    return response.data;
+  },
+  // Get room details with members
+  getRoomDetails: async (roomId: string) => {
+    const response = await api.get<ChatRoom>(`/chat/rooms/${roomId}/`);
+    return response.data;
+  },
+
+  // TeamChat favourites functionality
+  updateRoomSettings: async (roomId: string, settings: { is_favourite?: boolean; is_muted?: boolean }) => {
+    const response = await api.patch(`/chat/rooms/${roomId}/settings/`, settings);
+    return response.data;
+  },
+
 };
 
 
@@ -848,7 +873,6 @@ export class NotificationWebSocketService {
           }
           // Check if this is a chat unread update event
           if (message.type === 'SIGNAL' && message.event === 'CHAT_UNREAD_UPDATE') {
-            console.log('💬 Chat unread update received:', message.data);
 
             // Notify all registered unread callbacks
             this.chatUnreadCallbacks.forEach(callback => {

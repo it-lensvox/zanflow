@@ -2,9 +2,8 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Tabs from '@radix-ui/react-tabs';
 import {
-  MessageSquare, Search, Send, Paperclip, Smile, Phone, Video, Plus, Info,
-  X, ChevronRight, ChevronDown, Users as UsersIcon, Briefcase, MoreVertical,
-  Reply, Forward, Link2, Bookmark, Trash2, Pin, MailOpen,
+  MessageSquare, Search, Send, Paperclip, Smile, Phone, Video, Plus, X, Users as UsersIcon,
+  MoreVertical, Reply, Forward, Link2, Bookmark, Trash2, Pin, MailOpen, PinOff,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -20,6 +19,61 @@ interface UserWithActivity extends User {
   lastMessageContent?: string;
   isUnread?: boolean;
   activityTimestamp?: number;
+}
+
+function MemberListContent({ roomId, roomType }: { roomId: string; roomType: 'team' | 'project' }) {
+  const { data: roomDetails, isLoading } = useQuery({
+    queryKey: ['chat-room-details', roomId],
+    queryFn: () => chatApi.getRoomDetails(roomId),
+    enabled: !!roomId,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="animate-spin h-8 w-8 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+      </div>
+    );
+  }
+
+  const members = roomDetails?.memberships || [];
+
+  if (members.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <UsersIcon className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+        <p className="text-sm text-gray-500">No members found</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1">
+      {members.map((member) => (
+        <div
+          key={member.user.id}
+          className="flex items-center gap-2 p-2 rounded hover:bg-gray-50 transition-colors"
+        >
+          <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center font-semibold text-white text-xs flex-shrink-0">
+            {member.user.full_name?.charAt(0).toUpperCase() || member.user.username.charAt(0).toUpperCase()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium text-gray-900 truncate">
+              {member.user.full_name || member.user.username}
+            </p>
+            <p className="text-[10px] text-gray-500 truncate">
+              {member.user.email}
+            </p>
+          </div>
+          {member.room_role && member.room_role !== 'member' && (
+            <span className="px-1.5 py-0.5 text-[10px] font-medium bg-blue-100 text-blue-700 rounded">
+              {member.room_role}
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function TeamChatModern() {
@@ -59,12 +113,12 @@ export function TeamChatModern() {
   const [userLastActivity, setUserLastActivity] = useState<Map<number, number>>(new Map());
 
   // Sidebar section states
-  const [isChatSectionOpen, setIsChatSectionOpen] = useState(true);
-  const [isProjectsSectionOpen, setIsProjectsSectionOpen] = useState(false);
-  const [isTeamsSectionOpen, setIsTeamsSectionOpen] = useState(false);
   const [isCreateTeamModalOpen, setIsCreateTeamModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('chats');
   const [headerView, setHeaderView] = useState<'chat' | 'shared'>('chat');
+  const [showHeaderMenu, setShowHeaderMenu] = useState(false);
+  const [showMemberList, setShowMemberList] = useState(false);
+  const headerMenuRef = useRef<HTMLDivElement>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -72,6 +126,20 @@ export function TeamChatModern() {
   const gatewaySocketRef = useRef<GatewayWebSocketService | null>(null);
   const isGatewayInitialized = useRef(false);
   const activeRoomRef = useRef<ChatRoom | null>(null);
+
+  // Click outside handler for header menu
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (headerMenuRef.current && !headerMenuRef.current.contains(event.target as Node)) {
+        setShowHeaderMenu(false);
+      }
+    };
+
+    if (showHeaderMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showHeaderMenu]);
 
   // 1. Fetch Users List
   const { data: usersData, isLoading: isLoadingUsers } = useQuery({
@@ -98,7 +166,7 @@ export function TeamChatModern() {
     refetchOnMount: 'always',
   });
 
-  // 1e. Fetch Initial Unread Counts (MOVED UP: Must be declared before use in useMemo)
+  // 1e. Fetch Initial Unread Counts
   const { data: unreadData } = useQuery({
     queryKey: ['chat-unread-counts'],
     queryFn: () => chatApi.getUnreadCount(),
@@ -106,10 +174,75 @@ export function TeamChatModern() {
     staleTime: 0,
   });
 
-  // Sort Teams by Last Message Time (Priority to Unread Data)
+  // Fetch room details for all rooms to get favourite status on initial load
+  // Using state to track when room details are loaded
+  const [roomDetailsLoaded, setRoomDetailsLoaded] = useState(false);
+
+  useEffect(() => {
+    const fetchAllRoomDetails = async () => {
+      const allPromises: Promise<any>[] = [];
+
+      // Fetch private room details
+      if (privateRoomsData) {
+        privateRoomsData.forEach((room: ChatRoom) => {
+          const promise = queryClient.fetchQuery({
+            queryKey: ['chat-room-details', room.id],
+            queryFn: () => chatApi.getRoomDetails(room.id),
+            staleTime: 5 * 60 * 1000,
+          });
+          allPromises.push(promise);
+        });
+      }
+
+      // Fetch project room details
+      if (projectRoomsData) {
+        projectRoomsData.forEach((room: ProjectChatRoom) => {
+          const promise = queryClient.fetchQuery({
+            queryKey: ['chat-room-details', room.id],
+            queryFn: () => chatApi.getRoomDetails(room.id),
+            staleTime: 5 * 60 * 1000,
+          });
+          allPromises.push(promise);
+        });
+      }
+
+      // Fetch team room details
+      if (teamRoomsData) {
+        teamRoomsData.forEach((room: TeamChatRoom) => {
+          const promise = queryClient.fetchQuery({
+            queryKey: ['chat-room-details', room.id],
+            queryFn: () => chatApi.getRoomDetails(room.id),
+            staleTime: 5 * 60 * 1000,
+          });
+          allPromises.push(promise);
+        });
+      }
+
+      if (allPromises.length > 0) {
+        await Promise.all(allPromises);
+        setRoomDetailsLoaded(true);
+        setChatListVersion(prev => prev + 1);
+      }
+    };
+
+    if ((privateRoomsData || projectRoomsData || teamRoomsData) && !roomDetailsLoaded) {
+      fetchAllRoomDetails();
+    }
+  }, [privateRoomsData, projectRoomsData, teamRoomsData, queryClient, roomDetailsLoaded]);
+
+  // Sort Teams by Last Message Time 
   const teamRooms = useMemo(() => {
     if (!teamRoomsData) return [];
     return [...teamRoomsData].sort((a, b) => {
+      const roomDetailsA = queryClient.getQueryData(['chat-room-details', a.id]) as ChatRoom | undefined;
+      const roomDetailsB = queryClient.getQueryData(['chat-room-details', b.id]) as ChatRoom | undefined;
+      const isFavouriteA = roomDetailsA?.current_user_membership?.is_favourite || false;
+      const isFavouriteB = roomDetailsB?.current_user_membership?.is_favourite || false;
+
+      if (isFavouriteA !== isFavouriteB) {
+        return isFavouriteA ? -1 : 1;
+      }
+
       // 1. Get timestamp from Room object
       let timeA = (a.last_message as any)?.created_at ? new Date((a.last_message as any).created_at).getTime() : 0;
       let timeB = (b.last_message as any)?.created_at ? new Date((b.last_message as any).created_at).getTime() : 0;
@@ -131,7 +264,7 @@ export function TeamChatModern() {
       // Fallback to Alphabetical
       return a.name.localeCompare(b.name);
     });
-  }, [teamRoomsData, unreadData]);
+  }, [teamRoomsData, unreadData, queryClient, chatListVersion]);
 
   // Map AND Sort Project rooms by Last Message Time (Priority to Unread Data)
   const projectRooms = useMemo(() => {
@@ -141,6 +274,16 @@ export function TeamChatModern() {
     }));
 
     return normalized.sort((a, b) => {
+      // Priority 0: Favourite status (favourites first)
+      const roomDetailsA = queryClient.getQueryData(['chat-room-details', a.id]) as ChatRoom | undefined;
+      const roomDetailsB = queryClient.getQueryData(['chat-room-details', b.id]) as ChatRoom | undefined;
+      const isFavouriteA = roomDetailsA?.current_user_membership?.is_favourite || false;
+      const isFavouriteB = roomDetailsB?.current_user_membership?.is_favourite || false;
+
+      if (isFavouriteA !== isFavouriteB) {
+        return isFavouriteA ? -1 : 1;
+      }
+
       // 1. Get timestamp from Room object
       let timeA = a.last_message?.created_at ? new Date(a.last_message.created_at).getTime() : 0;
       let timeB = b.last_message?.created_at ? new Date(b.last_message.created_at).getTime() : 0;
@@ -162,7 +305,7 @@ export function TeamChatModern() {
       // Fallback to Alphabetical
       return a.name.localeCompare(b.name);
     });
-  }, [projectRoomsData, unreadData]);
+  }, [projectRoomsData, unreadData, queryClient, chatListVersion]);
 
   // Sync unread API data with local state & Map Private Rooms to Users
   useEffect(() => {
@@ -477,6 +620,11 @@ export function TeamChatModern() {
       activeRoomRef.current = roomData;
       queryClient.setQueryData(['chat-room', roomData.id], roomData);
 
+      // Prefetch room details for favourite status
+      queryClient.prefetchQuery({
+        queryKey: ['chat-room-details', roomData.id],
+        queryFn: () => chatApi.getRoomDetails(roomData.id),
+      });
 
       // Map room ID to user ID
       setRoomUserMap(prev => {
@@ -499,11 +647,22 @@ export function TeamChatModern() {
 
   const { data: messagesData, isLoading: isLoadingMessages } = useQuery({
     queryKey: ['chat-messages', activeRoom?.id || selectedProjectRoom?.id || selectedTeamRoom?.id],
-    queryFn: () => {
+    queryFn: async () => {
       const roomId = activeRoom?.id || selectedProjectRoom?.id || selectedTeamRoom?.id;
-      return roomId
-        ? chatApi.getRoomMessages(roomId)
-        : Promise.resolve({ messages: [], count: 0, has_more: false });
+      if (!roomId) {
+        return Promise.resolve({ messages: [], count: 0, has_more: false });
+      }
+
+      // Fetch messages
+      const messages = await chatApi.getRoomMessages(roomId);
+      try {
+        await chatApi.markAsRead(roomId);
+        queryClient.invalidateQueries({ queryKey: ['chat-unread-counts'] });
+      } catch (error) {
+        console.error('Failed to mark messages as read:', error);
+      }
+
+      return messages;
     },
     enabled: !!(activeRoom || selectedProjectRoom || selectedTeamRoom),
     staleTime: 0,
@@ -560,11 +719,22 @@ export function TeamChatModern() {
   }, [users, lastMessages, userLastActivity]);
 
   // unread first, then by timestamp (Last Message), then alphabetically
+  // unread first, then by timestamp (Last Message), then alphabetically
   const sortedUsers = useMemo(() => {
     return [...usersWithActivity].sort((a, b) => {
       // Get room IDs for both users
       const roomA = userRoomMap.get(a.id);
       const roomB = userRoomMap.get(b.id);
+
+      // Priority 0: Favourite status (favourites first)
+      const roomDetailsA = roomA ? (queryClient.getQueryData(['chat-room-details', roomA]) as ChatRoom | undefined) : undefined;
+      const roomDetailsB = roomB ? (queryClient.getQueryData(['chat-room-details', roomB]) as ChatRoom | undefined) : undefined;
+      const isFavouriteA = roomDetailsA?.current_user_membership?.is_favourite || false;
+      const isFavouriteB = roomDetailsB?.current_user_membership?.is_favourite || false;
+
+      if (isFavouriteA !== isFavouriteB) {
+        return isFavouriteA ? -1 : 1;
+      }
 
       // Priority 1: Unread messages
       const unreadA = roomA ? (unreadCounts.get(roomA) || 0) : 0;
@@ -593,7 +763,7 @@ export function TeamChatModern() {
       const nameB = b.first_name || b.username;
       return nameA.localeCompare(nameB);
     });
-  }, [usersWithActivity, unreadCounts, userRoomMap, chatListVersion, userLastActivity]);
+  }, [usersWithActivity, unreadCounts, userRoomMap, chatListVersion, userLastActivity, queryClient]);
 
   const filteredUsers = useMemo(() => {
     if (!searchQuery) return sortedUsers;
@@ -676,6 +846,13 @@ export function TeamChatModern() {
       newMap.set(projectRoom.id, 0);
       return newMap;
     });
+
+    // Prefetch room details for favourite status
+    queryClient.prefetchQuery({
+      queryKey: ['chat-room-details', projectRoom.id],
+      queryFn: () => chatApi.getRoomDetails(projectRoom.id),
+    });
+
     queryClient.resetQueries({ queryKey: ['chat-messages'] });
     queryClient.invalidateQueries({ queryKey: ['chat-messages', projectRoom.id] });
   };
@@ -693,6 +870,12 @@ export function TeamChatModern() {
       const newMap = new Map(prev);
       newMap.set(teamRoom.id, 0);
       return newMap;
+    });
+
+    // Prefetch room details for favourite status
+    queryClient.prefetchQuery({
+      queryKey: ['chat-room-details', teamRoom.id],
+      queryFn: () => chatApi.getRoomDetails(teamRoom.id),
     });
 
     // CRITICAL FIX: Reset previous messages and fetch new ones
@@ -998,6 +1181,33 @@ export function TeamChatModern() {
     },
   });
 
+  // Toggle Favourite Mutation
+  const toggleFavouriteMutation = useMutation({
+    mutationFn: ({ roomId, isFavourite }: { roomId: string; isFavourite: boolean }) =>
+      chatApi.updateRoomSettings(roomId, { is_favourite: isFavourite }),
+    onSuccess: async (response, { roomId, isFavourite }) => {
+      console.log('✅ Favourite updated successfully:', { roomId, isFavourite, response });
+
+      // Immediately fetch updated room details to update cache
+      const updatedRoomDetails = await chatApi.getRoomDetails(roomId);
+      queryClient.setQueryData(['chat-room-details', roomId], updatedRoomDetails);
+
+      // Invalidate related queries to trigger re-fetch
+      queryClient.invalidateQueries({ queryKey: ['private-chat-rooms'] });
+      queryClient.invalidateQueries({ queryKey: ['project-chat-rooms'] });
+      queryClient.invalidateQueries({ queryKey: ['team-chat-rooms'] });
+
+      // Force a re-render by updating chat list version
+      setChatListVersion(prev => prev + 1);
+
+      setShowHeaderMenu(false);
+    },
+    onError: (error) => {
+      console.error('Failed to update favourite status:', error);
+      alert('Failed to update favourite status. Please try again.');
+    },
+  });
+
 
   // Toast Notification Component
   const ToastNotificationComponent = ({ toast }: { toast: ToastNotification }) => (
@@ -1057,7 +1267,7 @@ export function TeamChatModern() {
         </div>
 
         {/* Tab Navigation */}
-       <Tabs.Root value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0 bg-white">
+       <Tabs.Root value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
           <Tabs.List className="flex items-center gap-1 px-3 py-2 bg-white border-b border-gray-200">
             <Tabs.Trigger
               value="chats"
@@ -1090,92 +1300,82 @@ export function TeamChatModern() {
             <Tabs.Content value="chats">
               {/* Chats Section */}
               <div className="bg-white">
-                <button
-                  onClick={() => setIsChatSectionOpen(!isChatSectionOpen)}
-                  className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4 text-gray-600" />
-                    <span className="text-sm font-medium text-gray-900">Chats</span>
-                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                      {filteredUsers.length}
-                    </span>
-                  </div>
-                  {isChatSectionOpen ? (
-                    <ChevronDown className="h-4 w-4 text-gray-600" />
+                <div className="border-t border-gray-100">
+                  {isLoadingUsers ? (
+                    <div className="p-4 text-center">
+                      <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                    </div>
+                  ) : filteredUsers.length === 0 ? (
+                    <div className="p-4 text-center text-sm text-gray-500">No users found</div>
                   ) : (
-                    <ChevronRight className="h-4 w-4 text-gray-600" />
-                  )}
-                </button>
+                    filteredUsers.map(user => {
+                      const isSelected = selectedUserId === user.id;
+                      const unreadCount = getUserUnreadCount(user.id);
+                      const hasUnreadMessages = (user as any).isUnread || unreadCount > 0;
 
-                {isChatSectionOpen && (
-                  <div className="border-t border-gray-100">
-                    {isLoadingUsers ? (
-                      <div className="p-4 text-center">
-                        <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
-                      </div>
-                    ) : filteredUsers.length === 0 ? (
-                      <div className="p-4 text-center text-sm text-gray-500">No users found</div>
-                    ) : (
-                      filteredUsers.map(user => {
-                        const isSelected = selectedUserId === user.id;
-                        const unreadCount = getUserUnreadCount(user.id);
-                        const hasUnreadMessages = (user as any).isUnread || unreadCount > 0;
+                      // Get favourite status for this user
+                      const roomId = userRoomMap.get(user.id);
+                      const roomDetailsQuery = roomId ? queryClient.getQueryData(['chat-room-details', roomId]) as ChatRoom | undefined : undefined;
+                      const isFavourite = roomDetailsQuery?.current_user_membership?.is_favourite || false;
 
-                        return (
-                          <button
-                            key={user.id}
-                            onClick={() => handleUserSelect(user.id)}
-                            className={cn(
-                              "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
-                              isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
-                            )}
-                          >
-                            <div className="relative flex-shrink-0">
-                              <div className={cn(
-                                "h-10 w-10 rounded-full flex items-center justify-center font-semibold text-sm",
-                                isSelected ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-700"
-                              )}>
-                                {user.username.charAt(0).toUpperCase()}
-                              </div>
+                      return (
+                        <button
+                          key={user.id}
+                          onClick={() => handleUserSelect(user.id)}
+                          className={cn(
+                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
+                            isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
+                          )}
+                        >
+                          <div className="relative flex-shrink-0">
+                            <div className={cn(
+                              "h-10 w-10 rounded-full flex items-center justify-center font-semibold text-sm",
+                              isSelected ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-700"
+                            )}>
+                              {user.username.charAt(0).toUpperCase()}
                             </div>
-                            <div className="flex-1 min-w-0 text-left">
-                              <div className="flex items-center justify-between mb-0.5">
-                                <p className={cn(
-                                  "text-sm truncate",
-                                  hasUnreadMessages ? "font-bold text-gray-900" : "font-medium text-gray-900"
-                                )}>
-                                  {user.first_name || user.username}
-                                </p>
+                          </div>
+                          <div className="flex-1 min-w-0 text-left">
+                            <div className="flex items-center justify-between mb-0.5">
+                              <p className={cn(
+                                "text-sm truncate flex-1",
+                                hasUnreadMessages ? "font-bold text-gray-900" : "font-medium text-gray-900"
+                              )}>
+                                {user.first_name || user.username}
+                              </p>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                {isFavourite && (
+                                  <Pin className="h-3.5 w-3.5 text-blue-600" />
+                                )}
                                 {user.lastMessageTime && (
                                   <span className={cn(
-                                    "text-[10px] ml-2 flex-shrink-0",
+                                    "text-[10px]",
                                     hasUnreadMessages ? "text-blue-600 font-semibold" : "text-gray-500"
                                   )}>
                                     {new Date(user.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                   </span>
                                 )}
                               </div>
-                              <div className="flex items-center justify-between">
-                                <p className={cn(
-                                  "text-xs truncate",
-                                  hasUnreadMessages ? "font-semibold text-gray-900" : "text-gray-600"
-                                )}>
-                                  {user.lastMessageContent || 'No messages yet'}
-                                </p>
-                                {unreadCount > 0 && (
-                                  <span className="ml-2 flex-shrink-0 h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
-                                    {unreadCount}
-                                  </span>
-                                )}
-                              </div>
                             </div>
-                          </button>
-                        );
-                      })
-                    )}
-                  </div>
-                )}
+                            <div className="flex items-center justify-between">
+                              <p className={cn(
+                                "text-xs truncate",
+                                hasUnreadMessages ? "font-semibold text-gray-900" : "text-gray-600"
+                              )}>
+                                {user.lastMessageContent || 'No messages yet'}
+                              </p>
+                              {unreadCount > 0 && (
+                                <span className="ml-2 flex-shrink-0 h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
+                                  {unreadCount}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
               </div>
             </Tabs.Content>
 
@@ -1183,66 +1383,55 @@ export function TeamChatModern() {
 
               {/* Projects Section */}
               <div className="bg-white">
-                <button
-                  onClick={() => setIsProjectsSectionOpen(!isProjectsSectionOpen)}
-                  className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <Briefcase className="h-4 w-4 text-gray-600" />
-                    <span className="text-sm font-medium text-gray-900">Projects</span>
-                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                      {projectRooms.length}
-                    </span>
-                  </div>
-                  {isProjectsSectionOpen ? (
-                    <ChevronDown className="h-4 w-4 text-gray-600" />
+                <div className="border-t border-gray-100">
+                  {isLoadingProjects ? (
+                    <div className="p-4 text-center">
+                      <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                    </div>
+                  ) : projectRooms.length === 0 ? (
+                    <div className="p-4 text-center text-sm text-gray-500">No projects</div>
                   ) : (
-                    <ChevronRight className="h-4 w-4 text-gray-600" />
-                  )}
-                </button>
+                    projectRooms.map(project => {
+                      const isSelected = selectedProjectRoom?.id === project.id;
+                      const unreadCount = unreadCounts.get(project.id) || 0;
 
-                {isProjectsSectionOpen && (
-                  <div className="border-t border-gray-100">
-                    {isLoadingProjects ? (
-                      <div className="p-4 text-center">
-                        <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
-                      </div>
-                    ) : projectRooms.length === 0 ? (
-                      <div className="p-4 text-center text-sm text-gray-500">No projects</div>
-                    ) : (
-                      projectRooms.map(project => {
-                        const isSelected = selectedProjectRoom?.id === project.id;
-                        const unreadCount = unreadCounts.get(project.id) || 0;
+                      // Get favourite status for this project
+                      const roomDetailsQuery = queryClient.getQueryData(['chat-room-details', project.id]) as ChatRoom | undefined;
+                      const isFavourite = roomDetailsQuery?.current_user_membership?.is_favourite || false;
 
-                        return (
-                          <button
-                            key={project.id}
-                            onClick={() => handleProjectClick(project)}
-                            className={cn(
-                              "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
-                              isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
+                      return (
+                        <button
+                          key={project.id}
+                          onClick={() => handleProjectClick(project)}
+                          className={cn(
+                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
+                            isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
+                          )}
+                        >
+                          <div className="h-10 w-10 rounded bg-purple-100 flex items-center justify-center font-semibold text-purple-700 text-sm flex-shrink-0">
+                            {project.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0 text-left">
+                            <p className="text-sm font-medium text-gray-900 truncate">{project.name}</p>
+                            <p className="text-xs text-gray-600 truncate">
+                              {project.last_message?.content_preview || 'No messages yet'}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {isFavourite && (
+                              <Pin className="h-3.5 w-3.5 text-blue-600" />
                             )}
-                          >
-                            <div className="h-10 w-10 rounded bg-purple-100 flex items-center justify-center font-semibold text-purple-700 text-sm flex-shrink-0">
-                              {project.name.charAt(0).toUpperCase()}
-                            </div>
-                            <div className="flex-1 min-w-0 text-left">
-                              <p className="text-sm font-medium text-gray-900 truncate">{project.name}</p>
-                              <p className="text-xs text-gray-600 truncate">
-                                {project.last_message?.content_preview || 'No messages yet'}
-                              </p>
-                            </div>
                             {unreadCount > 0 && (
-                              <span className="ml-2 flex-shrink-0 h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
+                              <span className="h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
                                 {unreadCount}
                               </span>
                             )}
-                          </button>
-                        );
-                      })
-                    )}
-                  </div>
-                )}
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
               </div>
             </Tabs.Content>
 
@@ -1250,142 +1439,111 @@ export function TeamChatModern() {
 
               {/* Teams Section */}
               <div className="bg-white">
-                <button
-                  onClick={() => setIsTeamsSectionOpen(!isTeamsSectionOpen)}
-                  className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <UsersIcon className="h-4 w-4 text-gray-600" />
-                    <span className="text-sm font-medium text-gray-900">Teams</span>
-                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                      {teamRooms.length}
-                    </span>
-                  </div>
-                  {isTeamsSectionOpen ? (
-                    <ChevronDown className="h-4 w-4 text-gray-600" />
+                <div className="border-t border-gray-100">
+                  {isLoadingTeams ? (
+                    <div className="p-4 text-center">
+                      <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+                    </div>
+                  ) : teamRooms.length === 0 ? (
+                    <div className="p-4 text-center text-sm text-gray-500">No teams</div>
                   ) : (
-                    <ChevronRight className="h-4 w-4 text-gray-600" />
-                  )}
-                </button>
+                    teamRooms.map(team => {
+                      const isSelected = selectedTeamRoom?.id === team.id;
+                      const unreadCount = unreadCounts.get(team.id) || 0;
 
-                {isTeamsSectionOpen && (
-                  <div className="border-t border-gray-100">
-                    {isLoadingTeams ? (
-                      <div className="p-4 text-center">
-                        <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
-                      </div>
-                    ) : teamRooms.length === 0 ? (
-                      <div className="p-4 text-center text-sm text-gray-500">No teams</div>
-                    ) : (
-                      teamRooms.map(team => {
-                        const isSelected = selectedTeamRoom?.id === team.id;
-                        const unreadCount = unreadCounts.get(team.id) || 0;
+                      // Get favourite status for this team
+                      const roomDetailsQuery = queryClient.getQueryData(['chat-room-details', team.id]) as ChatRoom | undefined;
+                      const isFavourite = roomDetailsQuery?.current_user_membership?.is_favourite || false;
 
-                        return (
-                          <button
-                            key={team.id}
-                            onClick={() => handleTeamClick(team)}
-                            className={cn(
-                              "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
-                              isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
+                      return (
+                        <button
+                          key={team.id}
+                          onClick={() => handleTeamClick(team)}
+                          className={cn(
+                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
+                            isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
+                          )}
+                        >
+                          <div className="h-10 w-10 rounded bg-green-100 flex items-center justify-center font-semibold text-green-700 text-sm flex-shrink-0">
+                            {team.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0 text-left">
+                            <p className="text-sm font-medium text-gray-900 truncate">{team.name}</p>
+                            <p className="text-xs text-gray-600 truncate">Team Chat</p>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {isFavourite && (
+                              <Pin className="h-3.5 w-3.5 text-blue-600" />
                             )}
-                          >
-                            <div className="h-10 w-10 rounded bg-green-100 flex items-center justify-center font-semibold text-green-700 text-sm flex-shrink-0">
-                              {team.name.charAt(0).toUpperCase()}
-                            </div>
-                            <div className="flex-1 min-w-0 text-left">
-                              <p className="text-sm font-medium text-gray-900 truncate">{team.name}</p>
-                              <p className="text-xs text-gray-600 truncate">Team Chat</p>
-                            </div>
                             {unreadCount > 0 && (
-                              <span className="ml-2 flex-shrink-0 h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
+                              <span className="h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
                                 {unreadCount}
                               </span>
                             )}
-                          </button>
-                        );
-                      })
-                    )}
-                  </div>
-                )}
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
               </div>
             </Tabs.Content>
 
-           <Tabs.Content value="unread">
+            <Tabs.Content value="unread">
               {/* Unread Section */}
               <div className="bg-white">
-                <button
-                  onClick={() => setIsChatSectionOpen(!isChatSectionOpen)}
-                  className="w-full px-4 py-2.5 flex items-center justify-between hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <MailOpen className="h-4 w-4 text-gray-600" />
-                    <span className="text-sm font-medium text-gray-900">Unread Messages</span>
-                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-                      {unreadUsers.length}
-                    </span>
-                  </div>
-                  {isChatSectionOpen ? (
-                    <ChevronDown className="h-4 w-4 text-gray-600" />
+                <div className="border-t border-gray-100">
+                  {unreadUsers.length === 0 ? (
+                    <div className="p-4 text-center text-sm text-gray-500">No unread messages</div>
                   ) : (
-                    <ChevronRight className="h-4 w-4 text-gray-600" />
+                    unreadUsers.map(user => {
+                      const isSelected = selectedUserId === user.id;
+                      const unreadCount = getUserUnreadCount(user.id);
+
+                      return (
+                        <button
+                          key={user.id}
+                          onClick={() => handleUserSelect(user.id)}
+                          className={cn(
+                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
+                            isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
+                          )}
+                        >
+                          <div className="relative flex-shrink-0">
+                            <div className={cn(
+                              "h-10 w-10 rounded-full flex items-center justify-center font-semibold text-sm",
+                              isSelected ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-700"
+                            )}>
+                              {user.username.charAt(0).toUpperCase()}
+                            </div>
+                          </div>
+                          <div className="flex-1 min-w-0 text-left">
+                            <div className="flex items-center justify-between mb-0.5">
+                              <p className="text-sm font-bold text-gray-900 truncate">
+                                {user.first_name || user.username}
+                              </p>
+                              {user.lastMessageTime && (
+                                <span className="text-[10px] ml-2 flex-shrink-0 text-blue-600 font-semibold">
+                                  {new Date(user.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs font-semibold text-gray-900 truncate">
+                                {user.lastMessageContent || 'No messages yet'}
+                              </p>
+                              {unreadCount > 0 && (
+                                <span className="ml-2 flex-shrink-0 h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
+                                  {unreadCount}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })
                   )}
-                </button>
-
-                {isChatSectionOpen && (
-                  <div className="border-t border-gray-100">
-                    {unreadUsers.length === 0 ? (
-                      <div className="p-4 text-center text-sm text-gray-500">No unread messages</div>
-                    ) : (
-                      unreadUsers.map(user => {
-                        const isSelected = selectedUserId === user.id;
-                        const unreadCount = getUserUnreadCount(user.id);
-
-                        return (
-                          <button
-                            key={user.id}
-                            onClick={() => handleUserSelect(user.id)}
-                            className={cn(
-                              "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
-                              isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
-                            )}
-                          >
-                            <div className="relative flex-shrink-0">
-                              <div className={cn(
-                                "h-10 w-10 rounded-full flex items-center justify-center font-semibold text-sm",
-                                isSelected ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-700"
-                              )}>
-                                {user.username.charAt(0).toUpperCase()}
-                              </div>
-                            </div>
-                            <div className="flex-1 min-w-0 text-left">
-                              <div className="flex items-center justify-between mb-0.5">
-                                <p className="text-sm font-bold text-gray-900 truncate">
-                                  {user.first_name || user.username}
-                                </p>
-                                {user.lastMessageTime && (
-                                  <span className="text-[10px] ml-2 flex-shrink-0 text-blue-600 font-semibold">
-                                    {new Date(user.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex items-center justify-between">
-                                <p className="text-xs font-semibold text-gray-900 truncate">
-                                  {user.lastMessageContent || 'No messages yet'}
-                                </p>
-                                {unreadCount > 0 && (
-                                  <span className="ml-2 flex-shrink-0 h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
-                                    {unreadCount}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </button>
-                        );
-                      })
-                    )}
-                  </div>
-                )}
+                </div>
               </div>
             </Tabs.Content>
           </div>
@@ -1455,9 +1613,71 @@ export function TeamChatModern() {
                 <button className="p-2 hover:bg-gray-100 rounded transition-colors">
                   <Video className="h-4 w-4 text-gray-600" />
                 </button>
-                <button className="p-2 hover:bg-gray-100 rounded transition-colors">
-                  <Info className="h-4 w-4 text-gray-600" />
-                </button>
+                <div className="relative" ref={headerMenuRef}>
+                  <button
+                    onClick={() => setShowHeaderMenu(!showHeaderMenu)}
+                    className="p-2 hover:bg-gray-100 rounded transition-colors"
+                  >
+                    <MoreVertical className="h-4 w-4 text-gray-600" />
+                  </button>
+
+                  {showHeaderMenu && (
+                    <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                      <button
+                        onClick={() => {
+                          const roomId = selectedProjectRoom?.id || selectedTeamRoom?.id || activeRoom?.id;
+                          if (roomId) {
+                            // Fetch current favourite status from the query cache
+                            const roomDetailsQuery = queryClient.getQueryData(['chat-room-details', roomId]) as ChatRoom | undefined;
+                            const currentFavourite = roomDetailsQuery?.current_user_membership?.is_favourite || false;
+
+                            console.log('🔖 Toggle Favourite:', { roomId, currentFavourite, newValue: !currentFavourite });
+                            toggleFavouriteMutation.mutate({ roomId, isFavourite: !currentFavourite });
+                          } else {
+                            console.error('❌ No room ID available for favourite toggle');
+                          }
+                        }}
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                      >
+                        {(() => {
+                          const roomId = selectedProjectRoom?.id || selectedTeamRoom?.id || activeRoom?.id;
+                          const roomDetailsQuery = roomId ? queryClient.getQueryData(['chat-room-details', roomId]) as ChatRoom | undefined : undefined;
+                          const isFavourite = roomDetailsQuery?.current_user_membership?.is_favourite || false;
+                          return isFavourite ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />;
+                        })()}
+                        {(() => {
+                          const roomId = selectedProjectRoom?.id || selectedTeamRoom?.id || activeRoom?.id;
+                          const roomDetailsQuery = roomId ? queryClient.getQueryData(['chat-room-details', roomId]) as ChatRoom | undefined : undefined;
+                          const isFavourite = roomDetailsQuery?.current_user_membership?.is_favourite || false;
+                          return isFavourite ? 'Remove from favourites' : 'Add to favourites';
+                        })()}
+                      </button>
+
+                      {(selectedTeamRoom || selectedProjectRoom) && (
+                        <>
+                          <button
+                            onClick={() => setShowMemberList(!showMemberList)}
+                            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                          >
+                            <UsersIcon className="h-4 w-4" />
+                            Member list
+                          </button>
+
+                          {showMemberList && (
+                            <div className="border-t border-gray-200 mt-1 pt-2 px-2 max-h-64 overflow-y-auto">
+                              {selectedTeamRoom && (
+                                <MemberListContent roomId={selectedTeamRoom.id} roomType="team" />
+                              )}
+                              {selectedProjectRoom && (
+                                <MemberListContent roomId={selectedProjectRoom.id} roomType="project" />
+                              )}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -1939,21 +2159,19 @@ export function TeamChatModern() {
           </div>
         )}
       </div>
-      {
-        isCreateTeamModalOpen && (
-          <CreateTeamModal
-            isOpen={isCreateTeamModalOpen}
-            onClose={() => setIsCreateTeamModalOpen(false)}
-            onSuccess={() => {
-              setIsCreateTeamModalOpen(false);
-              queryClient.invalidateQueries({
-                queryKey: ['team-chat-rooms'],
-                refetchType: 'active'
-              });
-            }}
-          />
-        )
-      }
+      {isCreateTeamModalOpen && (
+        <CreateTeamModal
+          isOpen={isCreateTeamModalOpen}
+          onClose={() => setIsCreateTeamModalOpen(false)}
+          onSuccess={() => {
+            setIsCreateTeamModalOpen(false);
+            queryClient.invalidateQueries({
+              queryKey: ['team-chat-rooms'],
+              refetchType: 'active'
+            });
+          }}
+        />
+      )}
     </div>
   );
 }
