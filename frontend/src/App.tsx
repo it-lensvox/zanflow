@@ -122,7 +122,9 @@ function AppRoutes() {
       <Route
         path="/login"
         element={
-          isAuthenticated ? <Navigate to="/users" replace /> : <Login />
+          isAuthenticated
+            ? <Navigate to="/users" replace />
+            : <Suspense fallback={<PageLoader />}><Login /></Suspense>
         }
       />
 
@@ -211,9 +213,7 @@ function App() {
   return (
     <AuthProvider>
       <WebSocketProvider>
-        <Suspense fallback={<PageLoader />}>
-          <AppRoutes />
-        </Suspense>
+        <AppRoutes />
       </WebSocketProvider>
     </AuthProvider>
   );
