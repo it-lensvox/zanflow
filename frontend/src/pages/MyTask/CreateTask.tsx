@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { X, Calendar, CheckCircle, AlertCircle, ArrowLeft, Briefcase, User, Flag, Paperclip, Type, Sparkles, Plus, Link, Trash2 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -486,67 +486,32 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                                 </div>
                             )}
 
-                        <div className="p-5 space-y-4">
-                            {/* Project Selection */}
-                            <div className="relative" data-dropdown="project">
-                                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                                    <Briefcase className="w-4 h-4" />
-                                    Project <span className="text-red-500">*</span>
-                                </label>
-                                <div
-                                    className={`w-full p-2.5 rounded border border-gray-300 bg-white flex flex-wrap gap-2 min-h-[42px] ${fixedProjectId ? 'cursor-not-allowed bg-gray-50' : 'cursor-pointer hover:border-gray-400'
-                                        } transition-colors`}
-                                    onClick={() => {
-                                        if (!fixedProjectId) {
-                                            setProjectDropdownOpen(true);
-                                            setTimeout(() => projectSearchInputRef.current?.focus(), 0);
-                                        }
-                                    }}
-                                >
-                                    {projectsLoading ? (
-                                        <span className="text-gray-400 text-sm flex items-center gap-2">
-                                            <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                                            Loading projects...
-                                        </span>
-                                    ) : selectedProjects.length === 0 ? (
-                                        !projectDropdownOpen ? (
-                                            <span className="text-gray-400 text-sm">Search project</span>
-                                        ) : (
-                                            <input
-                                                ref={projectSearchInputRef}
-                                                type="text"
-                                                value={projectSearchInput}
-                                                onChange={(e) => setProjectSearchInput(e.target.value)}
-                                                onClick={(e) => e.stopPropagation()}
-                                                placeholder="Search project"
-                                                className="flex-1 min-w-[120px] outline-none text-sm text-gray-400"
-                                            />
-                                        )
-                                    ) : (
-                                        <>
-                                            {selectedProjects.map((projectId) => {
-                                                const project = allProjectOptions.find(p => p.id === projectId);
-                                                if (!project) return null;
-                                                return (
-                                                    <span key={projectId} className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-sm font-medium flex items-center gap-1">
-                                                        {project.name}
-                                                        {!fixedProjectId && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setSelectedProjects([]);
-                                                                    setProjectSearchInput('');
-                                                                }}
-                                                                className="hover:text-red-600"
-                                                            >
-                                                                ×
-                                                            </button>
-                                                        )}
-                                                    </span>
-                                                );
-                                            })}
-                                            {!fixedProjectId && projectDropdownOpen && (
+                            <div className="p-5 space-y-4">
+                                {/* Project Selection */}
+                                <div className="relative" data-dropdown="project">
+                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                                        <Briefcase className="w-4 h-4" />
+                                        Project <span className="text-red-500">*</span>
+                                    </label>
+                                    <div
+                                        className={`w-full p-2.5 rounded border border-gray-300 bg-white flex flex-wrap gap-2 min-h-[42px] ${fixedProjectId ? 'cursor-not-allowed bg-gray-50' : 'cursor-pointer hover:border-gray-400'
+                                            } transition-colors`}
+                                        onClick={() => {
+                                            if (!fixedProjectId) {
+                                                setProjectDropdownOpen(true);
+                                                setTimeout(() => projectSearchInputRef.current?.focus(), 0);
+                                            }
+                                        }}
+                                    >
+                                        {projectsLoading ? (
+                                            <span className="text-gray-400 text-sm flex items-center gap-2">
+                                                <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                                                Loading projects...
+                                            </span>
+                                        ) : selectedProjects.length === 0 ? (
+                                            !projectDropdownOpen ? (
+                                                <span className="text-gray-400 text-sm">Search project</span>
+                                            ) : (
                                                 <input
                                                     ref={projectSearchInputRef}
                                                     type="text"
@@ -556,537 +521,572 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                                                     placeholder="Search project"
                                                     className="flex-1 min-w-[120px] outline-none text-sm text-gray-400"
                                                 />
-                                            )}
-                                        </>
-                                    )}
-                                </div>
-                                {projectDropdownOpen && !fixedProjectId && (
-                                    <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
-                                        {filteredProjectOptions.length > 0 ? (
-                                            filteredProjectOptions.map((project) => (
-                                                <div
-                                                    key={project.id}
-                                                    className="px-4 py-2.5 hover:bg-gray-50 cursor-pointer text-sm"
-                                                    onClick={() => {
-                                                        setSelectedProjects([project.id]);
-                                                        setProjectDropdownOpen(false);
-                                                        setProjectSearchInput('');
-                                                    }}
-                                                >
-                                                    {project.name}
-                                                </div>
-                                            ))
+                                            )
                                         ) : (
-                                            <div className="px-4 py-2.5 text-sm text-gray-500 text-center">
-                                                No projects found
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Task Title */}
-                            <div>
-                                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                                    <Type className="w-4 h-4" />
-                                    Task title <span className="text-red-500">*</span>
-                                </label>
-                                <div className="relative">
-                                    <input
-                                        type="text"
-                                        value={heading}
-                                        onChange={(e) => setHeading(e.target.value)}
-                                        className="w-full p-2.5 pr-10 rounded border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
-                                        placeholder="Enter a concise task title"
-                                        required
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={handleRefineTitle}
-                                        disabled={isTitleRefining || !heading.trim()}
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-purple-600 hover:bg-purple-50 rounded-full transition-colors disabled:opacity-50"
-                                        title="Optimize with AI"
-                                    >
-                                        {isTitleRefining ? (
-                                            <div className="w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
-                                        ) : (
-                                            <Sparkles className="w-4 h-4" />
-                                        )}
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/*  Description Section */}
-                            <div>
-                                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                                    Description
-                                    <button
-                                        type="button"
-                                        onClick={handleRefineDescription}
-                                        disabled={isDescRefining}
-                                        className="ml-auto p-1.5 hover:bg-purple-50 text-purple-600 rounded transition-colors flex items-center gap-1"
-                                        title="Refine/Generate Description with AI"
-                                    >
-                                        {isDescRefining ? (
-                                            <div className="w-3.5 h-3.5 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
-                                        ) : (
-                                            <Sparkles className="w-4 h-4" />
-                                        )}
-                                    </button>
-                                </label>
-                                <RichTextEditor
-                                    value={description}
-                                    onChange={setDescription}
-                                    placeholder="Type @ to mention a teammate and notify them about this work item."
-                                    minHeight="200px"
-                                    maxHeight="400px"
-                                    features={{
-                                        bold: true,
-                                        italic: true,
-                                        underline: true,
-                                        strikethrough: true,
-                                        code: true,
-                                        codeBlock: true,
-                                        link: true,
-                                        bulletList: true,
-                                        orderedList: true,
-                                        blockquote: true,
-                                        horizontalRule: true,
-                                        table: true,
-                                        image: true,
-                                        heading: true,
-                                        textAlign: true,
-                                    }}
-                                />
-                            </div>
-
-                            {/* Link Field */}
-                            <div>
-                                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                                    <Link className="w-4 h-4" />
-                                    Links
-                                </label>
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={linkInput}
-                                        onChange={(e) => setLinkInput(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddLink())}
-                                        placeholder="Paste URL here..."
-                                        className="flex-1 p-2.5 rounded border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={handleAddLink}
-                                        className="p-2.5 bg-blue-50 text-blue-600 rounded border border-blue-200 hover:bg-blue-100 transition-colors"
-                                    >
-                                        <Plus className="w-5 h-5" />
-                                    </button>
-                                </div>
-                                {links.length > 0 && (
-                                    <div className="mt-3 space-y-2">
-                                        {links.map((link, index) => (
-                                            <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-200 group">
-                                                <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                    <Link className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                                                    <a
-                                                        href={link.startsWith('http') ? link : `https://${link}`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-sm text-blue-600 hover:underline truncate"
-                                                    >
-                                                        {link}
-                                                    </a>
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removeLink(index)}
-                                                    className="p-1 text-gray-400 hover:text-red-600 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="border-t border-gray-200 pt-4">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {/* Status */}
-                                    <div>
-                                        <label className="text-sm font-medium text-gray-700 mb-2 block">
-                                            Status
-                                        </label>
-                                        <div className="relative" data-dropdown="status">
-                                            <div
-                                                className="w-full p-2.5 rounded border border-gray-300 hover:border-gray-400 cursor-pointer bg-white flex items-center justify-between min-h-[42px] transition-colors"
-                                                onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
-                                            >
-                                                <span className="text-sm text-gray-700">
-                                                    {statusOptions.find(opt => opt.value === status)?.label || 'Select status'}
-                                                </span>
-                                                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                                </svg>
-                                            </div>
-                                            {statusDropdownOpen && (
-                                                <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
-                                                    {statusOptions.map((option) => (
-                                                        <div
-                                                            key={option.value}
-                                                            className="px-4 py-2.5 hover:bg-gray-50 cursor-pointer text-sm flex items-center justify-between"
-                                                            onClick={() => {
-                                                                setStatus(option.value);
-                                                                setStatusDropdownOpen(false);
-                                                            }}
-                                                        >
-                                                            <span>{option.label}</span>
-                                                            {status === option.value && (
-                                                                <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                                                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                                                </svg>
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Priority */}
-                                    <div>
-                                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                                            <Flag className="w-4 h-4" />
-                                            Priority
-                                        </label>
-                                        <div className="relative" data-dropdown="priority">
-                                            <div
-                                                className="w-full p-2.5 rounded border border-gray-300 hover:border-gray-400 cursor-pointer bg-white flex items-center justify-between min-h-[42px] transition-colors"
-                                                onClick={() => setPriorityDropdownOpen(!priorityDropdownOpen)}
-                                            >
-                                                <span className="text-sm text-gray-700">
-                                                    {priorityOptions.find(opt => opt.value === priority)?.icon}{' '}
-                                                    {priorityOptions.find(opt => opt.value === priority)?.label || 'Select priority'}
-                                                </span>
-                                                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                                </svg>
-                                            </div>
-                                            {priorityDropdownOpen && (
-                                                <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
-                                                    {priorityOptions.map((option) => (
-                                                        <div
-                                                            key={option.value}
-                                                            className="px-4 py-2.5 hover:bg-gray-50 cursor-pointer text-sm flex items-center justify-between"
-                                                            onClick={() => {
-                                                                setPriority(option.value);
-                                                                setPriorityDropdownOpen(false);
-                                                            }}
-                                                        >
-                                                            <span>
-                                                                {option.icon} {option.label}
-                                                            </span>
-                                                            {priority === option.value && (
-                                                                <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                                                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                                                </svg>
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Combined Date & Duration Section */}
-                                    <div className="col-span-1 md:col-span-2">
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-50/50 rounded-xl border border-gray-100 shadow-sm">
-                                            {/* Start Date */}
-                                            <div className="">
-                                                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                                                    <Calendar className="w-4 h-4" />
-                                                    Start date
-                                                </label>
-                                                <input
-                                                    type="date"
-                                                    value={startDate}
-                                                    onChange={(e) => setStartDate(e.target.value)}
-                                                    className="w-full p-2.5 rounded border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-                                                />
-                                            </div>
-
-                                            {/* End Date */}
-                                            <div>
-                                                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                                                    <Calendar className="w-4 h-4" />
-                                                    Due Date
-                                                </label>
-                                                <input
-                                                    type="date"
-                                                    value={endDate}
-                                                    onChange={(e) => setEndDate(e.target.value)}
-                                                    className="w-full p-2.5 rounded border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-                                                />
-                                            </div>
-
-                                            {/* Duration Time */}
-                                            <div className="space-y-2">
-                                                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                                                    <span className="flex items-center justify-center w-4 h-4 bg-blue-100 text-blue-600 rounded-full text-[10px]">⏱</span>
-                                                    Duration
-                                                </label>
-                                                <div className="relative">
-                                                    <input
-                                                        type="text"
-                                                        value={duration}
-                                                        onChange={handleDurationChange}
-                                                        placeholder="HH:MM:SS"
-                                                        className="w-full p-2.5 rounded border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Assignees and Labels Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {/* Assignees */}
-                                <div>
-                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                                        <User className="w-4 h-4" />
-                                        Assignees <span className="text-red-500">*</span>
-                                    </label>
-                                    <div className="relative" data-dropdown="assignee">
-                                        {/* Main input field - shows selected users + allows typing */}
-                                        <div className="w-full p-2.5 rounded border border-gray-300 hover:border-gray-400 bg-white flex flex-wrap gap-2 min-h-[42px] transition-colors">
-                                            {usersLoading ? (
-                                                <span className="text-gray-400 text-sm flex items-center gap-2">
-                                                    <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                                                    Loading users...
-                                                </span>
-                                            ) : (
-                                                <>
-                                                    {/* Selected users as chips */}
-                                                    {assignedToList.map((userId) => {
-                                                        const user = allUserOptions.find(u => u.id === userId);
-                                                        if (!user) return null;
-                                                        return (
-                                                            <span key={userId} className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-sm font-medium flex items-center gap-1">
-                                                                {user.label}
+                                            <>
+                                                {selectedProjects.map((projectId) => {
+                                                    const project = allProjectOptions.find(p => p.id === projectId);
+                                                    if (!project) return null;
+                                                    return (
+                                                        <span key={projectId} className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-sm font-medium flex items-center gap-1">
+                                                            {project.name}
+                                                            {!fixedProjectId && (
                                                                 <button
                                                                     type="button"
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
-                                                                        setAssignedToList(assignedToList.filter(id => id !== userId));
+                                                                        setSelectedProjects([]);
+                                                                        setProjectSearchInput('');
                                                                     }}
                                                                     className="hover:text-red-600"
                                                                 >
                                                                     ×
                                                                 </button>
-                                                            </span>
-                                                        );
-                                                    })}
-
-                                                    {/* Search input */}
+                                                            )}
+                                                        </span>
+                                                    );
+                                                })}
+                                                {!fixedProjectId && projectDropdownOpen && (
                                                     <input
+                                                        ref={projectSearchInputRef}
                                                         type="text"
-                                                        value={assigneeSearchInput}
-                                                        onChange={(e) => {
-                                                            setAssigneeSearchInput(e.target.value);
-                                                            setHighlightedUserIndex(0);
-                                                            setDropdownOpen(true);
-                                                        }}
-                                                        onFocus={() => {
-                                                            setDropdownOpen(true);
-                                                            setHighlightedUserIndex(0);
-                                                        }}
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === 'ArrowDown') {
-                                                                e.preventDefault();
-                                                                setHighlightedUserIndex((prev) =>
-                                                                    Math.min(prev + 1, filteredUserOptions.length - 1)
-                                                                );
-                                                            } else if (e.key === 'ArrowUp') {
-                                                                e.preventDefault();
-                                                                setHighlightedUserIndex((prev) => Math.max(prev - 1, 0));
-                                                            } else if (e.key === 'Enter') {
-                                                                e.preventDefault();
-                                                                if (filteredUserOptions[highlightedUserIndex]) {
-                                                                    setAssignedToList([...assignedToList, filteredUserOptions[highlightedUserIndex].id]);
-                                                                    setAssigneeSearchInput('');
-                                                                    setHighlightedUserIndex(0);
-                                                                }
-                                                            } else if (e.key === 'Escape') {
-                                                                setDropdownOpen(false);
-                                                                setAssigneeSearchInput('');
-                                                                setHighlightedUserIndex(0);
-                                                            } else if (e.key === 'Backspace' && assigneeSearchInput === '' && assignedToList.length > 0) {
-                                                                // Remove last selected user when backspace is pressed on empty input
-                                                                setAssignedToList(assignedToList.slice(0, -1));
-                                                            }
-                                                        }}
-                                                        placeholder={assignedToList.length === 0 ? "Assign to team members" : ""}
-                                                        className="flex-1 min-w-[120px] outline-none text-sm"
+                                                        value={projectSearchInput}
+                                                        onChange={(e) => setProjectSearchInput(e.target.value)}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        placeholder="Search project"
+                                                        className="flex-1 min-w-[120px] outline-none text-sm text-gray-400"
                                                     />
-                                                </>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                    {projectDropdownOpen && !fixedProjectId && (
+                                        <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                                            {filteredProjectOptions.length > 0 ? (
+                                                filteredProjectOptions.map((project) => (
+                                                    <div
+                                                        key={project.id}
+                                                        className="px-4 py-2.5 hover:bg-gray-50 cursor-pointer text-sm"
+                                                        onClick={() => {
+                                                            setSelectedProjects([project.id]);
+                                                            setProjectDropdownOpen(false);
+                                                            setProjectSearchInput('');
+                                                        }}
+                                                    >
+                                                        {project.name}
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <div className="px-4 py-2.5 text-sm text-gray-500 text-center">
+                                                    No projects found
+                                                </div>
                                             )}
                                         </div>
+                                    )}
+                                </div>
 
-                                        {/* Dropdown with filtered users */}
-                                        {dropdownOpen && !usersLoading && filteredUserOptions.length > 0 && (
-                                            <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
-                                                {filteredUserOptions.map((user, index) => (
-                                                    <div
-                                                        key={user.id}
-                                                        className={`px-4 py-2.5 cursor-pointer text-sm ${index === highlightedUserIndex
-                                                            ? 'bg-blue-50 text-blue-700'
-                                                            : 'hover:bg-gray-50'
-                                                            }`}
-                                                        onClick={() => {
-                                                            setAssignedToList([...assignedToList, user.id]);
-                                                            setAssigneeSearchInput('');
-                                                            setHighlightedUserIndex(0);
-                                                            setDropdownOpen(false);
-                                                        }}
-                                                        onMouseEnter={() => setHighlightedUserIndex(index)}
-                                                    >
-                                                        {user.label}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
+                                {/* Task Title */}
+                                <div>
+                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                                        <Type className="w-4 h-4" />
+                                        Task title <span className="text-red-500">*</span>
+                                    </label>
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            value={heading}
+                                            onChange={(e) => setHeading(e.target.value)}
+                                            className="w-full p-2.5 pr-10 rounded border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                                            placeholder="Enter a concise task title"
+                                            required
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleRefineTitle}
+                                            disabled={isTitleRefining || !heading.trim()}
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-purple-600 hover:bg-purple-50 rounded-full transition-colors disabled:opacity-50"
+                                            title="Optimize with AI"
+                                        >
+                                            {isTitleRefining ? (
+                                                <div className="w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
+                                            ) : (
+                                                <Sparkles className="w-4 h-4" />
+                                            )}
+                                        </button>
                                     </div>
                                 </div>
 
-                                {/* Right: Labels */}
+                                {/*  Description Section */}
                                 <div>
                                     <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                                        <Flag className="w-4 h-4 text-gray-400" />
-                                        Labels
-                                    </label>
-                                    <div className="relative" data-dropdown="label">
-                                        <div
-                                            className={`w-full p-2.5 rounded border border-gray-300 bg-white flex flex-wrap gap-2 min-h-[42px] transition-colors ${selectedProjects.length === 0 ? 'cursor-not-allowed bg-gray-50' : 'cursor-pointer hover:border-gray-400'}`}
-                                            onClick={() => selectedProjects.length > 0 && setLabelDropdownOpen(!labelDropdownOpen)}
+                                        Description
+                                        <button
+                                            type="button"
+                                            onClick={handleRefineDescription}
+                                            disabled={isDescRefining}
+                                            className="ml-auto p-1.5 hover:bg-purple-50 text-purple-600 rounded transition-colors flex items-center gap-1"
+                                            title="Refine/Generate Description with AI"
                                         >
-                                            {selectedLabelIds.length === 0 ? (
-                                                <span className="text-gray-400 text-sm">
-                                                    {selectedProjects.length === 0 ? 'Select labels' : 'Select labels'}
-                                                </span>
+                                            {isDescRefining ? (
+                                                <div className="w-3.5 h-3.5 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
                                             ) : (
-                                                selectedLabelIds.map((labelId) => {
-                                                    const label = projectLabels.find(l => l.id === labelId);
-                                                    if (!label) return null;
-                                                    return (
-                                                        <span
-                                                            key={labelId}
-                                                            className="px-2 py-1 rounded text-xs font-medium text-white flex items-center gap-1"
-                                                            style={{ backgroundColor: label.color }}
-                                                        >
-                                                            {label.name}
-                                                            <button
-                                                                type="button"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setSelectedLabelIds(prev => prev.filter(id => id !== labelId));
-                                                                }}
-                                                                className="hover:text-black/50 ml-1"
-                                                            >
-                                                                ×
-                                                            </button>
-                                                        </span>
-                                                    );
-                                                })
+                                                <Sparkles className="w-4 h-4" />
                                             )}
-                                        </div>
-                                        {labelDropdownOpen && projectLabels.length > 0 && (
-                                            <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
-                                                {projectLabels.filter(label => !selectedLabelIds.includes(label.id)).map((label) => (
-                                                    <div
-                                                        key={label.id}
-                                                        className="px-4 py-2.5 hover:bg-gray-50 cursor-pointer text-sm flex items-center justify-between gap-2"
-                                                        onClick={() => {
-                                                            setSelectedLabelIds([...selectedLabelIds, label.id]);
-                                                        }}
-                                                    >
-                                                        <div className="flex items-center gap-2">
-                                                            <span
-                                                                className="w-3 h-3 rounded-full"
-                                                                style={{ backgroundColor: label.color }}
-                                                            />
-                                                            {label.name}
-                                                        </div>
-                                                        {/* Show checkmark for labels being added (not yet saved) */}
-                                                        {selectedLabelIds.includes(label.id) && (
-                                                            <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                                                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                                            </svg>
-                                                        )}
+                                        </button>
+                                    </label>
+                                    <RichTextEditor
+                                        value={description}
+                                        onChange={setDescription}
+                                        placeholder="Type @ to mention a teammate and notify them about this work item."
+                                        minHeight="200px"
+                                        maxHeight="400px"
+                                        features={{
+                                            bold: true,
+                                            italic: true,
+                                            underline: true,
+                                            strikethrough: true,
+                                            code: true,
+                                            codeBlock: true,
+                                            link: true,
+                                            bulletList: true,
+                                            orderedList: true,
+                                            blockquote: true,
+                                            horizontalRule: true,
+                                            table: true,
+                                            image: true,
+                                            heading: true,
+                                            textAlign: true,
+                                        }}
+                                    />
+                                </div>
+
+                                {/* Link Field */}
+                                <div>
+                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                                        <Link className="w-4 h-4" />
+                                        Links
+                                    </label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={linkInput}
+                                            onChange={(e) => setLinkInput(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddLink())}
+                                            placeholder="Paste URL here..."
+                                            className="flex-1 p-2.5 rounded border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleAddLink}
+                                            className="p-2.5 bg-blue-50 text-blue-600 rounded border border-blue-200 hover:bg-blue-100 transition-colors"
+                                        >
+                                            <Plus className="w-5 h-5" />
+                                        </button>
+                                    </div>
+                                    {links.length > 0 && (
+                                        <div className="mt-3 space-y-2">
+                                            {links.map((link, index) => (
+                                                <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-200 group">
+                                                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                        <Link className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                                                        <a
+                                                            href={link.startsWith('http') ? link : `https://${link}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-sm text-blue-600 hover:underline truncate"
+                                                        >
+                                                            {link}
+                                                        </a>
                                                     </div>
-                                                ))}
-                                                {projectLabels.filter(label => !selectedLabelIds.includes(label.id)).length === 0 && (
-                                                    <div className="px-4 py-2.5 text-sm text-gray-500 italic">
-                                                        No more labels available
-                                                        <div className="sticky bottom-0 bg-white border-t border-gray-200 p-2 mt-1">
-                                                            <button
-                                                                type="button"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setLabelDropdownOpen(false);
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeLink(index)}
+                                                        className="p-1 text-gray-400 hover:text-red-600 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="border-t border-gray-200 pt-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {/* Status */}
+                                        <div>
+                                            <label className="text-sm font-medium text-gray-700 mb-2 block">
+                                                Status
+                                            </label>
+                                            <div className="relative" data-dropdown="status">
+                                                <div
+                                                    className="w-full p-2.5 rounded border border-gray-300 hover:border-gray-400 cursor-pointer bg-white flex items-center justify-between min-h-[42px] transition-colors"
+                                                    onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
+                                                >
+                                                    <span className="text-sm text-gray-700">
+                                                        {statusOptions.find(opt => opt.value === status)?.label || 'Select status'}
+                                                    </span>
+                                                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                    </svg>
+                                                </div>
+                                                {statusDropdownOpen && (
+                                                    <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                                                        {statusOptions.map((option) => (
+                                                            <div
+                                                                key={option.value}
+                                                                className="px-4 py-2.5 hover:bg-gray-50 cursor-pointer text-sm flex items-center justify-between"
+                                                                onClick={() => {
+                                                                    setStatus(option.value);
+                                                                    setStatusDropdownOpen(false);
                                                                 }}
-                                                                className="w-full px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
                                                             >
-                                                                Done {selectedLabelIds.length > 0 && `(${selectedLabelIds.length} selected)`}
-                                                            </button>
-                                                        </div>
+                                                                <span>{option.label}</span>
+                                                                {status === option.value && (
+                                                                    <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                                    </svg>
+                                                                )}
+                                                            </div>
+                                                        ))}
                                                     </div>
                                                 )}
                                             </div>
-                                        )}
-                                        {labelDropdownOpen && projectLabels.length === 0 && (
-                                            <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm text-gray-500 text-center">
-                                                No labels found for this project.
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
+                                        </div>
 
-                            {/* Attachments */}
-                            <div>
-                                <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                                    <Paperclip className="w-4 h-4" />
-                                    Attachments
-                                </label>
-                                <div
-                                    className="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-gray-400 transition-colors cursor-pointer relative bg-gray-50"
-                                    onDragOver={(e) => e.preventDefault()}
-                                    onDrop={(e) => {
-                                        e.preventDefault();
-                                        if (e.dataTransfer.files) {
-                                            const droppedFiles = Array.from(e.dataTransfer.files);
-                                            setAttachments(prev => [...prev, ...droppedFiles]);
-                                        }
-                                    }}
-                                >
-                                    <input
-                                        type="file"
-                                        multiple
-                                        onChange={handleFileChange}
-                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                        accept="*"
-                                    />
-                                    <div className="text-center">
-                                        <Paperclip className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                                        <p className="text-sm text-gray-600">
-                                            <span className="font-medium text-blue-600">Click to upload</span> or drag and drop
-                                        </p>
-                                        <p className="text-xs text-gray-500 mt-1">Videos, images, archives, code, PDFs (Max 500MB)</p>
+                                        {/* Priority */}
+                                        <div>
+                                            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                                                <Flag className="w-4 h-4" />
+                                                Priority
+                                            </label>
+                                            <div className="relative" data-dropdown="priority">
+                                                <div
+                                                    className="w-full p-2.5 rounded border border-gray-300 hover:border-gray-400 cursor-pointer bg-white flex items-center justify-between min-h-[42px] transition-colors"
+                                                    onClick={() => setPriorityDropdownOpen(!priorityDropdownOpen)}
+                                                >
+                                                    <span className="text-sm text-gray-700">
+                                                        {priorityOptions.find(opt => opt.value === priority)?.icon}{' '}
+                                                        {priorityOptions.find(opt => opt.value === priority)?.label || 'Select priority'}
+                                                    </span>
+                                                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                    </svg>
+                                                </div>
+                                                {priorityDropdownOpen && (
+                                                    <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                                                        {priorityOptions.map((option) => (
+                                                            <div
+                                                                key={option.value}
+                                                                className="px-4 py-2.5 hover:bg-gray-50 cursor-pointer text-sm flex items-center justify-between"
+                                                                onClick={() => {
+                                                                    setPriority(option.value);
+                                                                    setPriorityDropdownOpen(false);
+                                                                }}
+                                                            >
+                                                                <span>
+                                                                    {option.icon} {option.label}
+                                                                </span>
+                                                                {priority === option.value && (
+                                                                    <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                                                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                                    </svg>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Combined Date & Duration Section */}
+                                        <div className="col-span-1 md:col-span-2">
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-50/50 rounded-xl border border-gray-100 shadow-sm">
+                                                {/* Start Date */}
+                                                <div className="">
+                                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                                                        <Calendar className="w-4 h-4" />
+                                                        Start date
+                                                    </label>
+                                                    <input
+                                                        type="date"
+                                                        value={startDate}
+                                                        onChange={(e) => setStartDate(e.target.value)}
+                                                        className="w-full p-2.5 rounded border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                                                    />
+                                                </div>
+
+                                                {/* End Date */}
+                                                <div>
+                                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                                                        <Calendar className="w-4 h-4" />
+                                                        Due Date
+                                                    </label>
+                                                    <input
+                                                        type="date"
+                                                        value={endDate}
+                                                        onChange={(e) => setEndDate(e.target.value)}
+                                                        className="w-full p-2.5 rounded border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                                                    />
+                                                </div>
+
+                                                {/* Duration Time */}
+                                                <div className="space-y-2">
+                                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                                                        <span className="flex items-center justify-center w-4 h-4 bg-blue-100 text-blue-600 rounded-full text-[10px]">⏱</span>
+                                                        Duration
+                                                    </label>
+                                                    <div className="relative">
+                                                        <input
+                                                            type="text"
+                                                            value={duration}
+                                                            onChange={handleDurationChange}
+                                                            placeholder="HH:MM:SS"
+                                                            className="w-full p-2.5 rounded border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
+
+                                {/* Assignees and Labels Grid */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* Assignees */}
+                                    <div>
+                                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                                            <User className="w-4 h-4" />
+                                            Assignees <span className="text-red-500">*</span>
+                                        </label>
+                                        <div className="relative" data-dropdown="assignee">
+                                            {/* Main input field - shows selected users + allows typing */}
+                                            <div className="w-full p-2.5 rounded border border-gray-300 hover:border-gray-400 bg-white flex flex-wrap gap-2 min-h-[42px] transition-colors">
+                                                {usersLoading ? (
+                                                    <span className="text-gray-400 text-sm flex items-center gap-2">
+                                                        <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                                                        Loading users...
+                                                    </span>
+                                                ) : (
+                                                    <>
+                                                        {/* Selected users as chips */}
+                                                        {assignedToList.map((userId) => {
+                                                            const user = allUserOptions.find(u => u.id === userId);
+                                                            if (!user) return null;
+                                                            return (
+                                                                <span key={userId} className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-sm font-medium flex items-center gap-1">
+                                                                    {user.label}
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setAssignedToList(assignedToList.filter(id => id !== userId));
+                                                                        }}
+                                                                        className="hover:text-red-600"
+                                                                    >
+                                                                        ×
+                                                                    </button>
+                                                                </span>
+                                                            );
+                                                        })}
+
+                                                        {/* Search input */}
+                                                        <input
+                                                            type="text"
+                                                            value={assigneeSearchInput}
+                                                            onChange={(e) => {
+                                                                setAssigneeSearchInput(e.target.value);
+                                                                setHighlightedUserIndex(0);
+                                                                setDropdownOpen(true);
+                                                            }}
+                                                            onFocus={() => {
+                                                                setDropdownOpen(true);
+                                                                setHighlightedUserIndex(0);
+                                                            }}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'ArrowDown') {
+                                                                    e.preventDefault();
+                                                                    setHighlightedUserIndex((prev) =>
+                                                                        Math.min(prev + 1, filteredUserOptions.length - 1)
+                                                                    );
+                                                                } else if (e.key === 'ArrowUp') {
+                                                                    e.preventDefault();
+                                                                    setHighlightedUserIndex((prev) => Math.max(prev - 1, 0));
+                                                                } else if (e.key === 'Enter') {
+                                                                    e.preventDefault();
+                                                                    if (filteredUserOptions[highlightedUserIndex]) {
+                                                                        setAssignedToList([...assignedToList, filteredUserOptions[highlightedUserIndex].id]);
+                                                                        setAssigneeSearchInput('');
+                                                                        setHighlightedUserIndex(0);
+                                                                    }
+                                                                } else if (e.key === 'Escape') {
+                                                                    setDropdownOpen(false);
+                                                                    setAssigneeSearchInput('');
+                                                                    setHighlightedUserIndex(0);
+                                                                } else if (e.key === 'Backspace' && assigneeSearchInput === '' && assignedToList.length > 0) {
+                                                                    // Remove last selected user when backspace is pressed on empty input
+                                                                    setAssignedToList(assignedToList.slice(0, -1));
+                                                                }
+                                                            }}
+                                                            placeholder={assignedToList.length === 0 ? "Assign to team members" : ""}
+                                                            className="flex-1 min-w-[120px] outline-none text-sm"
+                                                        />
+                                                    </>
+                                                )}
+                                            </div>
+
+                                            {/* Dropdown with filtered users */}
+                                            {dropdownOpen && !usersLoading && filteredUserOptions.length > 0 && (
+                                                <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                                                    {filteredUserOptions.map((user, index) => (
+                                                        <div
+                                                            key={user.id}
+                                                            className={`px-4 py-2.5 cursor-pointer text-sm ${index === highlightedUserIndex
+                                                                ? 'bg-blue-50 text-blue-700'
+                                                                : 'hover:bg-gray-50'
+                                                                }`}
+                                                            onClick={() => {
+                                                                setAssignedToList([...assignedToList, user.id]);
+                                                                setAssigneeSearchInput('');
+                                                                setHighlightedUserIndex(0);
+                                                                setDropdownOpen(false);
+                                                            }}
+                                                            onMouseEnter={() => setHighlightedUserIndex(index)}
+                                                        >
+                                                            {user.label}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Right: Labels */}
+                                    <div>
+                                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                                            <Flag className="w-4 h-4 text-gray-400" />
+                                            Labels
+                                        </label>
+                                        <div className="relative" data-dropdown="label">
+                                            <div
+                                                className={`w-full p-2.5 rounded border border-gray-300 bg-white flex flex-wrap gap-2 min-h-[42px] transition-colors ${selectedProjects.length === 0 ? 'cursor-not-allowed bg-gray-50' : 'cursor-pointer hover:border-gray-400'}`}
+                                                onClick={() => selectedProjects.length > 0 && setLabelDropdownOpen(!labelDropdownOpen)}
+                                            >
+                                                {selectedLabelIds.length === 0 ? (
+                                                    <span className="text-gray-400 text-sm">
+                                                        {selectedProjects.length === 0 ? 'Select labels' : 'Select labels'}
+                                                    </span>
+                                                ) : (
+                                                    selectedLabelIds.map((labelId) => {
+                                                        const label = projectLabels.find(l => l.id === labelId);
+                                                        if (!label) return null;
+                                                        return (
+                                                            <span
+                                                                key={labelId}
+                                                                className="px-2 py-1 rounded text-xs font-medium text-white flex items-center gap-1"
+                                                                style={{ backgroundColor: label.color }}
+                                                            >
+                                                                {label.name}
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setSelectedLabelIds(prev => prev.filter(id => id !== labelId));
+                                                                    }}
+                                                                    className="hover:text-black/50 ml-1"
+                                                                >
+                                                                    ×
+                                                                </button>
+                                                            </span>
+                                                        );
+                                                    })
+                                                )}
+                                            </div>
+                                            {labelDropdownOpen && projectLabels.length > 0 && (
+                                                <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                                                    {projectLabels.filter(label => !selectedLabelIds.includes(label.id)).map((label) => (
+                                                        <div
+                                                            key={label.id}
+                                                            className="px-4 py-2.5 hover:bg-gray-50 cursor-pointer text-sm flex items-center justify-between gap-2"
+                                                            onClick={() => {
+                                                                setSelectedLabelIds([...selectedLabelIds, label.id]);
+                                                            }}
+                                                        >
+                                                            <div className="flex items-center gap-2">
+                                                                <span
+                                                                    className="w-3 h-3 rounded-full"
+                                                                    style={{ backgroundColor: label.color }}
+                                                                />
+                                                                {label.name}
+                                                            </div>
+                                                            {/* Show checkmark for labels being added (not yet saved) */}
+                                                            {selectedLabelIds.includes(label.id) && (
+                                                                <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                                </svg>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                    {projectLabels.filter(label => !selectedLabelIds.includes(label.id)).length === 0 && (
+                                                        <div className="px-4 py-2.5 text-sm text-gray-500 italic">
+                                                            No more labels available
+                                                            <div className="sticky bottom-0 bg-white border-t border-gray-200 p-2 mt-1">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setLabelDropdownOpen(false);
+                                                                    }}
+                                                                    className="w-full px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                                                                >
+                                                                    Done {selectedLabelIds.length > 0 && `(${selectedLabelIds.length} selected)`}
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                            {labelDropdownOpen && projectLabels.length === 0 && (
+                                                <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm text-gray-500 text-center">
+                                                    No labels found for this project.
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Attachments */}
+                                <div>
+                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                                        <Paperclip className="w-4 h-4" />
+                                        Attachments
+                                    </label>
+                                    <div
+                                        className="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-gray-400 transition-colors cursor-pointer relative bg-gray-50"
+                                        onDragOver={(e) => e.preventDefault()}
+                                        onDrop={(e) => {
+                                            e.preventDefault();
+                                            if (e.dataTransfer.files) {
+                                                const droppedFiles = Array.from(e.dataTransfer.files);
+                                                setAttachments(prev => [...prev, ...droppedFiles]);
+                                            }
+                                        }}
+                                    >
+                                        <input
+                                            type="file"
+                                            multiple
+                                            onChange={handleFileChange}
+                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                            accept="*"
+                                        />
+                                        <div className="text-center">
+                                            <Paperclip className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                                            <p className="text-sm text-gray-600">
+                                                <span className="font-medium text-blue-600">Click to upload</span> or drag and drop
+                                            </p>
+                                            <p className="text-xs text-gray-500 mt-1">Videos, images, archives, code, PDFs (Max 500MB)</p>
+                                        </div>
+                                    </div>
 
                                     {attachments.length > 0 && (
                                         <div className="mt-3 space-y-2">

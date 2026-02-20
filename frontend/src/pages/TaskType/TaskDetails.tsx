@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
-import { ArrowLeft, Loader2, Upload, FileText, List, Grid3X3, Settings, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Loader2, Upload, FileText, List, Grid3X3, Settings, MessageCircle, Search } from 'lucide-react';
 import { projectsApi, taskApi, documentsApi } from '@/services/api';
 import { DualView } from '@/components/layout/DualView/DualView';
 import { TaskGridCard, createTasksTableColumns } from '@/components/layout/DualView/taskConfig';
@@ -15,7 +15,7 @@ import { MediaThumbnail } from './ContentCreation';
 import { DocumentPreview, useDocumentPreviewKeyboard } from '@/components/common/DocumentPreview';
 import './TaskDetails.scss';
 import { APITesting } from './APITesting';
-import type { Task } from '@/types';
+import type { Task, TaskOption, FilteredDocument, AllDocumentsResponse } from '@/types';
 
 
 type TabType = 'tasks' | 'add_documents' | 'api_testing';
@@ -44,6 +44,13 @@ export function TaskDetails() {
     } | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+
+    // Document UI state
+    const [documentFilter, setDocumentFilter] = useState<'project' | 'task'>('project');
+    const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+    const [taskSearchQuery, setTaskSearchQuery] = useState('');
+    const [showTaskDropdown, setShowTaskDropdown] = useState(false);
+    const taskDropdownRef = useRef<HTMLDivElement>(null);
 
     const { data: project, isLoading: isProjectLoading } = useQuery({
         queryKey: ['project', id],
@@ -132,6 +139,76 @@ export function TaskDetails() {
     });
 
     const tasks = (tasksData || []) as Task[];
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (taskDropdownRef.current && !taskDropdownRef.current.contains(event.target as Node)) {
+                setShowTaskDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Handle filter change
+    const handleFilterChange = (filter: 'project' | 'task') => {
+        setDocumentFilter(filter);
+        if (filter === 'project') {
+            setSelectedTaskId(null);
+            setShowTaskDropdown(false);
+        }
+    };
+
+    // Handle task selection
+    const handleTaskSelect = (taskId: number) => {
+        setSelectedTaskId(taskId);
+        setShowTaskDropdown(false);
+        setTaskSearchQuery('');
+    };
+
+    // Fetch all documents (project + task) - ONLY once when tab opens
+    const { data: allDocumentsData, isLoading: isAllDocumentsLoading } = useQuery({
+        queryKey: ['all-documents', id],
+        queryFn: async (): Promise<AllDocumentsResponse> => {
+            return await documentsApi.getAllDocuments(Number(id));
+        },
+        enabled: activeTab === 'add_documents',
+        staleTime: Infinity,
+        gcTime: Infinity,
+    });
+
+    const allDocuments: FilteredDocument[] = allDocumentsData?.documents || [];
+
+    // Filter documents based on selected filter
+    const filteredDocuments = React.useMemo(() => {
+        if (documentFilter === 'project') {
+            return allDocuments.filter((doc: FilteredDocument) => doc.source === 'Project');
+        } else if (documentFilter === 'task') {
+            if (selectedTaskId) {
+                return allDocuments.filter((doc: FilteredDocument) =>
+                    doc.source === 'Task' && doc.task_id === selectedTaskId
+                );
+            }
+            return allDocuments.filter((doc: FilteredDocument) => doc.source === 'Task');
+        }
+        return allDocuments;
+    }, [allDocuments, documentFilter, selectedTaskId]);
+    // Get unique task options from actual tasks data
+    const taskOptions: TaskOption[] = React.useMemo(() => {
+        return tasks.map((task: Task) => ({
+            task_id: task.id,
+            task_heading: task.heading
+        })).sort((a: TaskOption, b: TaskOption) => a.task_heading.localeCompare(b.task_heading));
+    }, [tasks]);
+
+    // Filter task options based on search
+    const filteredTaskOptions = taskOptions.filter(option =>
+        option.task_heading.toLowerCase().includes(taskSearchQuery.toLowerCase())
+    );
+
+    // Get selected task name
+    const selectedTaskName = taskOptions.find(t => t.task_id === selectedTaskId)?.task_heading || 'Select Task';
 
     // Filter configuration for task columns
     const filterConfig: ColumnFilterConfig[] = [
@@ -231,14 +308,8 @@ export function TaskDetails() {
             setMediaPage(1);
             setHasMoreMedia(true);
             setAllMediaFiles([]);
-
+            queryClient.invalidateQueries({ queryKey: ['all-documents', id] });
             queryClient.invalidateQueries({ queryKey: ['documents', { project: id }] });
-            await queryClient.refetchQueries({
-                queryKey: ['documents'],
-                type: 'active'
-            });
-
-            // Reset file input to close system dialog
             if (fileInputRef.current) {
                 fileInputRef.current.value = '';
             }
@@ -300,27 +371,18 @@ export function TaskDetails() {
         }
     };
 
-    // Handle document preview
-    const handleDocumentClick = async (doc: any) => {
-        try {
-            const projectIdNum = Number(id);
-            const downloadResponse = await documentsApi.getDownloadUrl(projectIdNum, {
-                document_id: doc.id
-            });
-
-            if (downloadResponse?.url) {
-                setPreviewDocument({
-                    url: downloadResponse.url,
-                    fileName: doc.original_file_name || doc.name,
-                    fileType: doc.file_type
-                });
-            } else {
-                alert('Unable to open document: Download URL not available.');
-            }
-        } catch (error) {
-            console.error('Failed to open document:', error);
-            alert('Failed to open document. Please try again.');
+    // Handle document preview 
+    const handleDocumentClick = (doc: FilteredDocument) => {
+        if (!doc.file_url) {
+            alert('Document URL not available.');
+            return;
         }
+
+        setPreviewDocument({
+            url: doc.file_url,
+            fileName: doc.file_name || 'Document',
+            fileType: doc.file_name?.split('.').pop() || ''
+        });
     };
 
     // Enable keyboard shortcuts for document preview
@@ -545,41 +607,115 @@ export function TaskDetails() {
                             onDragOver={handleDragOver}
                             onDrop={handleDrop}
                         >
-                            <div className="content-creation__upload-area">
-                                <label className={`content-creation__upload-box ${isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${isDragging ? 'border-primary bg-primary/5 border-2' : ''}`}>
-                                    <input
-                                        ref={fileInputRef}
-                                        type="file"
-                                        className="hidden"
-                                        onChange={handleFileUpload}
-                                        disabled={isUploading}
-                                        accept="*"
-                                    />
-                                    {isUploading ? (
-                                        <Loader2 className="content-creation__upload-icon animate-spin" />
-                                    ) : (
-                                        <Upload className={`content-creation__upload-icon ${isDragging ? 'text-primary' : ''}`} />
+                            {/* Filter Bar */}
+                            <div className="flex items-center justify-between mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        onClick={() => handleFilterChange('project')}
+                                        className={`px-5 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ${documentFilter === 'project'
+                                            ? 'bg-black text-white shadow-md'
+                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                            }`}
+                                    >
+                                        Project
+                                    </button>
+                                    <button
+                                        onClick={() => handleFilterChange('task')}
+                                        className={`px-5 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ${documentFilter === 'task'
+                                            ? 'bg-black text-white shadow-md'
+                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                            }`}
+                                    >
+                                        Task
+                                    </button>
+
+                                    {/* Task Dropdown */}
+                                    {documentFilter === 'task' && (
+                                        <div className="relative" ref={taskDropdownRef}>
+                                            <button
+                                                onClick={() => setShowTaskDropdown(!showTaskDropdown)}
+                                                className="flex items-center gap-2 px-4 py-2.5 bg-white border-2 border-gray-300 rounded-lg hover:border-gray-400 transition-all duration-200 min-w-[200px]"
+                                            >
+                                                <span className="text-sm font-medium text-gray-700 truncate flex-1 text-left">
+                                                    {selectedTaskName}
+                                                </span>
+                                                <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                </svg>
+                                            </button>
+
+                                            {showTaskDropdown && (
+                                                <div className="absolute top-full left-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-200 z-50 max-h-96 overflow-hidden">
+                                                    <div className="p-3 border-b border-gray-200">
+                                                        <div className="relative">
+                                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Search tasks..."
+                                                                value={taskSearchQuery}
+                                                                onChange={(e) => setTaskSearchQuery(e.target.value)}
+                                                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <div className="overflow-y-auto max-h-72">
+                                                        {filteredTaskOptions.length > 0 ? (
+                                                            filteredTaskOptions.map((option) => (
+                                                                <button
+                                                                    key={option.task_id}
+                                                                    onClick={() => handleTaskSelect(option.task_id)}
+                                                                    className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors duration-150 border-b border-gray-100 last:border-b-0 ${selectedTaskId === option.task_id ? 'bg-gray-100' : ''
+                                                                        }`}
+                                                                >
+                                                                    <p className="text-sm font-medium text-gray-900">{option.task_heading}</p>
+                                                                </button>
+                                                            ))
+                                                        ) : (
+                                                            <div className="px-4 py-8 text-center text-sm text-gray-500">
+                                                                No tasks found
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     )}
-                                    <p className="content-creation__upload-text">
-                                        {isUploading ? 'Uploading...' : isDragging ? 'Drop document here' : 'Drop documents here or click to browse'}
-                                    </p>
-                                    <p className="content-creation__upload-subtext">All document types supported (Max 500MB)</p>
-                                    {uploadError && <p className="text-destructive text-sm mt-2">{uploadError}</p>}
-                                </label>
+                                </div>
+
+                                {/* Upload Button */}
+                                {documentFilter === 'project' && (
+                                    <label className={`flex items-center gap-2 px-5 py-2.5 bg-black text-white rounded-lg font-medium text-sm cursor-pointer hover:bg-gray-800 transition-all duration-200 shadow-sm ${isUploading ? 'opacity-50 cursor-not-allowed' : ''
+                                        }`}>
+                                        <input
+                                            ref={fileInputRef}
+                                            type="file"
+                                            className="hidden"
+                                            onChange={handleFileUpload}
+                                            disabled={isUploading}
+                                            accept="*"
+                                        />
+                                        {isUploading ? (
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                            <Upload className="w-4 h-4" />
+                                        )}
+                                        <span>{isUploading ? 'Uploading...' : 'Upload Documents'}</span>
+                                    </label>
+                                )}
                             </div>
 
-                            {isMediaLoading && mediaPage === 1 ? (
+                            {isAllDocumentsLoading ? (
                                 <div className="flex justify-center p-12">
                                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black" />
                                 </div>
-                            ) : mediaFiles.length > 0 ? (
+                            ) : filteredDocuments.length > 0 ? (
                                 <div
                                     className="max-h-[600px] overflow-y-auto"
                                     onScroll={handleMediaScroll}
                                     ref={mediaScrollRef}
                                 >
                                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-6 px-2">
-                                        {mediaFiles.map((file: any) => (
+                                        {filteredDocuments.map((file: any) => (
                                             <div
                                                 key={file.id}
                                                 className="border rounded-lg p-2 bg-white text-center cursor-pointer hover:shadow-md transition-shadow"
@@ -639,15 +775,16 @@ export function TaskDetails() {
 
             {
                 isCreateTaskModalOpen && (
-                    <CreateTask
-                        onClose={() => setIsCreateTaskModalOpen(false)}
-                        onSuccess={() => {
-                            setIsCreateTaskModalOpen(false);
-                            queryClient.invalidateQueries({ queryKey: ['tasks'] });
-                        }}
-                        isModal={true}
-                        fixedProjectId={id ? Number(id) : undefined}
-                    />
+                            <CreateTask
+                                onClose={() => setIsCreateTaskModalOpen(false)}
+                                onSuccess={() => {
+                                    setIsCreateTaskModalOpen(false);
+                                    queryClient.invalidateQueries({ queryKey: ['tasks'] });
+                                }}
+                                isModal={true}
+                                fixedProjectId={id ? Number(id) : undefined}
+                            />
+
                 )
             }
 

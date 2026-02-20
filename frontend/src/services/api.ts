@@ -1,7 +1,7 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import type {
   AuthTokens, User as AppUser, PaginatedResponse, PaginatedProjectsResponse, GetUploadUrlPayload, GetUploadUrlResponse, ConfirmUploadResponse, GetDownloadUrlPayload, ConfirmUploadPayload,
-  GetDownloadUrlResponse, TaskComment, CreateTaskCommentPayload, AITaskSuggestionResponse, AITaskSuggestionPayload, APICollection,
+  GetDownloadUrlResponse, AllDocumentsResponse, TaskComment, CreateTaskCommentPayload, AITaskSuggestionResponse, AITaskSuggestionPayload, APICollection,
   APIEndpoint, AuthCredential, ExecutionRun, ExecutionResult, APITestingDashboard, CreateCollectionPayload, CreateEndpointPayload, CreateCredentialPayload, RunCollectionPayload, ProjectCreatePayload,
   Label, DocumentStatus, ChatMessage, ChatRoom, ChatRoomMessagesResponse, CreatePrivateChatPayload, GatewaySendMessagePayload, GatewayIncomingMessage, GatewayConnectedEvent, RefineTextPayload, RefineTextResponse, TaskResponse, TeamTypeChoicesResponse,
   CreateTeamPayload, ProjectChatRoom, TeamChatRoom, ChatUnreadResponse, NotificationData, NotificationCallback, WebSocketNotificationEvent, NotificationListResponse, Team
@@ -140,12 +140,6 @@ export const authApi = {
     return response.data;
   },
 
-  // Update profile fields (first_name, last_name, etc.)
-  updateProfile: async (data: { first_name?: string; last_name?: string }) => {
-    const response = await api.patch('/auth/me/', data);
-    return response.data;
-  },
-
   forgotPassword: async (email: string) => {
     const response = await api.post('/auth/forgot-password/', { email });
     return response.data;
@@ -176,37 +170,6 @@ export const authApi = {
     return response.data;
   },
 };
-
-// // Notification
-// export const notificationsApi = {
-//   list: async (params?: { limit?: number; offset?: number }) => {
-//     const response = await api.get('/notification/', { params });
-//     return response.data;
-//   },
-
-//   getSummary: async () => {
-//     const response = await api.get('/notification/');
-//     return {
-//       total: response.data.total,
-//       unread: response.data.unread_count
-//     };
-//   },
-
-//   // Mark a notification as read
-//   markAsRead: async (id: number) => {
-//     const response = await api.post(`/notification/${id}/mark-read/`);
-//     return response.data;
-//   },
-
-//   // Delete a specific notification
-//   delete: async (id: number) => {
-//     await api.delete(`/notification/${id}/`);
-//   },
-
-//   clearAll: async () => {
-//     await api.post('/notification/clear_all/');
-//   }
-// };
 
 
 // Projects API
@@ -353,6 +316,13 @@ export const documentsApi = {
 
   removeLabel: async (documentId: string, labelId: number) => {
     const response = await api.delete(`/documents/${documentId}/labels/${labelId}/`);
+    return response.data;
+  },
+  // Get all project and task documents with optional task filtering
+  getAllDocuments: async (projectId: number, taskId?: number) => {
+    const url = `/documents/project/${projectId}/all/`;
+    const params = taskId ? { task_id: taskId } : {};
+    const response = await api.get<AllDocumentsResponse>(url, { params });
     return response.data;
   },
 };
@@ -560,6 +530,7 @@ export const usersApi = {
     const response = await api.get<PaginatedResponse<AppUser>>('/auth/users/');
     return response.data;
   },
+  // Get all users name list
   listAll: async () => {
     const response = await api.get<{ message: string, users: AppUser[] }>('/tasksite/all-users/');
     return response.data.users;

@@ -80,9 +80,6 @@ export function TeamChatModern() {
   const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
 
-  // Prefetch the emoji picker bundle in the background after the chat UI
-  // has mounted. This is the Vite-native equivalent of webpackPrefetch —
-  // the chunk downloads silently so it's ready before the user clicks 😊.
   useEffect(() => {
     const prefetch = () => import('emoji-picker-react');
     prefetch();
@@ -167,7 +164,7 @@ export function TeamChatModern() {
     queryFn: () => chatApi.getTeamRooms(),
   });
 
-  // 1d. Fetch Private Rooms (Essential for History/Sorting)
+  // 1d. Fetch Private Rooms 
   const { data: privateRoomsData } = useQuery({
     queryKey: ['private-chat-rooms'],
     queryFn: () => chatApi.getPrivateRooms(),
@@ -183,7 +180,6 @@ export function TeamChatModern() {
   });
 
   // Fetch room details for all rooms to get favourite status on initial load
-  // Using state to track when room details are loaded
   const [roomDetailsLoaded, setRoomDetailsLoaded] = useState(false);
 
   useEffect(() => {
@@ -269,12 +265,11 @@ export function TeamChatModern() {
       }
       // Sort Descending (Newest first)
       if (timeA !== timeB) return timeB - timeA;
-      // Fallback to Alphabetical
       return a.name.localeCompare(b.name);
     });
   }, [teamRoomsData, unreadData, queryClient, chatListVersion]);
 
-  // Map AND Sort Project rooms by Last Message Time (Priority to Unread Data)
+  // Map AND Sort Project rooms by Last Message Time
   const projectRooms = useMemo(() => {
     const normalized = (projectRoomsData || []).map(room => ({
       ...room,
@@ -1361,7 +1356,7 @@ export function TeamChatModern() {
                                 "text-sm truncate flex-1",
                                 hasUnreadMessages ? "font-bold text-gray-900" : "font-medium text-gray-900"
                               )}>
-                                {user.first_name || user.username}
+                                {user?.first_name} {user?.last_name}
                               </p>
                               <div className="flex items-center gap-2 flex-shrink-0">
                                 {isFavourite && (

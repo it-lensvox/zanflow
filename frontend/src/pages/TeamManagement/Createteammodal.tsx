@@ -86,6 +86,7 @@ export function CreateTeamModal({ isOpen, onClose, onSuccess }: CreateTeamModalP
     const [leaderId, setLeaderId] = useState<number | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const memberDropdownRef = useRef<HTMLDivElement>(null);
 
     const { user } = useAuth();
 
@@ -213,6 +214,26 @@ export function CreateTeamModal({ isOpen, onClose, onSuccess }: CreateTeamModalP
             document.body.style.overflow = 'unset';
         };
     }, [isOpen, isSubmitting, onClose]);
+
+    // Handle click outside for member dropdown
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (
+                memberDropdownRef.current &&
+                !memberDropdownRef.current.contains(event.target as Node)
+            ) {
+                setMemberDropdownOpen(false);
+            }
+        };
+
+        if (memberDropdownOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [memberDropdownOpen]);
 
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {

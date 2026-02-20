@@ -7,7 +7,7 @@ import {
     List, Grid3X3, MessageCircle
 } from 'lucide-react';
 import { projectsApi, taskApi, documentsApi } from '@/services/api';
-import type { Task } from '@/types'
+import type { Task, AllDocumentsResponse, FilteredDocument, TaskOption } from '@/types'
 import { CreateTask } from '@/pages/MyTask/CreateTask';
 import { DualView } from '@/components/layout/DualView/DualView';
 import { TaskGridCard, createTasksTableColumns } from '@/components/layout/DualView/taskConfig';
@@ -16,129 +16,118 @@ import { TaskDetailModal } from '../MyTask/TaskDetailModal';
 import { useTableFilters, ColumnFilterConfig } from '@/hooks/useTableFilters';
 import { SearchFilter, ListFilter, DateFilter, FilterHeaderWrapper } from '@/components/layout/DualView/FilterComponents';
 import { getStatusConfig, priorityOptions, statusOptions } from '@/components/layout/DualView/taskConfig';
-// Lazy-load the PDF viewer — react-pdf + pdfjs-dist is ~2 MB.
-// It is only needed when a file thumbnail is of type "pdf".
-// The pdfjs worker is configured here (not in main.tsx) so it is only
-// initialised when this lazy chunk is actually downloaded, keeping the
-// app startup bundle free of any PDF-related code.
-const LazyPDFThumbnail = React.lazy(() =>
-  import('react-pdf').then(({ Document, Page, pdfjs }) => {
-    // Configure the local bundled worker — avoids an external CDN round-trip.
-    pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-      'pdfjs-dist/build/pdf.worker.min.mjs',
-      import.meta.url
-    ).toString();
-    return {
-      default: ({ url }: { url: string }) => (
-        <Document file={url} loading="">
-          <Page
-            pageNumber={1}
-            width={250}
-            renderTextLayer={false}
-            renderAnnotationLayer={false}
-          />
-        </Document>
-      ),
-    };
-  })
-);
+// import { Document as PDFDocument, Page as PDFPage } from 'react-pdf';
+// import 'react-pdf/dist/Page/AnnotationLayer.css';
+// import 'react-pdf/dist/Page/TextLayer.css';
 import './ContentCreation.scss';
 
-
 type TabType = 'tasks' | 'calendar' | 'media';
-type MediaTag = 'final' | 'draft' | 'rawFootage' | 'approved' | 'wip' | 'reference';
 
-export function MediaPreviewModal({
-    doc,
-    projectId,
-    onClose
-}: {
-    doc: any;
-    projectId: number;
-    onClose: () => void;
-}) {
-    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+export function MediaThumbnail({ file, projectId }: { file: any; projectId: number }) {
+    const [imageUrl, setImageUrl] = React.useState<string | null>(null);
+    const [imageError, setImageError] = React.useState(false);
+    const [isLoading, setIsLoading] = React.useState(false);
 
-    useEffect(() => {
-        const fetchUrl = async () => {
-            try {
-                const response = await documentsApi.getDownloadUrl(projectId, {
-                    document_id: doc.id
-                });
-                if (response?.url) {
-                    setPreviewUrl(response.url);
-                }
-            } catch (error) {
-                console.error('Failed to fetch download URL:', error);
-                onClose();
-            }
-        };
-        fetchUrl();
-    }, [doc.id, projectId, onClose]);
+    // Infer file type from filename
+    const getFileType = () => {
+        const fileName = file.file_name || file.original_file_name || '';
+        const ext = fileName.split('.').pop()?.toLowerCase() || '';
 
-    if (!previewUrl) {
+        const imageTypes = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'bmp'];
+        const videoTypes = ['mp4', 'mov', 'avi', 'webm'];
+
+        if (imageTypes.includes(ext)) return 'image';
+        if (ext === 'pdf') return 'pdf';
+        if (videoTypes.includes(ext)) return 'video';
+        if (ext === 'json') return 'json';
+        return 'other';
+    };
+
+    const fileType = file.file_type || getFileType();
+
+    // Fetch image URL for images
+    React.useEffect(() => {
+        if (fileType !== 'image' || imageError) return;
+
+        if (file.file_url) {
+            setImageUrl(file.file_url);
+        } else {
+            setImageError(true);
+        }
+        setIsLoading(false);
+    }, [file.file_url, fileType, imageError]);
+
+    // Render image thumbnail
+    if (fileType === 'image') {
+        if (isLoading) {
+            return (
+                <div className="w-full h-full flex items-center justify-center bg-gray-100 rounded">
+                    <Loader2 className="h-8 w-8 text-gray-400 animate-spin" />
+                </div>
+            );
+        }
+
+        if (imageUrl && !imageError) {
+            return (
+                <img
+                    src={imageUrl}
+                    alt={file.file_name || file.original_file_name || 'Image'}
+                    className="w-full h-full object-cover rounded"
+                    onError={() => setImageError(true)}
+                />
+            );
+        }
+
+        // Fallback to icon if error
         return (
-            <div className="fixed inset-0 z-[100] bg-black bg-opacity-90 flex items-center justify-center">
-                <Loader2 className="w-12 h-12 text-white animate-spin" />
+            <div className="w-full h-full flex items-center justify-center bg-gray-100 rounded">
+                <svg className="h-12 w-12 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
             </div>
         );
     }
 
-    return (
-        <DocumentPreview
-            url={previewUrl}
-            fileName={doc.original_file_name || doc.name}
-            fileType={doc.file_type}
-            onClose={onClose}
-        />
-    );
-}
-
-export function MediaThumbnail({ file, projectId }: { file: any; projectId: number }) {
-    const { data: downloadUrl, isLoading } = useQuery({
-        queryKey: ['document-download-url', projectId, file.id],
-        queryFn: () => documentsApi.getDownloadUrl(projectId, { document_id: file.id }).then(res => res.url),
-        staleTime: 60 * 1000,
-    });
-
-    if (isLoading) {
-        return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />;
-    }
-
-    if (!downloadUrl) {
-        return <Film className="h-8 w-8 text-muted-foreground" />;
-    }
-
-    switch (file.file_type) {
-        case 'image':
-            return (
-                <img
-                    src={downloadUrl}
-                    alt="Preview"
-                    className="w-full h-full object-cover rounded"
-                />
-            );
-        case 'video':
-            return (
-                <video className="w-full h-full object-cover rounded" preload="metadata">
-                    <source src={`${downloadUrl}#t=0.5`} />
-                </video>
-            );
-        case 'pdf':
-            return (
-                <div className="w-full h-full flex items-start justify-center overflow-hidden">
-                    <div className="scale-[0.4] origin-top mt-1">
-                        <React.Suspense fallback={<Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}>
-                            <LazyPDFThumbnail url={downloadUrl} />
-                        </React.Suspense>
+    // Video thumbnail with play icon overlay
+    if (fileType === 'video') {
+        return (
+            <div className="w-full h-full flex items-center justify-center bg-gray-900 rounded relative">
+                <Film className="h-12 w-12 text-white" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm">
+                        <svg className="w-6 h-6 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z" />
+                        </svg>
                     </div>
                 </div>
-            );
-        case 'json':
-            return <FileJson className="h-8 w-8 text-yellow-600" />;
-        default:
-            return <FileText className="h-8 w-8 text-muted-foreground" />;
+            </div>
+        );
     }
+
+    // PDF thumbnail
+    if (fileType === 'pdf') {
+        return (
+            <div className="w-full h-full flex items-center justify-center bg-red-50 rounded">
+                <FileText className="h-12 w-12 text-red-500" />
+            </div>
+        );
+    }
+
+    // JSON thumbnail
+    if (fileType === 'json') {
+        return (
+            <div className="w-full h-full flex items-center justify-center bg-yellow-50 rounded">
+                <FileJson className="h-12 w-12 text-yellow-600" />
+            </div>
+        );
+    }
+
+    // Default file icon
+    return (
+        <div className="w-full h-full flex items-center justify-center bg-gray-100 rounded">
+            <FileText className="h-12 w-12 text-gray-500" />
+        </div>
+    );
 }
 
 export function ContentCreation() {
@@ -150,7 +139,6 @@ export function ContentCreation() {
     const [searchQuery, setSearchQuery] = useState('');
     const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-    const [selectedMedia, setSelectedMedia] = useState<any | null>(null);
     const navigate = useNavigate();
     const [isUploading, setIsUploading] = useState(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
@@ -161,6 +149,11 @@ export function ContentCreation() {
         fileName: string;
         fileType?: string;
     } | null>(null);
+    const [documentFilter, setDocumentFilter] = useState<'project' | 'task'>('project');
+    const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+    const [taskSearchQuery, setTaskSearchQuery] = useState('');
+    const [showTaskDropdown, setShowTaskDropdown] = useState(false);
+    const taskDropdownRef = useRef<HTMLDivElement>(null);
     const { data: tasksData, isLoading: isTasksLoading } = useQuery({
         queryKey: ['tasks'],
         queryFn: () => taskApi.list(),
@@ -269,7 +262,78 @@ export function ContentCreation() {
         }
     }, [isMediaFetching, hasMoreMedia]);
 
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (taskDropdownRef.current && !taskDropdownRef.current.contains(event.target as Node)) {
+                setShowTaskDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Handle filter change
+    const handleFilterChange = (filter: 'project' | 'task') => {
+        setDocumentFilter(filter);
+        if (filter === 'project') {
+            setSelectedTaskId(null);
+            setShowTaskDropdown(false);
+        }
+    };
+
+    // Handle task selection
+    const handleTaskSelect = (taskId: number) => {
+        setSelectedTaskId(taskId);
+        setShowTaskDropdown(false);
+        setTaskSearchQuery('');
+    };
+
     const mediaFiles = allMediaFiles;
+
+    // Fetch all documents (project + task) - ONLY once when tab opens
+    const { data: allDocumentsData, isLoading: isAllDocumentsLoading } = useQuery({
+        queryKey: ['all-documents', id],
+        queryFn: async (): Promise<AllDocumentsResponse> => {
+            return await documentsApi.getAllDocuments(Number(id));
+        },
+        enabled: activeTab === 'media',
+        staleTime: Infinity,
+        gcTime: Infinity,
+    });
+
+    const allDocuments: FilteredDocument[] = allDocumentsData?.documents || [];
+
+    // Filter documents based on selected filter
+    const filteredDocuments = React.useMemo(() => {
+        if (documentFilter === 'project') {
+            return allDocuments.filter((doc: FilteredDocument) => doc.source === 'Project');
+        } else if (documentFilter === 'task') {
+            if (selectedTaskId) {
+                return allDocuments.filter((doc: FilteredDocument) =>
+                    doc.source === 'Task' && doc.task_id === selectedTaskId
+                );
+            }
+            return allDocuments.filter((doc: FilteredDocument) => doc.source === 'Task');
+        }
+        return allDocuments;
+    }, [allDocuments, documentFilter, selectedTaskId]);
+
+    // Get unique task options from actual tasks data (not documents)
+    const taskOptions: TaskOption[] = React.useMemo(() => {
+        return tasks.map((task: Task) => ({
+            task_id: task.id,
+            task_heading: task.heading
+        })).sort((a: TaskOption, b: TaskOption) => a.task_heading.localeCompare(b.task_heading));
+    }, [tasks]);
+
+    // Filter task options based on search
+    const filteredTaskOptions = taskOptions.filter(option =>
+        option.task_heading.toLowerCase().includes(taskSearchQuery.toLowerCase())
+    );
+
+    // Get selected task name
+    const selectedTaskName = taskOptions.find(t => t.task_id === selectedTaskId)?.task_heading || 'Select Task';
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -329,15 +393,7 @@ export function ContentCreation() {
             setMediaPage(1);
             setHasMoreMedia(true);
             setAllMediaFiles([]);
-
-            // Refresh the media list
-            queryClient.invalidateQueries({ queryKey: ['documents', { project: id }] });
-            await queryClient.refetchQueries({
-                queryKey: ['documents'],
-                type: 'active'
-            });
-
-            // Reset file input to close system dialog
+            queryClient.invalidateQueries({ queryKey: ['all-documents', id] });
             if (fileInputRef.current) {
                 fileInputRef.current.value = '';
             }
@@ -395,25 +451,17 @@ export function ContentCreation() {
         queryClient.invalidateQueries({ queryKey: ['tasks'] });
     };
 
-    // Handle document preview
-    const handleDocumentPreview = async (doc: any) => {
-        try {
-            const projectIdNum = Number(id);
-            const downloadResponse = await documentsApi.getDownloadUrl(projectIdNum, {
-                document_id: doc.id
-            });
-
-            if (downloadResponse?.url) {
-                setPreviewDocument({
-                    url: downloadResponse.url,
-                    fileName: doc.original_file_name || doc.name,
-                    fileType: doc.file_type
-                });
-            }
-        } catch (error) {
-            console.error('Failed to open document:', error);
-            alert('Failed to open document. Please try again.');
+    const handleDocumentPreview = (doc: FilteredDocument) => {
+        if (!doc.file_url) {
+            alert('Document URL not available.');
+            return;
         }
+
+        setPreviewDocument({
+            url: doc.file_url,
+            fileName: doc.file_name || 'Document',
+            fileType: doc.file_name?.split('.').pop() || ''
+        });
     };
 
     // Enable keyboard shortcuts for document preview
@@ -695,52 +743,115 @@ export function ContentCreation() {
                             onDragOver={handleDragOver}
                             onDrop={handleDrop}
                         >
-                            <div className="content-creation__search-bar">
-                                <Search className="content-creation__search-icon" />
-                                <input
-                                    type="text"
-                                    placeholder="Search files..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="content-creation__search-input"
-                                />
-                            </div>
+                            {/* Filter Bar */}
+                            <div className="flex items-center justify-between mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        onClick={() => handleFilterChange('project')}
+                                        className={`px-5 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ${documentFilter === 'project'
+                                            ? 'bg-black text-white shadow-md'
+                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                            }`}
+                                    >
+                                        Project
+                                    </button>
+                                    <button
+                                        onClick={() => handleFilterChange('task')}
+                                        className={`px-5 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ${documentFilter === 'task'
+                                            ? 'bg-black text-white shadow-md'
+                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                            }`}
+                                    >
+                                        Task
+                                    </button>
 
-                            <div className="content-creation__upload-area">
-                                <label className={`content-creation__upload-box ${isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${isDragging ? 'border-primary bg-primary/5 border-2' : ''}`}>
-                                    <input
-                                        ref={fileInputRef}
-                                        type="file"
-                                        className="hidden"
-                                        onChange={handleFileUpload}
-                                        disabled={isUploading}
-                                        accept="*"
-                                    />
-                                    {isUploading ? (
-                                        <Loader2 className="content-creation__upload-icon animate-spin" />
-                                    ) : (
-                                        <Upload className={`content-creation__upload-icon ${isDragging ? 'text-primary' : ''}`} />
+                                    {/* Task Dropdown */}
+                                    {documentFilter === 'task' && (
+                                        <div className="relative" ref={taskDropdownRef}>
+                                            <button
+                                                onClick={() => setShowTaskDropdown(!showTaskDropdown)}
+                                                className="flex items-center gap-2 px-4 py-2.5 bg-white border-2 border-gray-300 rounded-lg hover:border-gray-400 transition-all duration-200 min-w-[200px]"
+                                            >
+                                                <span className="text-sm font-medium text-gray-700 truncate flex-1 text-left">
+                                                    {selectedTaskName}
+                                                </span>
+                                                <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                </svg>
+                                            </button>
+
+                                            {showTaskDropdown && (
+                                                <div className="absolute top-full left-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-200 z-50 max-h-96 overflow-hidden">
+                                                    <div className="p-3 border-b border-gray-200">
+                                                        <div className="relative">
+                                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Search tasks..."
+                                                                value={taskSearchQuery}
+                                                                onChange={(e) => setTaskSearchQuery(e.target.value)}
+                                                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <div className="overflow-y-auto max-h-72">
+                                                        {filteredTaskOptions.length > 0 ? (
+                                                            filteredTaskOptions.map((option) => (
+                                                                <button
+                                                                    key={option.task_id}
+                                                                    onClick={() => handleTaskSelect(option.task_id)}
+                                                                    className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors duration-150 border-b border-gray-100 last:border-b-0 ${selectedTaskId === option.task_id ? 'bg-gray-100' : ''
+                                                                        }`}
+                                                                >
+                                                                    <p className="text-sm font-medium text-gray-900">{option.task_heading}</p>
+                                                                </button>
+                                                            ))
+                                                        ) : (
+                                                            <div className="px-4 py-8 text-center text-sm text-gray-500">
+                                                                No tasks found
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     )}
-                                    <p className="content-creation__upload-text">
-                                        {isUploading ? 'Uploading to S3...' : isDragging ? 'Drop file here' : 'Drop files here or click to browse'}
-                                    </p>
-                                    <p className="content-creation__upload-subtext">Videos, images, audio, PDFs (Max 500MB)</p>
-                                    {uploadError && <p className="text-destructive text-sm mt-2">{uploadError}</p>}
-                                </label>
+                                </div>
+
+                                {/* Upload Button */}
+                                {documentFilter === 'project' && (
+                                    <label className={`flex items-center gap-2 px-5 py-2.5 bg-black text-white rounded-lg font-medium text-sm cursor-pointer hover:bg-gray-800 transition-all duration-200 shadow-sm ${isUploading ? 'opacity-50 cursor-not-allowed' : ''
+                                        }`}>
+                                        <input
+                                            ref={fileInputRef}
+                                            type="file"
+                                            className="hidden"
+                                            onChange={handleFileUpload}
+                                            disabled={isUploading}
+                                            accept="*"
+                                        />
+                                        {isUploading ? (
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                            <Upload className="w-4 h-4" />
+                                        )}
+                                        <span>{isUploading ? 'Uploading...' : 'Upload Documents'}</span>
+                                    </label>
+                                )}
                             </div>
 
-                            {isMediaLoading && mediaPage === 1 ? (
+                            {isAllDocumentsLoading ? (
                                 <div className="flex justify-center p-12">
                                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black" />
                                 </div>
-                            ) : mediaFiles.length > 0 ? (
+                            ) : filteredDocuments.length > 0 ? (
                                 <div
                                     className="max-h-[600px] overflow-y-auto"
                                     onScroll={handleMediaScroll}
                                     ref={mediaScrollRef}
                                 >
                                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-6 px-2">
-                                        {mediaFiles.map((file: any) => (
+                                        {filteredDocuments.map((file: any) => (
                                             <div
                                                 key={file.id}
                                                 className="border rounded-lg p-2 bg-white text-center cursor-pointer hover:shadow-md transition-shadow"
@@ -749,7 +860,7 @@ export function ContentCreation() {
                                                 <div className="aspect-square bg-muted rounded flex items-center justify-center mb-2 overflow-hidden border relative">
                                                     <MediaThumbnail file={file} projectId={Number(id)} />
                                                 </div>
-                                                <p className="text-xs font-medium truncate">{file.original_file_name || file.name}</p>
+                                                <p className="text-xs font-medium truncate">{file.file_name || file.original_file_name || file.name}</p>
                                             </div>
                                         ))}
                                     </div>
@@ -758,11 +869,7 @@ export function ContentCreation() {
                                             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
                                         </div>
                                     )}
-                                    {!hasMoreMedia && mediaFiles.length > 20 && (
-                                        <div className="text-center py-4 text-muted-foreground text-sm">
-                                            All media loaded
-                                        </div>
-                                    )}
+
                                 </div>
                             ) : (
                                 <div className="content-creation__media-empty">
@@ -783,15 +890,6 @@ export function ContentCreation() {
                     )}
                 </div>
             </div>
-
-            {/* Modal for PDF/Image/Video Preview */}
-            {selectedMedia && (
-                <MediaPreviewModal
-                    doc={selectedMedia}
-                    projectId={Number(id)}
-                    onClose={() => setSelectedMedia(null)}
-                />
-            )}
 
             {isCreateTaskModalOpen && (
                         <CreateTask
