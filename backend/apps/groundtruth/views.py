@@ -1,13 +1,17 @@
 """
 Views for Ground Truth app.
 """
+import os
+import re
 from django.conf import settings  # Import settings for AWS URL construction
 from django_filters import rest_framework as filters
 from rest_framework import generics, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
-
+import boto3
+from rest_framework.views import APIView
+from apps.tasksite.models import TaskAttachment
 from apps.audit.services import get_object_history, log_action
 from django.db.models import Q
 from .models import Document, DocumentComment, GTVersion
@@ -361,3 +365,118 @@ class DocumentCommentViewSet(viewsets.ModelViewSet):
         comment.is_resolved = True
         comment.save()
         return Response(DocumentCommentSerializer(comment).data)
+class ProjectAllDocumentsView(APIView):
+    """
+    Unified endpoint to fetch both Project-level Documents 
+    and Task-level Attachments for a specific project.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, project_id):
+        # 1. Initialize S3 Client ONCE for performance
+        s3_client = boto3.client(
+            's3',
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region_name=settings.AWS_S3_REGION_NAME
+        )
+
+        # 2. Fetch Project-Level Documents
+        project_docs = Document.objects.filter(project_id=project_id)
+        project_data = [] 
+        for doc in project_docs:
+            # Fallback to doc.name if source_file doesn't exist
+            filename = doc.source_file.name.split('/')[-1] if doc.source_file else doc.name
+            
+            file_url = None
+            if doc.source_file:
+                try:
+                    file_url = s3_client.generate_presigned_url(
+                        'get_object',
+                        Params={
+                            'Bucket': settings.AWS_STORAGE_BUCKET_NAME,
+                            'Key': doc.source_file.name
+                        },
+                        ExpiresIn=3600 
+                    )
+                except Exception as e:
+                    print(f"S3 Error for Document {doc.id}: {e}")
+            elif doc.source_file_url:
+                file_url = doc.source_file_url # External URL fallback
+
+            project_data.append({
+                "id": str(doc.id), # UUID converted to string
+                "file_name": doc.name, 
+                "file_url": file_url, 
+                "uploaded_at": doc.created_at,
+                "source": "Project",
+                "task_id": None,
+                "task_heading": None
+            })
+
+        # 3. Fetch Task-Level Attachments
+        # Uses the double underscore to filter tasks by project_id
+        task_attachments = TaskAttachment.objects.filter(task__project_id=project_id)
+        task_data = []
+        for attachment in task_attachments:
+            # Get the raw S3 filename
+            raw_filename = attachment.file.name.split('/')[-1] if attachment.file else "Unknown"
+            
+            # --- NEW FIX: Clean the Django random string ---
+            # This looks for an underscore followed by exactly 7 letters/numbers before the extension
+            # Example: "api_10_qW94evv.ts" becomes "api_10.ts"
+            clean_filename = re.sub(r'_[a-zA-Z0-9]{7}(\.[^.]+)$', r'\1', raw_filename)
+            
+            file_url = None
+            if attachment.file:
+                try:
+                    file_url = s3_client.generate_presigned_url(
+                        'get_object',
+                        Params={
+                            'Bucket': settings.AWS_STORAGE_BUCKET_NAME,
+                            'Key': attachment.file.name
+                        },
+                        ExpiresIn=3600
+                    )
+                except Exception as e:
+                    print(f"S3 Error for TaskAttachment {attachment.id}: {e}")
+
+            task_data.append({
+                "id": str(attachment.id),
+                "file_name": clean_filename,
+                "file_url": file_url,
+                "uploaded_at": attachment.uploaded_at, # Adjust if your field is named differently
+                "source": "Task",
+                "task_id": attachment.task.id,
+                "task_heading": attachment.task.heading
+            })
+
+        # 4. Merge and Sort (Newest first)
+        all_documents = project_data + task_data
+        all_documents.sort(key=lambda x: x['uploaded_at'], reverse=True)
+
+        name_tracker = {}
+        for doc in all_documents:
+            original_name = doc['file_name']
+            
+            if original_name in name_tracker:
+                # We have seen this name before! Increase the count.
+                name_tracker[original_name] += 1
+                
+                # Split "LensVox_Theme.pdf" into "LensVox_Theme" and ".pdf"
+                name_part, ext_part = os.path.splitext(original_name)
+                
+                # Combine it back together as "LensVox_Theme (1).pdf"
+                doc['file_name'] = f"{name_part} ({name_tracker[original_name]}){ext_part}"
+            else:
+                # First time seeing this name, start the tracker at 0
+                name_tracker[original_name] = 0
+
+        # 5. Finally, sort by NEWEST first so the user sees the latest files at the top
+        all_documents.sort(key=lambda x: x['uploaded_at'], reverse=True)
+
+        return Response({
+            "message": "All project and task documents retrieved",
+            "total_files": len(all_documents),
+            "documents": all_documents
+        }, status=status.HTTP_200_OK)

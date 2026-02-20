@@ -1,8 +1,9 @@
 """
 Services for Ground Truth operations.
 """
+import os
 from django.utils import timezone
-
+from .models import Document
 
 def compute_gt_diff(old_data: dict, new_data: dict) -> dict:
     """
@@ -103,3 +104,4 @@ def import_gt_from_output(document, extracted_data: dict, user, source_reference
     )
     
     return version
+
