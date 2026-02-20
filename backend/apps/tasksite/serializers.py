@@ -1,4 +1,5 @@
 # serializers.py
+import re
 import os
 import boto3
 from django.conf import settings
@@ -7,6 +8,7 @@ from .models import Task, TaskAttachment, TaskComment, TaskLink
 from apps.users.models import User
 # Import your existing Project model here too
 from apps.projects.models import Project, Label
+from apps.groundtruth.models import Document
 
 class AssignedByUserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -32,49 +34,33 @@ class ProjectSimpleSerializer(serializers.ModelSerializer):
         fields = ['id', 'name']
 
 class TaskAttachmentSerializer(serializers.ModelSerializer):
-    file_name = serializers.SerializerMethodField()
-    file_url = serializers.SerializerMethodField() # <--- NEW: The working link
+    # Map the Document fields to match what the frontend expects
+    file_name = serializers.CharField(source='name', read_only=True)
+    uploaded_at = serializers.DateTimeField(source='created_at', read_only=True)
+    file_url = serializers.SerializerMethodField()
 
     class Meta:
-        model = TaskAttachment
-        fields = ['id', 'file', 'file_name', 'file_url', 'uploaded_at']
-        
-        # OPTIONAL: Hide the broken 'file' path from the output so you don't use it by mistake
-        extra_kwargs = {
-            'file': {'write_only': True} 
-        }
-
-    def get_file_name(self, obj):
-        return os.path.basename(obj.file.name)
+        model = Document  # <--- Now uses Document!
+        fields = ['id', 'file_name', 'file_url', 'uploaded_at']
 
     def get_file_url(self, obj):
-        """
-        Generates a temporary public link (Presigned URL) for the private S3 file.
-        """
-        if not obj.file:
-            return None
-
-        # 1. Initialize S3 Client using your Django Settings
+        if not obj.source_file:
+            return obj.source_file_url # Fallback for external links
+            
+        # Same boto3 logic as before!
         s3_client = boto3.client(
             's3',
             aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
             aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
             region_name=settings.AWS_S3_REGION_NAME
         )
-
-        # 2. Generate the URL (Valid for 1 hour / 3600 seconds)
         try:
-            url = s3_client.generate_presigned_url(
+            return s3_client.generate_presigned_url(
                 'get_object',
-                Params={
-                    'Bucket': settings.AWS_STORAGE_BUCKET_NAME,
-                    'Key': obj.file.name
-                },
+                Params={'Bucket': settings.AWS_STORAGE_BUCKET_NAME, 'Key': obj.source_file.name},
                 ExpiresIn=3600 
             )
-            return url
         except Exception as e:
-            print(f"Error generating presigned URL: {e}")
             return None
 class UserSimpleSerializer(serializers.ModelSerializer):
     """Helper to show user details inside a comment"""
@@ -93,6 +79,7 @@ class TaskCommentSerializer(serializers.ModelSerializer):
 class TaskSerializer(serializers.ModelSerializer):
     assigned_to_user_details = AssignedByUserSerializer(source='assigned_to', read_only=True, many=True)
     assigned_by_user_details = AssignedByUserSerializer(source='assigned_by', read_only=True)
+    attachments = TaskAttachmentSerializer(source='documents', many=True, read_only=True)
     
     links = TaskLinkSerializer(many=True, read_only=True)
     uploaded_links = serializers.ListField(
@@ -108,7 +95,6 @@ class TaskSerializer(serializers.ModelSerializer):
     # This shows the project name when you GET the task
     project_details = ProjectSimpleSerializer(source='project', read_only=True)
     label_details = LabelSimpleSerializer(source='labels', many=True, read_only=True)
-    attachments = TaskAttachmentSerializer(many=True, read_only=True)
     comments = TaskCommentSerializer(many=True, read_only=True)
     # WRITE ONLY: This allows uploading multiple files during creation
     uploaded_files = serializers.ListField(
@@ -174,9 +160,20 @@ class TaskSerializer(serializers.ModelSerializer):
         # 2. Create the Task normally
         task = super().create(validated_data)
         
-        # 3. Create the Attachment objects linking them to the new Task
+        # --- NEW LOGIC: Save files as Documents ---
+        user = self.context['request'].user
         for file in uploaded_files:
-            TaskAttachment.objects.create(task=task, file=file)
+            # Clean the filename for the DB
+            clean_name = re.sub(r'_[a-zA-Z0-9]{7}(\.[^.]+)$', r'\1', file.name)
+            Document.objects.create(
+                project=task.project, # Inherits the project from the task!
+                task=task,            # Links to this specific task
+                name=clean_name,
+                source_file=file,
+                status='draft',
+                created_by=user
+            )
+            
         for url in uploaded_links:
             TaskLink.objects.create(task=task, url=url)
         return task
@@ -187,12 +184,18 @@ class TaskSerializer(serializers.ModelSerializer):
         uploaded_links = validated_data.pop('uploaded_links', [])
         validated_data.pop('assigned_by', None)
 
-        # 2. Update the standard Task fields (Status, Heading, etc.)
-        instance = super().update(instance, validated_data)
-
-        # 3. ADD NEW ATTACHMENTS (The Missing Logic!)
+        # --- NEW LOGIC: Save NEW files as Documents ---
+        user = self.context['request'].user
         for file in uploaded_files:
-            TaskAttachment.objects.create(task=instance, file=file)
+            clean_name = re.sub(r'_[a-zA-Z0-9]{7}(\.[^.]+)$', r'\1', file.name)
+            Document.objects.create(
+                project=instance.project,
+                task=instance,
+                name=clean_name,
+                source_file=file,
+                status='draft',
+                created_by=user
+            )
             
         for url in uploaded_links:
             TaskLink.objects.create(task=instance, url=url)

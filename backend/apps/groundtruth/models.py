@@ -13,6 +13,11 @@ from core.models import UserStampedModel
 
 def document_upload_path(instance, filename):
     """Generate upload path for document source files."""
+    # If this file belongs to a task, put it in the task_documents folder
+    if hasattr(instance, 'task') and instance.task:
+        return f"task_documents/task_{instance.task.id}/{filename}"
+    
+    # Otherwise, it goes in the standard project folder
     return f"projects/{instance.project_id}/documents/{instance.id}/source/{filename}"
 
 
@@ -43,7 +48,16 @@ class Document(TenantModel, UserStampedModel):
         related_name="documents",
     )
     
-    # Document info
+    # --- ADD THIS NEW FIELD ---
+    # We use a string 'tasksite.Task' to prevent circular import errors
+    task = models.ForeignKey(
+        'tasksite.Task',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="documents",
+    )
+    
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     
