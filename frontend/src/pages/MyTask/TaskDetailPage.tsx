@@ -273,13 +273,15 @@ export function TaskDetailPage() {
         setUploadingDocs(true);
 
         try {
-            // Upload files directly to task using PATCH multipart request
             await taskApi.uploadFiles(task.id, fileArray);
-
-            // Invalidate queries to refresh task data
+            const projectId = task.project || (task as any).project_details?.id;
             await queryClient.invalidateQueries({ queryKey: ['task-documents', id] });
             await queryClient.invalidateQueries({ queryKey: ['tasks'] });
             await queryClient.invalidateQueries({ queryKey: ['task', id] });
+
+            if (projectId) {
+                await queryClient.invalidateQueries({ queryKey: ['all-documents', projectId.toString()] });
+            }
 
         } catch (err: any) {
             console.error('Upload failed:', err);
