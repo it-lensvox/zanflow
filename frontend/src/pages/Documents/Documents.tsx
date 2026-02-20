@@ -250,7 +250,7 @@ export function Documents() {
             <div>
               <h1 className="text-3xl font-bold">Documents</h1>
               <p className="text-muted-foreground">
-                Manage all ground truth documents across projects
+                Manage all documents across projects
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -319,7 +319,6 @@ export function Documents() {
                     </div>
 
                     {/* Status Filter */}
-
                     <div className="space-y-1">
                       <label className="text-sm font-medium">File Type</label>
                       <select
@@ -349,12 +348,25 @@ export function Documents() {
                 gridProps={{
                   data: displayedDocuments,
                   renderCard: (doc) => (
-                    <div onClick={() => handleDocumentClick(doc)}>
-                      <DocumentGridCard
-                        key={doc.id}
-                        document={doc}
-                        onDeleteClick={handleDeleteClick}
-                      />
+                    <div
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleDocumentClick(doc);
+                      }}
+                      className="cursor-pointer"
+                      style={{ pointerEvents: 'auto' }}
+                    >
+                      <div style={{ pointerEvents: 'none' }}>
+                        <DocumentGridCard
+                          key={doc.id}
+                          document={doc}
+                          onDeleteClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteClick(e, doc);
+                          }}
+                        />
+                      </div>
                     </div>
                   ),
                   emptyState,

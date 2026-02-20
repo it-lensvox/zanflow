@@ -775,8 +775,6 @@ export function TaskDetails() {
 
             {
                 isCreateTaskModalOpen && (
-                    <div className="content-creation__modal-overlay">
-                        <div className="content-creation__modal-container bg-gray-50 p-6">
                             <CreateTask
                                 onClose={() => setIsCreateTaskModalOpen(false)}
                                 onSuccess={() => {
@@ -786,8 +784,6 @@ export function TaskDetails() {
                                 isModal={true}
                                 fixedProjectId={id ? Number(id) : undefined}
                             />
-                        </div>
-                    </div>
                 )
             }
 

@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { useMutation, useQueryClient, useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { taskApi, usersApi, documentsApi } from '@/services/api';
+import { taskApi, usersApi, documentsApi, projectsApi } from '@/services/api';
 import { useAuth } from '@/hooks/useAuth';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { getStatusConfig } from '@/components/layout/DualView/taskConfig';
@@ -58,6 +58,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const [isMaximized, setIsMaximized] = useState(false);
     const [showAddUsersDropdown, setShowAddUsersDropdown] = useState(false);
+    const [projectMembers, setProjectMembers] = useState<{ user: { id: number; username: string; full_name: string } }[]>([]);
     const [isEditingDescription, setIsEditingDescription] = useState(false);
     const [editableDescription, setEditableDescription] = useState(task.description);
     const [attachmentPage, setAttachmentPage] = useState(1);
@@ -204,17 +205,27 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
     }, [task.status]);
 
     useEffect(() => {
-        const fetchUsers = async () => {
+        const fetchUsersAndProjectMembers = async () => {
             try {
+                // Fetch all users
                 const userResponse = await usersApi.list();
                 const users = userResponse.results || userResponse;
                 setAvailableUsers(users);
+
+                // Fetch project members if task has a project
+                if (task) {
+                    const projectId = task.project || (task as any)?.project_details?.id;
+                    if (projectId) {
+                        const projectDetails = await projectsApi.get(projectId);
+                        setProjectMembers(projectDetails.members || []);
+                    }
+                }
             } catch (error) {
-                console.error('Failed to fetch users:', error);
+                console.error('Failed to fetch users or project members:', error);
             }
         };
-        fetchUsers();
-    }, []);
+        fetchUsersAndProjectMembers();
+    }, [task?.project, (task as any)?.project_details?.id]);
 
     useEffect(() => {
         const statusChanged = selectedStatus !== task.status;
@@ -682,56 +693,90 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
                                             );
                                         })}
 
-                                        {/* Add Assignee Dropdown */}
-                                        <div className="relative">
-                                            <div
-                                                className="w-full p-2 rounded border border-gray-300 hover:border-gray-400 cursor-pointer bg-white flex items-center justify-between min-h-[38px] transition-colors"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setShowAddUsersDropdown(!showAddUsersDropdown);
-                                                }}
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <Plus className="w-3.5 h-3.5 text-gray-500" />
-                                                    <span className="text-sm text-gray-700 font-medium">Add Assignee</span>
-                                                </div>
-                                                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                                </svg>
-                                            </div>
+                                        {/* Add Assignee */}
+                                        {(() => {
+                                            let availableUnassignedUsers = availableUsers;
+                                            if (projectMembers.length > 0) {
+                                                const projectMemberIds = projectMembers.map(member => member.user.id);
+                                                availableUnassignedUsers = availableUsers.filter(u => projectMemberIds.includes(u.id));
+                                            }
+                                            availableUnassignedUsers = availableUnassignedUsers.filter(u =>
+                                                !task.assigned_to_user_details.some(a => a.id === u.id) &&
+                                                !newUsers.includes(u.id)
+                                            );
+                                            return availableUnassignedUsers.length > 0 && (
+                                                <div className="relative">
+                                                    <div
+                                                        className="w-full p-2 rounded border border-gray-300 hover:border-gray-400 cursor-pointer bg-white flex items-center justify-between min-h-[38px] transition-colors"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setShowAddUsersDropdown(!showAddUsersDropdown);
+                                                        }}
+                                                    >
+                                                        <div className="flex items-center gap-2">
+                                                            <Plus className="w-3.5 h-3.5 text-gray-500" />
+                                                            <span className="text-sm text-gray-700 font-medium">Add Assignee</span>
+                                                        </div>
+                                                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                        </svg>
+                                                    </div>
 
-                                            {/* Dropdown List */}
-                                            {showAddUsersDropdown && (
-                                                <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                                                    {availableUsers
-                                                        .filter(u => !task.assigned_to_user_details.some(a => a.id === u.id) && !newUsers.includes(u.id))
-                                                        .map((user) => (
-                                                            <div
-                                                                key={user.id}
-                                                                className="px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm flex items-center justify-between"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setNewUsers([...newUsers, user.id]);
-                                                                    setHasUnsavedChanges(true);
-                                                                    setShowAddUsersDropdown(false);
-                                                                }}
-                                                            >
-                                                                <div className="flex items-center gap-2.5">
-                                                                    <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-600">
-                                                                        {user.first_name[0]}{user.last_name?.[0] || ''}
+                                                    {/* Dropdown List */}
+                                                    {showAddUsersDropdown && (
+                                                        <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                                                            {(() => {
+                                                                let filteredUsers = availableUsers;
+                                                                if (projectMembers.length > 0) {
+                                                                    const projectMemberIds = projectMembers.map(member => member.user.id);
+                                                                    filteredUsers = availableUsers.filter(u => projectMemberIds.includes(u.id));
+                                                                }
+                                                                filteredUsers = filteredUsers.filter(u =>
+                                                                    !task.assigned_to_user_details.some(a => a.id === u.id) &&
+                                                                    !newUsers.includes(u.id)
+                                                                );
+
+                                                                return filteredUsers.map((user) => (
+                                                                    <div
+                                                                        key={user.id}
+                                                                        className="px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm flex items-center justify-between"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setNewUsers([...newUsers, user.id]);
+                                                                            setHasUnsavedChanges(true);
+                                                                            setShowAddUsersDropdown(false);
+                                                                        }}
+                                                                    >
+                                                                        <div className="flex items-center gap-2.5">
+                                                                            <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-600">
+                                                                                {user.first_name[0]}{user.last_name?.[0] || ''}
+                                                                            </div>
+                                                                            <span className="text-sm">{user.first_name} {user.last_name}</span>
+                                                                        </div>
                                                                     </div>
-                                                                    <span className="text-sm">{user.first_name} {user.last_name}</span>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    {availableUsers.filter(u => !task.assigned_to_user_details.some(a => a.id === u.id) && !newUsers.includes(u.id)).length === 0 && (
-                                                        <div className="px-3 py-2 text-sm text-gray-500 text-center">
-                                                            No more users to add
+                                                                ));
+                                                            })()}
+                                                            {(() => {
+                                                                let filteredUsers = availableUsers;
+                                                                if (projectMembers.length > 0) {
+                                                                    const projectMemberIds = projectMembers.map(member => member.user.id);
+                                                                    filteredUsers = availableUsers.filter(u => projectMemberIds.includes(u.id));
+                                                                }
+                                                                filteredUsers = filteredUsers.filter(u =>
+                                                                    !task.assigned_to_user_details.some(a => a.id === u.id) &&
+                                                                    !newUsers.includes(u.id)
+                                                                );
+                                                                return filteredUsers.length === 0 && (
+                                                                    <div className="px-3 py-2 text-sm text-gray-500 text-center">
+                                                                        No more users to add
+                                                                    </div>
+                                                                );
+                                                            })()}
                                                         </div>
                                                     )}
                                                 </div>
-                                            )}
-                                        </div>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                             )}

@@ -9,9 +9,6 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { usersApi, chatApi, GatewayWebSocketService } from '@/services/api';
 import type { ChatRoom, ChatMessage, ChatRoomMessagesResponse, ToastNotification, GatewayIncomingMessage, ProjectChatRoom, TeamChatRoom, User } from '@/types';
-// Lazy-load the emoji picker — it's a large bundle (~1 MB of emoji data).
-// It is only rendered when the user opens the picker, so there is no
-// reason to include it in the initial page bundle.
 const EmojiPicker = lazy(() => import('emoji-picker-react'));
 import type { EmojiClickData } from 'emoji-picker-react';
 import { CreateTeamModal } from '@/pages/TeamManagement/Createteammodal';
@@ -84,9 +81,6 @@ export function TeamChatModern() {
   const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
 
-  // Prefetch the emoji picker bundle in the background after the chat UI
-  // has mounted. This is the Vite-native equivalent of webpackPrefetch —
-  // the chunk downloads silently so it's ready before the user clicks 😊.
   useEffect(() => {
     const prefetch = () => import('emoji-picker-react');
     prefetch();
@@ -171,7 +165,7 @@ export function TeamChatModern() {
     queryFn: () => chatApi.getTeamRooms(),
   });
 
-  // 1d. Fetch Private Rooms (Essential for History/Sorting)
+  // 1d. Fetch Private Rooms 
   const { data: privateRoomsData } = useQuery({
     queryKey: ['private-chat-rooms'],
     queryFn: () => chatApi.getPrivateRooms(),
@@ -187,7 +181,6 @@ export function TeamChatModern() {
   });
 
   // Fetch room details for all rooms to get favourite status on initial load
-  // Using state to track when room details are loaded
   const [roomDetailsLoaded, setRoomDetailsLoaded] = useState(false);
 
   useEffect(() => {
@@ -273,12 +266,11 @@ export function TeamChatModern() {
       }
       // Sort Descending (Newest first)
       if (timeA !== timeB) return timeB - timeA;
-      // Fallback to Alphabetical
       return a.name.localeCompare(b.name);
     });
   }, [teamRoomsData, unreadData, queryClient, chatListVersion]);
 
-  // Map AND Sort Project rooms by Last Message Time (Priority to Unread Data)
+  // Map AND Sort Project rooms by Last Message Time
   const projectRooms = useMemo(() => {
     const normalized = (projectRoomsData || []).map(room => ({
       ...room,
@@ -1308,7 +1300,7 @@ export function TeamChatModern() {
           </Tabs.List>
 
           {/* Scrollable Lists */}
-          <div className="flex-1 overflow-y-auto min-h-0">
+          <div className="flex-1 overflow-y-auto min-h-0 bg-white">
             <Tabs.Content value="chats">
               {/* Chats Section */}
               <div className="bg-white">
@@ -1353,7 +1345,7 @@ export function TeamChatModern() {
                                 "text-sm truncate flex-1",
                                 hasUnreadMessages ? "font-bold text-gray-900" : "font-medium text-gray-900"
                               )}>
-                                {user.first_name || user.username}
+                                {user?.first_name} {user?.last_name}
                               </p>
                               <div className="flex items-center gap-2 flex-shrink-0">
                                 {isFavourite && (

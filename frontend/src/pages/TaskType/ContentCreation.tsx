@@ -16,15 +16,12 @@ import { TaskDetailModal } from '../MyTask/TaskDetailModal';
 import { useTableFilters, ColumnFilterConfig } from '@/hooks/useTableFilters';
 import { SearchFilter, ListFilter, DateFilter, FilterHeaderWrapper } from '@/components/layout/DualView/FilterComponents';
 import { getStatusConfig, priorityOptions, statusOptions } from '@/components/layout/DualView/taskConfig';
-import { Document as PDFDocument, Page as PDFPage } from 'react-pdf';
-import 'react-pdf/dist/Page/AnnotationLayer.css';
-import 'react-pdf/dist/Page/TextLayer.css';
+// import { Document as PDFDocument, Page as PDFPage } from 'react-pdf';
+// import 'react-pdf/dist/Page/AnnotationLayer.css';
+// import 'react-pdf/dist/Page/TextLayer.css';
 import './ContentCreation.scss';
 
-
 type TabType = 'tasks' | 'calendar' | 'media';
-// type MediaTag = 'final' | 'draft' | 'rawFootage' | 'approved' | 'wip' | 'reference';
-
 
 export function MediaThumbnail({ file, projectId }: { file: any; projectId: number }) {
     const [imageUrl, setImageUrl] = React.useState<string | null>(null);
@@ -895,16 +892,12 @@ export function ContentCreation() {
             </div>
 
             {isCreateTaskModalOpen && (
-                <div className="content-creation__modal-overlay">
-                    <div className="content-creation__modal-container bg-gray-50 p-6">
                         <CreateTask
                             onClose={() => setIsCreateTaskModalOpen(false)}
                             onSuccess={handleTaskCreated}
                             isModal={true}
                             fixedProjectId={Number(id)}
                         />
-                    </div>
-                </div>
             )}
 
             {selectedTask && (
