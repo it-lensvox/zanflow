@@ -298,7 +298,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
             temp.innerHTML = html;
             return temp.textContent || temp.innerText || '';
         };
-        
+
         const currentText = stripHtml(description);
         const isEmpty = !currentText.trim();
 
@@ -404,24 +404,40 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
     }
 
     return (
-        <div className={isModal ? "" : "min-h-screen bg-gray-50 py-4 px-6"}>
+        <div className={isModal ? "" : "min-h-screen py-4 px-6"}>
             <div className="max-w-4xl mx-auto">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                        {!isModal && (
-                            <button
-                                onClick={handleClose}
-                                className="p-2 rounded hover:bg-gray-100 transition-colors"
-                            >
-                                <ArrowLeft className="w-5 h-5 text-gray-600" />
-                            </button>
-                        )}
                         <div>
                             <h1 className="text-2xl font-semibold text-gray-900">Create task</h1>
                             <p className="text-sm text-gray-500 mt-1">Fill in the details below to create a new task</p>
                         </div>
-                    </div>
+                         <div className="flex items-center gap-3">
+                             <button
+                                type="submit"
+                                form="create-task-form"
+                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={loading}
+                            >
+                                {loading ? 'Creating...' : 'Create task'}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setShowAIModal(true)}
+                                className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded hover:bg-purple-700 transition-colors flex items-center gap-2"
+                            >
+                                <Sparkles className="w-4 h-4" />
+                                Generate Task By AI
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleClose}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                                disabled={loading}
+                            >
+                                Cancel
+                            </button>
+                        </div>                
                     {isModal && (
                         <button onClick={handleClose} className="p-2 rounded hover:bg-gray-100">
                             <X className="w-5 h-5 text-gray-600" />
@@ -429,7 +445,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                     )}
                 </div>
 
-                <form onSubmit={handleSubmit}>
+                <form id="create-task-form" onSubmit={handleSubmit}>
                     <div className="bg-white rounded-lg shadow-sm border border-gray-200">
                         {/* Alerts */}
                         {error && (
@@ -1078,7 +1094,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                         </div>
 
                         {/* Footer Actions */}
-                        <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
+                        {/* <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
                             <button
                                 type="button"
                                 onClick={handleClose}
@@ -1102,7 +1118,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                             >
                                 {loading ? 'Creating...' : 'Create task'}
                             </button>
-                        </div>
+                        </div> */}
                     </div>
                 </form>
             </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Download, Loader2, FileText, AlertCircle, ZoomIn, ZoomOut } from 'lucide-react';
+import { X, Download, Loader2, FileText, AlertCircle, ZoomIn, ZoomOut, Maximize2, Minimize2 } from 'lucide-react';
 /**
  * Supports: Images, PDF, DOCX, PPTX, TXT, Code files, and more.
  * 
@@ -14,6 +14,7 @@ interface DocumentPreviewProps {
     fileName: string;
     fileType?: string;
     onClose: () => void;
+    defaultFullscreen?: boolean;
 }
 
 export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
@@ -21,6 +22,7 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
     fileName,
     fileType = '',
     onClose,
+    defaultFullscreen = false,
 }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -29,6 +31,12 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
     const [totalPages, setTotalPages] = useState(1);
     const [textContent, setTextContent] = useState<string>('');
     const [downloading, setDownloading] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(defaultFullscreen);
+
+    // Toggle fullscreen mode
+    const toggleFullscreen = () => {
+        setIsFullscreen(!isFullscreen);
+    };
 
     // Determine file type from extension or MIME type
     const getFileExtension = () => {
@@ -107,6 +115,7 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
             }
         }
     };
+
 
     // Fetch text content for text/code files
     useEffect(() => {
@@ -230,7 +239,10 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 z-[100] bg-black bg-opacity-90 flex flex-col">
+        <div className={`fixed z-[100] bg-black flex flex-col transition-all duration-300 ${isFullscreen
+            ? 'inset-0 bg-opacity-90'
+            : 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] h-[90vh] max-w-7xl rounded-lg shadow-2xl bg-opacity-95'
+            }`}>
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 bg-gray-800 text-white">
                 <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -266,6 +278,19 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
                             </button>
                         </div>
                     )}
+
+                    {/* Maximize/Minimize Button */}
+                    <button
+                        onClick={toggleFullscreen}
+                        className="p-2 hover:bg-gray-700 rounded transition-colors"
+                        title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+                    >
+                        {isFullscreen ? (
+                            <Minimize2 className="w-5 h-5" />
+                        ) : (
+                            <Maximize2 className="w-5 h-5" />
+                        )}
+                    </button>
 
                     {/* Download Button */}
                     <button

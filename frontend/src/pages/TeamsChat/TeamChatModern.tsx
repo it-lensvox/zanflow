@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, lazy, Suspense } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Tabs from '@radix-ui/react-tabs';
 import {
@@ -9,7 +9,11 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { usersApi, chatApi, GatewayWebSocketService } from '@/services/api';
 import type { ChatRoom, ChatMessage, ChatRoomMessagesResponse, ToastNotification, GatewayIncomingMessage, ProjectChatRoom, TeamChatRoom, User } from '@/types';
-import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
+// Lazy-load the emoji picker — it's a large bundle (~1 MB of emoji data).
+// It is only rendered when the user opens the picker, so there is no
+// reason to include it in the initial page bundle.
+const EmojiPicker = lazy(() => import('emoji-picker-react'));
+import type { EmojiClickData } from 'emoji-picker-react';
 import { CreateTeamModal } from '@/pages/TeamManagement/Createteammodal';
 
 
@@ -79,6 +83,14 @@ function MemberListContent({ roomId, roomType }: { roomId: string; roomType: 'te
 export function TeamChatModern() {
   const { user: currentUser } = useAuth();
   const queryClient = useQueryClient();
+
+  // Prefetch the emoji picker bundle in the background after the chat UI
+  // has mounted. This is the Vite-native equivalent of webpackPrefetch —
+  // the chunk downloads silently so it's ready before the user clicks 😊.
+  useEffect(() => {
+    const prefetch = () => import('emoji-picker-react');
+    prefetch();
+  }, []);
 
   // UI State
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
@@ -1849,13 +1861,15 @@ export function TeamChatModern() {
                                           isOwn ? "right-0" : "left-0"
                                         )}
                                       >
-                                        <EmojiPicker
-                                          onEmojiClick={(emojiData) => handleReactionFromPicker(message.id, emojiData)}
-                                          width={280}
-                                          height={350}
-                                          searchPlaceHolder="Search emoji..."
-                                          previewConfig={{ showPreview: false }}
-                                        />
+                                        <Suspense fallback={<div style={{ width: 280, height: 350 }} className="rounded-lg border bg-white shadow-md" />}>
+                                          <EmojiPicker
+                                            onEmojiClick={(emojiData) => handleReactionFromPicker(message.id, emojiData)}
+                                            width={280}
+                                            height={350}
+                                            searchPlaceHolder="Search emoji..."
+                                            previewConfig={{ showPreview: false }}
+                                          />
+                                        </Suspense>
                                       </div>
                                     )}
 
@@ -2067,13 +2081,15 @@ export function TeamChatModern() {
                         {/* Emoji Picker Popup */}
                         {showEmojiPicker && (
                           <div className="absolute bottom-full right-0 mb-2 z-50">
-                            <EmojiPicker
-                              onEmojiClick={handleEmojiClick}
-                              width={320}
-                              height={400}
-                              searchPlaceHolder="Search emoji..."
-                              previewConfig={{ showPreview: false }}
-                            />
+                            <Suspense fallback={<div style={{ width: 320, height: 400 }} className="rounded-lg border bg-white shadow-md" />}>
+                              <EmojiPicker
+                                onEmojiClick={handleEmojiClick}
+                                width={320}
+                                height={400}
+                                searchPlaceHolder="Search emoji..."
+                                previewConfig={{ showPreview: false }}
+                              />
+                            </Suspense>
                           </div>
                         )}
                       </div>

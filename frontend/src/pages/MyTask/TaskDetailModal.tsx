@@ -289,13 +289,18 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
         setUploadingDocs(true);
 
         try {
-            // Upload files directly to task using PATCH multipart request
-            await taskApi.uploadFiles(task.id, fileArray);
 
-            // Invalidate queries to refresh task data
+            await taskApi.uploadFiles(task.id, fileArray);
+            const projectId = task.project;
+
             await queryClient.invalidateQueries({ queryKey: ['task-documents', task.id] });
             await queryClient.invalidateQueries({ queryKey: ['tasks'] });
             await queryClient.invalidateQueries({ queryKey: ['task-detail', task.id] });
+
+            if (projectId) {
+                await queryClient.invalidateQueries({ queryKey: ['all-documents', projectId.toString()] });
+            }
+
             await queryClient.refetchQueries({
                 queryKey: ['documents'],
                 type: 'active'

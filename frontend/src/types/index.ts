@@ -897,3 +897,38 @@ export interface ToastNotification {
   message_preview: string;
   timestamp: string;
 }
+
+// Document Filter Types for ContentCreation
+export interface ProjectDocument {
+  id: string;
+  file_name: string;
+  file_url: string;
+  uploaded_at: string;
+  source: 'Project';
+  task_id: null;
+  task_heading: null;
+}
+
+export interface TaskDocument {
+  id: number;
+  file_name: string;
+  file_url: string;
+  uploaded_at: string;
+  source: 'Task';
+  task_id: number;
+  task_heading: string;
+}
+
+export type FilteredDocument = ProjectDocument | TaskDocument;
+
+// Task Details and Content Creation--> Document section Filter documents based on selected filter
+export interface AllDocumentsResponse {
+  message: string;
+  total_files: number;
+  documents: FilteredDocument[];
+}
+
+export interface TaskOption {
+  task_id: number;
+  task_heading: string;
+}
