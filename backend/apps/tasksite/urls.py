@@ -8,5 +8,5 @@ urlpatterns = [
     path('<int:task_id>/comments/', TaskCommentListCreateView.as_view(), name='task_comments'),
     # --- New Performance Endpoint ---
     path('performance/<int:user_id>/', UserPerformanceView.as_view(), name='user_performance'),
-    path('attachments/<int:pk>/', TaskAttachmentDeleteView.as_view(), name='delete_task_attachment'),
+    path('attachments/<uuid:pk>/', TaskAttachmentDeleteView.as_view(), name='delete_task_attachment'),
 ]

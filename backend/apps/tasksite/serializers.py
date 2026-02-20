@@ -183,7 +183,7 @@ class TaskSerializer(serializers.ModelSerializer):
         uploaded_files = validated_data.pop('uploaded_files', [])
         uploaded_links = validated_data.pop('uploaded_links', [])
         validated_data.pop('assigned_by', None)
-
+        instance = super().update(instance, validated_data)
         # --- NEW LOGIC: Save NEW files as Documents ---
         user = self.context['request'].user
         for file in uploaded_files:
