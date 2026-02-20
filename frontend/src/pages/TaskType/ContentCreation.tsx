@@ -16,9 +16,32 @@ import { TaskDetailModal } from '../MyTask/TaskDetailModal';
 import { useTableFilters, ColumnFilterConfig } from '@/hooks/useTableFilters';
 import { SearchFilter, ListFilter, DateFilter, FilterHeaderWrapper } from '@/components/layout/DualView/FilterComponents';
 import { getStatusConfig, priorityOptions, statusOptions } from '@/components/layout/DualView/taskConfig';
-import { Document as PDFDocument, Page as PDFPage } from 'react-pdf';
-import 'react-pdf/dist/Page/AnnotationLayer.css';
-import 'react-pdf/dist/Page/TextLayer.css';
+// Lazy-load the PDF viewer — react-pdf + pdfjs-dist is ~2 MB.
+// It is only needed when a file thumbnail is of type "pdf".
+// The pdfjs worker is configured here (not in main.tsx) so it is only
+// initialised when this lazy chunk is actually downloaded, keeping the
+// app startup bundle free of any PDF-related code.
+const LazyPDFThumbnail = React.lazy(() =>
+  import('react-pdf').then(({ Document, Page, pdfjs }) => {
+    // Configure the local bundled worker — avoids an external CDN round-trip.
+    pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+      'pdfjs-dist/build/pdf.worker.min.mjs',
+      import.meta.url
+    ).toString();
+    return {
+      default: ({ url }: { url: string }) => (
+        <Document file={url} loading="">
+          <Page
+            pageNumber={1}
+            width={250}
+            renderTextLayer={false}
+            renderAnnotationLayer={false}
+          />
+        </Document>
+      ),
+    };
+  })
+);
 import './ContentCreation.scss';
 
 
@@ -105,14 +128,9 @@ export function MediaThumbnail({ file, projectId }: { file: any; projectId: numb
             return (
                 <div className="w-full h-full flex items-start justify-center overflow-hidden">
                     <div className="scale-[0.4] origin-top mt-1">
-                        <PDFDocument file={downloadUrl} loading="">
-                            <PDFPage
-                                pageNumber={1}
-                                width={250}
-                                renderTextLayer={false}
-                                renderAnnotationLayer={false}
-                            />
-                        </PDFDocument>
+                        <React.Suspense fallback={<Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}>
+                            <LazyPDFThumbnail url={downloadUrl} />
+                        </React.Suspense>
                     </div>
                 </div>
             );

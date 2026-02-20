@@ -1,19 +1,42 @@
-import { useEffect } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { Layout } from '@/components/layout';
 import type { User as AppUser } from '@/types';
-import { ContentCreation } from '@/pages/TaskType/ContentCreation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { projectsApi, notificationSocket } from '@/services/api';
-import { TaskDetails } from '@/pages/TaskType/TaskDetails';
-import { APITesting } from '@/pages/TaskType/APITesting';
-import {
-  Dashboard, Login, Projects, DocumentCreate, Documents, ProjectSettings,
-  Teams, UserManagement, MyTask, CreateTask, TeamPerformance, Calendar, NotificationsPage, Profile, ResetPassword, TeamChatModern, Settings,
-} from '@/pages';
-import { TaskDetailPage } from '@/pages/MyTask/TaskDetailPage';
+
+// Lazy-loaded page components for route-level code splitting
+const Dashboard = lazy(() => import('@/pages/Dashboard').then(m => ({ default: m.Dashboard })));
+const Login = lazy(() => import('@/pages/Login').then(m => ({ default: m.Login })));
+const Projects = lazy(() => import('@/pages/Project/Projects').then(m => ({ default: m.Projects })));
+const ProjectSettings = lazy(() => import('@/pages/Project/ProjectSettings').then(m => ({ default: m.ProjectSettings })));
+const DocumentCreate = lazy(() => import('@/pages/Documents/DocumentCreate').then(m => ({ default: m.DocumentCreate })));
+const Documents = lazy(() => import('@/pages/Documents/Documents').then(m => ({ default: m.Documents })));
+const MyTask = lazy(() => import('@/pages/MyTask/MyTask').then(m => ({ default: m.MyTask })));
+const CreateTask = lazy(() => import('@/pages/MyTask/CreateTask').then(m => ({ default: m.CreateTask })));
+const TaskDetailPage = lazy(() => import('@/pages/MyTask/TaskDetailPage').then(m => ({ default: m.TaskDetailPage })));
+const Teams = lazy(() => import('@/pages/TeamManagement/Teams').then(m => ({ default: m.Teams })));
+const UserManagement = lazy(() => import('@/pages/TeamManagement/UserManagement').then(m => ({ default: m.UserManagement })));
+const TeamPerformance = lazy(() => import('@/pages/TeamManagement/TeamPerformance').then(m => ({ default: m.TeamPerformance })));
+const ContentCreation = lazy(() => import('@/pages/TaskType/ContentCreation').then(m => ({ default: m.ContentCreation })));
+const TaskDetails = lazy(() => import('@/pages/TaskType/TaskDetails').then(m => ({ default: m.TaskDetails })));
+const APITesting = lazy(() => import('@/pages/TaskType/APITesting').then(m => ({ default: m.APITesting })));
+const Calendar = lazy(() => import('@/pages/Calendar/Calendar').then(m => ({ default: m.Calendar })));
+const NotificationsPage = lazy(() => import('@/pages/NotificationsPage').then(m => ({ default: m.NotificationsPage })));
+const Profile = lazy(() => import('@/pages/Profile').then(m => ({ default: m.Profile })));
+const ResetPassword = lazy(() => import('@/pages/ResetPassword').then(m => ({ default: m.ResetPassword })));
+const TeamChatModern = lazy(() => import('@/pages/TeamsChat/TeamChatModern').then(m => ({ default: m.TeamChatModern })));
+const Settings = lazy(() => import('@/pages/Settings').then(m => ({ default: m.Settings })));
+
+function PageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+    </div>
+  );
+}
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { isAllowed, isLoading, isAuthenticated } = useAuth();
@@ -161,6 +184,10 @@ function AppRoutes() {
   );
 }
 
+// Preload the Dashboard chunk as soon as the user is authenticated so
+// there is no lazy-load delay when they land on "/" after login.
+const preloadDashboard = () => import('@/pages/Dashboard');
+
 // Global WebSocket initializer component
 function WebSocketProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -169,6 +196,9 @@ function WebSocketProvider({ children }: { children: React.ReactNode }) {
     if (isAuthenticated) {
       notificationSocket.connect();
       console.log('🌐 Global WebSocket initialized');
+      // Kick off the Dashboard chunk download in the background the
+      // moment we know the user is logged in.
+      preloadDashboard();
       return () => {
       };
     }
@@ -181,7 +211,9 @@ function App() {
   return (
     <AuthProvider>
       <WebSocketProvider>
-        <AppRoutes />
+        <Suspense fallback={<PageLoader />}>
+          <AppRoutes />
+        </Suspense>
       </WebSocketProvider>
     </AuthProvider>
   );
