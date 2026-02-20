@@ -1,14 +1,36 @@
 """
 Serializers for Ground Truth app.
 """
+import os
 from django.utils import timezone
 from rest_framework import serializers
 
 from apps.users.serializers import UserMinimalSerializer
-
 from .models import Document, DocumentComment, GTVersion
 
-
+def get_clean_unique_name(project_id, original_filename):
+    """
+    Checks if a file name exists in a project. 
+    If yes, appends (1), (2), etc. until it finds a unique name.
+    """
+    # Split "api_10.ts" into "api_10" and ".ts"
+    base_name, ext = os.path.splitext(original_filename)
+    
+    # 1. If the original name doesn't exist yet, just use it!
+    if not Document.objects.filter(project_id=project_id, name=original_filename).exists():
+        return original_filename
+        
+    # 2. If it DOES exist, start counting...
+    count = 1
+    while True:
+        # Create the new name: "api_10 (1).ts"
+        new_name = f"{base_name} ({count}){ext}"
+        
+        # Check if "api_10 (1).ts" exists
+        if not Document.objects.filter(project_id=project_id, name=new_name).exists():
+            return new_name # Found an empty slot!
+            
+        count += 1 # Try the next number
 class GTVersionSerializer(serializers.ModelSerializer):
     """
     Serializer for GTVersion model.
@@ -151,6 +173,20 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         user = self.context["request"].user
         source_file = validated_data.get("source_file")
+        project = validated_data.get("project")
+        
+        # --- NEW CLEAN NAME LOGIC ---
+        # 1. Get the name from the request, or fallback to the actual uploaded filename
+        original_name = validated_data.get("name")
+        if not original_name and source_file:
+            original_name = source_file.name
+            
+        # 2. Run it through our cleaner function
+        if original_name and project:
+            clean_name = get_clean_unique_name(project.id, original_name)
+            validated_data["name"] = clean_name # Save the beautiful name to DB
+        # ----------------------------
+
         if source_file:
             validated_data["file_size"] = source_file.size
         
