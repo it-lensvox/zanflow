@@ -135,11 +135,7 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
-# This tells django-storages to append the access signature to your URLs
-AWS_QUERYSTRING_AUTH = True 
 
-# Optional: How long the link should be valid (in seconds). 3600 = 1 hour.
-AWS_QUERYSTRING_EXPIRE = 3600
 # Internationalization
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"

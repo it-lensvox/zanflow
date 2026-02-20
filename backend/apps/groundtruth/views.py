@@ -137,9 +137,27 @@ class DocumentViewSet(viewsets.ModelViewSet):
         log_action(document, "create", new_value={"name": document.name})
     
     def perform_update(self, serializer):
-        old_data = DocumentSerializer(self.get_object()).data
-        document = serializer.save(updated_by=self.request.user)
-        log_action(document, "update", old_value=old_data)
+        # 1. Grab the current document BEFORE saving to see its old status
+        instance = self.get_object()
+        old_status = instance.status
+
+        # 2. Save the new changes
+        # (Assuming your UserStampedModel automatically uses the updated_by field)
+        updated_document = serializer.save(updated_by=self.request.user)
+        
+        # 3. Did the status change?
+        new_status = updated_document.status
+        
+        if old_status != new_status:
+            # 4. Create the Audit Log!
+            log_action(
+                updated_document,   # Passed positionally (no 'target=')
+                "status_change",    # Passed positionally (no 'action=')
+                old_value={"status": old_status},
+                new_value={"status": new_status},
+                change_summary=f"Document status changed from '{old_status}' to '{new_status}'",
+                user=self.request.user,
+            )
     
     @action(detail=True, methods=["post"], url_path="upload-source")
     def upload_source(self, request, pk=None):

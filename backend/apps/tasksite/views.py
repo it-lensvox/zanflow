@@ -75,7 +75,7 @@ class TaskListCreateView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        serializer = TaskSerializer(data=request.data)
+        serializer = TaskSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             task = serializer.save(assigned_by=request.user)
             
@@ -122,7 +122,7 @@ class TaskRetrieveUpdateView(APIView):
         task = get_object_or_404(Task, id=task_id)
         old_status = task.status
         if request.user.is_manager:
-            serializer = TaskSerializer(task, data=request.data, partial=True)
+            serializer = TaskSerializer(task, data=request.data, partial=True, context={'request': request})
         else:
             if not task.assigned_to.filter(id=request.user.id).exists():
                 return Response(
