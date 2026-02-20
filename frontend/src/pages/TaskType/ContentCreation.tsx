@@ -479,8 +479,28 @@ export function ContentCreation() {
                             </button>
                         ))}
 
+                        {/* View toggle — ml-auto pushes it + everything after it to the right */}
+                        {activeTab === 'tasks' && (
+                            <div className="flex items-center bg-white p-1 gap-1 ml-auto">
+                                <button
+                                    onClick={() => setViewMode('list')}
+                                    className={`p-1.5 rounded transition-colors ${viewMode === 'list' ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:bg-gray-50'}`}
+                                    title="List View"
+                                >
+                                    <List className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('grid')}
+                                    className={`p-1.5 rounded transition-colors ${viewMode === 'grid' ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:bg-gray-50'}`}
+                                    title="Grid View"
+                                >
+                                    <Grid3X3 className="w-4 h-4" />
+                                </button>
+                            </div>
+                        )}
+
                         <button
-                            className="content-creation__tab content-creation__tab--create-task"
+                            className={`content-creation__tab content-creation__tab--create-task${activeTab !== 'tasks' ? ' !ml-auto' : ''}`}
                             onClick={() => setIsCreateTaskModalOpen(true)}
                         >
                             <Plus className="h-4 w-4" />
@@ -509,26 +529,6 @@ export function ContentCreation() {
                 <div className="content-creation__content">
                     {activeTab === 'tasks' && (
                         <div className="content-creation__tasks">
-                            {/* View Toggle Controls */}
-                            <div className="flex justify-end mb-2">
-                                <div className="flex items-center border border-gray-200 rounded-md bg-white p-1 gap-1">
-                                    <button
-                                        onClick={() => setViewMode('list')}
-                                        className={`p-1.5 rounded transition-colors ${viewMode === 'list' ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:bg-gray-50'}`}
-                                        title="List View"
-                                    >
-                                        <List className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                        onClick={() => setViewMode('grid')}
-                                        className={`p-1.5 rounded transition-colors ${viewMode === 'grid' ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:bg-gray-50'}`}
-                                        title="Grid View"
-                                    >
-                                        <Grid3X3 className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
-
                             {isTasksLoading ? (
                                 <div className="flex justify-center p-12">
                                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black" />
@@ -794,16 +794,12 @@ export function ContentCreation() {
             )}
 
             {isCreateTaskModalOpen && (
-                <div className="content-creation__modal-overlay">
-                    <div className="content-creation__modal-container bg-gray-50 p-6">
                         <CreateTask
                             onClose={() => setIsCreateTaskModalOpen(false)}
                             onSuccess={handleTaskCreated}
                             isModal={true}
                             fixedProjectId={Number(id)}
                         />
-                    </div>
-                </div>
             )}
 
             {selectedTask && (

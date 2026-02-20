@@ -9,13 +9,9 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { usersApi, chatApi, GatewayWebSocketService } from '@/services/api';
 import type { ChatRoom, ChatMessage, ChatRoomMessagesResponse, ToastNotification, GatewayIncomingMessage, ProjectChatRoom, TeamChatRoom, User } from '@/types';
-// Lazy-load the emoji picker — it's a large bundle (~1 MB of emoji data).
-// It is only rendered when the user opens the picker, so there is no
-// reason to include it in the initial page bundle.
 const EmojiPicker = lazy(() => import('emoji-picker-react'));
 import type { EmojiClickData } from 'emoji-picker-react';
 import { CreateTeamModal } from '@/pages/TeamManagement/Createteammodal';
-
 
 // Extended user type with last message info
 interface UserWithActivity extends User {
@@ -1219,11 +1215,22 @@ export function TeamChatModern() {
       alert('Failed to update favourite status. Please try again.');
     },
   });
+  
+  function ToastNotificationComponent({ toast }: { toast: ToastNotification }) {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      handleClose();
+    }, 5000);
 
+    return () => clearTimeout(timer); 
+  }, []);
 
-  // Toast Notification Component
-  const ToastNotificationComponent = ({ toast }: { toast: ToastNotification }) => (
-    <div className="flex items-start gap-3 p-4 bg-white rounded-lg shadow-lg border border-gray-200 min-w-[300px] max-w-[400px] animate-slide-in">
+  const handleClose = () => {
+    setToastNotifications(prev => prev.filter(t => t.id !== toast.id));
+  };
+
+  return (
+   <div className="flex items-start gap-3 p-4 bg-white rounded-lg shadow-lg border border-gray-200 min-w-[300px] max-w-[400px] animate-slide-in">
       <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center font-semibold text-blue-700 text-sm flex-shrink-0">
         {toast.sender_name.charAt(0).toUpperCase()}
       </div>
@@ -1239,6 +1246,7 @@ export function TeamChatModern() {
       </button>
     </div>
   );
+}
 
   return (
     <div className="flex h-screen bg-[#f3f2f1] overflow-hidden border-2 border-gray-200">
@@ -1308,7 +1316,7 @@ export function TeamChatModern() {
           </Tabs.List>
 
           {/* Scrollable Lists */}
-          <div className="flex-1 overflow-y-auto min-h-0">
+          <div className="flex-1 overflow-y-auto scrollbar-hide min-h-0 bg-white">
             <Tabs.Content value="chats">
               {/* Chats Section */}
               <div className="bg-white">
@@ -1619,12 +1627,12 @@ export function TeamChatModern() {
                 </Tabs.Root>
               </div>
               <div className="flex items-center gap-1">
-                <button className="p-2 hover:bg-gray-100 rounded transition-colors">
+                {/* <button className="p-2 hover:bg-gray-100 rounded transition-colors">
                   <Phone className="h-4 w-4 text-gray-600" />
                 </button>
                 <button className="p-2 hover:bg-gray-100 rounded transition-colors">
                   <Video className="h-4 w-4 text-gray-600" />
-                </button>
+                </button> */}
                 <div className="relative" ref={headerMenuRef}>
                   <button
                     onClick={() => setShowHeaderMenu(!showHeaderMenu)}
@@ -1642,8 +1650,6 @@ export function TeamChatModern() {
                             // Fetch current favourite status from the query cache
                             const roomDetailsQuery = queryClient.getQueryData(['chat-room-details', roomId]) as ChatRoom | undefined;
                             const currentFavourite = roomDetailsQuery?.current_user_membership?.is_favourite || false;
-
-                            console.log('🔖 Toggle Favourite:', { roomId, currentFavourite, newValue: !currentFavourite });
                             toggleFavouriteMutation.mutate({ roomId, isFavourite: !currentFavourite });
                           } else {
                             console.error('❌ No room ID available for favourite toggle');
@@ -1698,7 +1704,7 @@ export function TeamChatModern() {
               <>
                 {/* Messages Area */}
                 <div
-                  className="flex-1 overflow-y-auto bg-[#efeae2] p-6"
+                  className="flex-1 overflow-y-auto bg-[#efeae2] scrollbar-hide p-6"
                   onDragEnter={handleDragEnter}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
@@ -1733,12 +1739,38 @@ export function TeamChatModern() {
                         const isOwn = message.is_own_message;
                         const showAvatar = index === 0 || messages[index - 1].sender.id !== message.sender.id;
                         const isHovered = hoveredMessageId === message.id;
+
+                        // — Date separator logic —
+                        const msgDate = new Date(message.created_at);
+                        const msgDay = msgDate.toDateString();
+                        const prevMsgDay = index > 0 ? new Date(messages[index - 1].created_at).toDateString() : null;
+                        const showDateSeparator = index === 0 || msgDay !== prevMsgDay;
+
+                        const getDateLabel = (date: Date) => {
+                          const today = new Date();
+                          const yesterday = new Date();
+                          yesterday.setDate(today.getDate() - 1);
+                          if (date.toDateString() === today.toDateString()) return 'Today';
+                          if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+                          return date.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+                        };
                         const menuOpen = openMenuMessageId === message.id;
                         const reactions = messageReactions.get(message.id);
 
                         return (
+                          <div key={message.id}>
+                            {/* Date separator */}
+                            {showDateSeparator && (
+                              <div className="flex items-center gap-3 my-4 px-2">
+                                <div className="flex-1 h-px bg-gray-400" />
+                                <span className="text-[11px] font-medium text-gray-700 bg-[#efeae2] px-3 py-1 rounded-full whitespace-nowrap select-none">
+                                  {getDateLabel(msgDate)}
+                                </span>
+                                <div className="flex-1 h-px bg-gray-400" />
+                              </div>
+                            )}
+
                           <div
-                            key={message.id}
                             className={cn("flex gap-2 group relative", isOwn ? "flex-row-reverse" : "")}
                             onMouseEnter={() => setHoveredMessageId(message.id)}
                             onMouseLeave={() => setHoveredMessageId(null)}
@@ -1958,6 +1990,7 @@ export function TeamChatModern() {
                                 )}
                               </div>
                             </div>
+                          </div>
                           </div>
                         );
                       })}

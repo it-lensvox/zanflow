@@ -66,6 +66,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
     const [isTitleRefining, setIsTitleRefining] = useState(false);
     const [isDescRefining, setIsDescRefining] = useState(false);
     const projectSearchInputRef = useRef<HTMLInputElement>(null);
+    const [projectMembers, setProjectMembers] = useState<{ user: { id: number; username: string; full_name: string } }[]>([]);
 
     const handleDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         let val = e.target.value;
@@ -96,20 +97,26 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
     }, [location.state?.projectId, fixedProjectId]);
 
     useEffect(() => {
-        const fetchLabels = async () => {
+        const fetchLabelsAndMembers = async () => {
             if (selectedProjects.length > 0) {
                 try {
-                    const data = await projectsApi.getLabels(selectedProjects[0]);
-                    setProjectLabels(data.results || []);
+                    // Fetch labels
+                    const labelsData = await projectsApi.getLabels(selectedProjects[0]);
+                    setProjectLabels(labelsData.results || []);
+
+                    // Fetch project details including members
+                    const projectDetails = await projectsApi.get(selectedProjects[0]);
+                    setProjectMembers(projectDetails.members || []);
                 } catch (error) {
-                    console.error("Failed to fetch project labels:", error);
+                    console.error("Failed to fetch project data:", error);
                 }
             } else {
                 setProjectLabels([]);
                 setSelectedLabelIds([]);
+                setProjectMembers([]);
             }
         };
-        fetchLabels();
+        fetchLabelsAndMembers();
     }, [selectedProjects]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -185,10 +192,15 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
         return (projectsData as any).results || projectsData || [];
     }, [projectsData]);
 
-    // Filter users based on search input
+    // Filter users based on search input and project membership
     const filteredUserOptions = React.useMemo(() => {
-        const availableUsers = allUserOptions.filter((user) => !assignedToList.includes(user.id));
+        let availableUsers = allUserOptions;
 
+        if (selectedProjects.length > 0 && projectMembers.length > 0) {
+            const projectMemberIds = projectMembers.map(member => member.user.id);
+            availableUsers = allUserOptions.filter((user) => projectMemberIds.includes(user.id));
+        }
+        availableUsers = availableUsers.filter((user) => !assignedToList.includes(user.id));
         if (!assigneeSearchInput.trim()) {
             return availableUsers;
         }
@@ -196,7 +208,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
         return availableUsers.filter((user) =>
             user.label.toLowerCase().startsWith(assigneeSearchInput.toLowerCase())
         );
-    }, [allUserOptions, assignedToList, assigneeSearchInput]);
+    }, [allUserOptions, assignedToList, assigneeSearchInput, selectedProjects, projectMembers]);
 
     // Filter projects based on search input with priority sorting
     const filteredProjectOptions = React.useMemo(() => {
@@ -404,16 +416,25 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
     }
 
     return (
-        <div className={isModal ? "" : "min-h-screen py-4 px-6"}>
-            <div className="max-w-4xl mx-auto">
+        <div className={isModal
+            ? "fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            : "h-full flex flex-col"
+        }>
+            {/* Inner card: constrained + scrollable in both modes */}
+            <div className={isModal
+                ? "bg-white rounded-lg shadow-xl w-full max-w-4xl flex flex-col max-h-[calc(100vh-64px)]"
+                : "w-full max-w-4xl mx-auto flex flex-col max-h-[calc(100vh-64px)]"
+            }>
+
                 {/* Header */}
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex-shrink-0 flex items-center justify-between px-8 pt-6 pb-4 border-b border-gray-200 bg-background rounded-t-lg">
+                    <div className="max-w-4xl w-full mx-auto flex items-center justify-between">
                         <div>
                             <h1 className="text-2xl font-semibold text-gray-900">Create task</h1>
                             <p className="text-sm text-gray-500 mt-1">Fill in the details below to create a new task</p>
                         </div>
-                         <div className="flex items-center gap-3">
-                             <button
+                        <div className="flex items-center gap-3">
+                            <button
                                 type="submit"
                                 form="create-task-form"
                                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -437,34 +458,33 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                             >
                                 Cancel
                             </button>
-                        </div>                
-                    {isModal && (
-                        <button onClick={handleClose} className="p-2 rounded hover:bg-gray-100">
-                            <X className="w-5 h-5 text-gray-600" />
-                        </button>
-                    )}
+                        </div>
+                    </div>
                 </div>
 
-                <form id="create-task-form" onSubmit={handleSubmit}>
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                        {/* Alerts */}
-                        {error && (
-                            <div className="p-4 bg-red-50 border-b border-red-100 flex items-start gap-3">
-                                <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                                <div className="flex-1">
-                                    <p className="text-sm font-medium text-red-800">Error</p>
-                                    <p className="text-sm text-red-700 mt-1">{error}</p>
+                { /* scroolable body */}
+                <div className="flex-1 overflow-y-auto scrollbar-hide px-8 py-6">
+                    <div className="max-w-4xl mx-auto"></div>
+                    <form id="create-task-form" onSubmit={handleSubmit}>
+                        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+                            {/* Alerts */}
+                            {error && (
+                                <div className="p-4 bg-red-50 border-b border-red-100 flex items-start gap-3">
+                                    <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                                    <div className="flex-1">
+                                        <p className="text-sm font-medium text-red-800">Error</p>
+                                        <p className="text-sm text-red-700 mt-1">{error}</p>
+                                    </div>
                                 </div>
-                            </div>
-                        )}
-                        {success && (
-                            <div className="p-4 bg-green-50 border-b border-green-100 flex items-start gap-3">
-                                <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                                <div className="flex-1">
-                                    <p className="text-sm font-medium text-green-800">{success}</p>
+                            )}
+                            {success && (
+                                <div className="p-4 bg-green-50 border-b border-green-100 flex items-start gap-3">
+                                    <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                                    <div className="flex-1">
+                                        <p className="text-sm font-medium text-green-800">{success}</p>
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
 
                         <div className="p-5 space-y-4">
                             {/* Project Selection */}
@@ -1068,59 +1088,26 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                                     </div>
                                 </div>
 
-                                {attachments.length > 0 && (
-                                    <div className="mt-3 space-y-2">
-                                        {attachments.map((file, index) => (
-                                            <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-200">
-                                                <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                    <Paperclip className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                                                    <span className="text-sm text-gray-700 truncate">{file.name}</span>
-                                                    <span className="text-xs text-gray-500 flex-shrink-0">
-                                                        {(file.size / 1024 / 1024).toFixed(2)} MB
-                                                    </span>
+                                    {attachments.length > 0 && (
+                                        <div className="mt-3 space-y-2">
+                                            {attachments.map((file, index) => (
+                                                <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-200">
+                                                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                        <Paperclip className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                                        <span className="text-sm text-gray-700 truncate">{file.name}</span>
+                                                        <span className="text-xs text-gray-500 flex-shrink-0">
+                                                            {(file.size / 1024 / 1024).toFixed(2)} MB
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removeAttachment(index)}
-                                                    className="p-1 hover:bg-gray-200 rounded text-gray-400 hover:text-red-600 flex-shrink-0"
-                                                >
-                                                    <X className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
-
-                        {/* Footer Actions */}
-                        {/* <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
-                            <button
-                                type="button"
-                                onClick={handleClose}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-                                disabled={loading}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setShowAIModal(true)}
-                                className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded hover:bg-purple-700 transition-colors flex items-center gap-2"
-                            >
-                                <Sparkles className="w-4 h-4" />
-                                Generate Task By AI
-                            </button>
-                            <button
-                                type="submit"
-                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                disabled={loading}
-                            >
-                                {loading ? 'Creating...' : 'Create task'}
-                            </button>
-                        </div> */}
-                    </div>
-                </form>
+                    </form>
+                </div>
             </div>
             {showAIModal && (
                 <AITask

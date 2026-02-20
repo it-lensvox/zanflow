@@ -1,21 +1,64 @@
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { NotificationsPage } from '@/pages/NotificationsPage';
+
+// Skeleton shown inside the content area while a lazy page chunk loads.
+// Sidebar stays fully mounted and visible — only this placeholder swaps in.
+function PageSkeleton() {
+  return (
+    <div className="h-full flex flex-col animate-pulse p-6 gap-4">
+      {/* Page header bar */}
+      <div className="flex items-center justify-between">
+        <div className="h-7 w-48 rounded-lg bg-muted" />
+        <div className="h-9 w-28 rounded-lg bg-muted" />
+      </div>
+
+      {/* Subheader / filter row */}
+      <div className="flex gap-3">
+        <div className="h-5 w-32 rounded bg-muted" />
+        <div className="h-5 w-24 rounded bg-muted" />
+        <div className="h-5 w-20 rounded bg-muted" />
+      </div>
+
+      {/* Content cards grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-2">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="rounded-xl border border-border bg-card p-4 space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 rounded-full bg-muted" />
+              <div className="h-4 w-32 rounded bg-muted" />
+            </div>
+            <div className="h-3 w-full rounded bg-muted" />
+            <div className="h-3 w-4/5 rounded bg-muted" />
+            <div className="flex gap-2 pt-1">
+              <div className="h-5 w-16 rounded-full bg-muted" />
+              <div className="h-5 w-12 rounded-full bg-muted" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function Layout() {
   const [isActivityOpen, setIsActivityOpen] = useState(false);
 
   return (
     <div className="flex h-screen bg-background">
+      {/* Sidebar is OUTSIDE Suspense — it never unmounts on page transitions */}
       <Sidebar />
+
       <main className="flex-1 overflow-auto">
         <div id="layout-wrapper" className="container">
-          <Outlet context={{ isActivityOpen, setIsActivityOpen }} />
+          {/* Suspense only covers the page content, not the sidebar */}
+          <Suspense fallback={<PageSkeleton />}>
+            <Outlet context={{ isActivityOpen, setIsActivityOpen }} />
+          </Suspense>
         </div>
       </main>
 
-      {/* Render the component directly - it handles its own positioning and backdrop */}
       {isActivityOpen && (
         <NotificationsPage onClose={() => setIsActivityOpen(false)} />
       )}

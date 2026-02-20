@@ -356,8 +356,28 @@ export function TaskDetails() {
                         </button>
                     ))}
 
+                    {/* View toggle — only visible on Tasks tab, lives inside navbar */}
+                    {activeTab === 'tasks' && (
+                        <div className="flex items-center bg-white p-1 gap-1 ml-auto">
+                            <button
+                                onClick={() => setViewMode('list')}
+                                className={`p-1.5 rounded transition-colors ${viewMode === 'list' ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:bg-gray-50'}`}
+                                title="List View"
+                            >
+                                <List className="w-4 h-4" />
+                            </button>
+                            <button
+                                onClick={() => setViewMode('grid')}
+                                className={`p-1.5 rounded transition-colors ${viewMode === 'grid' ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:bg-gray-50'}`}
+                                title="Grid View"
+                            >
+                                <Grid3X3 className="w-4 h-4" />
+                            </button>
+                        </div>
+                    )}
+
                     <button
-                        className="content-creation__tab content-creation__tab--create-task"
+                        className={`content-creation__tab content-creation__tab--create-task${activeTab !== 'tasks' ? ' !ml-auto' : ''}`}
                         onClick={() => setIsCreateTaskModalOpen(true)}
                     >
                         Create Task
@@ -382,26 +402,6 @@ export function TaskDetails() {
                 <div className="content-creation__content">
                     {activeTab === 'tasks' && (
                         <div className="content-creation__tasks">
-                            {/* View Toggle Controls */}
-                            <div className="flex justify-end mb-2">
-                                <div className="flex items-center border border-gray-200 rounded-md bg-white p-1 gap-1">
-                                    <button
-                                        onClick={() => setViewMode('list')}
-                                        className={`p-1.5 rounded transition-colors ${viewMode === 'list' ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:bg-gray-50'}`}
-                                        title="List View"
-                                    >
-                                        <List className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                        onClick={() => setViewMode('grid')}
-                                        className={`p-1.5 rounded transition-colors ${viewMode === 'grid' ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:bg-gray-50'}`}
-                                        title="Grid View"
-                                    >
-                                        <Grid3X3 className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
-
                             {isLoadingTasks ? (
                                 <div className="flex justify-center p-12"><Loader2 className="animate-spin h-8 w-8" /></div>
                             ) : tasks.length > 0 ? (
@@ -639,19 +639,15 @@ export function TaskDetails() {
 
             {
                 isCreateTaskModalOpen && (
-                    <div className="content-creation__modal-overlay">
-                        <div className="content-creation__modal-container bg-gray-50 p-6">
-                            <CreateTask
-                                onClose={() => setIsCreateTaskModalOpen(false)}
-                                onSuccess={() => {
-                                    setIsCreateTaskModalOpen(false);
-                                    queryClient.invalidateQueries({ queryKey: ['tasks'] });
-                                }}
-                                isModal={true}
-                                fixedProjectId={id ? Number(id) : undefined}
-                            />
-                        </div>
-                    </div>
+                    <CreateTask
+                        onClose={() => setIsCreateTaskModalOpen(false)}
+                        onSuccess={() => {
+                            setIsCreateTaskModalOpen(false);
+                            queryClient.invalidateQueries({ queryKey: ['tasks'] });
+                        }}
+                        isModal={true}
+                        fixedProjectId={id ? Number(id) : undefined}
+                    />
                 )
             }
 

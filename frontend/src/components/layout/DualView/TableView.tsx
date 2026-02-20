@@ -50,7 +50,7 @@ export function TableView<T>({
 }: TableViewProps<T>) {
   return (
     <div 
-      className={`bg-white border border-[#dfe1e6] rounded-md shadow-sm overflow-auto font-sans text-[13px] ${className}`}
+      className={`bg-white border border-[#dfe1e6] rounded-md shadow-sm overflow-auto scrollbar-hide font-sans text-[13px] ${className}`}
       style={{ 
         maxHeight: typeof maxHeight === 'number' ? `${maxHeight}px` : maxHeight,
         display: 'flex',
