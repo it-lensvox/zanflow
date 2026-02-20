@@ -12,7 +12,7 @@ export default defineConfig({
   server: {
     port: 3001,
     host: true,
-    allowedHosts: ['localhost', '3.85.51.24', 'zanflow.lensvox.com']
+    allowedHosts: ['localhost', '3.85.51.24', 'zanflow.lensvox.com',  'dyuksa.com', 'www.dyuksa.com']
   },
   build: {
     rollupOptions: {
