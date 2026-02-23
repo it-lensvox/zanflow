@@ -402,7 +402,7 @@ export function TaskDetails() {
                             <h1 className="content-creation__title">{project?.name}</h1>
                         </div>
                         <p className="content-creation__subtitle">
-                            {project?.task_type.replace('_', ' ').toUpperCase()} Dashboard
+                            {project?.task_type.replace('_', ' ').toUpperCase()} DASHBOARD
                         </p>
                     </div>
 
