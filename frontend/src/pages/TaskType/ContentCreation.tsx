@@ -16,10 +16,8 @@ import { TaskDetailModal } from '../MyTask/TaskDetailModal';
 import { useTableFilters, ColumnFilterConfig } from '@/hooks/useTableFilters';
 import { SearchFilter, ListFilter, DateFilter, FilterHeaderWrapper } from '@/components/layout/DualView/FilterComponents';
 import { getStatusConfig, priorityOptions, statusOptions } from '@/components/layout/DualView/taskConfig';
-// import { Document as PDFDocument, Page as PDFPage } from 'react-pdf';
-// import 'react-pdf/dist/Page/AnnotationLayer.css';
-// import 'react-pdf/dist/Page/TextLayer.css';
 import './ContentCreation.scss';
+// import Threads from '../Project/Thread';
 
 type TabType = 'tasks' | 'calendar' | 'media';
 
@@ -892,12 +890,12 @@ export function ContentCreation() {
             </div>
 
             {isCreateTaskModalOpen && (
-                        <CreateTask
-                            onClose={() => setIsCreateTaskModalOpen(false)}
-                            onSuccess={handleTaskCreated}
-                            isModal={true}
-                            fixedProjectId={Number(id)}
-                        />
+                <CreateTask
+                    onClose={() => setIsCreateTaskModalOpen(false)}
+                    onSuccess={handleTaskCreated}
+                    isModal={true}
+                    fixedProjectId={Number(id)}
+                />
             )}
 
             {selectedTask && (
@@ -916,6 +914,10 @@ export function ContentCreation() {
                     onClose={() => setPreviewDocument(null)}
                 />
             )}
+            {/* Threads Component */}
+            {/* {project && (
+                <Threads projectId={project.id} projectName={project.name} />
+            )} */}
         </div>
     );
 }

@@ -1,14 +1,13 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import type {
   AuthTokens, User as AppUser, PaginatedResponse, PaginatedProjectsResponse, GetUploadUrlPayload, GetUploadUrlResponse, ConfirmUploadResponse, GetDownloadUrlPayload, ConfirmUploadPayload,
-  GetDownloadUrlResponse, AllDocumentsResponse, TaskComment, CreateTaskCommentPayload, AITaskSuggestionResponse, AITaskSuggestionPayload, APICollection,
-  APIEndpoint, AuthCredential, ExecutionRun, ExecutionResult, APITestingDashboard, CreateCollectionPayload, CreateEndpointPayload, CreateCredentialPayload, RunCollectionPayload, ProjectCreatePayload,
-  Label, DocumentStatus, ChatMessage, ChatRoom, ChatRoomMessagesResponse, CreatePrivateChatPayload, GatewaySendMessagePayload, GatewayIncomingMessage, GatewayConnectedEvent, RefineTextPayload, RefineTextResponse, TaskResponse, TeamTypeChoicesResponse,
-  CreateTeamPayload, ProjectChatRoom, TeamChatRoom, ChatUnreadResponse, NotificationData, NotificationCallback, WebSocketNotificationEvent, NotificationListResponse, Team
+  GetDownloadUrlResponse, AllDocumentsResponse, TaskComment, CreateTaskCommentPayload, AITaskSuggestionResponse, AITaskSuggestionPayload, ProjectCreatePayload,
+  Label, DocumentStatus, ChatMessage, ChatRoom, ChatRoomMessagesResponse, CreatePrivateChatPayload, GatewaySendMessagePayload, GatewayIncomingMessage, RefineTextPayload, RefineTextResponse, TaskResponse, TeamTypeChoicesResponse,
+  CreateTeamPayload, ProjectChatRoom, TeamChatRoom, ChatUnreadResponse, NotificationData, NotificationCallback, Team, ThreadRoom, ThreadSession, ThreadStorage, ThreadUIMessage, CreateThreadRoomPayload, WSJoinRoomCommand, WSSendMessageCommand, WSIncomingThreadMessage, WSUnreadUpdateSignal
 } from '@/types';
 
-export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.14:8000/api/v1';
-const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://192.168.1.14:8000/ws/gateway';
+export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.4:8000/api/v1';
+const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://192.168.1.4:8000/ws/gateway';
 
 export const api = axios.create({
   baseURL: API_URL,
@@ -339,6 +338,13 @@ export const taskApi = {
         attachments: task.attachments || [],
         labels: task.label_details || []
       }));
+
+      // Sort tasks by created_at and updated_at in descending order 
+      data.tasks.sort((a: any, b: any) => {
+        const dateA = new Date(a.updated_at || a.created_at).getTime();
+        const dateB = new Date(b.updated_at || b.created_at).getTime();
+        return dateB - dateA; 
+      });
     }
 
     return data;
@@ -961,114 +967,148 @@ export const fetchNotifications = async () => {
   return response.data;
 };
 
-// API Testing Platform API
-export const apiTestingApi = {
-  // Collections
-  listCollections: async (params?: { project_id?: number }) => {
-    const response = await api.get<PaginatedResponse<APICollection>>('/api-testing/collections/', { params });
-    return response.data;
-  },
 
-  getCollection: async (id: string) => {
-    const response = await api.get<APICollection>(`/api-testing/collections/${id}/`);
-    return response.data;
-  },
+// // THREADS API
+// const THREADS_STORAGE_KEY = 'zanflow_threads';
 
-  createCollection: async (data: CreateCollectionPayload) => {
-    const response = await api.post<APICollection>('/api-testing/collections/', data);
-    return response.data;
-  },
+// export const threadsApi = {
+//   /**
+//    * Create a new thread room via backend API
+//    */
+//   createThreadRoom: async (payload: CreateThreadRoomPayload): Promise<ThreadRoom> => {
+//     const response = await api.post<ThreadRoom>('/chat/rooms/thread/', payload);
+//     return response.data;
+//   },
 
-  updateCollection: async (id: string, data: Partial<CreateCollectionPayload>) => {
-    const response = await api.patch<APICollection>(`/api-testing/collections/${id}/`, data);
-    return response.data;
-  },
+//   /**
+//    * Connect to WebSocket gateway
+//    */
+//   connectThreadSocket: (token: string): WebSocket => {
+//     const wsUrl = `${WS_GATEWAY_URL}/?token=${token}`;
+//     return new WebSocket(wsUrl);
+//   },
 
-  deleteCollection: async (id: string) => {
-    await api.delete(`/api-testing/collections/${id}/`);
-  },
+//   /**
+//    * Join a thread room via WebSocket
+//    */
+//   joinThreadRoom: (socket: WebSocket, slug: string): void => {
+//     if (socket.readyState === WebSocket.OPEN) {
+//       const command: WSJoinRoomCommand = {
+//         command: 'join_room',
+//         room_slug: slug,
+//       };
+//       socket.send(JSON.stringify(command));
+//     }
+//   },
 
-  runCollection: async (id: string, data?: RunCollectionPayload) => {
-    const response = await api.post<ExecutionRun>(`/api-testing/collections/${id}/run/`, data || {});
-    return response.data;
-  },
+//   /**
+//    * Send message to thread room via WebSocket
+//    */
+//   sendThreadMessage: (socket: WebSocket, roomId: string, content: string): void => {
+//     if (socket.readyState === WebSocket.OPEN) {
+//       const command: WSSendMessageCommand = {
+//         command: 'send_message',
+//         room_id: roomId,
+//         content: content,
+//       };
+//       socket.send(JSON.stringify(command));
+//     }
+//   },
 
-  getCollectionHistory: async (id: string) => {
-    const response = await api.get<ExecutionRun[]>(`/api-testing/collections/${id}/history/`);
-    return response.data;
-  },
+//   /**
+//    * Parse incoming WebSocket message
+// /**
+//    * Parse incoming WebSocket message
+//    */
+//   parseIncomingMessage: (event: MessageEvent): WSIncomingThreadMessage | null => {
+//     try {
+//       const parsed = JSON.parse(event.data);
+//       if (parsed.type === 'CHAT_MESSAGE') {
+//         return parsed as WSIncomingThreadMessage;
+//       }
+//       return null;
+//     } catch (error) {
+//       return null;
+//     }
+//   },
 
-  // Endpoints
-  listEndpoints: async (params?: { collection?: string }) => {
-    const response = await api.get<PaginatedResponse<APIEndpoint>>('/api-testing/endpoints/', { params });
-    return response.data;
-  },
+//   // Parse incoming unread signal
+//   parseUnreadSignal: (event: MessageEvent): WSUnreadUpdateSignal | null => {
+//     try {
+//       const parsed = JSON.parse(event.data);
+//       if (parsed.type === 'SIGNAL' && parsed.event === 'CHAT_UNREAD_UPDATE') {
+//         return parsed as WSUnreadUpdateSignal;
+//       }
+//       return null;
+//     } catch (error) {
+//       return null;
+//     }
+//   },
 
-  getEndpoint: async (id: string) => {
-    const response = await api.get<APIEndpoint>(`/api-testing/endpoints/${id}/`);
-    return response.data;
-  },
 
-  createEndpoint: async (data: CreateEndpointPayload) => {
-    const response = await api.post<APIEndpoint>('/api-testing/endpoints/', data);
-    return response.data;
-  },
+//   // Convert backend message to UI message format
+//   convertToUIMessage: (backendMessage: WSIncomingThreadMessage['data']): ThreadUIMessage => {
+//     return {
+//       id: backendMessage.id,
+//       text: backendMessage.content,
+//       sender: backendMessage.is_ai_generated ? 'system' : 'user',
+//       timestamp: new Date(backendMessage.created_at),
+//       isAI: backendMessage.is_ai_generated,
+//     };
+//   },
+// };
 
-  updateEndpoint: async (id: string, data: Partial<CreateEndpointPayload>) => {
-    const response = await api.patch<APIEndpoint>(`/api-testing/endpoints/${id}/`, data);
-    return response.data;
-  },
 
-  deleteEndpoint: async (id: string) => {
-    await api.delete(`/api-testing/endpoints/${id}/`);
-  },
+// // THREADS STORAGE UTILITIE
+// export const threadsStorageApi = {
+//    // Get all thread sessions for a project from localStorage
+//   getProjectThreads: (projectId: number): ThreadStorage => {
+//     try {
+//       const data = localStorage.getItem(`${THREADS_STORAGE_KEY}_${projectId}`);
+//       if (!data) {
+//         return { sessions: [], lastActiveSessionId: null };
+//       }
+//       const parsed = JSON.parse(data);
+//       return {
+//         sessions: parsed.sessions.map((session: any) => ({
+//           ...session,
+//           createdAt: new Date(session.createdAt),
+//           updatedAt: new Date(session.updatedAt),
+//           messages: session.messages.map((msg: any) => ({
+//             ...msg,
+//             timestamp: new Date(msg.timestamp),
+//           })),
+//         })),
+//         lastActiveSessionId: parsed.lastActiveSessionId,
+//       };
+//     } catch (error) {
+//       return { sessions: [], lastActiveSessionId: null };
+//     }
+//   },
 
-  runEndpoint: async (id: string, data?: { credential_id?: string; environment_overrides?: Record<string, string> }) => {
-    const response = await api.post<ExecutionResult>(`/api-testing/endpoints/${id}/run/`, data || {});
-    return response.data;
-  },
 
-  // Credentials
-  listCredentials: async (params?: { collection?: string }) => {
-    const response = await api.get<PaginatedResponse<AuthCredential>>('/api-testing/credentials/', { params });
-    return response.data;
-  },
+//   // Save thread sessions to localStorage
+//   saveProjectThreads: (projectId: number, data: ThreadStorage): void => {
+//     try {
+//       localStorage.setItem(`${THREADS_STORAGE_KEY}_${projectId}`, JSON.stringify(data));
+//     } catch (error) {
+//     }
+//   },
 
-  getCredential: async (id: string) => {
-    const response = await api.get<AuthCredential>(`/api-testing/credentials/${id}/`);
-    return response.data;
-  },
 
-  createCredential: async (data: CreateCredentialPayload) => {
-    const response = await api.post<AuthCredential>('/api-testing/credentials/', data);
-    return response.data;
-  },
+//   // Search sessions by title or content
+//   searchSessions: (sessions: ThreadSession[], query: string): ThreadSession[] => {
+//     if (!query.trim()) return sessions;
+    
+//     const lowerQuery = query.toLowerCase();
+//     return sessions.filter(session => {
+//       if (session.title.toLowerCase().includes(lowerQuery)) return true;
+//       return session.messages.some(msg => 
+//         msg.text.toLowerCase().includes(lowerQuery)
+//       );
+//     });
+//   },
+// };
 
-  updateCredential: async (id: string, data: Partial<CreateCredentialPayload>) => {
-    const response = await api.patch<AuthCredential>(`/api-testing/credentials/${id}/`, data);
-    return response.data;
-  },
-
-  deleteCredential: async (id: string) => {
-    await api.delete(`/api-testing/credentials/${id}/`);
-  },
-
-  // Execution Runs
-  listRuns: async (params?: { collection?: string; status?: string }) => {
-    const response = await api.get<PaginatedResponse<ExecutionRun>>('/api-testing/runs/', { params });
-    return response.data;
-  },
-
-  getRun: async (id: string) => {
-    const response = await api.get<ExecutionRun>(`/api-testing/runs/${id}/`);
-    return response.data;
-  },
-
-  // Dashboard
-  getDashboard: async () => {
-    const response = await api.get<APITestingDashboard>('/api-testing/dashboard/');
-    return response.data;
-  },
-};
 
 export default api;

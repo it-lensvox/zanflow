@@ -432,28 +432,6 @@ export interface AITaskSuggestionResponse {
   };
 }
 
-// API Testing Tool types
-export interface APICollection {
-  id: string;
-  name: string;
-  description?: string;
-  project_id?: number;
-  api_count: number;
-  execution_order: 'sequential' | 'parallel';
-  environment_variables: Record<string, string>;
-  tags: string[];
-  is_active: boolean;
-  created_by?: UserMinimal;
-  created_at: string;
-  updated_at: string;
-  last_run?: {
-    id: string;
-    status: string;
-    executed_at: string;
-    success_rate: number;
-  } | null;
-}
-
 export interface APIEndpoint {
   id: string;
   collection: string;
@@ -498,58 +476,58 @@ export interface AuthCredential {
   updated_at: string;
 }
 
-export interface ExecutionRun {
-  id: string;
-  collection: APICollection;
-  executed_by?: UserMinimal;
-  status: 'pending' | 'running' | 'completed' | 'partial_failure' | 'failed' | 'cancelled';
-  started_at?: string;
-  completed_at?: string;
-  total_apis: number;
-  successful_count: number;
-  failed_count: number;
-  skipped_count: number;
-  trigger_type: 'manual' | 'scheduled' | 'webhook' | 'ci_cd';
-  environment?: Record<string, string>;
-  notes?: string;
-  duration_seconds?: number;
-  success_rate: number;
-  results?: ExecutionResult[];
-  created_at: string;
-  updated_at: string;
-}
+// export interface ExecutionRun {
+//   id: string;
+//   collection: APICollection;
+//   executed_by?: UserMinimal;
+//   status: 'pending' | 'running' | 'completed' | 'partial_failure' | 'failed' | 'cancelled';
+//   started_at?: string;
+//   completed_at?: string;
+//   total_apis: number;
+//   successful_count: number;
+//   failed_count: number;
+//   skipped_count: number;
+//   trigger_type: 'manual' | 'scheduled' | 'webhook' | 'ci_cd';
+//   environment?: Record<string, string>;
+//   notes?: string;
+//   duration_seconds?: number;
+//   success_rate: number;
+//   results?: ExecutionResult[];
+//   created_at: string;
+//   updated_at: string;
+// }
 
-export interface ExecutionResult {
-  id: string;
-  execution_run: string;
-  api_endpoint?: string;
-  endpoint_name: string;
-  endpoint_method: string;
-  status: 'success' | 'failed' | 'error' | 'timeout' | 'skipped';
-  request_url: string;
-  request_headers?: Record<string, string>;
-  request_body?: string;
-  response_status_code?: number;
-  response_headers?: Record<string, string>;
-  response_body?: string;
-  response_size_bytes?: number;
-  execution_time_ms: number;
-  error_message?: string;
-  error_type?: string;
-  assertions_passed: boolean;
-  assertion_details?: Record<string, any>;
-  extracted_variables?: Record<string, any>;
-  retry_attempt: number;
-  created_at: string;
-}
+// export interface ExecutionResult {
+//   id: string;
+//   execution_run: string;
+//   api_endpoint?: string;
+//   endpoint_name: string;
+//   endpoint_method: string;
+//   status: 'success' | 'failed' | 'error' | 'timeout' | 'skipped';
+//   request_url: string;
+//   request_headers?: Record<string, string>;
+//   request_body?: string;
+//   response_status_code?: number;
+//   response_headers?: Record<string, string>;
+//   response_body?: string;
+//   response_size_bytes?: number;
+//   execution_time_ms: number;
+//   error_message?: string;
+//   error_type?: string;
+//   assertions_passed: boolean;
+//   assertion_details?: Record<string, any>;
+//   extracted_variables?: Record<string, any>;
+//   retry_attempt: number;
+//   created_at: string;
+// }
 
-export interface APITestingDashboard {
-  total_collections: number;
-  total_endpoints: number;
-  endpoints_by_method: Record<string, number>;
-  recent_runs: ExecutionRun[];
-  success_rate_last_30_days: number;
-}
+// export interface APITestingDashboard {
+//   total_collections: number;
+//   total_endpoints: number;
+//   endpoints_by_method: Record<string, number>;
+//   recent_runs: ExecutionRun[];
+//   success_rate_last_30_days: number;
+// }
 
 export interface CreateCollectionPayload {
   name: string;
@@ -560,49 +538,49 @@ export interface CreateCollectionPayload {
   tags?: string[];
 }
 
-export interface CreateEndpointPayload {
-  collection: string;
-  name: string;
-  description?: string;
-  http_method: string;
-  url: string;
-  headers?: Record<string, string>;
-  query_params?: Record<string, string>;
-  request_body?: Record<string, any> | string;
-  body_type?: string;
-  expected_status_code?: number;
-  expected_response_contains?: Record<string, any>;
-  timeout_seconds?: number;
-  retry_count?: number;
-  sort_order?: number;
-  extract_variables?: Record<string, string>;
-  depends_on?: string;
-}
+// export interface CreateEndpointPayload {
+//   collection: string;
+//   name: string;
+//   description?: string;
+//   http_method: string;
+//   url: string;
+//   headers?: Record<string, string>;
+//   query_params?: Record<string, string>;
+//   request_body?: Record<string, any> | string;
+//   body_type?: string;
+//   expected_status_code?: number;
+//   expected_response_contains?: Record<string, any>;
+//   timeout_seconds?: number;
+//   retry_count?: number;
+//   sort_order?: number;
+//   extract_variables?: Record<string, string>;
+//   depends_on?: string;
+// }
 
-export interface CreateCredentialPayload {
-  collection: string;
-  name: string;
-  auth_type: string;
-  token?: string;
-  username?: string;
-  password?: string;
-  api_key?: string;
-  api_key_name?: string;
-  header_name?: string;
-  header_prefix?: string;
-  access_token?: string;
-  refresh_token?: string;
-  expires_at?: string;
-  auto_refresh?: boolean;
-  refresh_url?: string;
-  refresh_payload?: Record<string, any>;
-}
+// export interface CreateCredentialPayload {
+//   collection: string;
+//   name: string;
+//   auth_type: string;
+//   token?: string;
+//   username?: string;
+//   password?: string;
+//   api_key?: string;
+//   api_key_name?: string;
+//   header_name?: string;
+//   header_prefix?: string;
+//   access_token?: string;
+//   refresh_token?: string;
+//   expires_at?: string;
+//   auto_refresh?: boolean;
+//   refresh_url?: string;
+//   refresh_payload?: Record<string, any>;
+// }
 
-export interface RunCollectionPayload {
-  credential_id?: string;
-  environment_overrides?: Record<string, string>;
-  notes?: string;
-}
+// export interface RunCollectionPayload {
+//   credential_id?: string;
+//   environment_overrides?: Record<string, string>;
+//   notes?: string;
+// }
 
 // Calendar Event types
 export interface CalendarEvent {
@@ -898,6 +876,148 @@ export interface ToastNotification {
   timestamp: string;
 }
 
+// // THREADS TYPES
+
+// // Sender information in thread messages
+// export interface ThreadSender {
+//   username: string;
+//   full_name?: string;
+//   avatar?: string;
+// }
+
+// // Thread message from backend
+// export interface ThreadMessage {
+//   id: string;
+//   room_id: string;
+//   sender: ThreadSender;
+//   content: string;
+//   is_ai_generated: boolean;
+//   timestamp: Date;
+// }
+
+// // Thread room (session)
+// export interface ThreadRoom {
+//   id: string;
+//   slug: string;
+//   name: string;
+//   room_type: string;
+//   project: number;
+//   created_at: string;
+//   updated_at: string;
+//   is_active: boolean;
+//   unread_count: number;
+//   participants?: Array<{
+//     id: number;
+//     username: string;
+//     full_name: string;
+//     email: string;
+//   }>;
+//   current_user_membership?: {
+//     id: string;
+//     joined_at: string;
+//     last_read_at: string;
+//     is_muted: boolean;
+//     room_role: string;
+//   };
+// }
+
+// // Local thread session for UI state
+// export interface ThreadSession {
+//   id: string;
+//   room_id: string;
+//   slug: string;
+//   projectId: number;
+//   title: string;
+//   messages: ThreadUIMessage[];
+//   createdAt: Date;
+//   updatedAt: Date;
+//   unreadCount: number;
+//   lastReadAt: Date | null;
+// }
+
+// // UI message format
+// export interface ThreadUIMessage {
+//   id: string;
+//   text: string;
+//   sender: 'user' | 'system';
+//   timestamp: Date;
+//   isAI?: boolean;
+// }
+
+// // Props for Threads component
+// export interface ThreadsProps {
+//   projectId: number;
+//   projectName: string;
+// }
+
+// // Local storage structure
+// export interface ThreadStorage {
+//   sessions: ThreadSession[];
+//   lastActiveSessionId: string | null;
+// }
+
+// // Create thread room payload
+// export interface CreateThreadRoomPayload {
+//   project_id: number;
+//   name: string;
+// }
+
+// // WebSocket command types
+// export type WebSocketCommand = 
+//   | 'join_room'
+//   | 'send_message'
+//   | 'leave_room';
+
+// // WebSocket join room command
+// export interface WSJoinRoomCommand {
+//   command: 'join_room';
+//   room_slug: string;
+// }
+
+// // WebSocket send message command
+// export interface WSSendMessageCommand {
+//   command: 'send_message';
+//   room_id: string;
+//   content: string;
+// }
+
+// // WebSocket incoming message
+// export interface WSIncomingThreadMessage {
+//   type: 'CHAT_MESSAGE';
+//   data: {
+//     id: string;
+//     room_id: string;
+//     sender: {
+//       id: number | null;
+//       username: string;
+//       full_name?: string;
+//     };
+//     message_type: string;
+//     content: string;
+//     attachment_url: string | null;
+//     attachment_name: string;
+//     reply_to: string | null;
+//     created_at: string;
+//     is_deleted: boolean;
+//     is_ai_generated: boolean;
+//     thread_count: number;
+//   };
+// }
+
+// // WebSocket unread update signal
+// export interface WSUnreadUpdateSignal {
+//   type: 'SIGNAL';
+//   event: 'CHAT_UNREAD_UPDATE';
+//   data: {
+//     room_id: string;
+//     total_unread: number;
+//     room_unread: number;
+//   };
+// }
+
+// // Combined WebSocket message types
+// export type WSThreadMessage = WSIncomingThreadMessage | WSUnreadUpdateSignal;
+
 // Document Filter Types for ContentCreation
 export interface ProjectDocument {
   id: string;
@@ -932,3 +1052,4 @@ export interface TaskOption {
   task_id: number;
   task_heading: string;
 }
+
