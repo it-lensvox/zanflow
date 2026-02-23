@@ -14,11 +14,11 @@ import { CreateTask } from '@/pages/MyTask/CreateTask';
 import { MediaThumbnail } from './ContentCreation';
 import { DocumentPreview, useDocumentPreviewKeyboard } from '@/components/common/DocumentPreview';
 import './TaskDetails.scss';
-import { APITesting } from './APITesting';
 import type { Task, TaskOption, FilteredDocument, AllDocumentsResponse } from '@/types';
+// import Threads from '../Project/Thread';
 
 
-type TabType = 'tasks' | 'add_documents' | 'api_testing';
+type TabType = 'tasks' | 'add_documents';
 
 
 export function TaskDetails() {
@@ -402,13 +402,13 @@ export function TaskDetails() {
                             <h1 className="content-creation__title">{project?.name}</h1>
                         </div>
                         <p className="content-creation__subtitle">
-                            {project?.task_type.replace('_', ' ').toUpperCase()} Dashboard
+                            {project?.task_type.replace('_', ' ').toUpperCase()} DASHBOARD
                         </p>
                     </div>
 
                 </div>
                 <div className="content-creation__tabs">
-                    {(['tasks', 'add_documents', 'api_testing'] as TabType[]).map((tab) => (
+                    {(['tasks', 'add_documents'] as TabType[]).map((tab) => (
                         <button
                             key={tab}
                             className={`content-creation__tab ${activeTab === tab ? 'content-creation__tab--active' : ''}`}
@@ -756,11 +756,6 @@ export function TaskDetails() {
                             )}
                         </div>
                     )}
-
-                    {/* API Testing Tab Content */}
-                    {activeTab === 'api_testing' && (
-                        <APITesting />
-                    )}
                 </div>
             </div>
 
@@ -775,15 +770,15 @@ export function TaskDetails() {
 
             {
                 isCreateTaskModalOpen && (
-                            <CreateTask
-                                onClose={() => setIsCreateTaskModalOpen(false)}
-                                onSuccess={() => {
-                                    setIsCreateTaskModalOpen(false);
-                                    queryClient.invalidateQueries({ queryKey: ['tasks'] });
-                                }}
-                                isModal={true}
-                                fixedProjectId={id ? Number(id) : undefined}
-                            />
+                    <CreateTask
+                        onClose={() => setIsCreateTaskModalOpen(false)}
+                        onSuccess={() => {
+                            setIsCreateTaskModalOpen(false);
+                            queryClient.invalidateQueries({ queryKey: ['tasks'] });
+                        }}
+                        isModal={true}
+                        fixedProjectId={id ? Number(id) : undefined}
+                    />
 
                 )
             }
@@ -798,6 +793,10 @@ export function TaskDetails() {
                     />
                 )
             }
+            {/* Threads Component */}
+            {/* {project && (
+                <Threads projectId={project.id} projectName={project.name} />
+            )} */}
         </div >
     );
 }

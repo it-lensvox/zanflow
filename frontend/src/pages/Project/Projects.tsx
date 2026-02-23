@@ -5,6 +5,7 @@ import { FolderKanban, Bell } from 'lucide-react';
 import { Button, Card, CardContent } from '@/components/common';
 import { projectsApi } from '@/services/api';
 import type { Project } from '@/types';
+import { cn } from '@/lib/utils';
 import { ViewToggle, DualView, useViewMode, } from '@/components/layout/DualView';
 import {
   getProjectsTableColumns, ProjectGridCard,
@@ -14,6 +15,14 @@ import { SearchFilter, FilterHeaderWrapper } from '@/components/layout/DualView/
 import { useOutletContext } from 'react-router-dom';
 import { CreateProjectModal } from './CreateProjectModal';
 import { useNotifications } from '@/hooks/useNotifications';
+
+// Project type filter definitions — order matches the colour legend in the table
+const PROJECT_TYPE_FILTERS = [
+  { label: 'Client',           value: 'client',           dot: 'bg-blue-500'  },
+  { label: 'Internal',         value: 'internal',         dot: 'bg-green-500' },
+  { label: 'Content Creation', value: 'content_creation', dot: 'bg-pink-500'  },
+  { label: 'Ideas',            value: 'ideas',            dot: 'bg-yellow-500'},
+] as const;
 
 export function Projects() {
   const queryClient = useQueryClient();
@@ -144,6 +153,37 @@ export function Projects() {
             )}
           </Button>
         </div>
+      </div>
+
+      {/* ── Project-type filter pills ── */}
+      <div className="flex items-center gap-2 -mt-4">
+        <span className="text-xs text-muted-foreground font-medium mr-1">Filter:</span>
+        {PROJECT_TYPE_FILTERS.map(({ label, value, dot }) => {
+          const isActive = filter === value;
+          return (
+            <button
+              key={value}
+              onClick={() => setFilter(isActive ? '' : value)}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-150',
+                isActive
+                  ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                  : 'bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground',
+              )}
+            >
+              <span className={`h-2 w-2 rounded-full shrink-0 ${dot}`} />
+              {label}
+            </button>
+          );
+        })}
+        {filter && (
+          <button
+            onClick={() => setFilter('')}
+            className="ml-1 text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+          >
+            Clear
+          </button>
+        )}
       </div>
 
       <DualView
