@@ -135,7 +135,6 @@ const AddMembersDropdown: React.FC<AddMembersDropdownProps> = ({ team, onMemberA
     const handleAddMember = async (userId: number) => {
         try {
             const response = await teamsApi.addMember(team.id, { user_id: userId, role: 'member' });
-            console.log('Member added successfully:', response);
             onMemberAdded();
             setSearchTerm('');
         } catch (error) {

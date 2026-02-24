@@ -15,7 +15,7 @@ import { MediaThumbnail } from './ContentCreation';
 import { DocumentPreview, useDocumentPreviewKeyboard } from '@/components/common/DocumentPreview';
 import './TaskDetails.scss';
 import type { Task, TaskOption, FilteredDocument, AllDocumentsResponse } from '@/types';
-// import Threads from '../Project/Thread';
+import Threads from '../Project/Thread';
 
 
 type TabType = 'tasks' | 'add_documents';
@@ -794,9 +794,9 @@ export function TaskDetails() {
                 )
             }
             {/* Threads Component */}
-            {/* {project && (
+            {project && (
                 <Threads projectId={project.id} projectName={project.name} />
-            )} */}
+            )}
         </div >
     );
 }

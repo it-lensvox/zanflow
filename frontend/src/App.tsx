@@ -194,9 +194,6 @@ function WebSocketProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isAuthenticated) {
       notificationSocket.connect();
-      console.log('🌐 Global WebSocket initialized');
-      // Kick off the Dashboard chunk download in the background the
-      // moment we know the user is logged in.
       preloadDashboard();
       return () => {
       };
