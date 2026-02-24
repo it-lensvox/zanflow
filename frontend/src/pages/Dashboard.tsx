@@ -16,6 +16,7 @@ import { ProjectGridCard } from '@/components/layout/DualView/projectsConfig';
 import { useOutletContext } from 'react-router-dom';
 import { CreateProjectModal } from '@/pages/Project/CreateProjectModal';
 import { useNotifications } from '@/hooks/useNotifications';
+import { DocumentPreview } from '@/components/common/DocumentPreview';
 
 // Type Definitions
 type TaskStatus = 'pending' | 'backlog' | 'in_progress' | 'completed' | 'deployed' | 'deferred' | 'review';
@@ -60,7 +61,21 @@ export function Dashboard() {
   const [openDocDropdownId, setOpenDocDropdownId] = React.useState<string | null>(null);
   const [docDropdownPos, setDocDropdownPos] = React.useState<{ top: number; left: number } | null>(null);
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<{ url: string; fileName: string; fileType: string } | null>(null);
   const { unreadCount } = useNotifications();
+
+  const handleDocumentClick = async (doc: Document) => {
+    try {
+      const response = await documentsApi.getDownloadUrl(doc.project, { document_id: doc.id });
+      setPreviewDoc({
+        url: response.url,
+        fileName: doc.original_file_name || doc.name,
+        fileType: doc.file_type,
+      });
+    } catch (error) {
+      console.error('Failed to get download URL:', error);
+    }
+  };
 
   // Data Fetching
   const { data: projectsData, isLoading: projectsLoading } = useQuery({
@@ -452,9 +467,9 @@ export function Dashboard() {
                     const statusColorClass = getStatusColor(doc.status);
 
                     return (
-                      <Link
+                      <div
                         key={doc.id}
-                        to={`/documents/${doc.id}`}
+                        onClick={() => handleDocumentClick(doc)}
                         className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors cursor-pointer border border-gray-100"
                       >
                         {/* Left Section: Document Info */}
@@ -550,7 +565,7 @@ export function Dashboard() {
                             )}
                           </div>
                         </div>
-                      </Link>
+                      </div>
                     );
                   })}
                 </div>
@@ -642,6 +657,14 @@ export function Dashboard() {
         onClose={() => setIsCreateProjectModalOpen(false)}
         navigateOnSuccess={true}
       />
+      {previewDoc && (
+        <DocumentPreview
+          url={previewDoc.url}
+          fileName={previewDoc.fileName}
+          fileType={previewDoc.fileType}
+          onClose={() => setPreviewDoc(null)}
+        />
+      )}
     </div>
   );
 }

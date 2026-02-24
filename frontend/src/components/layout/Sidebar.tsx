@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   LayoutDashboard, FolderKanban, FileText, Settings, LogOut,
   Users, ChevronDown, ChevronUp, Plus, CheckSquare, CheckCircle,
-  Clock, PlayCircle, Pause, Crown, TrendingUp, ListTodo, Calendar, Eye, MessageSquare, UserPlus
+  Clock, PlayCircle, Pause, Crown, TrendingUp, ListTodo, Calendar, Eye, MessageSquare, UserPlus, NotebookPen
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -284,6 +284,7 @@ export function Sidebar() {
         {[
           { name: 'Documents', href: '/documents', icon: FileText },
           { name: 'Calendar', href: '/calendar', icon: Calendar },
+          { name: 'Quick Notes', href: '/quick-notes', icon: NotebookPen },
           // { name: 'Activity', href: '/notifications', icon: Bell },
           // { name: 'Test Runs', href: '/test-runs', icon: TestTube2 },
         ].map((item) => (
