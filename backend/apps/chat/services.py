@@ -10,7 +10,8 @@ Handles all business logic for chat operations:
 import logging
 from typing import Optional, List, Dict, Any, Tuple
 from uuid import UUID
-
+import json
+import boto3
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -65,6 +66,19 @@ class ChatRoomService:
         # We reuse the existing logic to ensure consistency
         rooms_data = ChatRoomService.get_user_rooms(user)
         return sum(room['unread_count'] for room in rooms_data)
+    @staticmethod
+    def get_unread_counts_breakdown(user) -> dict:
+        """Helper to calculate separated unread counts."""
+        rooms_data = ChatRoomService.get_user_rooms(user)
+        
+        # Calculate separately
+        thread_unread = sum(r['unread_count'] for r in rooms_data if r['room_type'] == 'thread')
+        normal_chat_unread = sum(r['unread_count'] for r in rooms_data if r['room_type'] != 'thread')
+        
+        return {
+            "total_unread": normal_chat_unread,  # ONLY normal chats
+            "thread_unread": thread_unread       # ONLY threads
+        }
     @staticmethod
     @transaction.atomic
     def create_project_room(project, created_by) -> ChatRoom:
@@ -165,7 +179,51 @@ class ChatRoomService:
         logger.info(f"Private room created between {user1.id} and {user2.id}: {room.id}")
         
         return room, True
+    @staticmethod
+    @transaction.atomic
+    def create_thread_room(project, name: str, created_by, parent_message_id=None) -> ChatRoom:
+        """
+        Create a thread room linked to a specific project and auto-add all project members.
+        """
+        parent_message = None
+        if parent_message_id:
+            parent_message = ChatMessage.objects.filter(id=parent_message_id).first()
 
+        # 1. Create the standalone thread
+        room = ChatRoom.objects.create(
+            room_type=ChatRoom.RoomType.THREAD,
+            project=project,
+            name=name,
+            created_by=created_by,
+            parent_message=parent_message
+        )
+        
+        # 2. Add the person who started the thread
+        ChatRoomService.add_participant(room, created_by)
+        
+        # 3. ---> NEW: Auto-add ALL project members to this thread <---4
+        # (Change 'members' to whatever your Project model uses to store its users)
+        if hasattr(project, 'members'): 
+            for member in project.members.all():
+                # Don't add the creator twice
+                if member.id != created_by.id: 
+                    ChatRoomService.add_participant(room, member)
+            
+        logger.info(f"Thread room '{name}' created for project {project.id}: {room.id}")
+        return room
+    @staticmethod
+    def delete_room(room: ChatRoom, user) -> bool:
+        """
+        Soft delete a chat room (thread) by setting is_active to False.
+        """
+        # Check permissions: Only the creator or a system admin can delete the thread
+        if room.created_by_id != user.id and not (hasattr(user, 'role') and user.role == 'admin'):
+            return False
+        
+        room.is_active = False
+        room.save(update_fields=['is_active'])
+        logger.info(f"Room/Thread {room.id} soft-deleted by user {user.id}")
+        return True
     @staticmethod
     def add_participant(room: ChatRoom, user, room_role: str = 'member') -> ChatRoomMembership:
         """
@@ -309,7 +367,7 @@ class ChatMessageService:
     
     @staticmethod
     @transaction.atomic
-    def create_message(room, sender, content, message_type='text', attachment=None, attachment_name='', reply_to_id=None):
+    def create_message(room, sender, content, message_type='text', attachment=None, attachment_name='', reply_to_id=None, is_ai_generated=False): # <-- ADD IT HERE
         try:
             # 1. Save to DB
             message = ChatMessage.objects.create(
@@ -319,10 +377,14 @@ class ChatMessageService:
                 message_type=message_type,
                 attachment=attachment,
                 attachment_name=attachment_name,
-                reply_to_id=reply_to_id
+                reply_to_id=reply_to_id,
+                is_ai_generated=is_ai_generated # <-- SO THIS RECOGNIZES IT
             )
             room.save(update_fields=['updated_at'])
+            
             # 2. Broadcast Message Content (Standard Chat)
+            from channels.layers import get_channel_layer
+            from asgiref.sync import async_to_sync
             channel_layer = get_channel_layer()
             async_to_sync(channel_layer.group_send)(
                 f"chat_{room.slug}",  
@@ -333,61 +395,133 @@ class ChatMessageService:
             )
 
             # 3. Broadcast Unread Counts (Safe Version)
-            # We loop through all participants to update their badges
             participants = room.participants.all()
-            
             for member in participants:
-                # Skip the sender (they don't need an unread alert for their own msg)
-                if member.id == sender.id:
+                if sender and member.id == sender.id:
                     continue 
                 
                 try:
-                    # A. Get Total Unread (Global)
-                    total_unread = ChatRoomService.get_total_unread_count(member)
-
-                    # B. Get Room Unr  
-                    # ead (Specific to this room)
-                    # We use 'filter' + 'first' to avoid crashing if membership is missing
                     membership = ChatRoomMembership.objects.filter(room=room, user=member).first()
+                    
+                    counts = ChatRoomService.get_unread_counts_breakdown(member)
                     
                     room_unread = 0
                     if membership:
-                        # Safety Check: If last_read_at is None, assume all messages are unread (or use a default)
                         last_read_time = membership.last_read_at or membership.joined_at
-                        
                         room_unread = room.messages.filter(
                             is_deleted=False,
                             created_at__gt=last_read_time
                         ).exclude(sender=member).count()
                     
-                    # C. Send Signal
-                    # Determine the group name (Ensure this matches your Consumer!)
                     group_name = f"user_{member.id}_global"
                     
                     async_to_sync(channel_layer.group_send)(
                         group_name,
                         {
-                            "type": "gateway_signal", # Must match handler in GatewayConsumer
+                            "type": "gateway_signal", 
                             "event": "CHAT_UNREAD_UPDATE",
                             "data": {
                                 "room_id": str(room.id),
-                                "total_unread": total_unread,
+                                "room_type": room.room_type,
+                                "total_unread": counts['total_unread'],   # Normal chats only
+                                "thread_unread": counts['thread_unread'], # Threads only
                                 "room_unread": room_unread
                             }
                         }
                     )
                 except Exception as inner_e:
-                    # Log error but DO NOT stop the loop or rollback the message
                     print(f"Error sending signal to user {member.id}: {inner_e}")
                     continue
 
             return message
 
         except Exception as e:
-            # This catches DB errors during message creation
             print(f"CRITICAL ERROR in create_message: {e}")
             raise e
+    @staticmethod
+    def process_zanflow_ai(room_id, prompt_text, user_id):
+        """
+        Fetch chat history and invoke AWS Bedrock LLM gracefully handling multiple model families.
+        """
+        room = ChatRoom.objects.get(id=room_id)
+        
+        # Fetch the last 15 messages for context
+        history = ChatMessage.objects.filter(room=room, is_deleted=False).order_by('-created_at')[:15]
+        
+        context_str = "\n".join([
+            f"{msg.sender.username if msg.sender else '@zanflow'}: {msg.content}" 
+            for msg in reversed(history)
+        ])
+        
+        system_instruction = (
+            "You are @zanflow, a helpful AI assistant inside the Zanflow ERP platform. "
+            "Read the following chat history and fulfill the user's latest request concisely. "
+            f"Chat History:\n{context_str}"
+        )
 
+        model_id = settings.BEDROCK_MODEL_ID
+        logger.info(f"Invoking Bedrock AI using model: {model_id}")
+
+        try:
+            client = boto3.client(
+                'bedrock-runtime', 
+                region_name=settings.AWS_REGION,
+                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
+            )
+            
+            # 1. Format payload dynamically based on the active Bedrock Model
+            if "amazon.nova" in model_id.lower():
+                body = json.dumps({
+                    "system": [{"text": system_instruction}],
+                    "messages": [
+                        {"role": "user", "content": [{"text": prompt_text}]}
+                    ],
+                    "inferenceConfig": {"maxTokens": 1024}
+                })
+            elif "claude-3" in model_id.lower():
+                body = json.dumps({
+                    "anthropic_version": "bedrock-2023-05-31",
+                    "max_tokens": 1024,
+                    "system": system_instruction,
+                    "messages": [{"role": "user", "content": prompt_text}]
+                })
+            else:
+                raise ValueError(f"Unsupported model family for ID: {model_id}")
+            
+            # 2. Invoke the model
+            response = client.invoke_model(
+                modelId=model_id,
+                body=body,
+                contentType="application/json",
+                accept="application/json"
+            )
+            response_body = json.loads(response.get('body').read())
+            
+            # 3. Parse the output dynamically
+            if "amazon.nova" in model_id.lower():
+                ai_reply_text = response_body.get('output', {}).get('message', {}).get('content', [{}])[0].get('text', "")
+            elif "claude-3" in model_id.lower():
+                ai_reply_text = response_body.get('content')[0].get('text')
+            else:
+                ai_reply_text = "I processed your request, but couldn't parse my own output."
+            
+            # Push the AI's reply back to the chat
+            ChatMessageService.create_message(
+                room=room,
+                sender=None,
+                content=ai_reply_text.strip(),
+                is_ai_generated=True
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to invoke Bedrock AI: {e}")
+            ChatMessageService.create_message(
+                room=room,
+                sender=None,
+                content="I'm sorry, my AI processing failed. Please check the server logs.",
+                is_ai_generated=True
+            )
     @staticmethod
     def _send_notification(message: ChatMessage):
         """
@@ -653,3 +787,18 @@ class ChatPermissionService:
             user=user,
             room_role='admin'
         ).exists()
+    
+    @staticmethod
+    def can_delete_thread(user, room: ChatRoom) -> bool:
+        """
+        STRICT CHECK: Only the exact user who created the thread can delete it.
+        No admins allowed.
+        """
+        if not user or not user.is_authenticated:
+            return False
+            
+        if room.room_type != ChatRoom.RoomType.THREAD:
+            return False
+            
+        # VERY STRICT: Compare the IDs directly. Remove any admin checks.
+        return room.created_by_id == user.id

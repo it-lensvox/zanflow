@@ -195,7 +195,6 @@ class ProjectViewSet(viewsets.ModelViewSet):
         is_creator = instance.created_by == user
 
         # 2. Fallback: Check 'owner' role in the intermediate membership table
-        # We use 'instance.members.through' to access the ProjectMembership model safely
         is_owner_member = instance.members.through.objects.filter(
             project=instance, 
             user=user, 
@@ -205,7 +204,43 @@ class ProjectViewSet(viewsets.ModelViewSet):
         if not (is_creator or is_owner_member):
              raise PermissionDenied("You do not have permission to delete this project. Only the project owner can delete it.")
 
-        # Proceed with deletion
+        # --- NEW CODE: CLEAN UP AWS S3 FILES ---
+        try:
+            from apps.groundtruth.models import Document
+            import boto3
+            from django.conf import settings
+            
+            # Find all documents related to this project
+            documents = Document.objects.filter(project=instance)
+            
+            if documents.exists():
+                s3_client = boto3.client(
+                    "s3",
+                    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+                    region_name=settings.AWS_S3_REGION_NAME,
+                )
+                
+                # Delete each file from S3
+                for doc in documents:
+                    # Assuming source_file stores the S3 key. 
+                    # Use doc.source_file.name if it's a Django FileField
+                    file_key = doc.source_file.name if hasattr(doc.source_file, 'name') else doc.source_file
+                    
+                    if file_key:
+                        try:
+                            s3_client.delete_object(
+                                Bucket=settings.AWS_STORAGE_BUCKET_NAME,
+                                Key=file_key
+                            )
+                        except Exception as e:
+                            # Log the error, but don't stop the project deletion
+                            print(f"Failed to delete {file_key} from S3: {e}")
+        except Exception as e:
+            print(f"Error during S3 cleanup: {e}")
+        # --- END OF NEW CODE ---
+
+        # Proceed with database deletion (CASCADE will handle Tasks and Document rows)
         instance.delete()
 
     # --- Custom Methods (Mapped explicitly in urls.py) ---

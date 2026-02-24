@@ -137,7 +137,41 @@ class ChatMessageCreateSerializer(serializers.ModelSerializer):
             'content': {'required': False, 'allow_blank': True}
         }
 
+class CreateThreadRoomSerializer(serializers.Serializer):
+    """
+    Serializer for creating a new standalone thread under a project.
+    """
+    # --- CHANGED TO IntegerField ---
+    project_id = serializers.IntegerField(
+        help_text="ID of the project this thread belongs to"
+    )
+    name = serializers.CharField(
+        max_length=255,
+        help_text="Title or topic of the thread (e.g., 'Login Button Issue')"
+    )
+    parent_message_id = serializers.UUIDField(
+        required=False, 
+        allow_null=True,
+        help_text="Optional: ID of a chat message if branching from an existing chat"
+    )
+    
+    def validate_project_id(self, value):
+        from apps.projects.models import Project
+        try:
+            Project.objects.get(id=value)
+        except Exception:
+            raise serializers.ValidationError("Project not found")
+        return value
 
+    def validate_parent_message_id(self, value):
+        if not value:
+            return value
+        from .models import ChatMessage
+        try:
+            ChatMessage.objects.get(id=value, is_deleted=False)
+        except ChatMessage.DoesNotExist:
+            raise serializers.ValidationError("Original message not found or deleted")
+        return value
 class ChatRoomListSerializer(serializers.ModelSerializer):
     """
     Serializer for listing chat rooms.
@@ -148,14 +182,14 @@ class ChatRoomListSerializer(serializers.ModelSerializer):
     unread_count = serializers.SerializerMethodField()
     is_member = serializers.SerializerMethodField()
     is_favourite = serializers.SerializerMethodField()
-    
+    created_by = UserMinimalSerializer(read_only=True)
     class Meta:
         model = ChatRoom
         fields = [
             'id', 'name', 'room_type', 'slug', 'project',
             'participant_count', 'last_message', 'unread_count',
             'is_member', 'created_at', 'updated_at', 'is_active',
-            'participants', 'is_favourite'
+            'participants', 'is_favourite','parent_message','created_by'
         ]
         read_only_fields = fields
 
@@ -242,7 +276,7 @@ class ChatRoomDetailSerializer(serializers.ModelSerializer):
             'participants', 'created_by', 'memberships',
             'current_user_membership', 'created_at', 'updated_at', 'is_active',
             # --- ADD TO FIELDS LIST ---
-            'last_message', 'unread_count'
+            'last_message', 'unread_count','parent_message'
         ]
         read_only_fields = fields
 
