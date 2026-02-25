@@ -79,7 +79,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const delay = expiresAtMs - now - REFRESH_BUFFER_MS;
 
       if (delay <= 0) {
-        // Token is already about to expire or expired, refresh immediately
         performTokenRefresh();
         return;
       }
@@ -113,19 +112,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [scheduleTokenRefresh]);
 
+  // // Schedule refresh whenever the user changes (login/logout)
+  // useEffect(() => {
+  //   if (user) {
+  //     scheduleTokenRefresh();
+  //   }
+
+  //   return () => {
+  //     if (refreshTimerRef.current) {
+  //       clearTimeout(refreshTimerRef.current);
+  //       refreshTimerRef.current = null;
+  //     }
+  //   };
+  // }, [user, scheduleTokenRefresh]);
+
   // Schedule refresh whenever the user changes (login/logout)
   useEffect(() => {
-    if (user) {
-      scheduleTokenRefresh();
-    }
-
     return () => {
       if (refreshTimerRef.current) {
         clearTimeout(refreshTimerRef.current);
-        refreshTimerRef.current = null;
       }
     };
-  }, [user, scheduleTokenRefresh]);
+  }, []);
+
 
   const login = async (username: string, password: string) => {
     await authApi.login(username, password);

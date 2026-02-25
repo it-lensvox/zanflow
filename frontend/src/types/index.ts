@@ -845,15 +845,17 @@ export interface WebSocketNotificationEvent {
 // Callback type for notification listeners
 export type NotificationCallback = (notification: NotificationData) => void;
 
-// Team chat total badge unread_count
+// Team chat and thread chattotal badge unread_count
 export interface ChatUnreadResponse {
   total_unread: number;
+  thread_unread: number;
   rooms_with_unread: number;
   by_room: Record<string, {
     name: string;
     unread_count: number;
     room_type: string;
     last_message_at?: string;
+    project_id?: string;
   }>;
 }
 
@@ -966,7 +968,7 @@ export interface ThreadSession {
   updatedAt: Date;
   unreadCount: number;
   lastReadAt: Date | null;
-  createdById?: number; 
+  createdById?: number;
 }
 
 // UI message format
@@ -997,6 +999,7 @@ export interface CreateThreadRoomPayload {
   project_id: number;
   name: string;
 }
+
 
 // WebSocket command types
 export type WebSocketCommand =
@@ -1046,6 +1049,8 @@ export interface WSUnreadUpdateSignal {
   event: 'CHAT_UNREAD_UPDATE';
   data: {
     room_id: string;
+    room_type: 'thread' | 'project' | 'direct' | 'team' | string;
+    thread_unread: number;
     total_unread: number;
     room_unread: number;
   };

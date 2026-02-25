@@ -74,6 +74,11 @@ api.interceptors.response.use(
               api.defaults.headers.common['Authorization'] = `Bearer ${newTokens.access}`;
               return newTokens;
             })
+            // .catch((refreshError) => {
+            //   clearTokens();
+            //   window.dispatchEvent(new CustomEvent('auth:token-expired'));
+            //   throw refreshError;
+            // })
             .catch((refreshError) => {
               clearTokens();
               window.dispatchEvent(new CustomEvent('auth:token-expired'));
@@ -975,7 +980,6 @@ export const threadsApi = {
         project_id: projectId
       }
     });
-    // Handle paginated response
     return response.data.results || response.data;
   },
 
@@ -984,6 +988,26 @@ export const threadsApi = {
     const response = await api.get<ThreadMessagesResponse>(`/chat/rooms/${roomId}/messages/`);
     return response.data;
   },
+
+  // Fetch authoritative unread counts for thread rooms scoped to a project.
+  getThreadUnreadCounts: async (projectId: number): Promise<Record<string, number>> => {
+    const response = await api.get<ChatUnreadResponse>('/chat/unread/', {
+      params: { project_id: projectId },
+    });
+    const byRoom = response.data.by_room || {};
+    const threadUnreads: Record<string, number> = {};
+
+    for (const [roomId, room] of Object.entries(byRoom)) {
+      if (
+        room.room_type === 'thread' &&
+        (room.project_id === undefined || room.project_id === String(projectId))
+      ) {
+        threadUnreads[roomId] = room.unread_count;
+      }
+    }
+    return threadUnreads;
+  },
+
 
   /// Delete a thread room
   deleteThreadRoom: async (roomId: string): Promise<void> => {
@@ -1037,7 +1061,7 @@ export const threadsApi = {
   parseUnreadSignal: (event: MessageEvent): WSUnreadUpdateSignal | null => {
     try {
       const parsed = JSON.parse(event.data);
-      if (parsed.type === 'SIGNAL' && parsed.event === 'CHAT_UNREAD_UPDATE') {
+      if (parsed.type === 'SIGNAL' && parsed.event === 'CHAT_UNREAD_UPDATE' && parsed.data?.room_type === 'thread') {
         return parsed as WSUnreadUpdateSignal;
       }
       return null;

@@ -1,10 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Users, UserPlus, Loader2, User, Mail, X, Lock, ChevronDown, CheckCircle, Crown, } from 'lucide-react';
-import {
-  Button,
-  Card,
-} from '@/components/common';
+import { UserPlus, Loader2, User, Mail, X, Lock, ChevronDown, CheckCircle, Crown, } from 'lucide-react';
+import { Button } from '@/components/common';
 import { usersApi } from '@/services/api';
 import type { User as AppUser, PaginatedResponse } from '@/types';
 import { DualView, useViewMode, ViewToggle } from '@/components/layout/DualView';
@@ -20,7 +17,7 @@ const CustomModal: React.FC<{ isOpen: boolean; onClose: () => void; children: Re
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div ref={modalRef} className="bg-white rounded-lg shadow-2xl w-full max-w-md m-4 p-6" role="dialog">
+      <div ref={modalRef} className="relative bg-white rounded-lg shadow-2xl w-full max-w-md m-4 p-6" role="dialog">
         <div className="flex justify-between items-start pb-4 border-b">
           <h2 className="text-xl font-semibold">{title}</h2>
           <Button variant="ghost" size="icon" onClick={onClose}><X className="h-5 w-5" /></Button>
@@ -33,7 +30,7 @@ const CustomModal: React.FC<{ isOpen: boolean; onClose: () => void; children: Re
 
 const ChangeRoleModal: React.FC<{ user: AppUser; isOpen: boolean; onClose: () => void; queryClient: any }> = ({ user, isOpen, onClose, queryClient }) => {
   const [newRole, setNewRole] = useState<AppUser['role']>(user.role);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false); 
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const roles: AppUser['role'][] = ['admin', 'manager', 'annotator', 'viewer'];
 
   const changeRoleMutation = useMutation({
@@ -69,8 +66,7 @@ const ChangeRoleModal: React.FC<{ user: AppUser; isOpen: boolean; onClose: () =>
                 {roles.map((role) => (
                   <div
                     key={role}
-                    className={`px-4 py-2.5 cursor-pointer text-sm transition-colors ${newRole === role ? 'bg-blue-50 text-blue-700 font-medium' : 'hover:bg-gray-50 text-gray-700'
-                      }`}
+                    className={`px-4 py-2.5 cursor-pointer text-sm transition-colors ${newRole === role ? 'bg-blue-50 text-blue-700 font-medium' : 'hover:bg-gray-50 text-gray-700'}`}
                     onClick={() => {
                       setNewRole(role);
                       setIsDropdownOpen(false);
@@ -111,9 +107,36 @@ const ChangeRoleModal: React.FC<{ user: AppUser; isOpen: boolean; onClose: () =>
 const AddUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient: any }> = ({ isOpen, onClose, queryClient }) => {
   const [form, setForm] = useState({ username: '', email: '', password: '', confirmPassword: '', firstName: '', lastName: '', role: 'viewer' as AppUser['role'] });
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [errors, setErrors] = useState<{ username?: string; email?: string; password?: string }>({});
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  const validate = () => {
+    const newErrors: { username?: string; email?: string; password?: string } = {};
+    if (form.username && /^\d/.test(form.username)) {
+      newErrors.username = 'Username must start with a letter.';
+    }
+    if (form.password && form.password.length < 4) {
+      newErrors.password = 'Password must be at least 4 characters.';
+    }
+    return newErrors;
+  };
+
   const createUserMutation = useMutation({
     mutationFn: usersApi.create,
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['users'] }); onClose(); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      setShowSuccess(true);
+      setTimeout(() => {
+        setShowSuccess(false);
+        onClose();
+      }, 2500);
+    },
+    onError: (error: any) => {
+      const data = error?.response?.data;
+      if (data?.email) {
+        setErrors(prev => ({ ...prev, email: 'This email is already in use.' }));
+      }
+    },
   });
 
   const inputClass = "w-full border rounded-md p-2 pl-3 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all";
@@ -134,11 +157,27 @@ const AddUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient
         </div>
         <div>
           <label className={labelClass}><User className="h-4 w-4" /> Username</label>
-          <input placeholder="unique_username" className={inputClass} onChange={e => setForm({ ...form, username: e.target.value })} />
+          <input
+            placeholder="unique_username"
+            className={`${inputClass} ${errors.username ? 'border-red-400 focus:ring-red-200' : ''}`}
+            onChange={e => {
+              setForm({ ...form, username: e.target.value });
+              setErrors(prev => ({ ...prev, username: undefined }));
+            }}
+          />
+          {errors.username && <p className="text-xs text-red-500 mt-1">{errors.username}</p>}
         </div>
         <div>
           <label className={labelClass}><Mail className="h-4 w-4" /> Email</label>
-          <input placeholder="user@example.com" className={inputClass} onChange={e => setForm({ ...form, email: e.target.value })} />
+          <input
+            placeholder="user@example.com"
+            className={`${inputClass} ${errors.email ? 'border-red-400 focus:ring-red-200' : ''}`}
+            onChange={e => {
+              setForm({ ...form, email: e.target.value });
+              setErrors(prev => ({ ...prev, email: undefined }));
+            }}
+          />
+          {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
         </div>
         <div>
           <label className={labelClass}><Crown className="h-4 w-4" /> Role</label>
@@ -171,31 +210,67 @@ const AddUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient
         </div>
         <div>
           <label className={labelClass}><Lock className="h-4 w-4" /> Password</label>
-          <input type="password" placeholder="********" className={inputClass} onChange={e => setForm({ ...form, password: e.target.value })} />
+          <input
+            type="password"
+            placeholder="********"
+            className={`${inputClass} ${errors.password ? 'border-red-400 focus:ring-red-200' : ''}`}
+            onChange={e => {
+              setForm({ ...form, password: e.target.value });
+              setErrors(prev => ({ ...prev, password: undefined }));
+            }}
+          />
+          {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
         </div>
         <div>
           <label className={labelClass}><Lock className="h-4 w-4" /> Confirm Password</label>
-          <input type="password" placeholder="********" className={inputClass} onChange={e => setForm({ ...form, confirmPassword: e.target.value })} />
+          <div className="relative">
+            <input
+              type="password"
+              placeholder="********"
+              className={`${inputClass} pr-9`}
+              onChange={e => setForm({ ...form, confirmPassword: e.target.value })}
+            />
+            {form.password.length >= 4 && form.confirmPassword && form.password === form.confirmPassword && (
+              <CheckCircle className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
+            )}
+          </div>
         </div>
       </div>
+
       <div className="flex justify-end gap-3 pt-6 mt-2 border-t">
         <Button variant="outline" className="px-6" onClick={onClose}>Cancel</Button>
         <Button
           className="px-6 bg-[#1a1f2e] text-white hover:bg-[#252b3d]"
-          onClick={() => createUserMutation.mutate({
-            username: form.username,
-            email: form.email,
-            password: form.password,
-            password_confirm: form.confirmPassword,
-            first_name: form.firstName,  
-            last_name: form.lastName,              
-            role: form.role
-          })}
+          onClick={() => {
+            const validationErrors = validate();
+            if (Object.keys(validationErrors).length > 0) {
+              setErrors(validationErrors);
+              return;
+            }
+            createUserMutation.mutate({
+              username: form.username,
+              email: form.email,
+              password: form.password,
+              password_confirm: form.confirmPassword,
+              first_name: form.firstName,
+              last_name: form.lastName,
+              role: form.role,
+            });
+          }}
           disabled={createUserMutation.isPending}
         >
           {createUserMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create User'}
         </Button>
       </div>
+
+      {showSuccess && (
+        <div className="absolute inset-0 flex items-center justify-center z-10 rounded-lg bg-white/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3 px-8 py-6 rounded-xl shadow-lg bg-white border border-green-100">
+            <CheckCircle className="w-10 h-10 text-green-500" />
+            <p className="text-base font-semibold text-gray-800 tracking-wide">User created successfully.</p>
+          </div>
+        </div>
+      )}
     </CustomModal>
   );
 };
@@ -212,7 +287,7 @@ const DeleteConfirmationModal: React.FC<{ isOpen: boolean; onClose: () => void; 
   </CustomModal>
 );
 
-// Main Page Component 
+// Main Page Component
 
 export function UserManagement() {
   const queryClient = useQueryClient();
@@ -254,7 +329,7 @@ export function UserManagement() {
             isLoading={isLoading}
             gridProps={{
               data: users,
-              renderCard: () => null, 
+              renderCard: () => null,
             }}
             tableProps={{
               data: users,
@@ -270,8 +345,10 @@ export function UserManagement() {
       </div>
 
       <AddUserModal isOpen={isAddUserModalOpen} onClose={() => setIsAddUserModalOpen(false)} queryClient={queryClient} />
-      {roleChangeUser && <ChangeRoleModal user={roleChangeUser} isOpen={!!roleChangeUser} onClose={() => setRoleChangeUser(null)} queryClient={queryClient} />}
-      {userToDelete && <DeleteConfirmationModal isOpen={!!userToDelete} onClose={() => setUserToDelete(null)} onConfirm={() => deleteUserMutation.mutate(userToDelete.id)} username={userToDelete.username} isPending={deleteUserMutation.isPending} />}
+      {roleChangeUser && 
+      <ChangeRoleModal user={roleChangeUser} isOpen={!!roleChangeUser} onClose={() => setRoleChangeUser(null)} queryClient={queryClient} />}
+      {userToDelete && 
+      <DeleteConfirmationModal isOpen={!!userToDelete} onClose={() => setUserToDelete(null)} onConfirm={() => deleteUserMutation.mutate(userToDelete.id)} username={userToDelete.username} isPending={deleteUserMutation.isPending} />}
     </div>
   );
 }
