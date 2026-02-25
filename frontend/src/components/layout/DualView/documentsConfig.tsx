@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Trash2, CheckCircle, Clock, File } from 'lucide-react';
+import { FileText, Trash2, CheckCircle, Clock, File, Info } from 'lucide-react';
 import { TablePopover } from '@/components/common';
 import { formatRelativeTime } from '@/lib/utils';
 import type { Document, DocumentStatus } from '@/types';
@@ -9,6 +9,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 interface DocumentTableColumnsProps {
   onDeleteClick: (e: React.MouseEvent, doc: Document) => void;
+  onInfoClick?: (doc: Document) => void;
 }
 
 const getDocumentStatusConfig = (status: DocumentStatus) => {
@@ -62,7 +63,7 @@ const statusOptions: { value: DocumentStatus; label: string; icon: any }[] = [
   { value: 'archived', label: 'ARCHIVED', icon: FileText },
 ];
 
-export const createDocumentsTableColumns = ({ onDeleteClick }: DocumentTableColumnsProps): TableColumn<Document>[] => {
+export const createDocumentsTableColumns = ({ onDeleteClick, onInfoClick }: DocumentTableColumnsProps): TableColumn<Document>[] => {
   const StatusDropdown = ({ doc }: { doc: Document }) => {
     const [activeDropdown, setActiveDropdown] = useState(false);
     const queryClient = useQueryClient();
@@ -134,16 +135,24 @@ export const createDocumentsTableColumns = ({ onDeleteClick }: DocumentTableColu
               {doc.name}
             </span>
           </div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDeleteClick(e, doc);
-            }}
-            className="opacity-0 group-hover:opacity-100 transition-all duration-200 p-1.5 hover:bg-red-50 rounded flex-shrink-0"
-            title="Delete Document"
-          >
-            <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-600" />
-          </button>
+          <div className="opacity-0 group-hover/cell:opacity-100 transition-all duration-200 flex items-center gap-0.5 flex-shrink-0">
+            {onInfoClick && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onInfoClick(doc); }}
+                className="p-1.5 hover:bg-blue-50 rounded"
+                title="Document Info"
+              >
+                <Info className="w-4 h-4 text-gray-400 hover:text-blue-600" />
+              </button>
+            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); onDeleteClick(e, doc); }}
+              className="p-1.5 hover:bg-red-50 rounded"
+              title="Delete Document"
+            >
+              <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-600" />
+            </button>
+          </div>
         </div>
       ),
     },

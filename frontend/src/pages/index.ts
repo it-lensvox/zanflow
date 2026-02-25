@@ -2,7 +2,6 @@ export { Dashboard } from './Dashboard';
 export { Login } from './Login';
 export { Projects } from './Project/Projects';
 export { DocumentCreate } from './Documents/DocumentCreate';
-// export { DocumentDetail } from './Documents/DocumentDetail';
 export { MyTask } from './MyTask/MyTask';
 export { CreateTask } from './MyTask/CreateTask'
 export { Teams } from './TeamManagement/Teams';

@@ -6,6 +6,8 @@ import {
   Button, Input, Card, CardHeader, CardTitle, CardContent, Badge,
 } from '@/components/common';
 import { projectsApi, usersApi } from '@/services/api';
+import DeleteModal from '@/components/common/Deletemodal';
+import { useAuth } from '@/hooks/useAuth';
 import { cn, getProjectTypeColor } from '@/lib/utils';
 import type { Project, Label, TaskType, User as AppUser } from '@/types';
 
@@ -62,6 +64,9 @@ export function ProjectSettings() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteModalType, setDeleteModalType] = useState<'confirm' | 'denied'>('confirm');
+  const { user: currentUser } = useAuth();
 
   const { data: project, isLoading } = useQuery({
     queryKey: ['project', id],
@@ -210,6 +215,17 @@ export function ProjectSettings() {
     deleteMutation.mutate();
   };
 
+  const handleDeleteClick = () => {
+    const isCreator = project?.created_by?.id === currentUser?.id
+      || project?.created_by === currentUser?.id;
+    if (isCreator) {
+      setDeleteModalType('confirm');
+    } else {
+      setDeleteModalType('denied');
+    }
+    setDeleteModalOpen(true);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -221,10 +237,10 @@ export function ProjectSettings() {
   if (!project) {
     return (
       <div className="text-center py-12">
-        <h2 className="text-xl font-semibold">Project not found</h2>
+        {/* <h2 className="text-xl font-semibold">Project not found</h2>
         <Link to="/projects" className="text-primary hover:underline">
           Back to projects
-        </Link>
+        </Link> */}
       </div>
     );
   }
@@ -310,6 +326,19 @@ export function ProjectSettings() {
               </div>
 
               <div className="space-y-2">
+                <label className="text-sm font-medium ">
+                  Project created by
+                </label>
+                <div className="min-h-[40px] w-full rounded-md border border-input bg-muted/20 px-3 py-2 flex items-center">
+                  <span className="text-sm font-medium">
+                    {project.created_by?.full_name || project.created_by?.username || '—'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="col-span-2 space-y-2">
                 <label className="text-sm font-medium">
                   Members
                 </label>
@@ -317,13 +346,11 @@ export function ProjectSettings() {
                   {project.members && project.members.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
                       {project.members.map((member: any) => {
-                        // Fallback logic: Try direct full_name, then nested user.full_name, then username
                         const displayName =
                           member.full_name ||
                           member.user?.full_name ||
                           member.user?.username ||
                           member.user?.first_name + ' ' + member.user?.last_name;
-
                         return (
                           <Badge
                             key={member.id}
@@ -359,14 +386,14 @@ export function ProjectSettings() {
               />
             </div>
 
-            {/* Assigned To (Reused from ProjectCreate) */}
+            {/* Assigned To */}
             <div className="space-y-3">
               <label className="text-sm font-medium">
                 Assigned To <span className="text-destructive">*</span>
               </label>
 
               <div className="flex gap-3">
-                {/* Left: User Select (50%) */}
+                {/* Left */}
                 <div className="relative flex-1" ref={userDropdownRef}>
                   <div
                     className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer"
@@ -665,55 +692,35 @@ export function ProjectSettings() {
             <div className="p-4 border border-red-200 rounded-lg bg-red-50">
               <h4 className="font-medium text-red-800 mb-2">Delete Project</h4>
               <p className="text-sm text-red-600 mb-4">
-                This will permanently delete the project, all documents, ground truth versions,
+                This will permanently delete the project, all documents, task
                 and associated data. This action cannot be undone.
               </p>
 
-              {!showDeleteConfirm ? (
-                <Button
-                  variant="outline"
-                  className="border-red-300 text-red-600 hover:bg-red-100"
-                  onClick={() => setShowDeleteConfirm(true)}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete Project
-                </Button>
-              ) : (
-                <div className="space-y-3">
-                  <p className="text-sm font-medium text-red-800">
-                    Are you sure? Type "{project.name}" to confirm.
-                  </p>
-                  <div className="flex gap-3">
-                    <Input
-                      placeholder="Type project name to confirm"
-                      id="confirm-delete"
-                      value={deleteConfirmText}
-                      onChange={(e) => setDeleteConfirmText(e.target.value)}
-                    />
-                    <Button
-                      variant="destructive"
-                      onClick={handleDeleteProject}
-                      disabled={deleteMutation.isPending || deleteConfirmText !== project.name}
-                    >
-                      {deleteMutation.isPending ? 'Deleting...' : 'Confirm Delete'}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setShowDeleteConfirm(false);
-                        setDeleteConfirmText('');
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              )}
+              <Button
+                variant="outline"
+                className="border-red-300 text-red-600 hover:bg-red-100"
+                onClick={handleDeleteClick}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Project
+              </Button>
             </div>
           </CardContent>
         </Card>
       )}
       {/* Error Popup Modal */}
+      <DeleteModal
+        isOpen={deleteModalOpen}
+        type={deleteModalType}
+        itemType="project"
+        itemName={deleteModalType === 'confirm' ? project?.name : undefined}
+        onConfirm={() => {
+          setDeleteModalOpen(false);
+          handleDeleteProject();
+        }}
+        onCancel={() => setDeleteModalOpen(false)}
+        isDeleting={deleteMutation.isPending}
+      />
       {showErrorModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in zoom-in duration-200">
           <div className="bg-background border rounded-lg shadow-xl max-w-md w-full p-6 space-y-4 mx-4">
