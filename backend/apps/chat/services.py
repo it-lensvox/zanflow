@@ -423,8 +423,8 @@ class ChatMessageService:
                             "data": {
                                 "room_id": str(room.id),
                                 "room_type": room.room_type,
-                                "total_unread": counts['total_unread'],   # Normal chats only
-                                "thread_unread": counts['thread_unread'], # Threads only
+                                "total_unread": counts['total_unread'],
+                                "thread_unread": counts['thread_unread'],
                                 "room_unread": room_unread
                             }
                         }
@@ -433,6 +433,10 @@ class ChatMessageService:
                     print(f"Error sending signal to user {member.id}: {inner_e}")
                     continue
 
+            # >>> NEW CODE: Trigger the persistent/offline notification <<<
+            # This runs in the background for users who aren't on the WebSocket
+            ChatMessageService._send_notification(message)
+
             return message
 
         except Exception as e:
@@ -440,22 +444,58 @@ class ChatMessageService:
             raise e
     @staticmethod
     def process_zanflow_ai(room_id, prompt_text, user_id):
-        """
-        Fetch chat history and invoke AWS Bedrock LLM gracefully handling multiple model families.
-        """
         room = ChatRoom.objects.get(id=room_id)
         
-        # Fetch the last 15 messages for context
-        history = ChatMessage.objects.filter(room=room, is_deleted=False).order_by('-created_at')[:15]
+        # 1. Fetch the current user and their active tasks
+        from apps.tasksite.models import Task 
+        sender_user = User.objects.get(id=user_id)
         
+        active_tasks = Task.objects.filter(
+            assigned_to=sender_user, 
+            status__in=['pending', 'in_progress']
+        )
+        
+        if active_tasks.exists():
+            task_list_str = "\n".join([
+                f"- Task ID: {task.id}, Heading: {task.heading}, Status: {task.status}, Priority: {task.priority}" 
+                for task in active_tasks
+            ])
+        else:
+            task_list_str = "The user currently has NO assigned tasks."
+
+        # 2. Fetch Chat History
+        history = ChatMessage.objects.filter(room=room, is_deleted=False).order_by('-created_at')[:15]
         context_str = "\n".join([
             f"{msg.sender.username if msg.sender else '@zanflow'}: {msg.content}" 
             for msg in reversed(history)
         ])
         
+        # 3. ---> NEW: Build a list of users in this project so the AI knows their IDs <---
+        participants = room.participants.all()
+        users_context = "\n".join([f"- Name: {u.get_full_name() or u.username} | Username: {u.username} | ID: {u.id}" for u in participants])
+        
+        # 4. Update the System Instruction with strict JSON tool calling instructions
         system_instruction = (
-            "You are @zanflow, a helpful AI assistant inside the Zanflow ERP platform. "
-            "Read the following chat history and fulfill the user's latest request concisely. "
+            "You are @zanflow, an AI assistant inside the Zanflow platform. "
+            f"The user speaking to you right now has the ID: {user_id}. "
+            "Always base your task summaries ONLY on the 'Current Real Tasks' provided below.\n\n"
+            f"--- CURRENT REAL TASKS ---\n{task_list_str}\n--------------------------\n\n"
+            f"--- AVAILABLE USERS IN THIS PROJECT ---\n{users_context}\n---------------------------------------\n\n"
+            "=== TASK CREATION INSTRUCTIONS ===\n"
+            "If the user explicitly asks you to CREATE A TASK, you must reply ONLY with a valid JSON block and NO OTHER TEXT. "
+            "If they say 'assign it to me', use the ID of the user speaking to you. "
+            "Match the user names mentioned to the User IDs provided. "
+            "The JSON MUST look exactly like this:\n"
+            "```json\n"
+            "{\n"
+            '  "action": "create_task",\n'
+            '  "heading": "Task title",\n'
+            '  "description": "Task description",\n'
+            '  "priority": "medium",\n'  # priority must be one of: low, medium, high, critical
+            '  "assigned_to_ids": [12]\n'
+            "}\n"
+            "```\n"
+            "If they are NOT asking to create a task, reply with normal conversational text to fulfill their request based on the Chat History:\n"
             f"Chat History:\n{context_str}"
         )
 
@@ -470,13 +510,11 @@ class ChatMessageService:
                 aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
             )
             
-            # 1. Format payload dynamically based on the active Bedrock Model
+            # Payload formatting
             if "amazon.nova" in model_id.lower():
                 body = json.dumps({
                     "system": [{"text": system_instruction}],
-                    "messages": [
-                        {"role": "user", "content": [{"text": prompt_text}]}
-                    ],
+                    "messages": [{"role": "user", "content": [{"text": prompt_text}]}],
                     "inferenceConfig": {"maxTokens": 1024}
                 })
             elif "claude-3" in model_id.lower():
@@ -489,7 +527,7 @@ class ChatMessageService:
             else:
                 raise ValueError(f"Unsupported model family for ID: {model_id}")
             
-            # 2. Invoke the model
+            # Invoke model
             response = client.invoke_model(
                 modelId=model_id,
                 body=body,
@@ -498,7 +536,6 @@ class ChatMessageService:
             )
             response_body = json.loads(response.get('body').read())
             
-            # 3. Parse the output dynamically
             if "amazon.nova" in model_id.lower():
                 ai_reply_text = response_body.get('output', {}).get('message', {}).get('content', [{}])[0].get('text', "")
             elif "claude-3" in model_id.lower():
@@ -506,11 +543,69 @@ class ChatMessageService:
             else:
                 ai_reply_text = "I processed your request, but couldn't parse my own output."
             
-            # Push the AI's reply back to the chat
+            # ==========================================================
+            # 5. ---> NEW: INTERCEPT AI JSON AND CREATE THE TASK <---
+            # ==========================================================
+            ai_reply_text = ai_reply_text.strip()
+            
+            try:
+                # Check if the AI replied with the JSON block
+                cleaned_text = ai_reply_text
+                if "```json" in cleaned_text:
+                    cleaned_text = cleaned_text.split("```json")[1].split("```")[0].strip()
+                elif "```" in cleaned_text:
+                    cleaned_text = cleaned_text.split("```")[1].split("```")[0].strip()
+                    
+                ai_json = json.loads(cleaned_text)
+                
+                # Check if the AI wants to execute the 'create_task' action
+                if isinstance(ai_json, dict) and ai_json.get("action") == "create_task":
+                    
+                    # Ensure priority matches Django model choices
+                    priority = str(ai_json.get("priority", "medium")).lower()
+                    if priority not in ['low', 'medium', 'high', 'critical']:
+                        priority = 'medium'
+                        
+                    # Create the Task in the database!
+                    new_task = Task.objects.create(
+                        heading=ai_json.get("heading", "AI Generated Task"),
+                        description=ai_json.get("description", ""),
+                        priority=priority,
+                        project=room.project,
+                        assigned_by=sender_user,
+                        status="pending"
+                    )
+                    
+                    # Assign the users
+                    assignee_ids = ai_json.get("assigned_to_ids", [])
+                    if not assignee_ids:
+                        assignee_ids = [user_id] # Default to the person who asked if AI fails
+                    new_task.assigned_to.add(*assignee_ids)
+                    
+                    # Format a nice success message to show in the chat
+                    assignees = new_task.assigned_to.all()
+                    assignee_names = ", ".join([u.username for u in assignees])
+                    
+                    ai_reply_text = (
+                        f"✅ **Task Created Successfully!**\n\n"
+                        f"**ID:** #{new_task.id}\n"
+                        f"**Heading:** {new_task.heading}\n"
+                        f"**Priority:** {new_task.priority.capitalize()}\n"
+                        f"**Assigned To:** {assignee_names}"
+                    )
+            except json.JSONDecodeError:
+                # The AI didn't output JSON, it output a normal text reply. 
+                # We just pass the text forward naturally.
+                pass
+            except Exception as e:
+                logger.error(f"Failed to create task via AI: {e}")
+                ai_reply_text = "I understood your request to create a task, but a system error occurred while saving it to the database."
+
+            # 6. Push the final message back to the chat room
             ChatMessageService.create_message(
                 room=room,
                 sender=None,
-                content=ai_reply_text.strip(),
+                content=ai_reply_text,
                 is_ai_generated=True
             )
             
@@ -636,12 +731,11 @@ class ChatMessageService:
             MessageReadStatus.objects.bulk_create(read_statuses, ignore_conflicts=True)
 
         # 2. >>> NEW CODE: Broadcast New Unread Count <<<
-        # Since we just marked everything as read, this room's count is now 0.
         try:
             channel_layer = get_channel_layer()
             
-            # Recalculate the global total for this user
-            total_unread = ChatRoomService.get_total_unread_count(user)
+            # Use your breakdown helper instead of get_total_unread_count
+            counts = ChatRoomService.get_unread_counts_breakdown(user)
             
             # Send the signal to the User's Personal Group
             async_to_sync(channel_layer.group_send)(
@@ -651,7 +745,9 @@ class ChatMessageService:
                     "event": "CHAT_UNREAD_UPDATE",
                     "data": {
                         "room_id": str(room.id),
-                        "total_unread": total_unread,
+                        "room_type": room.room_type,
+                        "total_unread": counts['total_unread'],   # Normal chats only
+                        "thread_unread": counts['thread_unread'], # Threads only
                         "room_unread": 0  # It is definitely 0 now!
                     }
                 }

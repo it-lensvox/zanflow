@@ -787,20 +787,32 @@ class UnreadCountView(APIView):
     """
     Get unread message count across all rooms.
     
-    GET /api/v1/chat/unread/
+    GET /api/v1/chat/unread/?project_id=<optional>
     """
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(summary="Get unread message counts")
+    @extend_schema(
+        summary="Get unread message counts",
+        parameters=[
+            OpenApiParameter(name='project_id', description='Filter by project UUID to get specific project counts', required=False),
+        ]
+    )
     def get(self, request):
         """Get unread message counts per room and total."""
-        # This service already fetches last_message and updated_at
         rooms_data = ChatRoomService.get_user_rooms(request.user)
+        
+        # Grab the project_id from the query parameters if it exists
+        target_project_id = request.query_params.get('project_id')
         
         unread_by_room = {}
         for room in rooms_data:
             if room['unread_count'] > 0:
-                # --- FIX: Determine the correct timestamp ---
+                
+                # If the frontend requested a specific project, skip rooms that don't match
+                room_project_id = str(room.get('project_id')) if room.get('project_id') else None
+                if target_project_id and room_project_id != str(target_project_id):
+                    continue
+                    
                 # Prefer the actual message time, fallback to room update time
                 last_activity = room['updated_at']
                 if room.get('last_message') and room['last_message'].get('created_at'):
@@ -810,16 +822,16 @@ class UnreadCountView(APIView):
                     'name': room['name'],
                     'unread_count': room['unread_count'],
                     'room_type': room['room_type'],
-                    # --- FIX: Include the timestamp ---
-                    'last_message_at': last_activity, 
+                    'last_message_at': last_activity,
+                    'project_id': room.get('project_id')  
                 }
         
         thread_unread = sum(r['unread_count'] for r in unread_by_room.values() if r['room_type'] == 'thread')
         normal_chat_unread = sum(r['unread_count'] for r in unread_by_room.values() if r['room_type'] != 'thread')
         
         return Response({
-            'total_unread': normal_chat_unread, # Keeping original name for normal chats
-            'thread_unread': thread_unread,     # NEW: Only counts threads
+            'total_unread': normal_chat_unread,
+            'thread_unread': thread_unread, 
             'rooms_with_unread': len(unread_by_room),
             'by_room': unread_by_room,
         })
