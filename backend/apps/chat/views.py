@@ -24,7 +24,8 @@ from .serializers import (
     AddParticipantSerializer,
     RoomSettingsSerializer,
     MessageSearchSerializer,
-    ChatMessageCreateSerializer
+    ChatMessageCreateSerializer,
+    CreateThreadRoomSerializer
 )
 from .services import ChatRoomService, ChatMessageService, ChatPermissionService
 
@@ -56,7 +57,40 @@ class UserListView(APIView):
         )
         
         return Response(list(users))
+class CreateThreadRoomView(APIView):
+    """
+    Create or get a thread room for a specific message.
     
+    POST /api/v1/chat/rooms/thread/
+    Body: { "parent_message_id": <uuid> }
+    """
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="Create thread chat room",
+        # We will need to update serializers.py for CreateThreadRoomSerializer
+        # request=CreateThreadRoomSerializer, 
+        responses={201: ChatRoomDetailSerializer}
+    )
+    def post(self, request):
+        """Create a new thread branching from a specific message."""
+        parent_msg_id = request.data.get('parent_message_id')
+        if not parent_msg_id:
+            return Response(
+                {'error': 'parent_message_id is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        parent_message = get_object_or_404(ChatMessage, id=parent_msg_id)
+        
+        # We will add create_thread_room to ChatRoomService in the next step
+        room = ChatRoomService.create_thread_room(parent_message, request.user)
+        
+        serializer = ChatRoomDetailSerializer(
+            room,
+            context={'request': request}
+        )
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 class ChatRoomListView(APIView):
     """
     List all chat rooms for the current user.
@@ -213,7 +247,29 @@ class ChatRoomDetailView(APIView):
         
         serializer = ChatRoomDetailSerializer(room, context={'request': request})
         return Response(serializer.data)
+    @extend_schema(summary="Delete a chat room/thread")
+    def delete(self, request, room_id):
+        """Soft delete a chat room/thread."""
+        room = get_object_or_404(ChatRoom, id=room_id, is_active=True)
+        
+        # 1. ENFORCE THE STRICT PERMISSION RULE
+        if not ChatPermissionService.can_delete_thread(request.user, room):
+            return Response(
+                {'error': 'Access Denied: Only the creator of this thread can delete it.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
 
+        # 2. If they pass the check, perform the deletion
+        # (Assuming you added delete_room to ChatRoomService as discussed previously)
+        success = ChatRoomService.delete_room(room, request.user)
+
+        if success:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        
+        return Response(
+            {'error': 'An error occurred while trying to delete the thread.'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
 class GetGlobalRoomView(APIView):
     """
@@ -731,20 +787,32 @@ class UnreadCountView(APIView):
     """
     Get unread message count across all rooms.
     
-    GET /api/v1/chat/unread/
+    GET /api/v1/chat/unread/?project_id=<optional>
     """
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(summary="Get unread message counts")
+    @extend_schema(
+        summary="Get unread message counts",
+        parameters=[
+            OpenApiParameter(name='project_id', description='Filter by project UUID to get specific project counts', required=False),
+        ]
+    )
     def get(self, request):
         """Get unread message counts per room and total."""
-        # This service already fetches last_message and updated_at
         rooms_data = ChatRoomService.get_user_rooms(request.user)
+        
+        # Grab the project_id from the query parameters if it exists
+        target_project_id = request.query_params.get('project_id')
         
         unread_by_room = {}
         for room in rooms_data:
             if room['unread_count'] > 0:
-                # --- FIX: Determine the correct timestamp ---
+                
+                # If the frontend requested a specific project, skip rooms that don't match
+                room_project_id = str(room.get('project_id')) if room.get('project_id') else None
+                if target_project_id and room_project_id != str(target_project_id):
+                    continue
+                    
                 # Prefer the actual message time, fallback to room update time
                 last_activity = room['updated_at']
                 if room.get('last_message') and room['last_message'].get('created_at'):
@@ -754,14 +822,16 @@ class UnreadCountView(APIView):
                     'name': room['name'],
                     'unread_count': room['unread_count'],
                     'room_type': room['room_type'],
-                    # --- FIX: Include the timestamp ---
-                    'last_message_at': last_activity, 
+                    'last_message_at': last_activity,
+                    'project_id': room.get('project_id')  
                 }
         
-        total_unread = sum(r['unread_count'] for r in unread_by_room.values())
+        thread_unread = sum(r['unread_count'] for r in unread_by_room.values() if r['room_type'] == 'thread')
+        normal_chat_unread = sum(r['unread_count'] for r in unread_by_room.values() if r['room_type'] != 'thread')
         
         return Response({
-            'total_unread': total_unread,
+            'total_unread': normal_chat_unread,
+            'thread_unread': thread_unread, 
             'rooms_with_unread': len(unread_by_room),
             'by_room': unread_by_room,
         })
@@ -799,3 +869,42 @@ class DeleteMessageView(APIView):
             {'error': 'Could not delete message'}, 
             status=status.HTTP_400_BAD_REQUEST
         )
+
+class CreateThreadRoomView(APIView):
+    """
+    Create a standalone thread room for a project.
+    
+    POST /api/v1/chat/rooms/thread/
+    Body: { "project_id": <uuid>, "name": "My Issue Topic" }
+    """
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="Create project thread room",
+        request=CreateThreadRoomSerializer,
+        responses={201: ChatRoomDetailSerializer}
+    )
+    def post(self, request):
+        serializer = CreateThreadRoomSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        project_id = serializer.validated_data['project_id']
+        name = serializer.validated_data['name']
+        parent_msg_id = serializer.validated_data.get('parent_message_id')
+        
+        from apps.projects.models import Project
+        project = get_object_or_404(Project, id=project_id)
+            
+        # This calls the updated service method
+        room = ChatRoomService.create_thread_room(
+            project=project,
+            name=name,
+            created_by=request.user,
+            parent_message_id=parent_msg_id
+        )
+        
+        response_serializer = ChatRoomDetailSerializer(
+            room,
+            context={'request': request}
+        )
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)

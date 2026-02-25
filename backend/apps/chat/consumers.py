@@ -1,5 +1,6 @@
 import json
 import logging
+import asyncio
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
@@ -80,7 +81,17 @@ class GatewayConsumer(AsyncWebsocketConsumer):
             command = data.get('command')
 
             if command == 'send_message':
+                # 1. Save the user's message to the database (Sync context)
                 await self.process_chat_message(data)
+                
+                # 2. Trigger the AI safely in the main ASYNC loop
+                content = data.get('content', '')
+                room_id = data.get('room_id')
+                
+                if content and room_id and "@zanflow" in content.lower():
+                    logger.info("Spawning background AI task...")
+                    asyncio.create_task(self.invoke_zanflow_ai(room_id, content, self.user.id))
+
             elif command == 'join_room':
                 room_slug = data.get('room_slug')
                 if room_slug:
@@ -121,15 +132,37 @@ class GatewayConsumer(AsyncWebsocketConsumer):
                 return
 
             room = ChatRoom.objects.get(id=room_id)
-            ChatMessageService.create_message(
+            
+            # Save the message to the database
+            message = ChatMessageService.create_message(
                 room=room,
                 sender=self.user,
                 content=content
             )
+            # Notice we REMOVED the AI trigger from here!
+
         except ChatRoom.DoesNotExist:
             logger.error(f"User {self.user.id} tried to send to non-existent room {room_id}")
         except Exception as e:
             logger.error(f"Failed to process chat message: {e}")
+
+    # --- NEW METHOD: Background AI Worker ---
+    async def invoke_zanflow_ai(self, room_id, content, user_id):
+        """Handles the AI processing asynchronously so WebSockets don't block."""
+        await asyncio.sleep(0.5)  # Brief pause to ensure the user's message broadcasts first
+        
+        try:
+            logger.info(f"AI Triggered in room {room_id} with query: {content}")
+            
+            # Use database_sync_to_async to run the synchronous Bedrock call without blocking the websocket
+            await database_sync_to_async(ChatMessageService.process_zanflow_ai)(
+                room_id=room_id, 
+                prompt_text=content, 
+                user_id=user_id
+            )
+            
+        except Exception as e:
+            logger.error(f"Error invoking Zanflow AI: {e}")
 
     async def chat_message(self, event):
         await self.send(text_data=json.dumps({

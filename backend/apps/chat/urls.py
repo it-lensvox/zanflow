@@ -29,7 +29,8 @@ from .views import (
     UnreadCountView,
     UserListView,
     SendMessageView,
-    DeleteMessageView
+    DeleteMessageView,
+    CreateThreadRoomView,
 )
 
 urlpatterns = [
@@ -174,5 +175,10 @@ urlpatterns = [
         'rooms/<uuid:room_id>/messages/<uuid:message_id>/',
         DeleteMessageView.as_view(),
         name='chat-message-delete'
+    ),
+    path(
+        'rooms/thread/',
+        CreateThreadRoomView.as_view(),
+        name='chat-room-create-thread'
     ),
 ]
