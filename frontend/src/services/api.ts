@@ -1,9 +1,9 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import type {
-  AuthTokens, User as AppUser, PaginatedResponse, PaginatedProjectsResponse, GetUploadUrlPayload, GetUploadUrlResponse, ConfirmUploadResponse, GetDownloadUrlPayload, ConfirmUploadPayload,
-  GetDownloadUrlResponse, AllDocumentsResponse, TaskComment, CreateTaskCommentPayload, AITaskSuggestionResponse, AITaskSuggestionPayload, ProjectCreatePayload,
-  Label, DocumentStatus, ChatMessage, ChatRoom, ChatRoomMessagesResponse, CreatePrivateChatPayload, GatewaySendMessagePayload, GatewayIncomingMessage, RefineTextPayload, RefineTextResponse, TaskResponse, TeamTypeChoicesResponse,
-  CreateTeamPayload, ProjectChatRoom, TeamChatRoom, ChatUnreadResponse, NotificationData, NotificationCallback, Team, ThreadRoom, ThreadSession, ThreadStorage, ThreadUIMessage, CreateThreadRoomPayload, WSJoinRoomCommand, WSSendMessageCommand, WSIncomingThreadMessage, WSUnreadUpdateSignal
+  AuthTokens, User as AppUser, PaginatedResponse, PaginatedProjectsResponse, GetUploadUrlPayload, GetUploadUrlResponse, ConfirmUploadResponse, GetDownloadUrlPayload, ConfirmUploadPayload, GetDownloadUrlResponse, AllDocumentsResponse,
+  TaskComment, CreateTaskCommentPayload, AITaskSuggestionResponse, AITaskSuggestionPayload, ProjectCreatePayload, Label, DocumentStatus, ChatMessage, ChatRoom, ChatRoomMessagesResponse, CreatePrivateChatPayload,
+  GatewaySendMessagePayload, GatewayIncomingMessage, RefineTextPayload, RefineTextResponse, TaskResponse, TeamTypeChoicesResponse,
+  CreateTeamPayload, ProjectChatRoom, TeamChatRoom, ChatUnreadResponse, NotificationData, NotificationCallback, Team, ThreadRoom, ThreadSession, ThreadStorage, ThreadUIMessage, CreateThreadRoomPayload, WSJoinRoomCommand, WSSendMessageCommand, WSIncomingThreadMessage, WSUnreadUpdateSignal, ThreadMessagesResponse
 } from '@/types';
 
 
@@ -94,6 +94,11 @@ api.interceptors.response.use(
               api.defaults.headers.common['Authorization'] = `Bearer ${newTokens.access}`;
               return newTokens;
             })
+            // .catch((refreshError) => {
+            //   clearTokens();
+            //   window.dispatchEvent(new CustomEvent('auth:token-expired'));
+            //   throw refreshError;
+            // })
             .catch((refreshError) => {
               clearTokens();
               window.dispatchEvent(new CustomEvent('auth:token-expired'));
@@ -159,10 +164,10 @@ export const authApi = {
     return response.data;
   },
 
-  // Update profile fields (first_name, last_name, etc.)
+  // Update profile fields (first_name, last_name)
   updateProfile: async (data: { first_name?: string; last_name?: string }) => {
     const response = await api.patch('/auth/me/', data);
-    return response. data;
+    return response.data;
   },
 
   forgotPassword: async (email: string) => {
@@ -369,7 +374,7 @@ export const taskApi = {
       data.tasks.sort((a: any, b: any) => {
         const dateA = new Date(a.updated_at || a.created_at).getTime();
         const dateB = new Date(b.updated_at || b.created_at).getTime();
-        return dateB - dateA; 
+        return dateB - dateA;
       });
     }
 
@@ -705,7 +710,6 @@ export class GatewayWebSocketService {
   connect() {
     // Prevent multiple connections
     if (this.ws && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) {
-      console.log('⚠️ Gateway WebSocket already connected/connecting');
       return;
     }
 
@@ -721,7 +725,6 @@ export class GatewayWebSocketService {
     this.ws = new WebSocket(wsUrl);
 
     this.ws.onopen = () => {
-      console.log('🌍 Connected to WebSocket Gateway');
       this.reconnectAttempts = 0;
     };
 
@@ -748,7 +751,6 @@ export class GatewayWebSocketService {
     };
 
     this.ws.onclose = () => {
-      console.log('❌ Gateway WebSocket Disconnected');
       this.attemptReconnect();
     };
   }
@@ -761,9 +763,6 @@ export class GatewayWebSocketService {
 
     this.reconnectAttempts++;
     const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
-
-    console.log(`Reconnecting Gateway WebSocket in ${delay}ms... (Attempt ${this.reconnectAttempts})`);
-
     this.reconnectTimeout = setTimeout(() => {
       this.connect();
     }, delay);
@@ -778,7 +777,6 @@ export class GatewayWebSocketService {
         content: content
       };
       this.ws.send(JSON.stringify(payload));
-      console.log(`📤 Message sent to room ${roomId}`);
     } else {
       console.error("Gateway WebSocket is not open. Cannot send message.");
     }
@@ -827,12 +825,10 @@ export class NotificationWebSocketService {
   // Connect to the WebSocket notification gateway
   connect() {
     if (this.isConnecting || (this.ws && this.ws.readyState === WebSocket.CONNECTING)) {
-      console.log('⚠️ Notification WebSocket already connecting');
       return;
     }
 
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      console.log('⚠️ Notification WebSocket already connected');
       return;
     }
 
@@ -850,7 +846,6 @@ export class NotificationWebSocketService {
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
-        console.log('🔔 Connected to Notification WebSocket Gateway');
         this.reconnectAttempts = 0;
         this.isConnecting = false;
       };
@@ -862,9 +857,6 @@ export class NotificationWebSocketService {
           // Check if this is a notification event
           if (message.type === 'SIGNAL' && message.event === 'NEW_NOTIFICATION') {
             const notificationData: NotificationData = message.data;
-
-            console.log('📬 New notification received:', notificationData);
-
             // Notify all registered callbacks
             this.notificationCallbacks.forEach(callback => {
               try {
@@ -897,7 +889,6 @@ export class NotificationWebSocketService {
       };
 
       this.ws.onclose = (event) => {
-        console.log('❌ Notification WebSocket disconnected', event.code, event.reason);
         this.isConnecting = false;
         this.attemptReconnect();
       };
@@ -917,9 +908,6 @@ export class NotificationWebSocketService {
 
     this.reconnectAttempts++;
     const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
-
-    console.log(`🔄 Reconnecting Notification WebSocket in ${delay}ms... (Attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-
     this.reconnectTimeout = setTimeout(() => {
       this.connect();
     }, delay);
@@ -994,147 +982,219 @@ export const fetchNotifications = async () => {
 };
 
 
-// // THREADS API
-// const THREADS_STORAGE_KEY = 'zanflow_threads';
+// THREADS API
+const THREADS_STORAGE_KEY = 'zanflow_threads';
 
-// export const threadsApi = {
-//   /**
-//    * Create a new thread room via backend API
-//    */
-//   createThreadRoom: async (payload: CreateThreadRoomPayload): Promise<ThreadRoom> => {
-//     const response = await api.post<ThreadRoom>('/chat/rooms/thread/', payload);
-//     return response.data;
-//   },
+export const threadsApi = {
+  // Create a new thread room via backend API
+  createThreadRoom: async (payload: CreateThreadRoomPayload): Promise<ThreadRoom> => {
+    const response = await api.post<ThreadRoom>('/chat/rooms/thread/', payload);
+    return response.data;
+  },
 
-//   /**
-//    * Connect to WebSocket gateway
-//    */
-//   connectThreadSocket: (token: string): WebSocket => {
-//     const wsUrl = `${WS_GATEWAY_URL}/?token=${token}`;
-//     return new WebSocket(wsUrl);
-//   },
+  // Get all thread rooms for a project from backend
+  getProjectThreads: async (projectId: number): Promise<ThreadRoom[]> => {
+    const response = await api.get('/chat/rooms/', {
+      params: {
+        type: 'thread',
+        project_id: projectId
+      }
+    });
+    return response.data.results || response.data;
+  },
 
-//   /**
-//    * Join a thread room via WebSocket
-//    */
-//   joinThreadRoom: (socket: WebSocket, slug: string): void => {
-//     if (socket.readyState === WebSocket.OPEN) {
-//       const command: WSJoinRoomCommand = {
-//         command: 'join_room',
-//         room_slug: slug,
-//       };
-//       socket.send(JSON.stringify(command));
-//     }
-//   },
+  // Get messages for a specific thread room
+  getThreadMessages: async (roomId: string): Promise<ThreadMessagesResponse> => {
+    const response = await api.get<ThreadMessagesResponse>(`/chat/rooms/${roomId}/messages/`);
+    return response.data;
+  },
 
-//   /**
-//    * Send message to thread room via WebSocket
-//    */
-//   sendThreadMessage: (socket: WebSocket, roomId: string, content: string): void => {
-//     if (socket.readyState === WebSocket.OPEN) {
-//       const command: WSSendMessageCommand = {
-//         command: 'send_message',
-//         room_id: roomId,
-//         content: content,
-//       };
-//       socket.send(JSON.stringify(command));
-//     }
-//   },
+  // Fetch authoritative unread counts for thread rooms scoped to a project.
+  getThreadUnreadCounts: async (projectId: number): Promise<Record<string, number>> => {
+    const response = await api.get<ChatUnreadResponse>('/chat/unread/', {
+      params: { project_id: projectId },
+    });
+    const byRoom = response.data.by_room || {};
+    const threadUnreads: Record<string, number> = {};
 
-//   /**
-//    * Parse incoming WebSocket message
-// /**
-//    * Parse incoming WebSocket message
-//    */
-//   parseIncomingMessage: (event: MessageEvent): WSIncomingThreadMessage | null => {
-//     try {
-//       const parsed = JSON.parse(event.data);
-//       if (parsed.type === 'CHAT_MESSAGE') {
-//         return parsed as WSIncomingThreadMessage;
-//       }
-//       return null;
-//     } catch (error) {
-//       return null;
-//     }
-//   },
-
-//   // Parse incoming unread signal
-//   parseUnreadSignal: (event: MessageEvent): WSUnreadUpdateSignal | null => {
-//     try {
-//       const parsed = JSON.parse(event.data);
-//       if (parsed.type === 'SIGNAL' && parsed.event === 'CHAT_UNREAD_UPDATE') {
-//         return parsed as WSUnreadUpdateSignal;
-//       }
-//       return null;
-//     } catch (error) {
-//       return null;
-//     }
-//   },
+    for (const [roomId, room] of Object.entries(byRoom)) {
+      if (
+        room.room_type === 'thread' &&
+        (room.project_id === undefined || room.project_id === String(projectId))
+      ) {
+        threadUnreads[roomId] = room.unread_count;
+      }
+    }
+    return threadUnreads;
+  },
 
 
-//   // Convert backend message to UI message format
-//   convertToUIMessage: (backendMessage: WSIncomingThreadMessage['data']): ThreadUIMessage => {
-//     return {
-//       id: backendMessage.id,
-//       text: backendMessage.content,
-//       sender: backendMessage.is_ai_generated ? 'system' : 'user',
-//       timestamp: new Date(backendMessage.created_at),
-//       isAI: backendMessage.is_ai_generated,
-//     };
-//   },
-// };
+  /// Delete a thread room
+  deleteThreadRoom: async (roomId: string): Promise<void> => {
+    await api.delete(`/chat/rooms/${roomId}/`);
+  },
+
+  // Connect to WebSocket gateway
+  connectThreadSocket: (token: string): WebSocket => {
+    const wsUrl = `${WS_GATEWAY_URL}/?token=${token}`;
+    return new WebSocket(wsUrl);
+  },
+
+  // Join a thread room via WebSocket
+  joinThreadRoom: (socket: WebSocket, slug: string): void => {
+    if (socket.readyState === WebSocket.OPEN) {
+      const command: WSJoinRoomCommand = {
+        command: 'join_room',
+        room_slug: slug,
+      };
+      socket.send(JSON.stringify(command));
+    }
+  },
 
 
-// // THREADS STORAGE UTILITIE
-// export const threadsStorageApi = {
-//    // Get all thread sessions for a project from localStorage
-//   getProjectThreads: (projectId: number): ThreadStorage => {
-//     try {
-//       const data = localStorage.getItem(`${THREADS_STORAGE_KEY}_${projectId}`);
-//       if (!data) {
-//         return { sessions: [], lastActiveSessionId: null };
-//       }
-//       const parsed = JSON.parse(data);
-//       return {
-//         sessions: parsed.sessions.map((session: any) => ({
-//           ...session,
-//           createdAt: new Date(session.createdAt),
-//           updatedAt: new Date(session.updatedAt),
-//           messages: session.messages.map((msg: any) => ({
-//             ...msg,
-//             timestamp: new Date(msg.timestamp),
-//           })),
-//         })),
-//         lastActiveSessionId: parsed.lastActiveSessionId,
-//       };
-//     } catch (error) {
-//       return { sessions: [], lastActiveSessionId: null };
-//     }
-//   },
+  // Send message to thread room via WebSocket
+  sendThreadMessage: (socket: WebSocket, roomId: string, content: string): void => {
+    if (socket.readyState === WebSocket.OPEN) {
+      const command: WSSendMessageCommand = {
+        command: 'send_message',
+        room_id: roomId,
+        content: content,
+      };
+      socket.send(JSON.stringify(command));
+    }
+  },
+
+  // Parse incoming WebSocket message
+  parseIncomingMessage: (event: MessageEvent): WSIncomingThreadMessage | null => {
+    try {
+      const parsed = JSON.parse(event.data);
+      if (parsed.type === 'CHAT_MESSAGE') {
+        return parsed as WSIncomingThreadMessage;
+      }
+      return null;
+    } catch (error) {
+      return null;
+    }
+  },
+
+  // Parse incoming unread signal
+  parseUnreadSignal: (event: MessageEvent): WSUnreadUpdateSignal | null => {
+    try {
+      const parsed = JSON.parse(event.data);
+      if (parsed.type === 'SIGNAL' && parsed.event === 'CHAT_UNREAD_UPDATE' && parsed.data?.room_type === 'thread') {
+        return parsed as WSUnreadUpdateSignal;
+      }
+      return null;
+    } catch (error) {
+      return null;
+    }
+  },
 
 
-//   // Save thread sessions to localStorage
-//   saveProjectThreads: (projectId: number, data: ThreadStorage): void => {
-//     try {
-//       localStorage.setItem(`${THREADS_STORAGE_KEY}_${projectId}`, JSON.stringify(data));
-//     } catch (error) {
-//     }
-//   },
+  // Convert backend message to UI message format
+  convertToUIMessage: (backendMessage: WSIncomingThreadMessage['data'], currentUserId?: number): ThreadUIMessage => {
+    let senderType: 'user' | 'system' | 'other' = 'other';
+
+    if (backendMessage.is_ai_generated || !backendMessage.sender) {
+      senderType = 'system';
+    } else if (currentUserId && backendMessage.sender.id === currentUserId) {
+      senderType = 'user';
+    } else if (backendMessage.sender.id !== null) {
+      senderType = 'other';
+    }
+    return {
+      id: backendMessage.id,
+      text: backendMessage.content,
+      sender: senderType,
+      timestamp: new Date(backendMessage.created_at),
+      isAI: backendMessage.is_ai_generated,
+      senderName: backendMessage.sender?.full_name || backendMessage.sender?.username || 'System',
+      senderId: backendMessage.sender?.id || null,
+    };
+  },
+
+  // Convert backend message from messages API to UI format
+  convertBackendMessageToUI: (
+    backendMsg: ThreadMessagesResponse['messages'][0],
+    currentUserId?: number
+  ): ThreadUIMessage => {
+    // Determine sender type - CRITICAL: Use is_own_message from backend
+    let senderType: 'user' | 'system' | 'other' = 'other';
+
+    if (!backendMsg.sender) {
+      // AI generated message (sender is null)
+      senderType = 'system';
+    } else if (backendMsg.is_own_message) {
+      // Backend tells us this is our own message
+      senderType = 'user';
+    } else {
+      // Message from another user
+      senderType = 'other';
+    }
+
+    return {
+      id: backendMsg.id,
+      text: backendMsg.content,
+      sender: senderType,
+      timestamp: new Date(backendMsg.created_at),
+      isAI: !backendMsg.sender,
+      senderName: backendMsg.sender?.full_name || backendMsg.sender?.username,
+      senderId: backendMsg.sender?.id || null,
+    };
+  },
+};
 
 
-//   // Search sessions by title or content
-//   searchSessions: (sessions: ThreadSession[], query: string): ThreadSession[] => {
-//     if (!query.trim()) return sessions;
-    
-//     const lowerQuery = query.toLowerCase();
-//     return sessions.filter(session => {
-//       if (session.title.toLowerCase().includes(lowerQuery)) return true;
-//       return session.messages.some(msg => 
-//         msg.text.toLowerCase().includes(lowerQuery)
-//       );
-//     });
-//   },
-// };
+// THREADS STORAGE UTILITIE
+export const threadsStorageApi = {
+  // Get all thread sessions for a project from localStorage
+  getProjectThreads: (projectId: number): ThreadStorage => {
+    try {
+      const data = localStorage.getItem(`${THREADS_STORAGE_KEY}_${projectId}`);
+      if (!data) {
+        return { sessions: [], lastActiveSessionId: null };
+      }
+      const parsed = JSON.parse(data);
+      return {
+        sessions: parsed.sessions.map((session: any) => ({
+          ...session,
+          createdAt: new Date(session.createdAt),
+          updatedAt: new Date(session.updatedAt),
+          messages: session.messages.map((msg: any) => ({
+            ...msg,
+            timestamp: new Date(msg.timestamp),
+          })),
+        })),
+        lastActiveSessionId: parsed.lastActiveSessionId,
+      };
+    } catch (error) {
+      return { sessions: [], lastActiveSessionId: null };
+    }
+  },
+
+
+  // Save thread sessions to localStorage
+  saveProjectThreads: (projectId: number, data: ThreadStorage): void => {
+    try {
+      localStorage.setItem(`${THREADS_STORAGE_KEY}_${projectId}`, JSON.stringify(data));
+    } catch (error) {
+    }
+  },
+
+
+  // Search sessions by title or content
+  searchSessions: (sessions: ThreadSession[], query: string): ThreadSession[] => {
+    if (!query.trim()) return sessions;
+
+    const lowerQuery = query.toLowerCase();
+    return sessions.filter(session => {
+      if (session.title.toLowerCase().includes(lowerQuery)) return true;
+      return session.messages.some(msg =>
+        msg.text.toLowerCase().includes(lowerQuery)
+      );
+    });
+  },
+};
 
 
 export default api;

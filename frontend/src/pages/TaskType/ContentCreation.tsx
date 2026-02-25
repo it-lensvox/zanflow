@@ -17,7 +17,7 @@ import { useTableFilters, ColumnFilterConfig } from '@/hooks/useTableFilters';
 import { SearchFilter, ListFilter, DateFilter, FilterHeaderWrapper } from '@/components/layout/DualView/FilterComponents';
 import { getStatusConfig, priorityOptions, statusOptions } from '@/components/layout/DualView/taskConfig';
 import './ContentCreation.scss';
-// import Threads from '../Project/Thread';
+import Threads from '../Project/Thread';
 
 type TabType = 'tasks' | 'calendar' | 'media';
 
@@ -915,9 +915,9 @@ export function ContentCreation() {
                 />
             )}
             {/* Threads Component */}
-            {/* {project && (
+            {project && (
                 <Threads projectId={project.id} projectName={project.name} />
-            )} */}
+            )}
         </div>
     );
 }

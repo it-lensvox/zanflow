@@ -78,7 +78,6 @@ export function DocumentCreate() {
     if (initialGT.trim()) {
       try {
         gtData = JSON.parse(initialGT);
-        console.log('[DocumentCreate] Parsed GT Data successfully.');
       } catch {
         setError('Invalid JSON format for ground truth data');
         return;
@@ -87,19 +86,15 @@ export function DocumentCreate() {
 
     try {
       // Step 1: Get Upload URL from backend API
-      console.log('[DocumentCreate] Step 1: Requesting upload URL...');
       const uploadUrlResponse = await documentsApi.getUploadUrl(projectIdNum, {
         file_name: file.name,
         file_type: file.type || 'application/octet-stream',
       });
 
       const { url: s3Url, fields: s3Fields, file_key } = uploadUrlResponse;
-      console.log(`[DocumentCreate] Step 1 Success. file_key: ${file_key}`);
 
       // Step 2: Upload File directly to S3 using the pre-signed URL/fields
-      console.log('[DocumentCreate] Step 2: Uploading file to S3...');
       await documentsApi.uploadFileToS3(s3Url, s3Fields, file);
-      console.log('[DocumentCreate] Step 2 Success: File uploaded to S3.');
       // Step 3: CONFIRM UPLOAD original_file_name
       const fileNameWithoutPath = file_key.split('/').pop() || file.name;
       console.log(`[DocumentCreate] Step 3: Confirming upload with file_key: ${file_key}, file_name: ${fileNameWithoutPath}`);

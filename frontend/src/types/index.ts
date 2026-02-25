@@ -845,15 +845,17 @@ export interface WebSocketNotificationEvent {
 // Callback type for notification listeners
 export type NotificationCallback = (notification: NotificationData) => void;
 
-// Team chat total badge unread_count
+// Team chat and thread chattotal badge unread_count
 export interface ChatUnreadResponse {
   total_unread: number;
+  thread_unread: number;
   rooms_with_unread: number;
   by_room: Record<string, {
     name: string;
     unread_count: number;
     room_type: string;
     last_message_at?: string;
+    project_id?: string;
   }>;
 }
 
@@ -876,147 +878,186 @@ export interface ToastNotification {
   timestamp: string;
 }
 
-// // THREADS TYPES
+// THREADS TYPES
 
-// // Sender information in thread messages
-// export interface ThreadSender {
-//   username: string;
-//   full_name?: string;
-//   avatar?: string;
-// }
+// Sender information in thread messages
+export interface ThreadSender {
+  username: string;
+  full_name?: string;
+  avatar?: string;
+}
 
-// // Thread message from backend
-// export interface ThreadMessage {
-//   id: string;
-//   room_id: string;
-//   sender: ThreadSender;
-//   content: string;
-//   is_ai_generated: boolean;
-//   timestamp: Date;
-// }
+// Thread message from backend
+export interface ThreadMessage {
+  id: string;
+  room_id: string;
+  sender: ThreadSender;
+  content: string;
+  is_ai_generated: boolean;
+  timestamp: Date;
+}
 
-// // Thread room (session)
-// export interface ThreadRoom {
-//   id: string;
-//   slug: string;
-//   name: string;
-//   room_type: string;
-//   project: number;
-//   created_at: string;
-//   updated_at: string;
-//   is_active: boolean;
-//   unread_count: number;
-//   participants?: Array<{
-//     id: number;
-//     username: string;
-//     full_name: string;
-//     email: string;
-//   }>;
-//   current_user_membership?: {
-//     id: string;
-//     joined_at: string;
-//     last_read_at: string;
-//     is_muted: boolean;
-//     room_role: string;
-//   };
-// }
+// Thread room (session)
+export interface ThreadRoom {
+  id: string;
+  slug: string;
+  name: string;
+  room_type: string;
+  project: number;
+  created_at: string;
+  updated_at: string;
+  is_active: boolean;
+  unread_count: number;
+  created_by?: {
+    id: number;
+    username: string;
+    full_name: string;
+    email: string;
+  };
+  participants?: Array<{
+    id: number;
+    username: string;
+    full_name: string;
+    email: string;
+  }>;
+  current_user_membership?: {
+    id: string;
+    joined_at: string;
+    last_read_at: string;
+    is_muted: boolean;
+    room_role: string;
+  };
+}
 
-// // Local thread session for UI state
-// export interface ThreadSession {
-//   id: string;
-//   room_id: string;
-//   slug: string;
-//   projectId: number;
-//   title: string;
-//   messages: ThreadUIMessage[];
-//   createdAt: Date;
-//   updatedAt: Date;
-//   unreadCount: number;
-//   lastReadAt: Date | null;
-// }
+// Thread messages response from backend API
+export interface ThreadMessagesResponse {
+  messages: Array<{
+    id: string;
+    room: string;
+    sender: {
+      id: number | null;
+      username: string;
+      full_name: string;
+      email: string;
+    } | null;
+    message_type: string;
+    content: string;
+    attachment: string | null;
+    attachment_name: string;
+    metadata: Record<string, any>;
+    reply_to: string | null;
+    reply_to_preview: string | null;
+    created_at: string;
+    updated_at: string;
+    is_deleted: boolean;
+    is_own_message: boolean;
+  }>;
+  count: number;
+  has_more: boolean;
+}
 
-// // UI message format
-// export interface ThreadUIMessage {
-//   id: string;
-//   text: string;
-//   sender: 'user' | 'system';
-//   timestamp: Date;
-//   isAI?: boolean;
-// }
+// Local thread session for UI state
+export interface ThreadSession {
+  id: string;
+  room_id: string;
+  slug: string;
+  projectId: number;
+  title: string;
+  messages: ThreadUIMessage[];
+  createdAt: Date;
+  updatedAt: Date;
+  unreadCount: number;
+  lastReadAt: Date | null;
+  createdById?: number;
+}
 
-// // Props for Threads component
-// export interface ThreadsProps {
-//   projectId: number;
-//   projectName: string;
-// }
+// UI message format
+export interface ThreadUIMessage {
+  id: string;
+  text: string;
+  sender: 'user' | 'system' | 'other';
+  timestamp: Date;
+  isAI?: boolean;
+  senderName?: string;
+  senderId?: number | null;
+}
 
-// // Local storage structure
-// export interface ThreadStorage {
-//   sessions: ThreadSession[];
-//   lastActiveSessionId: string | null;
-// }
+// Props for Threads component
+export interface ThreadsProps {
+  projectId: number;
+  projectName: string;
+}
 
-// // Create thread room payload
-// export interface CreateThreadRoomPayload {
-//   project_id: number;
-//   name: string;
-// }
+// Local storage structure
+export interface ThreadStorage {
+  sessions: ThreadSession[];
+  lastActiveSessionId: string | null;
+}
 
-// // WebSocket command types
-// export type WebSocketCommand = 
-//   | 'join_room'
-//   | 'send_message'
-//   | 'leave_room';
+// Create thread room payload
+export interface CreateThreadRoomPayload {
+  project_id: number;
+  name: string;
+}
 
-// // WebSocket join room command
-// export interface WSJoinRoomCommand {
-//   command: 'join_room';
-//   room_slug: string;
-// }
 
-// // WebSocket send message command
-// export interface WSSendMessageCommand {
-//   command: 'send_message';
-//   room_id: string;
-//   content: string;
-// }
+// WebSocket command types
+export type WebSocketCommand =
+  | 'join_room'
+  | 'send_message'
+  | 'leave_room';
 
-// // WebSocket incoming message
-// export interface WSIncomingThreadMessage {
-//   type: 'CHAT_MESSAGE';
-//   data: {
-//     id: string;
-//     room_id: string;
-//     sender: {
-//       id: number | null;
-//       username: string;
-//       full_name?: string;
-//     };
-//     message_type: string;
-//     content: string;
-//     attachment_url: string | null;
-//     attachment_name: string;
-//     reply_to: string | null;
-//     created_at: string;
-//     is_deleted: boolean;
-//     is_ai_generated: boolean;
-//     thread_count: number;
-//   };
-// }
+// WebSocket join room command
+export interface WSJoinRoomCommand {
+  command: 'join_room';
+  room_slug: string;
+}
 
-// // WebSocket unread update signal
-// export interface WSUnreadUpdateSignal {
-//   type: 'SIGNAL';
-//   event: 'CHAT_UNREAD_UPDATE';
-//   data: {
-//     room_id: string;
-//     total_unread: number;
-//     room_unread: number;
-//   };
-// }
+// WebSocket send message command
+export interface WSSendMessageCommand {
+  command: 'send_message';
+  room_id: string;
+  content: string;
+}
 
-// // Combined WebSocket message types
-// export type WSThreadMessage = WSIncomingThreadMessage | WSUnreadUpdateSignal;
+// WebSocket incoming message
+export interface WSIncomingThreadMessage {
+  type: 'CHAT_MESSAGE';
+  data: {
+    id: string;
+    room_id: string;
+    sender: {
+      id: number | null;
+      username: string;
+      full_name?: string;
+    };
+    message_type: string;
+    content: string;
+    attachment_url: string | null;
+    attachment_name: string;
+    reply_to: string | null;
+    created_at: string;
+    is_deleted: boolean;
+    is_ai_generated: boolean;
+    thread_count: number;
+  };
+}
+
+// WebSocket unread update signal
+export interface WSUnreadUpdateSignal {
+  type: 'SIGNAL';
+  event: 'CHAT_UNREAD_UPDATE';
+  data: {
+    room_id: string;
+    room_type: 'thread' | 'project' | 'direct' | 'team' | string;
+    thread_unread: number;
+    total_unread: number;
+    room_unread: number;
+  };
+}
+
+// Combined WebSocket message types
+export type WSThreadMessage = WSIncomingThreadMessage | WSUnreadUpdateSignal;
 
 // Document Filter Types for ContentCreation
 export interface ProjectDocument {

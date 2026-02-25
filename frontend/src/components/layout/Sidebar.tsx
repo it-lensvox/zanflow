@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   LayoutDashboard, FolderKanban, FileText, Settings, LogOut,
   Users, ChevronDown, ChevronUp, Plus, CheckSquare, CheckCircle,
-  Clock, PlayCircle, Pause, Crown, TrendingUp, ListTodo, Calendar, Eye, MessageSquare, UserPlus
+  Clock, PlayCircle, Pause, TrendingUp, ListTodo, Calendar, Eye, MessageSquare, UserPlus
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -130,7 +130,6 @@ export function Sidebar() {
 
         // Subscribe to chat unread updates
         const unsubscribe = notificationSocket.onChatUnreadUpdate((updateData) => {
-          console.log('📊 Sidebar received unread update:', updateData);
           setChatUnreadCount(updateData.total_unread);
         });
 
