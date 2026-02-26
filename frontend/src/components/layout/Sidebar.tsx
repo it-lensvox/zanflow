@@ -130,7 +130,6 @@ export function Sidebar() {
 
         // Subscribe to chat unread updates
         const unsubscribe = notificationSocket.onChatUnreadUpdate((updateData) => {
-          console.log('📊 Sidebar received unread update:', updateData);
           setChatUnreadCount(updateData.total_unread);
         });
 

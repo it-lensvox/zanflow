@@ -22,7 +22,6 @@ const UserManagement = lazy(() => import('@/pages/TeamManagement/UserManagement'
 const TeamPerformance = lazy(() => import('@/pages/TeamManagement/TeamPerformance').then(m => ({ default: m.TeamPerformance })));
 const ContentCreation = lazy(() => import('@/pages/TaskType/ContentCreation').then(m => ({ default: m.ContentCreation })));
 const TaskDetails = lazy(() => import('@/pages/TaskType/TaskDetails').then(m => ({ default: m.TaskDetails })));
-const APITesting = lazy(() => import('@/pages/TaskType/APITesting').then(m => ({ default: m.APITesting })));
 const Calendar = lazy(() => import('@/pages/Calendar/Calendar').then(m => ({ default: m.Calendar })));
 const NotificationsPage = lazy(() => import('@/pages/NotificationsPage').then(m => ({ default: m.NotificationsPage })));
 const Profile = lazy(() => import('@/pages/Profile').then(m => ({ default: m.Profile })));
@@ -142,7 +141,6 @@ function AppRoutes() {
         <Route path="/resetPassword" element={<ResetPassword />} />
         <Route path="/projects" element={<Projects />} />
         <Route path="/projects/:id" element={<ProjectDetailWrapper />} />
-        <Route path="/projects/:id/api-testing" element={<APITesting />} />
         <Route path="/projects/:projectId/documents/new" element={<DocumentCreate />} />
         <Route path="/projects/:id/settings" element={<ProjectSettings />} />
         <Route path="/notifications" element={<NotificationsPage />} />
@@ -199,9 +197,6 @@ function WebSocketProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isAuthenticated) {
       notificationSocket.connect();
-      console.log('🌐 Global WebSocket initialized');
-      // Kick off the Dashboard chunk download in the background the
-      // moment we know the user is logged in.
       preloadDashboard();
       return () => {
       };

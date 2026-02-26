@@ -54,7 +54,6 @@ export const TeamPerformance: React.FC = () => {
         setIsPerformanceLoading(true);
         try {
             const data: UserPerformance = await taskApi.getPerformance(userId);
-            console.log("🔥 PERFORMANCE API RESPONSE FOR USER:", userId, data);
             setTeamMembers(prevMembers => 
                 prevMembers.map(m => 
                     m.id === userId ? { ...m, performance: data } : m

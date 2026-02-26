@@ -74,7 +74,7 @@ export function Login() {
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
-    setTimeout(() => setToast(null), 4000); // Auto-hide after 4 seconds
+    setTimeout(() => setToast(null), 4000);
   };
 
   const handleSendOTP = async () => {

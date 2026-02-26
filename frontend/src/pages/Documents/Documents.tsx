@@ -2,7 +2,7 @@ import React from 'react';
 import { useState } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useSearchParams, useNavigate, useOutletContext } from 'react-router-dom';
-import { FileText, Search, Filter, ChevronDown, Bell, ChevronLeft, ChevronRight } from 'lucide-react';
+import { FileText, Search, Filter, ChevronDown, Bell, ChevronLeft, ChevronRight, Info, X, Calendar, User, HardDrive, Tag, Hash } from 'lucide-react';
 import { Button, Card, CardContent, Input } from '@/components/common';
 import { documentsApi, projectsApi } from '@/services/api';
 import type { Document, Project } from '@/types';
@@ -25,6 +25,136 @@ interface ConfirmationModalProps {
   onClose: () => void;
   onConfirm: () => void;
   title: string;
+}
+
+function DocumentInfoPanel({ doc, onClose }: { doc: Document | null; onClose: () => void }) {
+  if (!doc) return null;
+
+  const formatBytes = (bytes?: number) => {
+    if (!bytes) return 'N/A';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  };
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return 'N/A';
+    return new Date(dateStr).toLocaleString(undefined, {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
+  };
+
+  const statusColors: Record<string, string> = {
+    draft: 'bg-yellow-50 text-yellow-700 border border-yellow-200',
+    in_review: 'bg-blue-50 text-blue-700 border border-blue-200',
+    approved: 'bg-green-50 text-green-700 border border-green-200',
+    archived: 'bg-gray-100 text-gray-700 border border-gray-200',
+  };
+
+  const rows: { icon: React.ReactNode; label: string; value: React.ReactNode }[] = [
+    {
+      icon: <FileText className="w-4 h-4 text-blue-500" />,
+      label: 'File Name',
+      value: <span className="text-gray-600 font-semibold break-all">{doc.original_file_name || doc.name}</span>,
+    },
+    {
+      icon: <Tag className="w-4 h-4 text-purple-500" />,
+      label: 'File Type',
+      value: <span className="uppercase px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200">{doc.file_type}</span>,
+    },
+    {
+      icon: <HardDrive className="w-4 h-4 text-gray-500" />,
+      label: 'File Size',
+      value: formatBytes(doc.file_size),
+    },
+    {
+      icon: <Tag className="w-4 h-4 text-indigo-500" />,
+      label: 'Status',
+      value: (
+        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${statusColors[doc.status] || 'bg-gray-100 text-gray-600'}`}>
+          {doc.status.toUpperCase().replace('_', ' ')}
+        </span>
+      ),
+    },
+    {
+      icon: <User className="w-4 h-4 text-blue-500" />,
+      label: 'Uploaded By',
+      value: doc.created_by?.full_name || 'System',
+    },
+    {
+      icon: <Calendar className="w-4 h-4 text-rose-500" />,
+      label: 'Created At',
+      value: formatDate(doc.created_at),
+    },
+    {
+      icon: <Calendar className="w-4 h-4 text-amber-500" />,
+      label: 'Updated At',
+      value: formatDate(doc.updated_at),
+    },
+  ];
+
+  if (doc.description) {
+    rows.splice(1, 0, {
+      icon: <FileText className="w-4 h-4 text-gray-400" />,
+      label: 'Description',
+      value: <span className="text-gray-600 break-words">{doc.description}</span>,
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end pointer-events-none">
+      <div className="pointer-events-auto w-[340px] h-full bg-white border-l border-gray-200 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+        {/* Panel Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-50">
+          <div className="flex items-center gap-2">
+            <Info className="w-4 h-4 text-blue-600" />
+            <span className="text-sm font-semibold text-gray-800">Document Info</span>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded hover:bg-gray-200 transition-colors"
+          >
+            <X className="w-4 h-4 text-gray-500" />
+          </button>
+        </div>
+
+        {/* Metadata Rows */}
+        <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
+          {rows.map((row, i) => (
+            <div key={i} className="flex items-start gap-3 py-1.5 border-b border-gray-50 last:border-0">
+              <div className="mt-0.5 flex-shrink-0">{row.icon}</div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">{row.label}</div>
+                <div className="text-[12px] text-gray-700">{row.value}</div>
+              </div>
+            </div>
+          ))}
+
+          {/* Labels */}
+          {doc.labels && doc.labels.length > 0 && (
+            <div className="flex items-start gap-3 py-1.5">
+              <Tag className="w-3.5 h-3.5 text-pink-500 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Labels</div>
+                <div className="flex flex-wrap gap-1">
+                  {doc.labels.map((label) => (
+                    <span
+                      key={label.id}
+                      className="px-2 py-0.5 rounded-full text-[10px] font-medium text-white"
+                      style={{ backgroundColor: label.color }}
+                    >
+                      {label.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function ConfirmationModal({
@@ -92,6 +222,7 @@ export function Documents() {
     fileType: string;
   } | null>(null);
   const navigate = useNavigate();
+  const [infoDoc, setInfoDoc] = useState<Document | null>(null);
   const { viewMode, setViewMode } = useViewMode({
     defaultMode: 'table',
   });
@@ -374,7 +505,7 @@ export function Documents() {
                 }}
                 tableProps={{
                   data: displayedDocuments,
-                  columns: createDocumentsTableColumns({ onDeleteClick: handleDeleteClick }),
+                  columns: createDocumentsTableColumns({ onDeleteClick: handleDeleteClick, onInfoClick: (doc) => setInfoDoc(doc) }),
                   rowKey: (doc) => doc.id,
                   onRowClick: (doc) => handleDocumentClick(doc),
                   emptyState,
@@ -409,6 +540,7 @@ export function Documents() {
           defaultFilter="unread"
         />
       )}
+      <DocumentInfoPanel doc={infoDoc} onClose={() => setInfoDoc(null)} />
       {previewDoc && (
         <DocumentPreview
           url={previewDoc.url}
