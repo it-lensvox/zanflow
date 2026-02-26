@@ -4,7 +4,7 @@ from datetime import timedelta
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 import uuid
-
+import secrets
 
 class User(AbstractUser):
     """
@@ -93,3 +93,29 @@ class PasswordResetOTP(models.Model):
     @staticmethod
     def hash_otp(otp):
         return hashlib.sha256(str(otp).encode()).hexdigest()
+
+class Invitation(models.Model):
+    email = models.EmailField()
+    role = models.CharField(max_length=20, choices=User.Role.choices)
+    organization = models.ForeignKey(
+        "organizations.Organization",
+        on_delete=models.CASCADE,
+        related_name="invitations"
+    )
+    token = models.CharField(max_length=64, unique=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    is_used = models.BooleanField(default=False)
+
+    def save(self, *args, **kwargs):
+        if not self.token:
+            # Generate a cryptographically secure random token
+            self.token = secrets.token_urlsafe(32)
+        if not self.expires_at:
+            # Set expiration to 12 hours from now
+            self.expires_at = timezone.now() + timedelta(hours=12)
+        super().save(*args, **kwargs)
+
+    @property
+    def is_valid(self):
+        return not self.is_used and timezone.now() < self.expires_at
