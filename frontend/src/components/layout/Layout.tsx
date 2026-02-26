@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { useState, Suspense } from 'react';
 import { NotificationsPage } from '@/pages/NotificationsPage';
+import { QuickNotes } from '@/components/QuickNotes';
 
 // Skeleton shown inside the content area while a lazy page chunk loads.
 // Sidebar stays fully mounted and visible — only this placeholder swaps in.
@@ -50,8 +51,8 @@ export function Layout() {
       {/* Sidebar is OUTSIDE Suspense — it never unmounts on page transitions */}
       <Sidebar />
 
-      <main className="flex-1 overflow-auto">
-        <div id="layout-wrapper" className="container">
+      <main className="flex-1 overflow-auto flex flex-col">
+        <div id="layout-wrapper" className="container flex-1 flex flex-col">
           {/* Suspense only covers the page content, not the sidebar */}
           <Suspense fallback={<PageSkeleton />}>
             <Outlet context={{ isActivityOpen, setIsActivityOpen }} />
@@ -62,6 +63,7 @@ export function Layout() {
       {isActivityOpen && (
         <NotificationsPage onClose={() => setIsActivityOpen(false)} />
       )}
+      <QuickNotes />
     </div>
   );
 }

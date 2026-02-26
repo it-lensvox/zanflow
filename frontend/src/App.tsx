@@ -29,6 +29,8 @@ const ResetPassword = lazy(() => import('@/pages/ResetPassword').then(m => ({ de
 const TeamChatModern = lazy(() => import('@/pages/TeamsChat/TeamChatModern').then(m => ({ default: m.TeamChatModern })));
 const Settings = lazy(() => import('@/pages/Settings').then(m => ({ default: m.Settings })));
 const SetupAccount = lazy(() => import('@/pages/TeamManagement/SetupAccount').then(m => ({ default: m.SetupAccount })));
+const QuickNotesPage = lazy(() => import('@/pages/QuickNotes/QuickNotesPage').then(m => ({ default: m.QuickNotesPage })));
+
 function PageLoader() {
   return (
     <div className="min-h-screen flex items-center justify-center">
@@ -154,6 +156,8 @@ function AppRoutes() {
         <Route path="/team-chat" element={<TeamChatModern />} />
         <Route path="/team-chat/:projectId/:roomId" element={<TeamChatModern />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/quick-notes" element={<QuickNotesPage />} />
+        {/* Task Detail Page (full-page view) */}
         <Route path="/tasks/:id" element={<TaskDetailPage />} />
 
         {/* Taskboard Routes */}
