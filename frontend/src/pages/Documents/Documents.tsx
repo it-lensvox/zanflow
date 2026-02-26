@@ -46,25 +46,25 @@ function DocumentInfoPanel({ doc, onClose }: { doc: Document | null; onClose: ()
   };
 
   const statusColors: Record<string, string> = {
-    draft: 'bg-yellow-50 text-yellow-700 border border-yellow-200',
-    in_review: 'bg-blue-50 text-blue-700 border border-blue-200',
-    approved: 'bg-green-50 text-green-700 border border-green-200',
-    archived: 'bg-gray-100 text-gray-700 border border-gray-200',
+    draft: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-700/50',
+    in_review: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700/50',
+    approved: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-700/50',
+    archived: 'bg-muted text-muted-foreground border border-border',
   };
 
   const rows: { icon: React.ReactNode; label: string; value: React.ReactNode }[] = [
     {
       icon: <FileText className="w-4 h-4 text-blue-500" />,
       label: 'File Name',
-      value: <span className="text-gray-600 font-semibold break-all">{doc.original_file_name || doc.name}</span>,
+      value: <span className="text-foreground font-semibold break-all">{doc.original_file_name || doc.name}</span>,
     },
     {
       icon: <Tag className="w-4 h-4 text-purple-500" />,
       label: 'File Type',
-      value: <span className="uppercase px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200">{doc.file_type}</span>,
+      value: <span className="uppercase px-1.5 py-0.5 rounded text-[10px] font-bold bg-muted text-muted-foreground border border-border">{doc.file_type}</span>,
     },
     {
-      icon: <HardDrive className="w-4 h-4 text-gray-500" />,
+      icon: <HardDrive className="w-4 h-4 text-muted-foreground" />,
       label: 'File Size',
       value: formatBytes(doc.file_size),
     },
@@ -72,7 +72,7 @@ function DocumentInfoPanel({ doc, onClose }: { doc: Document | null; onClose: ()
       icon: <Tag className="w-4 h-4 text-indigo-500" />,
       label: 'Status',
       value: (
-        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${statusColors[doc.status] || 'bg-gray-100 text-gray-600'}`}>
+        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${statusColors[doc.status] || 'bg-muted text-muted-foreground'}`}>
           {doc.status.toUpperCase().replace('_', ' ')}
         </span>
       ),
@@ -96,37 +96,37 @@ function DocumentInfoPanel({ doc, onClose }: { doc: Document | null; onClose: ()
 
   if (doc.description) {
     rows.splice(1, 0, {
-      icon: <FileText className="w-4 h-4 text-gray-400" />,
+      icon: <FileText className="w-4 h-4 text-muted-foreground" />,
       label: 'Description',
-      value: <span className="text-gray-600 break-words">{doc.description}</span>,
+      value: <span className="text-foreground break-words">{doc.description}</span>,
     });
   }
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end pointer-events-none">
-      <div className="pointer-events-auto w-[340px] h-full bg-white border-l border-gray-200 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+      <div className="pointer-events-auto w-[340px] h-full bg-card border-l border-border shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
         {/* Panel Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-50">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-muted">
           <div className="flex items-center gap-2">
             <Info className="w-4 h-4 text-blue-600" />
-            <span className="text-sm font-semibold text-gray-800">Document Info</span>
+            <span className="text-sm font-semibold text-foreground">Document Info</span>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded hover:bg-gray-200 transition-colors"
+            className="p-1.5 rounded hover:bg-accent transition-colors"
           >
-            <X className="w-4 h-4 text-gray-500" />
+            <X className="w-4 h-4 text-muted-foreground" />
           </button>
         </div>
 
         {/* Metadata Rows */}
         <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
           {rows.map((row, i) => (
-            <div key={i} className="flex items-start gap-3 py-1.5 border-b border-gray-50 last:border-0">
+            <div key={i} className="flex items-start gap-3 py-1.5 border-b border-border/50 last:border-0">
               <div className="mt-0.5 flex-shrink-0">{row.icon}</div>
               <div className="flex-1 min-w-0">
-                <div className="text-[13px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">{row.label}</div>
-                <div className="text-[12px] text-gray-700">{row.value}</div>
+                <div className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">{row.label}</div>
+                <div className="text-[12px] text-foreground">{row.value}</div>
               </div>
             </div>
           ))}
@@ -136,7 +136,7 @@ function DocumentInfoPanel({ doc, onClose }: { doc: Document | null; onClose: ()
             <div className="flex items-start gap-3 py-1.5">
               <Tag className="w-3.5 h-3.5 text-pink-500 mt-0.5 flex-shrink-0" />
               <div className="flex-1">
-                <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Labels</div>
+                <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Labels</div>
                 <div className="flex flex-wrap gap-1">
                   {doc.labels.map((label) => (
                     <span
@@ -339,7 +339,7 @@ export function Documents() {
     </div>
   );
 
-  const paginationControls = totalCount > 0 && (
+  const paginationControls = viewMode === 'grid' && totalCount > 0 && (
     <div className="flex items-center justify-between px-4 py-3 border-t bg-background">
       <div className="text-sm text-muted-foreground">
         Showing page {currentPage} of {Math.ceil(totalCount / 20)} ({totalCount} total documents)

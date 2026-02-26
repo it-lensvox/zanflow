@@ -9,6 +9,7 @@ import type {
 export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.4:8000/api/v1';
 const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://192.168.1.4:8000/ws/gateway';
 
+
 export const api = axios.create({
   baseURL: API_URL,
   headers: {
@@ -141,6 +142,11 @@ export const authApi = {
   // Skills API
   updateSkills: async (skills: string[]) => {
     const response = await api.patch('/auth/me/', { skills });
+    return response.data;
+  },
+  // Update profile fields (first_name, last_name, etc.)
+  updateProfile: async (data: { first_name?: string; last_name?: string }) => {
+    const response = await api.patch('/auth/me/', data);
     return response.data;
   },
 

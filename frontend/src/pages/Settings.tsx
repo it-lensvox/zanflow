@@ -22,6 +22,7 @@ import {
   Smartphone,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/common';
+import { useTheme } from '@/hooks/useTheme';
 
 // Toggle Switch
 function Toggle({
@@ -148,7 +149,7 @@ function SectionCard({
   );
 }
 
-// Main Settings Page 
+// Main Settings Page
 export function Settings() {
   // Configuration
   const [dataMode, setDataMode] = useState<'local' | 'cloud'>('cloud');
@@ -156,8 +157,8 @@ export function Settings() {
   const [language, setLanguage] = useState('en');
   const [dateFormat, setDateFormat] = useState('DD/MM/YYYY');
 
-  // Appearance
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  // Appearance — theme driven by global ThemeContext
+  const { theme, setTheme } = useTheme();
   const [fontSize, setFontSize] = useState('medium');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -255,21 +256,91 @@ export function Settings() {
 
         {/* ── Appearance ── */}
         <SectionCard title="Appearance">
-          <SettingRow
-            icon={<Palette className="h-4 w-4" />}
-            label="Theme"
-            description="Choose your preferred color scheme"
-            control={
-              <SegmentedControl
-                options={[
-                  { label: 'Light', value: 'light', icon: <Sun className="h-3.5 w-3.5" /> },
-                  { label: 'Dark', value: 'dark', icon: <Moon className="h-3.5 w-3.5" /> },
-                ]}
-                value={theme}
-                onChange={setTheme}
-              />
-            }
-          />
+          {/* Theme picker — visual card style */}
+          <div className="py-4 border-b border-border">
+            <div className="flex items-start gap-3 mb-4">
+              <span className="mt-0.5 text-muted-foreground"><Palette className="h-4 w-4" /></span>
+              <div>
+                <p className="text-sm font-medium text-foreground">Theme</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Choose your preferred color scheme</p>
+              </div>
+            </div>
+            <div className="flex gap-3 pl-7">
+              {/* Light card */}
+              <button
+                onClick={() => setTheme('light')}
+                className={`group relative flex-1 rounded-xl border-2 overflow-hidden transition-all duration-200 focus:outline-none ${
+                  theme === 'light'
+                    ? 'border-primary shadow-md shadow-primary/20'
+                    : 'border-border hover:border-primary/40'
+                }`}
+              >
+                {/* Preview */}
+                <div className="bg-white p-3 space-y-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-2 w-2 rounded-full bg-slate-200" />
+                    <div className="h-1.5 w-12 rounded-full bg-slate-200" />
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-slate-100" />
+                  <div className="h-1.5 w-4/5 rounded-full bg-slate-100" />
+                  <div className="flex gap-1 pt-0.5">
+                    <div className="h-4 w-8 rounded bg-blue-100" />
+                    <div className="h-4 w-8 rounded bg-slate-100" />
+                  </div>
+                </div>
+                {/* Label */}
+                <div className="flex items-center justify-center gap-1.5 py-2 bg-slate-50 border-t border-slate-100">
+                  <Sun className="h-3.5 w-3.5 text-amber-500" />
+                  <span className="text-xs font-medium text-slate-700">Light</span>
+                </div>
+                {/* Active tick */}
+                {theme === 'light' && (
+                  <span className="absolute top-2 right-2 flex h-4 w-4 items-center justify-center rounded-full bg-primary">
+                    <svg className="h-2.5 w-2.5 text-primary-foreground" fill="none" viewBox="0 0 10 10">
+                      <path d="M2 5l2.5 2.5L8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
+                )}
+              </button>
+
+              {/* Dark card */}
+              <button
+                onClick={() => setTheme('dark')}
+                className={`group relative flex-1 rounded-xl border-2 overflow-hidden transition-all duration-200 focus:outline-none ${
+                  theme === 'dark'
+                    ? 'border-primary shadow-md shadow-primary/20'
+                    : 'border-border hover:border-primary/40'
+                }`}
+              >
+                {/* Preview */}
+                <div className="bg-slate-900 p-3 space-y-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-2 w-2 rounded-full bg-slate-600" />
+                    <div className="h-1.5 w-12 rounded-full bg-slate-700" />
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-slate-800" />
+                  <div className="h-1.5 w-4/5 rounded-full bg-slate-800" />
+                  <div className="flex gap-1 pt-0.5">
+                    <div className="h-4 w-8 rounded bg-blue-900" />
+                    <div className="h-4 w-8 rounded bg-slate-800" />
+                  </div>
+                </div>
+                {/* Label */}
+                <div className="flex items-center justify-center gap-1.5 py-2 bg-slate-800 border-t border-slate-700">
+                  <Moon className="h-3.5 w-3.5 text-slate-300" />
+                  <span className="text-xs font-medium text-slate-300">Dark</span>
+                </div>
+                {/* Active tick */}
+                {theme === 'dark' && (
+                  <span className="absolute top-2 right-2 flex h-4 w-4 items-center justify-center rounded-full bg-primary">
+                    <svg className="h-2.5 w-2.5 text-primary-foreground" fill="none" viewBox="0 0 10 10">
+                      <path d="M2 5l2.5 2.5L8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
           <SettingRow
             icon={<Type className="h-4 w-4" />}
             label="Font Size"

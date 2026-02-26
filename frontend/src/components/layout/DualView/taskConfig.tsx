@@ -33,9 +33,9 @@ export const getStatusConfig = (status: Task['status']) => {
   switch (normalizedStatus) {
     case 'PENDING':
       return {
-        bg: 'bg-yellow-50',
-        text: 'text-yellow-800',
-        badge: 'bg-yellow-50 text-yellow-600 border border-yellow-200',
+        bg: 'bg-yellow-100 dark:bg-yellow-900/30',
+        text: 'text-yellow-800 dark:text-yellow-300',
+        badge: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-700/50',
         cardClass: 'card-pending',
         label: 'PENDING',
         icon: Clock,
@@ -43,9 +43,9 @@ export const getStatusConfig = (status: Task['status']) => {
       };
     case 'BACKLOG':
       return {
-        bg: 'bg-orange-50',
-        text: 'text-orange-800',
-        badge: 'bg-orange-50 text-orange-600 border border-orange-200',
+        bg: 'bg-orange-100 dark:bg-orange-900/30',
+        text: 'text-orange-800 dark:text-orange-300',
+        badge: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-700/50',
         cardClass: 'card-backlog',
         label: 'BACKLOG',
         icon: ListTodo,
@@ -53,9 +53,9 @@ export const getStatusConfig = (status: Task['status']) => {
       };
     case 'IN_PROGRESS':
       return {
-        bg: 'bg-blue-50',
-        text: 'text-blue-800',
-        badge: 'bg-blue-50 text-blue-600 border border-blue-200',
+        bg: 'bg-blue-100 dark:bg-blue-900/30',
+        text: 'text-blue-800 dark:text-blue-300',
+        badge: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700/50',
         cardClass: 'card-in-progress',
         label: 'IN PROGRESS',
         icon: PlayCircle,
@@ -63,9 +63,9 @@ export const getStatusConfig = (status: Task['status']) => {
       };
     case 'COMPLETED':
       return {
-        bg: 'bg-green-50',
-        text: 'text-green-800',
-        badge: 'bg-green-50 text-green-600 border border-green-200',
+        bg: 'bg-green-100 dark:bg-green-900/30',
+        text: 'text-green-800 dark:text-green-300',
+        badge: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-700/50',
         cardClass: 'card-completed',
         label: 'COMPLETED',
         icon: CheckCircle,
@@ -73,9 +73,9 @@ export const getStatusConfig = (status: Task['status']) => {
       };
     case 'DEPLOYED':
       return {
-        bg: 'bg-purple-50',
-        text: 'text-purple-800',
-        badge: 'bg-purple-50 text-purple-600 border border-purple-200',
+        bg: 'bg-purple-100 dark:bg-purple-900/30',
+        text: 'text-purple-800 dark:text-purple-300',
+        badge: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-700/50',
         cardClass: 'card-deployed',
         label: 'DEPLOYED',
         icon: CheckSquare,
@@ -83,9 +83,9 @@ export const getStatusConfig = (status: Task['status']) => {
       };
     case 'DEFERRED':
       return {
-        bg: 'bg-gray-50',
-        text: 'text-gray-800',
-        badge: 'bg-gray-100 text-gray-600 border border-gray-200',
+        bg: 'bg-muted',
+        text: 'text-foreground',
+        badge: 'bg-muted text-muted-foreground border border-border',
         cardClass: 'card-deferred',
         label: 'DEFERRED',
         icon: Pause,
@@ -93,9 +93,9 @@ export const getStatusConfig = (status: Task['status']) => {
       };
     case 'REVIEW':
       return {
-        bg: 'bg-indigo-50',
-        text: 'text-indigo-800',
-        badge: 'bg-indigo-100 text-indigo-600 border border-indigo-200',
+        bg: 'bg-indigo-100 dark:bg-indigo-900/30',
+        text: 'text-indigo-800 dark:text-indigo-300',
+        badge: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700/50',
         cardClass: 'card-review',
         label: 'REVIEW',
         icon: Eye,
@@ -103,9 +103,9 @@ export const getStatusConfig = (status: Task['status']) => {
       };
     default:
       return {
-        bg: 'bg-gray-50',
-        text: 'text-gray-800',
-        badge: 'bg-gray-100 text-gray-600 border border-gray-200',
+        bg: 'bg-muted',
+        text: 'text-foreground',
+        badge: 'bg-muted text-muted-foreground border border-border',
         cardClass: 'card-gray',
         label: normalizedStatus,
         icon: AlertCircle,
@@ -145,29 +145,29 @@ export function TaskGridCard({ task, onTaskClick }: TaskGridCardProps) {
   return (
     <div
       onClick={() => onTaskClick(task)}
-      className={`${statusConfig.cardClass} rounded-xl p-4 transition-all duration-300 cursor-pointer text-gray-800 hover:shadow-lg hover:-translate-y-0.5 border border-[#d0d5dd] relative hover:z-50 h-full group bg-white`}
+      className={`${statusConfig.cardClass} rounded-xl p-4 transition-all duration-300 cursor-pointer hover:shadow-lg hover:-translate-y-0.5 border border-border relative hover:z-50 h-full group bg-card text-card-foreground`}
     >
       {/* Header */}
       <div className="flex justify-between items-start gap-2 mb-3">
         <div className="pr-2 flex flex-col">
           {/* Project Name */}
-          <span className="text-sm font-bold text-gray-700 line-clamp-1 mb-0.5" title={task.project_details?.name || task.project_name || undefined}>
+          <span className="text-sm font-bold text-foreground line-clamp-1 mb-0.5" title={task.project_details?.name || task.project_name || undefined}>
             {task.project_details?.name || task.project_name || 'No Project'}
           </span>
           {/* Task Heading */}
-          <span className="text-xs font-medium text-gray-600 line-clamp-2" title={task.heading}>
+          <span className="text-xs font-medium text-muted-foreground line-clamp-2" title={task.heading}>
             {task.heading || 'No Task'}
           </span>
         </div>
         {task.updated_at && (
-          <div className="text-[10px] text-gray-400 whitespace-nowrap flex-shrink-0 mt-0.5">
+          <div className="text-[10px] text-muted-foreground whitespace-nowrap flex-shrink-0 mt-0.5">
             {formatRelativeTime(task.updated_at)}
           </div>
         )}
       </div>
 
       {/* Details Section */}
-      <div className="space-y-1 text-xs text-gray-500 mb-6">
+      <div className="space-y-1 text-xs text-muted-foreground mb-6">
         <div className="flex items-center">
           <Calendar className="w-3 h-3 mr-1" />
           <span className="font-medium">Due:</span>
@@ -184,21 +184,21 @@ export function TaskGridCard({ task, onTaskClick }: TaskGridCardProps) {
           <span className="ml-1 font-bold">{task.assigned_to.length}</span>
 
           {/* Hover Dropdown */}
-          <div className="absolute top-full left-0 mt-1 hidden group-hover/assigned:block z-50 min-w-[160px] bg-white border border-gray-200 rounded-lg shadow-xl p-2 animate-in fade-in zoom-in-95 duration-100">
+          <div className="absolute top-full left-0 mt-1 hidden group-hover/assigned:block z-50 min-w-[160px] bg-popover border border-border rounded-lg shadow-xl p-2 animate-in fade-in zoom-in-95 duration-100">
             <div className="flex flex-col gap-1 max-h-[150px] overflow-y-auto">
               {task.assigned_to_user_details && task.assigned_to_user_details.length > 0 ? (
                 task.assigned_to_user_details.map((u) => (
-                  <div key={u.id} className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded">
-                    <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-[9px] font-bold text-blue-700 shrink-0">
+                  <div key={u.id} className="flex items-center gap-2 p-1.5 hover:bg-accent rounded">
+                    <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center text-[9px] font-bold text-blue-500 shrink-0">
                       {u.first_name[0]}{u.last_name?.[0]}
                     </div>
-                    <span className="text-[11px] font-medium text-gray-700 truncate">
+                    <span className="text-[11px] font-medium text-foreground truncate">
                       {u.first_name} {u.last_name}
                     </span>
                   </div>
                 ))
               ) : (
-                <span className="text-[11px] text-gray-400 px-1 italic">No users assigned</span>
+                <span className="text-[11px] text-muted-foreground px-1 italic">No users assigned</span>
               )}
             </div>
           </div>
@@ -265,7 +265,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
             return (
               <div
                 key={option.value}
-                className="px-3 py-2 hover:bg-gray-50 cursor-pointer text-[12px] flex items-center gap-2"
+                className="px-3 py-2 hover:bg-accent cursor-pointer text-[12px] flex items-center gap-2"
                 onClick={() => handleStatusChange(option.value)}
               >
                 {React.createElement(option.icon, { className: `w-3.5 h-3.5 ${textColor}` })}
@@ -301,7 +301,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     };
 
     const trigger = (
-      <div className="flex items-center gap-1.5 text-gray-600 cursor-pointer hover:bg-gray-100 px-2 py-1 rounded transition-colors">
+      <div className="flex items-center gap-1.5 text-foreground cursor-pointer hover:bg-accent px-2 py-1 rounded transition-colors">
         <div className={`h-1 w-3 rounded-full ${priorityOption?.dotColor || 'bg-gray-400'}`} />
         <span className="capitalize text-[12px]">{task.priority || 'None'}</span>
       </div>
@@ -320,7 +320,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
           {priorityOptions.map((option) => (
             <div
               key={option.value}
-              className="px-3 py-2 hover:bg-gray-50 cursor-pointer text-[12px] flex items-center gap-2"
+              className="px-3 py-2 hover:bg-accent cursor-pointer text-[12px] flex items-center gap-2"
               onClick={() => handlePriorityChange(option.value)}
             >
               <span>{option.icon}</span>
@@ -351,19 +351,17 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     };
 
     return (
-      <div className="border rounded px-1.5 py-1 bg-white hover:border-blue-400 transition-all" onClick={(e) => e.stopPropagation()}>
+      <div className="border border-border rounded px-1.5 py-1 bg-background hover:border-primary transition-all" onClick={(e) => e.stopPropagation()}>
         {user?.role === 'admin' || user?.role === 'manager' ? (
           <input
             type="date"
             value={task[field]?.split('T')[0] || ''}
             onChange={(e) => handleDateChange(e.target.value, e)}
-            className="border-none bg-transparent text-[11px] p-0 cursor-pointer w-full text-[#172b4d] font-medium focus:outline-none"
-            style={{
-              colorScheme: 'light'
-            }}
+            className="border-none bg-transparent text-[11px] p-0 cursor-pointer w-full text-foreground font-medium focus:outline-none"
+            
           />
         ) : (
-          <span className="text-[11px] text-[#172b4d] font-medium py-0.5">
+          <span className="text-[11px] text-foreground font-medium py-0.5">
             {formatDate(task[field])}
           </span>
         )}
@@ -374,7 +372,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
   return [
   {
     key: 'type',
-    label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Type</span>,
+    label: <span className="text-[14px] font-bold tracking-wide text-foreground">Type</span>,
     width: '8%', 
     render: (task: Task) => (
       <div className="flex items-center gap-1.5">
@@ -384,33 +382,33 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
   },
   {
     key: 'project',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Project</span>,
+      label: <span className="text-[14px] font-bold tracking-wide text-foreground">Project</span>,
       width: '150px',
     render: (task: Task) => (
-        <span className="text-[12px] text-gray-700 font-medium">
+        <span className="text-[12px] text-foreground font-medium">
         {task.project_details?.name || task.project_name || 'No Project'}
       </span>
     ),
   },
   {
     key: 'heading',
-    label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Task Title</span>,
+    label: <span className="text-[14px] font-bold tracking-wide text-foreground">Task Title</span>,
     width: '25%', 
     render: (task: Task) => (
-        <span className="font-medium text-[#172b4d] truncate block max-w-[300px]" title={task.heading}>
+        <span className="font-medium text-foreground truncate block max-w-[300px]" title={task.heading}>
         {task.heading}
       </span>
     ),
   },
   {
     key: 'status',
-    label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Status</span>,
+    label: <span className="text-[14px] font-bold tracking-wide text-foreground">Status</span>,
     width: '10%',
     render: (task: Task) => <StatusDropdown task={task} />,
   },
   {
     key: 'assigned_to',
-    label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Assignee</span>,
+    label: <span className="text-[14px] font-bold tracking-wide text-foreground">Assignee</span>,
     width: '10%',
     render: (task: Task) => {
       const trigger = (
@@ -428,7 +426,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
               ))}
               {task.assigned_to_user_details.length > 3 && (
                 <div
-                  className="w-6 h-6 rounded-full bg-gray-400 text-white flex items-center justify-center text-[10px] font-semibold ring-1 ring-white"
+                  className="w-6 h-6 rounded-full bg-muted-foreground/60 text-white flex items-center justify-center text-[10px] font-semibold ring-1 ring-border"
                   title={`+${task.assigned_to_user_details.length - 3} more`}
                 >
                   +{task.assigned_to_user_details.length - 3}
@@ -436,34 +434,34 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
               )}
             </>
           ) : (
-            <span className="text-gray-300 text-[11px] pl-1">—</span>
+            <span className="text-muted-foreground/40 text-[11px] pl-1">—</span>
           )}
         </div>
       );
 
       return (
         <TablePopover trigger={trigger}>
-          <div className="p-2 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-lg">
-            <span className="text-xs font-semibold text-gray-700">Assignees</span>
-            <span className="text-[10px] bg-gray-200 px-1.5 py-0.5 rounded text-gray-600">
+          <div className="p-2 border-b border-border flex justify-between items-center bg-muted rounded-t-lg">
+            <span className="text-xs font-semibold text-foreground">Assignees</span>
+            <span className="text-[10px] bg-accent px-1.5 py-0.5 rounded text-muted-foreground">
               {task.assigned_to_user_details.length}
             </span>
           </div>
           <div className="max-h-48 overflow-y-auto p-1">
             {task.assigned_to_user_details.length > 0 ? (
               task.assigned_to_user_details.map((u) => (
-                <div key={u.id} className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded">
-                  <div className="w-6 h-6 rounded-full bg-[#8d87b5] text-white flex items-center justify-center text-[10px] font-semibold shrink-0">
+                <div key={u.id} className="flex items-center gap-2 p-1.5 hover:bg-accent rounded">
+                  <div className="w-6 h-6 rounded-full bg-[#8d87b5] text-white flex items-center justify-center text-[10px] font-semibold shrink-0 ring-1 ring-border">
                     {u.first_name[0]}{u.last_name?.[0]}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[11px] font-medium text-gray-700 truncate">{u.first_name} {u.last_name}</p>
-                    <p className="text-[10px] text-gray-400 truncate capitalize">{u.role}</p>
+                    <p className="text-[11px] font-medium text-foreground truncate">{u.first_name} {u.last_name}</p>
+                    <p className="text-[10px] text-muted-foreground truncate capitalize">{u.role}</p>
                   </div>
                 </div>
               ))
             ) : (
-              <div className="p-2 text-center text-xs text-gray-400 italic">No assignees</div>
+              <div className="p-2 text-center text-xs text-muted-foreground italic">No assignees</div>
             )}
           </div>
         </TablePopover>
@@ -472,13 +470,13 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
   },
   {
     key: 'priority',
-    label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Priority</span>,
+    label: <span className="text-[14px] font-bold tracking-wide text-foreground">Priority</span>,
     width: '10%',
     render: (task: Task) => <PriorityDropdown task={task} />,
   },
   {
     key: 'labels',
-    label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Labels</span>,
+    label: <span className="text-[14px] font-bold tracking-wide text-foreground">Labels</span>,
     width: '10%',
     render: (task: Task) => (
       <div className="flex flex-wrap gap-1.5 items-center h-full min-h-[24px]" onClick={(e) => e.stopPropagation()}>
@@ -493,20 +491,20 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
             </span>
           ))
         ) : (
-          <span className="text-gray-300 text-[11px] pl-1">—</span>
+          <span className="text-muted-foreground/40 text-[11px] pl-1">—</span>
         )}
       </div>
     ),
   },
   {
     key: 'end_date',
-    label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Due Date</span>,
+    label: <span className="text-[14px] font-bold tracking-wide text-foreground">Due Date</span>,
     width: '10%',
     render: (task: Task) => <DateInput task={task} field="end_date" />,
   },
   {
     key: 'duration',
-    label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Duration</span>,
+    label: <span className="text-[14px] font-bold tracking-wide text-foreground">Duration</span>,
     width: '15%',
     render: (task: Task) => (
       <input
@@ -523,7 +521,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
           }
         }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full bg-transparent border-none text-[12px] focus:ring-1 focus:ring-blue-400 rounded px-1 py-0.5 placeholder-gray-300"
+        className="w-full bg-transparent border-none text-[12px] text-foreground focus:ring-1 focus:ring-primary rounded px-1 py-0.5 placeholder:text-muted-foreground/40"
       />
     ),
   },

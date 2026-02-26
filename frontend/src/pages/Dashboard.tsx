@@ -297,7 +297,7 @@ export function Dashboard() {
                         className="fixed inset-0 z-10"
                         onClick={() => setShowStatusFilter(false)}
                       />
-                      <div className="absolute left-0 mt-2 w-48 bg-white rounded-lg shadow-lg border z-20 py-1">
+                      <div className="absolute left-0 mt-2 w-48 bg-popover rounded-lg shadow-lg border border-border z-20 py-1">
                         {statusOptions.map((option) => (
                           <button
                             key={option.value}
@@ -305,7 +305,7 @@ export function Dashboard() {
                               setSelectedTaskStatus(option.value);
                               setShowStatusFilter(false);
                             }}
-                            className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 transition-colors flex items-center justify-between ${selectedTaskStatus === option.value ? 'bg-gray-100' : ''
+                            className={`w-full px-4 py-2 text-left text-sm hover:bg-accent transition-colors flex items-center justify-between ${selectedTaskStatus === option.value ? 'bg-accent' : ''
                               }`}
                           >
                             <span className={option.color}>{option.label}</span>
@@ -323,11 +323,11 @@ export function Dashboard() {
             <CardContent>
               {filteredTasks.length === 0 ? (
                 <div className="text-center py-12">
-                  <Clock className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                  <Clock className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
                   <p className="text-sm text-muted-foreground mb-2">
                     No {selectedTaskStatus} tasks assigned to you
                   </p>
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-muted-foreground/60">
                     {myAssignedTasks.length > 0
                       ? `You have ${myAssignedTasks.length} total assigned task(s) in other statuses`
                       : 'No tasks are currently assigned to you'}
@@ -341,7 +341,7 @@ export function Dashboard() {
                       <div
                         key={task.id}
                         onClick={() => navigate(`/taskboard/${task.status.toLowerCase()}`)}
-                        className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors cursor-pointer border border-gray-100"
+                        className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors cursor-pointer border border-border"
                       >
                         {/* Left Section: Task Info */}
                         <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -401,7 +401,7 @@ export function Dashboard() {
                                 />
                                 <div
                                   style={{ top: dropdownPos.top, left: dropdownPos.left }}
-                                  className="fixed w-48 bg-white rounded-lg shadow-xl border border-gray-100 z-50 py-1 animate-in fade-in zoom-in-95 duration-100"
+                                  className="fixed w-48 bg-popover rounded-lg shadow-xl border border-border z-50 py-1 animate-in fade-in zoom-in-95 duration-100"
                                 >
                                   {statusOptions.map((opt) => (
                                     <button
@@ -410,7 +410,7 @@ export function Dashboard() {
                                         handleStatusUpdate(task.id, opt.value, e as any);
                                         setOpenTaskDropdownId(null);
                                       }}
-                                      className={`w-full px-4 py-2.5 text-left text-xs font-medium hover:bg-gray-50 transition-colors flex items-center justify-between gap-2 ${task.status === opt.value ? 'bg-gray-50' : ''}`}
+                                      className={`w-full px-4 py-2.5 text-left text-xs font-medium hover:bg-accent transition-colors flex items-center justify-between gap-2 ${task.status === opt.value ? 'bg-accent' : ''}`}
                                     >
                                       <span className={opt.color}>{opt.label}</span>
                                       {task.status === opt.value && (
@@ -453,7 +453,7 @@ export function Dashboard() {
             <CardContent>
               {recentDocuments.length === 0 ? (
                 <div className="text-center py-10">
-                  <FileText className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+                  <FileText className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
                   <p className="text-sm text-muted-foreground mb-2">No documents yet</p>
                   <Link to="/projects">
                     {/* <Button variant="outline" size="sm" className="mt-2">
@@ -470,7 +470,7 @@ export function Dashboard() {
                       <div
                         key={doc.id}
                         onClick={() => handleDocumentClick(doc)}
-                        className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors cursor-pointer border border-gray-100"
+                        className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors cursor-pointer border border-border"
                       >
                         {/* Left Section: Document Info */}
                         <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -526,7 +526,7 @@ export function Dashboard() {
                                 />
                                 <div
                                   style={{ top: docDropdownPos.top, left: docDropdownPos.left }}
-                                  className="fixed w-36 bg-white rounded-lg shadow-xl border border-gray-100 z-50 py-1 animate-in fade-in zoom-in-95 duration-100"
+                                  className="fixed w-36 bg-popover rounded-lg shadow-xl border border-border z-50 py-1 animate-in fade-in zoom-in-95 duration-100"
                                   onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
@@ -540,12 +540,12 @@ export function Dashboard() {
                                         handleDocStatusUpdate(doc.id, status, e as any);
                                         setOpenDocDropdownId(null);
                                       }}
-                                      className={`w-full px-4 py-2 text-left text-xs font-medium hover:bg-gray-50 transition-colors flex items-center justify-between gap-2 ${doc.status === status ? 'bg-gray-50' : ''}`}
+                                      className={`w-full px-4 py-2 text-left text-xs font-medium hover:bg-accent transition-colors flex items-center justify-between gap-2 ${doc.status === status ? 'bg-accent' : ''}`}
                                     >
                                       <span className={
-                                        status === 'approved' ? 'text-green-600' :
-                                          status === 'in_review' ? 'text-yellow-600' :
-                                            status === 'archived' ? 'text-gray-500' : 'text-gray-600'
+                                        status === 'approved' ? 'text-green-600 dark:text-green-400' :
+                                          status === 'in_review' ? 'text-yellow-600 dark:text-yellow-400' :
+                                            status === 'archived' ? 'text-muted-foreground' : 'text-foreground'
                                       }>
                                         {status.replace('_', ' ').toUpperCase()}
                                       </span>

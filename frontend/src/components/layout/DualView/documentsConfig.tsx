@@ -18,37 +18,37 @@ const getDocumentStatusConfig = (status: DocumentStatus) => {
   switch (normalizedStatus) {
     case 'draft':
       return {
-        bg: 'bg-yellow-50',
-        text: 'text-yellow-800',
+        bg: 'bg-yellow-100 dark:bg-yellow-900/30',
+        text: 'text-yellow-800 dark:text-yellow-300',
         label: 'DRAFT',
         icon: File
       };
     case 'in_review':
       return {
-        bg: 'bg-blue-50',
-        text: 'text-blue-800',
+        bg: 'bg-blue-100 dark:bg-blue-900/30',
+        text: 'text-blue-800 dark:text-blue-300',
         label: 'IN REVIEW',
         icon: Clock
       };
     case 'approved':
       return {
-        bg: 'bg-green-50',
-        text: 'text-green-800',
+        bg: 'bg-green-100 dark:bg-green-900/30',
+        text: 'text-green-800 dark:text-green-300',
         label: 'APPROVED',
         icon: CheckCircle
       };
     case 'archived':
       return {
-        bg: 'bg-gray-50',
-        text: 'text-gray-800',
+        bg: 'bg-muted',
+        text: 'text-muted-foreground',
         label: 'ARCHIVED',
         icon: FileText
       };
     default: {
       const exhaustiveCheck: never = normalizedStatus;
       return {
-        bg: 'bg-gray-50',
-        text: 'text-gray-800',
+        bg: 'bg-muted',
+        text: 'text-muted-foreground',
         label: String(status).toUpperCase().replace('_', ' '),
         icon: FileText
       };
@@ -102,15 +102,15 @@ export const createDocumentsTableColumns = ({ onDeleteClick, onInfoClick }: Docu
             return (
               <div
                 key={option.value}
-                className="px-3 py-2 hover:bg-gray-50 cursor-pointer text-[12px] flex items-center gap-2"
+                className="px-3 py-2 hover:bg-accent cursor-pointer text-[12px] flex items-center gap-2"
                 onClick={() => handleStatusChange(option.value)}
               >
                 {React.createElement(option.icon, { className: `w-3.5 h-3.5 ${optionConfig.text}` })}
-                <span className={doc.status === option.value ? "font-bold text-blue-600" : ""}>
+                <span className={doc.status === option.value ? "font-bold text-primary" : "text-foreground"}>
                   {option.label}
                 </span>
                 {doc.status === option.value && (
-                  <svg className="w-3.5 h-3.5 text-blue-600 ml-auto" fill="currentColor" viewBox="0 0 20 20">
+                  <svg className="w-3.5 h-3.5 text-primary ml-auto" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
                 )}
@@ -125,13 +125,13 @@ export const createDocumentsTableColumns = ({ onDeleteClick, onInfoClick }: Docu
   return [
     {
       key: 'name',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Document</span>,
+      label: <span className="text-[14px] font-bold tracking-wide text-foreground">Document</span>,
       // width: '350px',  // Added width
       render: (doc: Document) => (
         <div className="flex items-center justify-between w-full group/cell">
           <div className="flex items-center gap-2 min-w-0 pr-2">
             <FileText className="w-4 h-4 text-blue-600 flex-shrink-0" />
-            <span className="font-medium text-[#172b4d] truncate" title={doc.name}>
+            <span className="font-medium text-foreground truncate" title={doc.name}>
               {doc.name}
             </span>
           </div>
@@ -139,18 +139,18 @@ export const createDocumentsTableColumns = ({ onDeleteClick, onInfoClick }: Docu
             {onInfoClick && (
               <button
                 onClick={(e) => { e.stopPropagation(); onInfoClick(doc); }}
-                className="p-1.5 hover:bg-blue-50 rounded"
+                className="p-1.5 hover:bg-blue-500/10 rounded"
                 title="Document Info"
               >
-                <Info className="w-4 h-4 text-gray-400 hover:text-blue-600" />
+                <Info className="w-4 h-4 text-muted-foreground hover:text-blue-500" />
               </button>
             )}
             <button
               onClick={(e) => { e.stopPropagation(); onDeleteClick(e, doc); }}
-              className="p-1.5 hover:bg-red-50 rounded"
+              className="p-1.5 hover:bg-red-500/10 rounded"
               title="Delete Document"
             >
-              <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-600" />
+              <Trash2 className="w-4 h-4 text-muted-foreground hover:text-red-500" />
             </button>
           </div>
         </div>
@@ -158,40 +158,40 @@ export const createDocumentsTableColumns = ({ onDeleteClick, onInfoClick }: Docu
     },
     {
       key: 'project',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Project</span>,
+      label: <span className="text-[14px] font-bold tracking-wide text-foreground">Project</span>,
       width: '180px',  // Added width
       render: (doc: Document) => (
-        <span className="text-[12px] text-gray-700 font-medium">
+        <span className="text-[12px] text-foreground font-medium">
           {doc.project_name || 'General'}
         </span>
       ),
     },
     {
       key: 'file_type',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Type</span>,
+      label: <span className="text-[14px] font-bold tracking-wide text-foreground">Type</span>,
       width: '120px',
       render: (doc: Document) => (
-        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600 uppercase border border-gray-200">
+        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-muted text-muted-foreground uppercase border border-border">
           {doc.file_type}
         </span>
       ),
     },
     {
       key: 'status',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Status</span>,
+      label: <span className="text-[14px] font-bold tracking-wide text-foreground">Status</span>,
       width: '120px',  // Reduced from 140px
       render: (doc: Document) => <StatusDropdown doc={doc} />,
     },
     {
       key: 'created_by',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Uploaded By</span>,
+      label: <span className="text-[14px] font-bold tracking-wide text-foreground">Uploaded By</span>,
       width: '180px',  // Added width
       render: (doc: Document) => (
         <div className="flex items-center gap-2">
-          <div className="h-6 w-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-700">
+          <div className="h-6 w-6 rounded-full bg-blue-500/20 flex items-center justify-center text-[10px] font-bold text-blue-500">
             {doc.created_by?.full_name?.charAt(0) || 'U'}
           </div>
-          <span className="text-gray-700">{doc.created_by?.full_name || 'System'}</span>
+          <span className="text-foreground">{doc.created_by?.full_name || 'System'}</span>
         </div>
       ),
     },
@@ -210,17 +210,17 @@ export function DocumentGridCard({ document: doc, onDeleteClick }: DocumentGridC
 
     switch (normalizedStatus) {
       case 'approved':
-        return { badge: 'bg-green-50 text-green-600 border border-green-200', label: 'APPROVED' };
+        return { badge: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-700/50', label: 'APPROVED' };
       case 'in_review':
-        return { badge: 'bg-blue-50 text-blue-600 border border-blue-200', label: 'IN REVIEW' };
+        return { badge: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700/50', label: 'IN REVIEW' };
       case 'draft':
-        return { badge: 'bg-yellow-50 text-yellow-600 border border-yellow-200', label: 'DRAFT' };
+        return { badge: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-700/50', label: 'DRAFT' };
       case 'archived':
-        return { badge: 'bg-gray-100 text-gray-600 border border-gray-200', label: 'ARCHIVED' };
+        return { badge: 'bg-muted text-muted-foreground border border-border', label: 'ARCHIVED' };
       default: {
         const exhaustiveCheck: never = normalizedStatus;
         return {
-          badge: 'bg-gray-50 text-gray-600 border border-gray-200',
+          badge: 'bg-muted text-muted-foreground border border-border',
           label: String(status).toUpperCase().replace('_', ' ')
         };
       }
@@ -232,27 +232,27 @@ export function DocumentGridCard({ document: doc, onDeleteClick }: DocumentGridC
   return (
     <div
       onClick={() => window.location.href = `/documents/${doc.id}`}
-      className="bg-white rounded-xl p-4 transition-all duration-300 cursor-pointer text-gray-800 hover:shadow-lg hover:-translate-y-0.5 border border-[#d0d5dd] relative hover:z-50 h-full group"
+      className="bg-card rounded-xl p-4 transition-all duration-300 cursor-pointer hover:shadow-lg hover:-translate-y-0.5 border border-border relative hover:z-50 h-full group text-card-foreground"
     >
       {/* Header */}
       <div className="flex justify-between items-start gap-2 mb-3">
         <div className="pr-2 flex flex-col">
           {/* Project Name */}
-          <span className="text-sm font-bold text-gray-700 line-clamp-1 mb-0.5" title={doc.project_name}>
+          <span className="text-sm font-bold text-foreground line-clamp-1 mb-0.5" title={doc.project_name}>
             {doc.project_name || 'General'}
           </span>
           {/* Document Name */}
-          <span className="text-xs font-medium text-gray-600 line-clamp-2" title={doc.name}>
+          <span className="text-xs font-medium text-muted-foreground line-clamp-2" title={doc.name}>
             {doc.name}
           </span>
         </div>
-        <div className="text-[10px] text-gray-400 whitespace-nowrap flex-shrink-0 mt-0.5">
+        <div className="text-[10px] text-muted-foreground whitespace-nowrap flex-shrink-0 mt-0.5">
           {formatRelativeTime(doc.updated_at)}
         </div>
       </div>
 
       {/* Details Section */}
-      <div className="space-y-1 text-xs text-gray-500 mb-6">
+      <div className="space-y-1 text-xs text-muted-foreground mb-6">
         <div className="flex items-center">
           <FileText className="w-3 h-3 mr-1" />
           <span className="font-medium">Type:</span>
@@ -263,7 +263,7 @@ export function DocumentGridCard({ document: doc, onDeleteClick }: DocumentGridC
       {/* Trash Button */}
       <button
         onClick={(e) => onDeleteClick(e, doc)}
-        className="absolute bottom-3 left-3 opacity-0 group-hover:opacity-100 transition-all duration-200 p-1.5 hover:bg-red-50 rounded text-gray-400 hover:text-red-600"
+        className="absolute bottom-3 left-3 opacity-0 group-hover:opacity-100 transition-all duration-200 p-1.5 hover:bg-red-500/10 rounded text-muted-foreground hover:text-red-500"
         title="Delete Document"
       >
         <Trash2 className="w-4 h-4" />

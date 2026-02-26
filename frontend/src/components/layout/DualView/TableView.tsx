@@ -49,23 +49,23 @@ export function TableView<T>({
   maxHeight = '70vh',
 }: TableViewProps<T>) {
   return (
-    <div 
-      className={`bg-white border border-[#dfe1e6] rounded-md shadow-sm overflow-auto scrollbar-hide font-sans text-[13px] ${className}`}
-      style={{ 
+    <div
+      className={`bg-card border border-border rounded-md shadow-sm overflow-auto scrollbar-hide font-sans text-[13px] ${className}`}
+      style={{
         maxHeight: typeof maxHeight === 'number' ? `${maxHeight}px` : maxHeight,
         display: 'flex',
         flexDirection: 'column',
       }}
     >
-      {/* Sticky Header - Always visible */}
-      <div className="flex-shrink-0 bg-[#fafbfc] border-b border-[#dfe1e6] sticky top-0 z-20">
+      {/* Sticky Header */}
+      <div className="flex-shrink-0 bg-muted/50 border-b border-border sticky top-0 z-20">
         <table className="w-full border-collapse table-fixed">
           <thead>
             <tr>
               {columns.map((column) => (
                 <th
                   key={column.key}
-                  className={`group/header text-left py-[10px] px-3 font-semibold text-[12px] text-[#5e6c84] border-r border-[#dfe1e6] last:border-r-0 whitespace-nowrap relative ${activeFilterKey === column.key ? 'z-[100]' : ''} ${column.headerClassName || ''}`}
+                  className={`group/header text-left py-[10px] px-3 font-semibold text-[12px] text-muted-foreground border-r border-border last:border-r-0 whitespace-nowrap relative ${activeFilterKey === column.key ? 'z-[100]' : ''} ${column.headerClassName || ''}`}
                   style={column.width ? { width: column.width } : undefined}
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -73,20 +73,20 @@ export function TableView<T>({
                     <div className="flex items-center gap-1 opacity-0 group-hover/header:opacity-100 transition-opacity">
                       {onSort && (
                         <button
-                          className="hover:bg-gray-200 p-0.5 rounded transition-colors"
+                          className="hover:bg-accent p-0.5 rounded transition-colors"
                           onClick={(e) => { e.stopPropagation(); onSort(column.key); }}
                         >
-                          <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-3 h-3 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
                           </svg>
                         </button>
                       )}
                       {onFilter && (
                         <button
-                          className="hover:bg-gray-200 p-0.5 rounded transition-colors"
+                          className="hover:bg-accent p-0.5 rounded transition-colors"
                           onClick={(e) => { e.stopPropagation(); onFilter(column.key); }}
                         >
-                          <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-3 h-3 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                           </svg>
                         </button>
@@ -108,12 +108,12 @@ export function TableView<T>({
                 key={rowKey(item)}
                 onClick={() => onRowClick?.(item)}
                 onMouseEnter={() => onRowMouseEnter?.(item)}
-                className={`group border-b border-[#f4f5f7] last:border-b-0 hover:bg-[#f4f5f7] transition-colors cursor-pointer relative hover:z-[50] ${rowClassName ? rowClassName(item) : ''}`}
+                className={`group border-b border-border/50 last:border-b-0 hover:bg-accent/50 transition-colors cursor-pointer relative hover:z-[50] ${rowClassName ? rowClassName(item) : ''}`}
               >
                 {columns.map((column) => (
                   <td
                     key={column.key}
-                    className={`py-2 px-3 h-12 align-middle text-[13px] border-r border-[#f4f5f7] group-hover:border-r-[#dfe1e6] last:border-r-0 relative ${column.className || ''}`}
+                    className={`py-2 px-3 h-12 align-middle text-[13px] border-r border-border/40 group-hover:border-r-border last:border-r-0 relative ${column.className || ''}`}
                     style={column.width ? { width: column.width } : undefined}
                   >
                     {column.render ? column.render(item, index) : (item as any)[column.key]}

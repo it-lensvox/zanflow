@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   NotebookPen, Plus, FolderPlus, Maximize2, X, Folder, FileText,
@@ -459,7 +459,7 @@ function MiniWindow({
   return (
     <div
       className={cn(
-        'fixed bottom-24 right-6 z-[60] w-[340px] rounded-2xl border border-border',
+        'w-[340px] rounded-2xl border border-border',
         'bg-card shadow-2xl flex flex-col overflow-hidden',
         'animate-in fade-in slide-in-from-bottom-4 duration-200',
       )}
@@ -516,21 +516,86 @@ function MiniWindow({
 
 // ─── FAB + mini window (mounted in Layout) ────────────────────────────────────
 
+const FAB_SIZE = 48; // h-12 w-12 = 48px
+const MINI_W = 340;
+const MINI_H = 260; // approximate MiniWindow height
+const FAB_POS_KEY = 'zanflow_fab_pos';
+
+function clamp(val: number, min: number, max: number) {
+  return Math.min(Math.max(val, min), max);
+}
+
+function getInitialFabPos(): { x: number; y: number } {
+  try {
+    const raw = localStorage.getItem(FAB_POS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  // default: bottom-6 right-6
+  return {
+    x: window.innerWidth - FAB_SIZE - 24,
+    y: window.innerHeight - FAB_SIZE - 24,
+  };
+}
+
 export function QuickNotes() {
   const navigate = useNavigate();
   const [isMiniOpen, setIsMiniOpen] = useState(false);
   const miniTextareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const {
-    state,
-    getNoteTitle,
-    createNote,
-    updateNote,
-  } = useQuickNotes();
+  // ── Drag state ──────────────────────────────────────────────────────────────
+  const [fabPos, setFabPos] = useState<{ x: number; y: number }>(getInitialFabPos);
+  const dragging = useRef(false);
+  const didDrag = useRef(false);
+  const dragStart = useRef<{ mx: number; my: number; fx: number; fy: number } | null>(null);
 
+  // Persist position
+  useEffect(() => {
+    localStorage.setItem(FAB_POS_KEY, JSON.stringify(fabPos));
+  }, [fabPos]);
+
+  // Clamp position on window resize
+  useEffect(() => {
+    const onResize = () => {
+      setFabPos((prev) => ({
+        x: clamp(prev.x, 0, window.innerWidth - FAB_SIZE),
+        y: clamp(prev.y, 0, window.innerHeight - FAB_SIZE),
+      }));
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const onMouseMove = useCallback((e: MouseEvent) => {
+    if (!dragging.current || !dragStart.current) return;
+    const dx = e.clientX - dragStart.current.mx;
+    const dy = e.clientY - dragStart.current.my;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) didDrag.current = true;
+    setFabPos({
+      x: clamp(dragStart.current.fx + dx, 0, window.innerWidth - FAB_SIZE),
+      y: clamp(dragStart.current.fy + dy, 0, window.innerHeight - FAB_SIZE),
+    });
+  }, []);
+
+  const onMouseUp = useCallback(() => {
+    dragging.current = false;
+    dragStart.current = null;
+    window.removeEventListener('mousemove', onMouseMove);
+    window.removeEventListener('mouseup', onMouseUp);
+  }, [onMouseMove]);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    didDrag.current = false;
+    dragging.current = true;
+    dragStart.current = { mx: e.clientX, my: e.clientY, fx: fabPos.x, fy: fabPos.y };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  }, [fabPos, onMouseMove, onMouseUp]);
+
+  // ── Notes logic ─────────────────────────────────────────────────────────────
+  const { state, getNoteTitle, createNote, updateNote } = useQuickNotes();
   const selectedNote = state.notes.find((n) => n.id === state.selectedNoteId) ?? null;
 
-  // Auto-focus mini textarea only when it opens
   useEffect(() => {
     if (isMiniOpen) {
       const id = setTimeout(() => miniTextareaRef.current?.focus(), 50);
@@ -538,53 +603,53 @@ export function QuickNotes() {
     }
   }, [isMiniOpen]);
 
-  const handleNewNote = () => {
-    createNote(state.selectedFolderId);
-  };
+  const handleNewNote = () => { createNote(state.selectedFolderId); };
 
   const handleFabClick = () => {
+    if (didDrag.current) return; // suppress click after drag
     if (!isMiniOpen && !selectedNote) createNote(state.selectedFolderId);
     setIsMiniOpen((prev) => !prev);
   };
 
-  const handleMaximize = () => {
-    setIsMiniOpen(false);
-    navigate('/quick-notes');
-  };
+  const handleMaximize = () => { setIsMiniOpen(false); navigate('/quick-notes'); };
+  const handleNewFolder = () => { setIsMiniOpen(false); navigate('/quick-notes'); };
 
-  const handleNewFolder = () => {
-    setIsMiniOpen(false);
-    navigate('/quick-notes');
-  };
+  // ── Mini window position: prefer above-left of FAB, clamped to viewport ────
+  const miniLeft = clamp(fabPos.x + FAB_SIZE / 2 - MINI_W / 2, 8, window.innerWidth - MINI_W - 8);
+  const miniTop  = clamp(fabPos.y - MINI_H - 12, 8, window.innerHeight - MINI_H - 8);
 
   return (
     <>
       {/* FAB */}
       <button
+        onMouseDown={handleMouseDown}
         onClick={handleFabClick}
-        title="Quick Notes"
+        title="Quick Notes (drag to reposition)"
+        style={{ left: fabPos.x, top: fabPos.y }}
         className={cn(
-          'fixed bottom-6 right-6 z-[60] flex h-12 w-12 items-center justify-center rounded-full',
+          'fixed z-[60] flex h-12 w-12 items-center justify-center rounded-full',
           'bg-primary text-primary-foreground shadow-lg',
-          'hover:opacity-90 hover:scale-105 transition-all duration-200',
-          'focus:outline-none',
+          'hover:opacity-90 transition-opacity duration-200',
+          'focus:outline-none cursor-grab active:cursor-grabbing select-none',
         )}
       >
-        <NotebookPen className="h-5 w-5" />
+        <NotebookPen className="h-5 w-5 pointer-events-none" />
       </button>
 
-      {/* Mini window */}
+      {/* Mini window — positioned relative to FAB */}
       {isMiniOpen && (
-        <MiniWindow
-          selectedNote={selectedNote}
-          getNoteTitle={getNoteTitle}
-          onClose={() => setIsMiniOpen(false)}
-          onMaximize={handleMaximize}
-          onNewNote={handleNewNote}
-          onNewFolder={handleNewFolder}
-          onUpdateNote={updateNote}
-          textareaRef={miniTextareaRef}
-        />
+        <div style={{ position: 'fixed', left: miniLeft, top: miniTop, zIndex: 60 }}>
+          <MiniWindow
+            selectedNote={selectedNote}
+            getNoteTitle={getNoteTitle}
+            onClose={() => setIsMiniOpen(false)}
+            onMaximize={handleMaximize}
+            onNewNote={handleNewNote}
+            onNewFolder={handleNewFolder}
+            onUpdateNote={updateNote}
+            textareaRef={miniTextareaRef}
+          />
+        </div>
       )}
     </>
   );
