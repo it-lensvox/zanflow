@@ -12,6 +12,36 @@ export interface User {
   skills?: string[];
 }
 
+// User Management 
+// Invite User
+export interface InviteUserPayload {
+  email: string;
+  role: 'admin' | 'manager' | 'annotator' | 'viewer';
+}
+
+export interface InviteUserResponse {
+  detail: string;
+}
+
+// Invite Accept (Setup Account page)
+export interface InviteVerifyResponse {
+  email: string;
+  role: 'admin' | 'manager' | 'annotator' | 'viewer';
+}
+
+export interface InviteAcceptPayload {
+  token: string;
+  username: string;
+  password: string;
+  password_confirm: string;
+  first_name: string;
+  last_name: string;
+}
+
+export interface InviteAcceptResponse {
+  detail: string;
+}
+
 // Minimal user info for nested references
 export interface UserMinimal {
   id: number;
@@ -476,59 +506,6 @@ export interface AuthCredential {
   updated_at: string;
 }
 
-// export interface ExecutionRun {
-//   id: string;
-//   collection: APICollection;
-//   executed_by?: UserMinimal;
-//   status: 'pending' | 'running' | 'completed' | 'partial_failure' | 'failed' | 'cancelled';
-//   started_at?: string;
-//   completed_at?: string;
-//   total_apis: number;
-//   successful_count: number;
-//   failed_count: number;
-//   skipped_count: number;
-//   trigger_type: 'manual' | 'scheduled' | 'webhook' | 'ci_cd';
-//   environment?: Record<string, string>;
-//   notes?: string;
-//   duration_seconds?: number;
-//   success_rate: number;
-//   results?: ExecutionResult[];
-//   created_at: string;
-//   updated_at: string;
-// }
-
-// export interface ExecutionResult {
-//   id: string;
-//   execution_run: string;
-//   api_endpoint?: string;
-//   endpoint_name: string;
-//   endpoint_method: string;
-//   status: 'success' | 'failed' | 'error' | 'timeout' | 'skipped';
-//   request_url: string;
-//   request_headers?: Record<string, string>;
-//   request_body?: string;
-//   response_status_code?: number;
-//   response_headers?: Record<string, string>;
-//   response_body?: string;
-//   response_size_bytes?: number;
-//   execution_time_ms: number;
-//   error_message?: string;
-//   error_type?: string;
-//   assertions_passed: boolean;
-//   assertion_details?: Record<string, any>;
-//   extracted_variables?: Record<string, any>;
-//   retry_attempt: number;
-//   created_at: string;
-// }
-
-// export interface APITestingDashboard {
-//   total_collections: number;
-//   total_endpoints: number;
-//   endpoints_by_method: Record<string, number>;
-//   recent_runs: ExecutionRun[];
-//   success_rate_last_30_days: number;
-// }
-
 export interface CreateCollectionPayload {
   name: string;
   description?: string;
@@ -537,50 +514,6 @@ export interface CreateCollectionPayload {
   environment_variables?: Record<string, string>;
   tags?: string[];
 }
-
-// export interface CreateEndpointPayload {
-//   collection: string;
-//   name: string;
-//   description?: string;
-//   http_method: string;
-//   url: string;
-//   headers?: Record<string, string>;
-//   query_params?: Record<string, string>;
-//   request_body?: Record<string, any> | string;
-//   body_type?: string;
-//   expected_status_code?: number;
-//   expected_response_contains?: Record<string, any>;
-//   timeout_seconds?: number;
-//   retry_count?: number;
-//   sort_order?: number;
-//   extract_variables?: Record<string, string>;
-//   depends_on?: string;
-// }
-
-// export interface CreateCredentialPayload {
-//   collection: string;
-//   name: string;
-//   auth_type: string;
-//   token?: string;
-//   username?: string;
-//   password?: string;
-//   api_key?: string;
-//   api_key_name?: string;
-//   header_name?: string;
-//   header_prefix?: string;
-//   access_token?: string;
-//   refresh_token?: string;
-//   expires_at?: string;
-//   auto_refresh?: boolean;
-//   refresh_url?: string;
-//   refresh_payload?: Record<string, any>;
-// }
-
-// export interface RunCollectionPayload {
-//   credential_id?: string;
-//   environment_overrides?: Record<string, string>;
-//   notes?: string;
-// }
 
 // Calendar Event types
 export interface CalendarEvent {
@@ -706,6 +639,14 @@ export interface ChatMessage {
   is_deleted: boolean;
   is_read?: boolean;
   attachments?: any[];
+}
+
+// Optimistic message status for UI rendering
+export type OptimisticMessageStatus = 'sending' | 'sent' | 'error';
+
+export interface OptimisticChatMessage extends ChatMessage {
+  optimisticStatus?: OptimisticMessageStatus;
+  optimisticId?: string;
 }
 
 export interface ChatRoomMessagesResponse {
