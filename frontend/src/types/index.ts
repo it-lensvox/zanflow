@@ -641,6 +641,14 @@ export interface ChatMessage {
   attachments?: any[];
 }
 
+// Optimistic message status for UI rendering
+export type OptimisticMessageStatus = 'sending' | 'sent' | 'error';
+
+export interface OptimisticChatMessage extends ChatMessage {
+  optimisticStatus?: OptimisticMessageStatus;
+  optimisticId?: string;
+}
+
 export interface ChatRoomMessagesResponse {
   messages: ChatMessage[];
   count: number;

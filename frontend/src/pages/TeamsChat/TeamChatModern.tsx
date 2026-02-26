@@ -4,14 +4,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Tabs from '@radix-ui/react-tabs';
 import {
   MessageSquare, Search, Plus, X, Users as UsersIcon, Paperclip, Smile,
-  MoreVertical, Reply, Forward, Link2, Bookmark, Trash2, Pin, MailOpen, PinOff,
+  MoreVertical, Reply, Forward, Link2, Bookmark, Trash2, Pin, MailOpen, PinOff, Loader2, AlertCircle, RotateCcw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { usersApi, chatApi, GatewayWebSocketService } from '@/services/api';
-import type { ChatRoom, ChatMessage, ChatRoomMessagesResponse, ToastNotification, GatewayIncomingMessage, ProjectChatRoom, TeamChatRoom, User } from '@/types';
+import type { ChatRoom, ChatMessage, ChatRoomMessagesResponse, ToastNotification, GatewayIncomingMessage, ProjectChatRoom, TeamChatRoom, User, OptimisticChatMessage } from '@/types';
 import { CreateTeamModal } from '@/pages/TeamManagement/Createteammodal';
 import { ChatMessageInput } from '@/components/common/RichTextEditor';
+import { DocumentThumbnail, DocumentPreview } from '@/components/common/DocumentPreview';
 
 // Extended user type with last message info
 interface UserWithActivity extends User {
@@ -102,6 +103,8 @@ export function TeamChatModern() {
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const dragCounter = useRef(0);
+  const [optimisticMessages, setOptimisticMessages] = useState<OptimisticChatMessage[]>([]);
+  const [previewDoc, setPreviewDoc] = useState<{ url: string; fileName: string; fileType?: string } | null>(null);
 
   // Unread tracking & notifications
   const [unreadCounts, setUnreadCounts] = useState<Map<string, number>>(new Map());
@@ -546,6 +549,18 @@ export function TeamChatModern() {
           };
         });
 
+        // Remove any matching optimistic message for own confirmed messages
+        if (isOwnMessage) {
+          setOptimisticMessages(prev =>
+            prev.filter(m =>
+              !(m.room === actualRoomId &&
+                m.optimisticStatus !== 'error' &&
+                m.content === enrichedMessage.content &&
+                m.message_type === enrichedMessage.message_type)
+            )
+          );
+        }
+
         // 4. Verify cache update
         const afterUpdate = queryClient.getQueryData<ChatRoomMessagesResponse>(['chat-messages', actualRoomId]);
 
@@ -572,7 +587,7 @@ export function TeamChatModern() {
             return newMap;
           });
 
-        const toast: ToastNotification = {
+          const toast: ToastNotification = {
             id: `${Date.now()}`,
             room_id: actualRoomId,
             sender_name: enrichedMessage.sender.full_name || enrichedMessage.sender.username,
@@ -700,15 +715,21 @@ export function TeamChatModern() {
   }, [activeRoom?.id]);
 
   const messages = useMemo(() => {
-    if (!messagesData?.messages) {
-      return [];
-    }
+    const confirmedMessages: OptimisticChatMessage[] = (messagesData?.messages || []).map(m => ({
+      ...m,
+      optimisticStatus: 'sent' as const,
+    }));
 
-    const sortedMessages = [...messagesData.messages].sort((a, b) =>
+    const currentRoomId = activeRoom?.id || selectedProjectRoom?.id || selectedTeamRoom?.id;
+    const confirmedIds = new Set(confirmedMessages.map(m => String(m.id)));
+    const pendingOptimistic = optimisticMessages.filter(om =>
+      om.room === currentRoomId && !confirmedIds.has(String(om.id))
+    );
+
+    return [...confirmedMessages, ...pendingOptimistic].sort((a, b) =>
       new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     );
-    return sortedMessages;
-  }, [messagesData?.messages]);
+  }, [messagesData?.messages, optimisticMessages, activeRoom?.id, selectedProjectRoom?.id, selectedTeamRoom?.id]);
 
   // Log when messages array changes
   useEffect(() => {
@@ -923,7 +944,7 @@ export function TeamChatModern() {
   };
 
   // Handle message actions
- const handleReplyWithQuote = (message: ChatMessage) => {
+  const handleReplyWithQuote = (message: ChatMessage) => {
     const plainPreview = message.content.replace(/<[^>]*>/g, '').trim().slice(0, 120);
     const quoteHtml = `<blockquote>${plainPreview}</blockquote><p></p>`;
     setRichHtmlContent(quoteHtml);
@@ -1059,6 +1080,77 @@ export function TeamChatModern() {
   }, [filePreviewUrl]);
 
   // Send Message
+  const buildOptimisticMessage = (
+    roomId: string,
+    content: string,
+    tempId: string,
+    file?: File | null
+  ): OptimisticChatMessage => ({
+    id: tempId,
+    room: roomId,
+    sender: {
+      id: currentUser!.id,
+      username: currentUser!.username,
+      full_name: `${currentUser!.first_name} ${currentUser!.last_name}`.trim() || currentUser!.username,
+      email: currentUser!.email,
+    },
+    content,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    is_own_message: true,
+    message_type: file ? 'file' : 'text',
+    attachment: file ? URL.createObjectURL(file) : null,
+    attachment_name: file ? file.name : '',
+    reply_to: null,
+    reply_to_preview: null,
+    is_deleted: false,
+    optimisticStatus: 'sending',
+    optimisticId: tempId,
+  });
+
+  // Retry sending a failed optimistic message
+  const handleRetryMessage = async (optimisticMsg: OptimisticChatMessage) => {
+    const roomId = optimisticMsg.room;
+
+    // Mark as sending again
+    setOptimisticMessages(prev =>
+      prev.map(m => m.optimisticId === optimisticMsg.optimisticId
+        ? { ...m, optimisticStatus: 'sending' }
+        : m
+      )
+    );
+
+    try {
+      if (optimisticMsg.message_type === 'file' && optimisticMsg.attachment) {
+        setOptimisticMessages(prev =>
+          prev.filter(m => m.optimisticId !== optimisticMsg.optimisticId)
+        );
+        return;
+      }
+
+      const gatewaySocket = gatewaySocketRef.current;
+      if (gatewaySocket) {
+        gatewaySocket.sendMessage(roomId, optimisticMsg.content);
+        setTimeout(() => {
+          setOptimisticMessages(prev =>
+            prev.map(m => m.optimisticId === optimisticMsg.optimisticId
+              ? { ...m, optimisticStatus: 'sent' }
+              : m
+            )
+          );
+        }, 5000);
+      }
+    } catch {
+      setOptimisticMessages(prev =>
+        prev.map(m => m.optimisticId === optimisticMsg.optimisticId
+          ? { ...m, optimisticStatus: 'error' }
+          : m
+        )
+      );
+    }
+  };
+
+  // Send Message
   const handleSendMessage = async () => {
     // Prevent multiple submissions while uploading
     if (isUploadingFile) {
@@ -1077,22 +1169,42 @@ export function TeamChatModern() {
 
     // If there's a file attachment, use HTTP POST
     if (hasFile && roomId) {
+      const tempId = `optimistic-${Date.now()}-${Math.random()}`;
+      const optimisticMsg = buildOptimisticMessage(roomId, content, tempId, selectedFile);
+
+      // 1. Immediately render optimistic message
+      setOptimisticMessages(prev => [...prev, optimisticMsg]);
+
+      // 2. Clear input right away
+      setMessageInput('');
+      setRichHtmlContent('');
+      const capturedFile = selectedFile!;
+      setSelectedFile(null);
+      if (filePreviewUrl) {
+        URL.revokeObjectURL(filePreviewUrl);
+        setFilePreviewUrl(null);
+      }
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+
       try {
         setIsUploadingFile(true);
         const response = await chatApi.sendMessageWithAttachment(roomId, {
           content: content,
-          attachment: selectedFile!
+          attachment: capturedFile,
         });
 
-        // Update messages in cache
+        // 3. Confirmed: replace optimistic with real message in cache
         queryClient.setQueryData(
           ['chat-messages', roomId],
           (oldData: ChatRoomMessagesResponse | undefined) => {
             const existingMessages = oldData?.messages || [];
+            const isDuplicate = existingMessages.some(m => m.id === response.id);
+            if (isDuplicate) return oldData;
             const updatedMessages = [...existingMessages, response].sort(
               (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
             );
-
             return {
               ...oldData,
               messages: updatedMessages,
@@ -1101,49 +1213,76 @@ export function TeamChatModern() {
             };
           }
         );
+        // 4. Remove the optimistic entry and force re-render in one state batch
+        setOptimisticMessages(prev => prev.filter(m => m.optimisticId !== tempId));
 
-        // Trigger re-render without refetch
-        queryClient.invalidateQueries({ queryKey: ['chat-messages', roomId], refetchType: 'none' });
-
-        // Reset states
-        setMessageInput('');
-        setRichHtmlContent('');
-        setSelectedFile(null);
-        if (filePreviewUrl) {
-          URL.revokeObjectURL(filePreviewUrl);
-          setFilePreviewUrl(null);
-        }
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
+        // 5. Force React Query to notify subscribers of the cache change
+        queryClient.invalidateQueries({ queryKey: ['chat-messages', roomId], refetchType: 'active' });
       } catch (error) {
         console.error('❌ [SEND ERROR] Failed to send message with attachment:', error);
+        // 5. Mark optimistic message as errored
+        setOptimisticMessages(prev =>
+          prev.map(m => m.optimisticId === tempId ? { ...m, optimisticStatus: 'error' } : m)
+        );
       } finally {
         setIsUploadingFile(false);
       }
       return;
     }
+
+    // Text-only via WebSocket 
+    if (!roomId) {
+      console.error('❌ [SEND ERROR] No active room');
+      return;
+    }
+
+    const tempId = `optimistic-${Date.now()}-${Math.random()}`;
+    const optimisticMsg = buildOptimisticMessage(roomId, content, tempId);
+
+    // 1. Immediately render optimistic message
+    setOptimisticMessages(prev => [...prev, optimisticMsg]);
+
+    // 2. Clear input immediately
     setMessageInput('');
     setRichHtmlContent('');
 
-    // Send via Gateway WebSocket if project room is selected
-    if (selectedProjectRoom && gatewaySocketRef.current) {
-      gatewaySocketRef.current.sendMessage(selectedProjectRoom.id, content);
-      return;
-    }
+    const sendViaWebSocket = () => {
+      if (selectedProjectRoom && gatewaySocketRef.current) {
+        gatewaySocketRef.current.sendMessage(selectedProjectRoom.id, content);
+        return true;
+      }
+      if (selectedTeamRoom && gatewaySocketRef.current) {
+        gatewaySocketRef.current.sendMessage(selectedTeamRoom.id, content);
+        return true;
+      }
+      if (activeRoom && gatewaySocketRef.current) {
+        gatewaySocketRef.current.sendMessage(activeRoom.id, content);
+        return true;
+      }
+      return false;
+    };
 
-    // Send via Gateway WebSocket if team room is selected
-    if (selectedTeamRoom && gatewaySocketRef.current) {
-      gatewaySocketRef.current.sendMessage(selectedTeamRoom.id, content);
-      return;
-    }
+    const sent = sendViaWebSocket();
 
-    // Send via Gateway WebSocket for private rooms
-    if (activeRoom && gatewaySocketRef.current) {
-      gatewaySocketRef.current.sendMessage(activeRoom.id, content);
-    } else {
+    if (!sent) {
       console.error('❌ [SEND ERROR] No active Gateway WebSocket connection');
+      // Mark as error immediately if no socket
+      setOptimisticMessages(prev =>
+        prev.map(m => m.optimisticId === tempId ? { ...m, optimisticStatus: 'error' } : m)
+      );
+      return;
     }
+
+    // 3. The WebSocket echo
+    setTimeout(() => {
+      setOptimisticMessages(prev => {
+        const still = prev.find(m => m.optimisticId === tempId);
+        if (still && still.optimisticStatus === 'sending') {
+          return prev.map(m => m.optimisticId === tempId ? { ...m, optimisticStatus: 'error' } : m);
+        }
+        return prev;
+      });
+    }, 10000);
   };
 
   // Delete Message Mutation
@@ -1228,6 +1367,17 @@ export function TeamChatModern() {
 
   return (
     <div className="flex h-screen bg-[#f3f2f1] overflow-hidden border-2 border-gray-200">
+      {previewDoc && (
+        <div className="fixed inset-0 z-[200]">
+          <DocumentPreview
+            url={previewDoc.url}
+            fileName={previewDoc.fileName}
+            fileType={previewDoc.fileType}
+            onClose={() => setPreviewDoc(null)}
+            defaultFullscreen={false}
+          />
+        </div>
+      )}
       {/* Toast Notifications Container */}
       <div className="fixed top-4 right-4 z-50 space-y-2">
         {toastNotifications.map(toast => (
@@ -1360,7 +1510,9 @@ export function TeamChatModern() {
                                 "text-xs truncate",
                                 hasUnreadMessages ? "font-semibold text-gray-900" : "text-gray-600"
                               )}>
-                                {user.lastMessageContent || 'No messages yet'}
+                                {user.lastMessageContent
+                                  ? user.lastMessageContent.replace(/<[^>]*>/g, '').trim() || 'Sent a message'
+                                  : 'No messages yet'}
                               </p>
                               {unreadCount > 0 && (
                                 <span className="ml-2 flex-shrink-0 h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
@@ -1412,7 +1564,9 @@ export function TeamChatModern() {
                           <div className="flex-1 min-w-0 text-left">
                             <p className="text-sm font-medium text-gray-900 truncate">{project.name}</p>
                             <p className="text-xs text-gray-600 truncate">
-                              {project.last_message?.content_preview || 'No messages yet'}
+                              {project.last_message?.content_preview
+                                ? project.last_message.content_preview.replace(/<[^>]*>/g, '').trim() || 'Sent a message'
+                                : 'No messages yet'}
                             </p>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
@@ -1467,7 +1621,14 @@ export function TeamChatModern() {
                           </div>
                           <div className="flex-1 min-w-0 text-left">
                             <p className="text-sm font-medium text-gray-900 truncate">{team.name}</p>
-                            <p className="text-xs text-gray-600 truncate">Team Chat</p>
+                            <p className="text-xs text-gray-600 truncate">
+                              {(() => {
+                                const lastMsg = (team.last_message as any);
+                                if (!lastMsg) return 'No messages yet';
+                                const raw = lastMsg.content_preview || lastMsg.content || '';
+                                return raw.replace(/<[^>]*>/g, '').trim() || 'Sent a message';
+                              })()}
+                            </p>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
                             {isFavourite && (
@@ -1795,11 +1956,11 @@ export function TeamChatModern() {
                                         className={cn(
                                           "text-sm break-words max-w-full",
                                           isEmojiOnly
-                                            ? "px-1 py-1" 
+                                            ? "px-1 py-1"
                                             : cn(
                                               "px-3 py-2 rounded-lg shadow-sm",
                                               isOwn
-                                                ? "bg-[#005c4b] text-white rounded-br-none"
+                                                ? "bg-[#7699a3] text-white rounded-br-none"
                                                 : "bg-white text-gray-900 border border-gray-100 rounded-bl-none"
                                             )
                                         )}
@@ -1822,24 +1983,54 @@ export function TeamChatModern() {
                                             dangerouslySetInnerHTML={{ __html: message.content }}
                                           />
                                         )}
-
                                         {/* Attachment */}
                                         {message.attachment && (
                                           <div className={message.content ? "mt-2 pt-2 border-t border-blue-500" : ""}>
-                                            <a
-                                              href={message.attachment}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="flex items-center gap-2 text-xs hover:underline"
-                                            >
-                                              <Paperclip className="h-3 w-3" />
-                                              {message.attachment_name || 'Attachment'}
-                                            </a>
+                                            {(message as OptimisticChatMessage).optimisticStatus === 'sending' ? (
+                                              <div className="flex items-center gap-2 text-xs opacity-70">
+                                                <Loader2 className="h-3 w-3 animate-spin" />
+                                                <span>{(message as OptimisticChatMessage).attachment_name || 'Uploading file…'}</span>
+                                              </div>
+                                            ) : (
+                                              <DocumentThumbnail
+                                                url={message.attachment}
+                                                fileName={message.attachment_name || 'Attachment'}
+                                                onClick={() => setPreviewDoc({
+                                                  url: message.attachment!,
+                                                  fileName: message.attachment_name || 'Attachment',
+                                                })}
+                                                className="w-40"
+                                              />
+                                            )}
                                           </div>
                                         )}
                                       </div>
                                     );
                                   })()}
+
+                                  {/* Optimistic status indicator */}
+                                  {isOwn && (message as OptimisticChatMessage).optimisticStatus === 'sending' && (
+                                    <div className="flex justify-end mt-1">
+                                      <span className="flex items-center gap-1 text-[10px] text-gray-400">
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                        Sending…
+                                      </span>
+                                    </div>
+                                  )}
+                                  {isOwn && (message as OptimisticChatMessage).optimisticStatus === 'error' && (
+                                    <div className="flex justify-end mt-1">
+                                      <button
+                                        onClick={() => handleRetryMessage(message as OptimisticChatMessage)}
+                                        className="flex items-center gap-1 text-[10px] text-red-500 hover:text-red-700 transition-colors"
+                                        title="Failed to send — click to retry"
+                                      >
+                                        <AlertCircle className="h-3 w-3" />
+                                        Failed to send
+                                        <RotateCcw className="h-3 w-3 ml-0.5" />
+                                      </button>
+                                    </div>
+                                  )}
+
 
                                   {/* Quick Actions on Hover */}
                                   {(isHovered || menuOpen) && (

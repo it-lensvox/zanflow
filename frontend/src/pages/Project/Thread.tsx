@@ -690,12 +690,6 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
           </div>
         ) : (
           <div className="text-center py-2">
-            <button
-              onClick={createNewSession}
-              className="w-full px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors text-sm font-medium"
-            >
-              Start New Thread
-            </button>
           </div>
         )}
       </div>
