@@ -59,25 +59,6 @@ function DocumentInfoPanel({ doc, onClose }: { doc: Document | null; onClose: ()
       value: <span className="text-gray-600 font-semibold break-all">{doc.original_file_name || doc.name}</span>,
     },
     {
-      icon: <Tag className="w-4 h-4 text-purple-500" />,
-      label: 'File Type',
-      value: <span className="uppercase px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200">{doc.file_type}</span>,
-    },
-    {
-      icon: <HardDrive className="w-4 h-4 text-gray-500" />,
-      label: 'File Size',
-      value: formatBytes(doc.file_size),
-    },
-    {
-      icon: <Tag className="w-4 h-4 text-indigo-500" />,
-      label: 'Status',
-      value: (
-        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${statusColors[doc.status] || 'bg-gray-100 text-gray-600'}`}>
-          {doc.status.toUpperCase().replace('_', ' ')}
-        </span>
-      ),
-    },
-    {
       icon: <User className="w-4 h-4 text-blue-500" />,
       label: 'Uploaded By',
       value: doc.created_by?.full_name || 'System',
@@ -232,6 +213,7 @@ export function Documents() {
   const fileTypeFilter = searchParams.get('file_type') || '';
 
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, setSortBy] = useState<'updated_at' | 'created_at'>('updated_at');
 
   // Reset to page 1 when filters change
   React.useEffect(() => {
@@ -240,7 +222,7 @@ export function Documents() {
 
   React.useEffect(() => {
     queryClient.invalidateQueries({ queryKey: ['documents'] });
-  }, [queryClient]);
+  }, []);
 
   const { data: projectsData } = useQuery({
     queryKey: ['projects'],
@@ -258,6 +240,8 @@ export function Documents() {
     enabled: true,
     placeholderData: keepPreviousData,
     refetchOnWindowFocus: true,
+    refetchOnMount: 'always',
+    staleTime: 0,
   });
   const rawProjects = projectsData?.results || projectsData || [];
   const projects = (Array.isArray(rawProjects) ? rawProjects : []) as Project[];
@@ -277,6 +261,8 @@ export function Documents() {
     if (statusFilter && doc.status !== statusFilter) return false;
     if (searchTerm && !doc.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
     return true;
+  }).sort((a: Document, b: Document) => {
+    return new Date(b[sortBy]).getTime() - new Date(a[sortBy]).getTime();
   });
 
   const updateFilter = (key: string, value: string) => {

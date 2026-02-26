@@ -133,7 +133,7 @@ export function Projects() {
         <div>
           <h1 className="text-3xl font-bold">Projects</h1>
           <p className="text-muted-foreground">
-            Manage your ground truth and testing projects
+            Manage Your Projects
           </p>
         </div>
         <div className="flex items-center gap-3">
