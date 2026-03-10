@@ -2,6 +2,7 @@
 Views for Users app.
 """
 from django.contrib.auth import get_user_model
+from django.template.loader import render_to_string
 from rest_framework import generics, permissions, status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -10,14 +11,14 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from django.shortcuts import get_object_or_404
 from .serializers import UserRoleUpdateSerializer
-from .serializers import UserCreateSerializer, UserSerializer, VerifyOTPSerializer, ForgotPasswordSerializer, SetNewPasswordSerializer, AuthenticatedResetPasswordSerializer
+from .serializers import UserCreateSerializer, UserSerializer, VerifyOTPSerializer, ForgotPasswordSerializer, SetNewPasswordSerializer, AuthenticatedResetPasswordSerializer, SendInvitationSerializer, AcceptInvitationSerializer
 import random
 import uuid
-from django.core.mail import send_mail
+from django.core.mail import send_mail,EmailMultiAlternatives
 from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
-from .models import PasswordResetOTP
+from .models import PasswordResetOTP, Invitation
 User = get_user_model()
 
 
@@ -305,3 +306,106 @@ class AuthenticatedResetPasswordView(APIView):
             {"detail": "Password has been updated successfully."}, 
             status=status.HTTP_200_OK
         )
+    
+class SendInvitationView(APIView):
+    permission_classes = [IsAdminRole]
+
+    def post(self, request):
+        serializer = SendInvitationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        email = serializer.validated_data['email']
+        role = serializer.validated_data['role']
+
+        if User.objects.filter(email=email).exists():
+            return Response({"detail": "A user with this email already exists."}, status=status.HTTP_400_BAD_REQUEST)
+
+        invitation = Invitation.objects.create(
+            email=email,
+            role=role,
+            organization=request.user.organization
+        )
+
+        # 1. Set your frontend URL here. 
+        # (Change this to https://dyuksa.lensvox.com when deploying to production)
+        frontend_url = "http://192.168.1.10:5173"  # Update with your actual frontend URL
+        invite_link = f"{frontend_url}/setup-account?token={invitation.token}"
+
+        # 2. Pass the data to the HTML template
+        context = {
+            'email': email,
+            'role': role,
+            'invite_link': invite_link
+        }
+
+        # 3. Render the beautiful HTML you designed
+        html_content = render_to_string('dyuksa.html', context)
+        
+        # 4. Plain text fallback
+        text_content = f"You have been invited to join DYUKSA as a {role}. Click here to set up your account: {invite_link}. This link expires in 12 hours."
+
+        # 5. Send the email
+        subject = "You've been invited to join DYUKSA"
+        msg = EmailMultiAlternatives(
+            subject,
+            text_content,
+            settings.DEFAULT_FROM_EMAIL,
+            [email]
+        )
+        msg.attach_alternative(html_content, "text/html")
+        msg.send()
+
+        return Response({"detail": "Invitation sent successfully."}, status=status.HTTP_200_OK)
+
+class VerifyInvitationTokenView(APIView):
+    """
+    Public endpoint for the frontend to check if a token is valid on page load.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, token):
+        invitation = get_object_or_404(Invitation, token=token)
+        
+        if not invitation.is_valid:
+            return Response({"detail": "This invitation link is invalid or has expired."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        return Response({
+            "email": invitation.email,
+            "role": invitation.role
+        }, status=status.HTTP_200_OK)
+
+
+class AcceptInvitationView(APIView):
+    """
+    Public endpoint to complete registration using the valid token.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = AcceptInvitationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        token = serializer.validated_data['token']
+        invitation = get_object_or_404(Invitation, token=token)
+
+        # Re-verify token validity right before creation
+        if not invitation.is_valid:
+            return Response({"detail": "This invitation link is invalid or has expired."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Create the new user
+        user = User.objects.create(
+            username=serializer.validated_data['username'],
+            email=invitation.email,       # Take directly from DB, not user input
+            role=invitation.role,         # Take directly from DB, not user input
+            organization=invitation.organization, # Assign to correct tenant
+            first_name=serializer.validated_data.get('first_name', ''),
+            last_name=serializer.validated_data.get('last_name', '')
+        )
+        user.set_password(serializer.validated_data['password'])
+        user.save()
+
+        # Burn the invitation token so it can't be used again
+        invitation.is_used = True
+        invitation.save()
+
+        return Response({"detail": "Account setup successful. You can now log in."}, status=status.HTTP_201_CREATED)

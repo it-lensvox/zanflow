@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
+from .models import Invitation
 User = get_user_model()
 
 class UserSerializer(serializers.ModelSerializer):
@@ -125,4 +126,32 @@ class AuthenticatedResetPasswordSerializer(serializers.Serializer):
         if data["new_password"] == data["old_password"]:
             raise serializers.ValidationError({"new_password": "New password cannot be the same as the old password."})
             
+        return data
+    
+class SendInvitationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Invitation
+        fields = ['email', 'role']
+            
+    def validate_role(self, value):
+        if value not in [choice[0] for choice in User.Role.choices]:
+            raise serializers.ValidationError("Invalid role selected.")
+        return value
+
+class AcceptInvitationSerializer(serializers.Serializer):
+    token = serializers.CharField(required=True)
+    username = serializers.CharField(required=True)
+    password = serializers.CharField(write_only=True, required=True)
+    password_confirm = serializers.CharField(write_only=True, required=True)
+    first_name = serializers.CharField(required=False, allow_blank=True)
+    last_name = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, data):
+        if data["password"] != data["password_confirm"]:
+            raise serializers.ValidationError({"password_confirm": "Passwords do not match."})
+        
+        # Check if username already exists
+        if User.objects.filter(username=data['username']).exists():
+             raise serializers.ValidationError({"username": "This username is already taken."})
+             
         return data
