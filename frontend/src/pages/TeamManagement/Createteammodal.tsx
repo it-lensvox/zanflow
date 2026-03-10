@@ -316,7 +316,7 @@ export function CreateTeamModal({ isOpen, onClose, onSuccess }: CreateTeamModalP
                             />
                         </div>
 
-                        {/* Description */}
+                        {/* Description
                         <div>
                             <label className={labelClass}>Description</label>
                             <RichTextEditor
@@ -339,7 +339,7 @@ export function CreateTeamModal({ isOpen, onClose, onSuccess }: CreateTeamModalP
                                     heading: false,
                                 }}
                             />
-                        </div>
+                        </div> */}
 
                         {/* Add Members */}
                         <div>

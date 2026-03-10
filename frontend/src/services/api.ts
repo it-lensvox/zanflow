@@ -3,8 +3,10 @@ import type {
   AuthTokens, User as AppUser, PaginatedResponse, PaginatedProjectsResponse, GetUploadUrlPayload, GetUploadUrlResponse, ConfirmUploadResponse, GetDownloadUrlPayload, ConfirmUploadPayload, GetDownloadUrlResponse, AllDocumentsResponse,
   TaskComment, CreateTaskCommentPayload, AITaskSuggestionResponse, AITaskSuggestionPayload, ProjectCreatePayload, Label, DocumentStatus, ChatMessage, ChatRoom, ChatRoomMessagesResponse, CreatePrivateChatPayload,
   GatewaySendMessagePayload, GatewayIncomingMessage, RefineTextPayload, RefineTextResponse, TaskResponse, TeamTypeChoicesResponse,
-  CreateTeamPayload, ProjectChatRoom, TeamChatRoom, ChatUnreadResponse, NotificationData, NotificationCallback, Team, ThreadRoom, ThreadSession, ThreadStorage, ThreadUIMessage, CreateThreadRoomPayload, WSJoinRoomCommand, WSSendMessageCommand, WSIncomingThreadMessage, WSUnreadUpdateSignal, ThreadMessagesResponse
+  CreateTeamPayload, ProjectChatRoom, TeamChatRoom, ChatUnreadResponse, NotificationData, NotificationCallback, Team, ThreadRoom, ThreadSession, ThreadStorage, ThreadUIMessage, CreateThreadRoomPayload, WSJoinRoomCommand, WSSendMessageCommand, WSIncomingThreadMessage, WSUnreadUpdateSignal, ThreadMessagesResponse,
+  InviteUserPayload, InviteUserResponse, InviteVerifyResponse, InviteAcceptPayload, InviteAcceptResponse
 } from '@/types';
+
 
 
 //export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.4:8000/api/v1';
@@ -29,6 +31,9 @@ const WS_GATEWAY_URL = import.meta.env.VITE_WS_GATEWAY_URL || 'ws://localhost:80
 //export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.18:8000/api/v1';
 //const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://192.168.1.12:8000/ws/gateway';
  
+
+// export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://zanflow.lensvox.com/api/v1';
+
 export const api = axios.create({
   baseURL: API_URL,
   headers: {
@@ -593,6 +598,30 @@ export const usersApi = {
 
   delete: async (id: number) => {
     await api.delete(`/auth/delete-user/${id}/`);
+  },
+
+  invite: async (data: InviteUserPayload): Promise<InviteUserResponse> => {
+    const response = await api.post<InviteUserResponse>('/auth/invite/send/', data);
+    return response.data;
+  },
+
+  // Invite Accept (Setup Account page)
+
+  // Called on page load — no auth token needed, uses plain axios
+  verifyInvite: async (token: string): Promise<InviteVerifyResponse> => {
+    const response = await axios.get<InviteVerifyResponse>(
+      `${API_URL}/auth/invite/verify/${token}/`
+    );
+    return response.data;
+  },
+
+  // Called on form submit — no auth token needed, uses plain axios
+  acceptInvite: async (data: InviteAcceptPayload): Promise<InviteAcceptResponse> => {
+    const response = await axios.post<InviteAcceptResponse>(
+      `${API_URL}/auth/invite/accept/`,
+      data
+    );
+    return response.data;
   },
 };
 

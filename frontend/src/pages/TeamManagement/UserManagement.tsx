@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { UserPlus, Loader2, User, Mail, X, Lock, ChevronDown, CheckCircle, Crown, } from 'lucide-react';
+import { UserPlus, Loader2, User, Mail, X, Lock, ChevronDown, CheckCircle, Crown, Send } from 'lucide-react';
 import { Button } from '@/components/common';
 import { usersApi } from '@/services/api';
 import type { User as AppUser, PaginatedResponse } from '@/types';
@@ -107,20 +107,28 @@ const ChangeRoleModal: React.FC<{ user: AppUser; isOpen: boolean; onClose: () =>
 const AddUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient: any }> = ({ isOpen, onClose, queryClient }) => {
   const [form, setForm] = useState({ username: '', email: '', password: '', confirmPassword: '', firstName: '', lastName: '', role: 'viewer' as AppUser['role'] });
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [errors, setErrors] = useState<{ username?: string; email?: string; password?: string }>({});
+  const [errors, setErrors] = useState<{ username?: string; email?: string; password?: string; confirmPassword?: string }>({});
   const [showSuccess, setShowSuccess] = useState(false);
 
+  const isValidEmail = (email: string) =>
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
   const validate = () => {
-    const newErrors: { username?: string; email?: string; password?: string } = {};
+     const newErrors: { username?: string; email?: string; password?: string; confirmPassword?: string } = {};
     if (form.username && /^\d/.test(form.username)) {
       newErrors.username = 'Username must start with a letter.';
+    }
+    if (form.email && !isValidEmail(form.email)) {
+      newErrors.email = 'Please enter a valid email address.';
     }
     if (form.password && form.password.length < 4) {
       newErrors.password = 'Password must be at least 4 characters.';
     }
+    if (form.password && form.confirmPassword && form.password !== form.confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match.';
+    }
     return newErrors;
   };
-
   const createUserMutation = useMutation({
     mutationFn: usersApi.create,
     onSuccess: () => {
@@ -135,6 +143,8 @@ const AddUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient
       const data = error?.response?.data;
       if (data?.email) {
         setErrors(prev => ({ ...prev, email: 'This email is already in use.' }));
+      } else if (data?.detail) {
+        setErrors(prev => ({ ...prev, email: data.detail }));
       }
     },
   });
@@ -175,6 +185,12 @@ const AddUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient
             onChange={e => {
               setForm({ ...form, email: e.target.value });
               setErrors(prev => ({ ...prev, email: undefined }));
+            }}
+            onBlur={e => {
+              const val = e.target.value;
+              if (val && !isValidEmail(val)) {
+                setErrors(prev => ({ ...prev, email: 'Please enter a valid email address.' }));
+              }
             }}
           />
           {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
@@ -227,13 +243,22 @@ const AddUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient
             <input
               type="password"
               placeholder="********"
-              className={`${inputClass} pr-9`}
-              onChange={e => setForm({ ...form, confirmPassword: e.target.value })}
+              className={`${inputClass} pr-9 ${errors.confirmPassword ? 'border-red-400 focus:ring-red-200' : ''}`}
+              onChange={e => {
+                setForm({ ...form, confirmPassword: e.target.value });
+                setErrors(prev => ({ ...prev, confirmPassword: undefined }));
+              }}
+              onBlur={e => {
+                if (form.password && e.target.value && form.password !== e.target.value) {
+                  setErrors(prev => ({ ...prev, confirmPassword: 'Passwords do not match.' }));
+                }
+              }}
             />
             {form.password.length >= 4 && form.confirmPassword && form.password === form.confirmPassword && (
               <CheckCircle className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
             )}
           </div>
+          {errors.confirmPassword && <p className="text-xs text-red-500 mt-1">{errors.confirmPassword}</p>}
         </div>
       </div>
 
@@ -275,6 +300,111 @@ const AddUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient
   );
 };
 
+const InviteUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient: any }> = ({ isOpen, onClose, queryClient }) => {
+  const [form, setForm] = useState({ email: '', role: 'viewer' as AppUser['role'] });
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [errors, setErrors] = useState<{ email?: string }>({});
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  const inviteUserMutation = useMutation({
+    mutationFn: usersApi.invite,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      setShowSuccess(true);
+      setTimeout(() => {
+        setShowSuccess(false);
+        onClose();
+        setForm({ email: '', role: 'viewer' });
+      }, 2500);
+    },
+    onError: (error: any) => {
+      const data = error?.response?.data;
+      if (data?.detail) {
+        setErrors(prev => ({ ...prev, email: data.detail }));
+      } else if (data?.email) {
+        setErrors(prev => ({ ...prev, email: data.email[0] ?? 'This email is already in use or invalid.' }));
+      }
+    },
+  });
+
+  const inputClass = "w-full border rounded-md p-2 pl-3 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all";
+  const labelClass = "flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5";
+
+  return (
+    <CustomModal isOpen={isOpen} onClose={onClose} title="Invite User">
+      <div className="py-4 space-y-4 max-h-[75vh] overflow-y-auto pr-2 custom-scrollbar">
+        <div>
+          <label className={labelClass}><Mail className="h-4 w-4" /> Email</label>
+          <input
+            placeholder="user@example.com"
+            value={form.email}
+            className={`${inputClass} ${errors.email ? 'border-red-400 focus:ring-red-200' : ''}`}
+            onChange={e => {
+              setForm({ ...form, email: e.target.value });
+              setErrors(prev => ({ ...prev, email: undefined }));
+            }}
+          />
+          {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
+        </div>
+        <div>
+          <label className={labelClass}><Crown className="h-4 w-4" /> Role</label>
+          <div className="space-y-1">
+            <div
+              className={`${inputClass} cursor-pointer flex justify-between items-center bg-white`}
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            >
+              <span className="capitalize">{form.role}</span>
+              <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+            </div>
+            {isDropdownOpen && (
+              <div className="border border-gray-200 rounded-md mt-1 bg-white overflow-hidden shadow-sm">
+                {(['admin', 'manager', 'annotator', 'viewer'] as AppUser['role'][]).map((role) => (
+                  <div
+                    key={role}
+                    className="px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer capitalize"
+                    onClick={() => {
+                      setForm({ ...form, role });
+                      setIsDropdownOpen(false);
+                    }}
+                  >
+                    {role}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-3 pt-6 mt-2 border-t">
+        <Button variant="outline" className="px-6" onClick={() => { onClose(); setForm({ email: '', role: 'viewer' }); setErrors({}); }}>Cancel</Button>
+        <Button
+          className="px-6 bg-[#1a1f2e] text-white hover:bg-[#252b3d]"
+          onClick={() => {
+            if (!form.email) {
+              setErrors({ email: 'Email is required.' });
+              return;
+            }
+            inviteUserMutation.mutate({ email: form.email, role: form.role });
+          }}
+          disabled={inviteUserMutation.isPending}
+        >
+          {inviteUserMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Send className="h-4 w-4 mr-2" />Invite</>}
+        </Button>
+      </div>
+
+      {showSuccess && (
+        <div className="absolute inset-0 flex items-center justify-center z-10 rounded-lg bg-white/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3 px-8 py-6 rounded-xl shadow-lg bg-white border border-green-100">
+            <CheckCircle className="w-10 h-10 text-green-500" />
+            <p className="text-base font-semibold text-gray-800 tracking-wide">Invitation sent successfully.</p>
+          </div>
+        </div>
+      )}
+    </CustomModal>
+  );
+};
+
 const DeleteConfirmationModal: React.FC<{ isOpen: boolean; onClose: () => void; onConfirm: () => void; username: string; isPending: boolean }> = ({ isOpen, onClose, onConfirm, username, isPending }) => (
   <CustomModal isOpen={isOpen} onClose={onClose} title="Delete User">
     <div className="py-4"><p className="text-sm">Are you sure you want to delete <span className="font-bold">{username}</span>?</p></div>
@@ -292,6 +422,7 @@ const DeleteConfirmationModal: React.FC<{ isOpen: boolean; onClose: () => void; 
 export function UserManagement() {
   const queryClient = useQueryClient();
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
+  const [isInviteUserModalOpen, setIsInviteUserModalOpen] = useState(false);
   const [roleChangeUser, setRoleChangeUser] = useState<AppUser | null>(null);
   const [userToDelete, setUserToDelete] = useState<AppUser | null>(null);
   const viewMode = 'table' as const;
@@ -321,6 +452,9 @@ export function UserManagement() {
               <Button onClick={() => setIsAddUserModalOpen(true)}>
                 <UserPlus className="h-4 w-4 mr-2" /> Add New User
               </Button>
+              <Button onClick={() => setIsInviteUserModalOpen(true)}>
+                <Send className="h-4 w-4 mr-2" /> Invite User
+              </Button>
             </div>
           </div>
 
@@ -345,10 +479,11 @@ export function UserManagement() {
       </div>
 
       <AddUserModal isOpen={isAddUserModalOpen} onClose={() => setIsAddUserModalOpen(false)} queryClient={queryClient} />
-      {roleChangeUser && 
-      <ChangeRoleModal user={roleChangeUser} isOpen={!!roleChangeUser} onClose={() => setRoleChangeUser(null)} queryClient={queryClient} />}
-      {userToDelete && 
-      <DeleteConfirmationModal isOpen={!!userToDelete} onClose={() => setUserToDelete(null)} onConfirm={() => deleteUserMutation.mutate(userToDelete.id)} username={userToDelete.username} isPending={deleteUserMutation.isPending} />}
+      <InviteUserModal isOpen={isInviteUserModalOpen} onClose={() => setIsInviteUserModalOpen(false)} queryClient={queryClient} />
+      {roleChangeUser &&
+        <ChangeRoleModal user={roleChangeUser} isOpen={!!roleChangeUser} onClose={() => setRoleChangeUser(null)} queryClient={queryClient} />}
+      {userToDelete &&
+        <DeleteConfirmationModal isOpen={!!userToDelete} onClose={() => setUserToDelete(null)} onConfirm={() => deleteUserMutation.mutate(userToDelete.id)} username={userToDelete.username} isPending={deleteUserMutation.isPending} />}
     </div>
   );
 }

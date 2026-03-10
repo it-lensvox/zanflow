@@ -16,7 +16,8 @@ import { useOutletContext } from 'react-router-dom';
 import { CreateProjectModal } from './CreateProjectModal';
 import { useNotifications } from '@/hooks/useNotifications';
 
-// Project type filter 
+
+// Project type filter definitions — order matches the colour legend in the table
 const PROJECT_TYPE_FILTERS = [
   { label: 'Client',           value: 'client',           dot: 'bg-blue-500'  },
   { label: 'Internal',         value: 'internal',         dot: 'bg-green-500' },
@@ -133,7 +134,7 @@ export function Projects() {
         <div>
           <h1 className="text-3xl font-bold">Projects</h1>
           <p className="text-muted-foreground">
-            Manage your ground truth and testing projects
+            Manage Your Projects
           </p>
         </div>
         <div className="flex items-center gap-3">

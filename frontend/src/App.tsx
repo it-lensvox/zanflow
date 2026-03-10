@@ -28,6 +28,8 @@ const Profile = lazy(() => import('@/pages/Profile').then(m => ({ default: m.Pro
 const ResetPassword = lazy(() => import('@/pages/ResetPassword').then(m => ({ default: m.ResetPassword })));
 const TeamChatModern = lazy(() => import('@/pages/TeamsChat/TeamChatModern').then(m => ({ default: m.TeamChatModern })));
 const Settings = lazy(() => import('@/pages/Settings').then(m => ({ default: m.Settings })));
+const SetupAccount = lazy(() => import('@/pages/TeamManagement/SetupAccount').then(m => ({ default: m.SetupAccount })));
+const QuickNotesPage = lazy(() => import('@/pages/QuickNotes/QuickNotesPage').then(m => ({ default: m.QuickNotesPage })));
 
 function PageLoader() {
   return (
@@ -127,6 +129,12 @@ function AppRoutes() {
         }
       />
 
+       {/* Public — no auth required — invited user has no account yet */}
+      <Route
+        path="/setup-account"
+        element={<Suspense fallback={<PageLoader />}><SetupAccount /></Suspense>}
+      />
+
       {/* Routes WITH Sidebar */}
       <Route
         element={
@@ -144,10 +152,12 @@ function AppRoutes() {
         <Route path="/projects/:id/settings" element={<ProjectSettings />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/documents" element={<Documents />} />
-        {/* <Route path="/documents/:id" element={<DocumentDetail />} /> */}
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/team-chat" element={<TeamChatModern />} />
+        <Route path="/team-chat/:projectId/:roomId" element={<TeamChatModern />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/quick-notes" element={<QuickNotesPage />} />
+        {/* Task Detail Page (full-page view) */}
         <Route path="/tasks/:id" element={<TaskDetailPage />} />
 
         {/* Taskboard Routes */}

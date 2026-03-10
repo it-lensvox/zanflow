@@ -1,17 +1,18 @@
-import { useState, useMemo, useEffect, useRef, lazy, Suspense } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Tabs from '@radix-ui/react-tabs';
 import {
-  MessageSquare, Search, Send, Paperclip, Smile, Phone, Video, Plus, X, Users as UsersIcon,
-  MoreVertical, Reply, Forward, Link2, Bookmark, Trash2, Pin, MailOpen, PinOff,
+  MessageSquare, Search, Plus, X, Users as UsersIcon, Paperclip, Smile,
+  MoreVertical, Reply, Forward, Link2, Bookmark, Trash2, Pin, MailOpen, PinOff, Loader2, AlertCircle, RotateCcw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { usersApi, chatApi, GatewayWebSocketService } from '@/services/api';
-import type { ChatRoom, ChatMessage, ChatRoomMessagesResponse, ToastNotification, GatewayIncomingMessage, ProjectChatRoom, TeamChatRoom, User } from '@/types';
-const EmojiPicker = lazy(() => import('emoji-picker-react'));
-import type { EmojiClickData } from 'emoji-picker-react';
+import type { ChatRoom, ChatMessage, ChatRoomMessagesResponse, ToastNotification, GatewayIncomingMessage, ProjectChatRoom, TeamChatRoom, User, OptimisticChatMessage } from '@/types';
 import { CreateTeamModal } from '@/pages/TeamManagement/Createteammodal';
+import { ChatMessageInput } from '@/components/common/RichTextEditor';
+import { DocumentThumbnail, DocumentPreview } from '@/components/common/DocumentPreview';
 
 // Extended user type with last message info
 interface UserWithActivity extends User {
@@ -78,12 +79,10 @@ function MemberListContent({ roomId, roomType }: { roomId: string; roomType: 'te
 
 export function TeamChatModern() {
   const { user: currentUser } = useAuth();
+  const navigate = useNavigate();
+  const { projectId: urlProjectId, roomId: urlRoomId } = useParams<{ projectId: string; roomId: string }>();
   const queryClient = useQueryClient();
 
-  useEffect(() => {
-    const prefetch = () => import('emoji-picker-react');
-    prefetch();
-  }, []);
 
   // UI State
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
@@ -91,12 +90,11 @@ export function TeamChatModern() {
   const [selectedProjectRoom, setSelectedProjectRoom] = useState<ProjectChatRoom | null>(null);
   const [selectedTeamRoom, setSelectedTeamRoom] = useState<TeamChatRoom | null>(null);
   const [messageInput, setMessageInput] = useState('');
+  const [richHtmlContent, setRichHtmlContent] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const emojiPickerRef = useRef<HTMLDivElement>(null);
   const [hoveredMessageId, setHoveredMessageId] = useState<string | number | null>(null);
   const [openMenuMessageId, setOpenMenuMessageId] = useState<string | number | null>(null);
   const [showReactionPicker, setShowReactionPicker] = useState<string | number | null>(null);
@@ -105,6 +103,8 @@ export function TeamChatModern() {
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const dragCounter = useRef(0);
+  const [optimisticMessages, setOptimisticMessages] = useState<OptimisticChatMessage[]>([]);
+  const [previewDoc, setPreviewDoc] = useState<{ url: string; fileName: string; fileType?: string } | null>(null);
 
   // Unread tracking & notifications
   const [unreadCounts, setUnreadCounts] = useState<Map<string, number>>(new Map());
@@ -233,6 +233,25 @@ export function TeamChatModern() {
       fetchAllRoomDetails();
     }
   }, [privateRoomsData, projectRoomsData, teamRoomsData, queryClient, roomDetailsLoaded]);
+
+  // Auto-select project room from URL params
+  useEffect(() => {
+    if (urlRoomId && projectRoomsData && projectRoomsData.length > 0 && !selectedProjectRoom) {
+      const matchedRoom = projectRoomsData.find(room => room.id === urlRoomId);
+      if (matchedRoom) {
+        setSelectedUserId(null);
+        setSelectedTeamRoom(null);
+        setActiveRoom(null);
+        setSelectedProjectRoom(matchedRoom);
+        activeRoomRef.current = { id: matchedRoom.id } as ChatRoom;
+        queryClient.prefetchQuery({
+          queryKey: ['chat-room-details', matchedRoom.id],
+          queryFn: () => chatApi.getRoomDetails(matchedRoom.id),
+        });
+        queryClient.invalidateQueries({ queryKey: ['chat-messages', matchedRoom.id] });
+      }
+    }
+  }, [urlRoomId, projectRoomsData]);
 
   // Sort Teams by Last Message Time 
   const teamRooms = useMemo(() => {
@@ -396,7 +415,7 @@ export function TeamChatModern() {
               // Only update if this data is newer or doesn't exist
               if (roomTime > existingTime) {
                 newLastMessages.set(otherUserId, {
-                  content: room.last_message.content_preview || 'Sent a message',
+                  content: (room.last_message.content_preview || room.last_message.content || 'Sent a message').replace(/<[^>]*>/g, '').trim() || 'Sent a message',
                   timestamp: room.last_message.created_at,
                   isUnread: room.unread_count > 0
                 });
@@ -488,7 +507,7 @@ export function TeamChatModern() {
           setLastMessages(prev => {
             const newMap = new Map(prev);
             newMap.set(chatListUserId!, {
-              content: enrichedMessage.content,
+              content: enrichedMessage.content.replace(/<[^>]*>/g, '').trim() || enrichedMessage.content,
               timestamp: enrichedMessage.created_at,
               isUnread: shouldMarkUnread
             });
@@ -530,6 +549,18 @@ export function TeamChatModern() {
           };
         });
 
+        // Remove any matching optimistic message for own confirmed messages
+        if (isOwnMessage) {
+          setOptimisticMessages(prev =>
+            prev.filter(m =>
+              !(m.room === actualRoomId &&
+                m.optimisticStatus !== 'error' &&
+                m.content === enrichedMessage.content &&
+                m.message_type === enrichedMessage.message_type)
+            )
+          );
+        }
+
         // 4. Verify cache update
         const afterUpdate = queryClient.getQueryData<ChatRoomMessagesResponse>(['chat-messages', actualRoomId]);
 
@@ -560,7 +591,7 @@ export function TeamChatModern() {
             id: `${Date.now()}`,
             room_id: actualRoomId,
             sender_name: enrichedMessage.sender.full_name || enrichedMessage.sender.username,
-            message_preview: enrichedMessage.content,
+            message_preview: enrichedMessage.content.replace(/<[^>]*>/g, '').trim() || enrichedMessage.content,
             timestamp: enrichedMessage.created_at
           };
           setToastNotifications(prev => [...prev, toast]);
@@ -684,15 +715,21 @@ export function TeamChatModern() {
   }, [activeRoom?.id]);
 
   const messages = useMemo(() => {
-    if (!messagesData?.messages) {
-      return [];
-    }
+    const confirmedMessages: OptimisticChatMessage[] = (messagesData?.messages || []).map(m => ({
+      ...m,
+      optimisticStatus: 'sent' as const,
+    }));
 
-    const sortedMessages = [...messagesData.messages].sort((a, b) =>
+    const currentRoomId = activeRoom?.id || selectedProjectRoom?.id || selectedTeamRoom?.id;
+    const confirmedIds = new Set(confirmedMessages.map(m => String(m.id)));
+    const pendingOptimistic = optimisticMessages.filter(om =>
+      om.room === currentRoomId && !confirmedIds.has(String(om.id))
+    );
+
+    return [...confirmedMessages, ...pendingOptimistic].sort((a, b) =>
       new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     );
-    return sortedMessages;
-  }, [messagesData?.messages]);
+  }, [messagesData?.messages, optimisticMessages, activeRoom?.id, selectedProjectRoom?.id, selectedTeamRoom?.id]);
 
   // Log when messages array changes
   useEffect(() => {
@@ -722,14 +759,13 @@ export function TeamChatModern() {
   }, [users, lastMessages, userLastActivity]);
 
   // unread first, then by timestamp (Last Message), then alphabetically
-  // unread first, then by timestamp (Last Message), then alphabetically
   const sortedUsers = useMemo(() => {
     return [...usersWithActivity].sort((a, b) => {
       // Get room IDs for both users
       const roomA = userRoomMap.get(a.id);
       const roomB = userRoomMap.get(b.id);
 
-      // Priority 0: Favourite status (favourites first)
+      // Priority 0: Favourite status
       const roomDetailsA = roomA ? (queryClient.getQueryData(['chat-room-details', roomA]) as ChatRoom | undefined) : undefined;
       const roomDetailsB = roomB ? (queryClient.getQueryData(['chat-room-details', roomB]) as ChatRoom | undefined) : undefined;
       const isFavouriteA = roomDetailsA?.current_user_membership?.is_favourite || false;
@@ -814,6 +850,8 @@ export function TeamChatModern() {
   const handleUserSelect = (userId: number) => {
     if (selectedUserId === userId) return;
 
+    navigate('/team-chat');
+
     // Reset project/team selections
     setSelectedProjectRoom(null);
     setSelectedTeamRoom(null);
@@ -858,10 +896,17 @@ export function TeamChatModern() {
 
     queryClient.resetQueries({ queryKey: ['chat-messages'] });
     queryClient.invalidateQueries({ queryKey: ['chat-messages', projectRoom.id] });
+
+    // Navigate to the project chat room URL
+    const projectId = (projectRoom as any).project_id ?? (projectRoom as any).project ?? '';
+    if (projectId) {
+      navigate(`/team-chat/${projectId}/${projectRoom.id}`);
+    }
   };
 
   // Handler for team room click
   const handleTeamClick = async (teamRoom: TeamChatRoom) => {
+    navigate('/team-chat');
     setSelectedUserId(null);
     setSelectedProjectRoom(null);
     setActiveRoom(null);
@@ -886,13 +931,6 @@ export function TeamChatModern() {
     queryClient.invalidateQueries({ queryKey: ['chat-messages', teamRoom.id] });
   };
 
-
-  // handler for emoji click
-  const handleEmojiClick = (emojiData: EmojiClickData) => {
-    setMessageInput((prev) => prev + emojiData.emoji);
-    setShowEmojiPicker(false);
-  };
-
   // Handle quick emoji reaction
   const handleQuickReaction = (messageId: string | number, emoji: string) => {
     setMessageReactions(prev => {
@@ -905,15 +943,12 @@ export function TeamChatModern() {
     });
   };
 
-  // Handle reaction from picker
-  const handleReactionFromPicker = (messageId: string | number, emojiData: EmojiClickData) => {
-    handleQuickReaction(messageId, emojiData.emoji);
-    setShowReactionPicker(null);
-  };
-
   // Handle message actions
   const handleReplyWithQuote = (message: ChatMessage) => {
-    setMessageInput(`> ${message.content}\n\n`);
+    const plainPreview = message.content.replace(/<[^>]*>/g, '').trim().slice(0, 120);
+    const quoteHtml = `<blockquote>${plainPreview}</blockquote><p></p>`;
+    setRichHtmlContent(quoteHtml);
+    setMessageInput(plainPreview);
     setOpenMenuMessageId(null);
   };
 
@@ -964,40 +999,6 @@ export function TeamChatModern() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [openMenuMessageId, showReactionPicker]);
-
-  const toggleEmojiPicker = () => {
-    setShowEmojiPicker((prev) => !prev);
-  };
-
-  // Close emoji picker when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        emojiPickerRef.current &&
-        !emojiPickerRef.current.contains(event.target as Node)
-      ) {
-        setShowEmojiPicker(false);
-      }
-    };
-
-    if (showEmojiPicker) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showEmojiPicker]);
-
-  // Send on Enter key
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      if (messageInput.trim() || selectedFile) {
-        handleSendMessage();
-      }
-    }
-  };
 
   // Handle file selection
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1079,13 +1080,85 @@ export function TeamChatModern() {
   }, [filePreviewUrl]);
 
   // Send Message
+  const buildOptimisticMessage = (
+    roomId: string,
+    content: string,
+    tempId: string,
+    file?: File | null
+  ): OptimisticChatMessage => ({
+    id: tempId,
+    room: roomId,
+    sender: {
+      id: currentUser!.id,
+      username: currentUser!.username,
+      full_name: `${currentUser!.first_name} ${currentUser!.last_name}`.trim() || currentUser!.username,
+      email: currentUser!.email,
+    },
+    content,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    is_own_message: true,
+    message_type: file ? 'file' : 'text',
+    attachment: file ? URL.createObjectURL(file) : null,
+    attachment_name: file ? file.name : '',
+    reply_to: null,
+    reply_to_preview: null,
+    is_deleted: false,
+    optimisticStatus: 'sending',
+    optimisticId: tempId,
+  });
+
+  // Retry sending a failed optimistic message
+  const handleRetryMessage = async (optimisticMsg: OptimisticChatMessage) => {
+    const roomId = optimisticMsg.room;
+
+    // Mark as sending again
+    setOptimisticMessages(prev =>
+      prev.map(m => m.optimisticId === optimisticMsg.optimisticId
+        ? { ...m, optimisticStatus: 'sending' }
+        : m
+      )
+    );
+
+    try {
+      if (optimisticMsg.message_type === 'file' && optimisticMsg.attachment) {
+        setOptimisticMessages(prev =>
+          prev.filter(m => m.optimisticId !== optimisticMsg.optimisticId)
+        );
+        return;
+      }
+
+      const gatewaySocket = gatewaySocketRef.current;
+      if (gatewaySocket) {
+        gatewaySocket.sendMessage(roomId, optimisticMsg.content);
+        setTimeout(() => {
+          setOptimisticMessages(prev =>
+            prev.map(m => m.optimisticId === optimisticMsg.optimisticId
+              ? { ...m, optimisticStatus: 'sent' }
+              : m
+            )
+          );
+        }, 5000);
+      }
+    } catch {
+      setOptimisticMessages(prev =>
+        prev.map(m => m.optimisticId === optimisticMsg.optimisticId
+          ? { ...m, optimisticStatus: 'error' }
+          : m
+        )
+      );
+    }
+  };
+
+  // Send Message
   const handleSendMessage = async () => {
     // Prevent multiple submissions while uploading
     if (isUploadingFile) {
       return;
     }
 
-    const content = messageInput.trim();
+    // Use rich HTML if available (Tiptap), fall back to plain text
+    const content = richHtmlContent && richHtmlContent !== '<p></p>' ? richHtmlContent : messageInput.trim();
     const hasFile = selectedFile !== null;
 
     if (!content && !hasFile) {
@@ -1096,22 +1169,42 @@ export function TeamChatModern() {
 
     // If there's a file attachment, use HTTP POST
     if (hasFile && roomId) {
+      const tempId = `optimistic-${Date.now()}-${Math.random()}`;
+      const optimisticMsg = buildOptimisticMessage(roomId, content, tempId, selectedFile);
+
+      // 1. Immediately render optimistic message
+      setOptimisticMessages(prev => [...prev, optimisticMsg]);
+
+      // 2. Clear input right away
+      setMessageInput('');
+      setRichHtmlContent('');
+      const capturedFile = selectedFile!;
+      setSelectedFile(null);
+      if (filePreviewUrl) {
+        URL.revokeObjectURL(filePreviewUrl);
+        setFilePreviewUrl(null);
+      }
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+
       try {
         setIsUploadingFile(true);
         const response = await chatApi.sendMessageWithAttachment(roomId, {
           content: content,
-          attachment: selectedFile!
+          attachment: capturedFile,
         });
 
-        // Update messages in cache
+        // 3. Confirmed: replace optimistic with real message in cache
         queryClient.setQueryData(
           ['chat-messages', roomId],
           (oldData: ChatRoomMessagesResponse | undefined) => {
             const existingMessages = oldData?.messages || [];
+            const isDuplicate = existingMessages.some(m => m.id === response.id);
+            if (isDuplicate) return oldData;
             const updatedMessages = [...existingMessages, response].sort(
               (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
             );
-
             return {
               ...oldData,
               messages: updatedMessages,
@@ -1120,47 +1213,76 @@ export function TeamChatModern() {
             };
           }
         );
+        // 4. Remove the optimistic entry and force re-render in one state batch
+        setOptimisticMessages(prev => prev.filter(m => m.optimisticId !== tempId));
 
-        // Trigger re-render without refetch
-        queryClient.invalidateQueries({ queryKey: ['chat-messages', roomId], refetchType: 'none' });
-
-        // Reset states
-        setMessageInput('');
-        setSelectedFile(null);
-        if (filePreviewUrl) {
-          URL.revokeObjectURL(filePreviewUrl);
-          setFilePreviewUrl(null);
-        }
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
+        // 5. Force React Query to notify subscribers of the cache change
+        queryClient.invalidateQueries({ queryKey: ['chat-messages', roomId], refetchType: 'active' });
       } catch (error) {
         console.error('❌ [SEND ERROR] Failed to send message with attachment:', error);
+        // 5. Mark optimistic message as errored
+        setOptimisticMessages(prev =>
+          prev.map(m => m.optimisticId === tempId ? { ...m, optimisticStatus: 'error' } : m)
+        );
       } finally {
         setIsUploadingFile(false);
       }
       return;
     }
+
+    // Text-only via WebSocket 
+    if (!roomId) {
+      console.error('❌ [SEND ERROR] No active room');
+      return;
+    }
+
+    const tempId = `optimistic-${Date.now()}-${Math.random()}`;
+    const optimisticMsg = buildOptimisticMessage(roomId, content, tempId);
+
+    // 1. Immediately render optimistic message
+    setOptimisticMessages(prev => [...prev, optimisticMsg]);
+
+    // 2. Clear input immediately
     setMessageInput('');
+    setRichHtmlContent('');
 
-    // Send via Gateway WebSocket if project room is selected
-    if (selectedProjectRoom && gatewaySocketRef.current) {
-      gatewaySocketRef.current.sendMessage(selectedProjectRoom.id, content);
-      return;
-    }
+    const sendViaWebSocket = () => {
+      if (selectedProjectRoom && gatewaySocketRef.current) {
+        gatewaySocketRef.current.sendMessage(selectedProjectRoom.id, content);
+        return true;
+      }
+      if (selectedTeamRoom && gatewaySocketRef.current) {
+        gatewaySocketRef.current.sendMessage(selectedTeamRoom.id, content);
+        return true;
+      }
+      if (activeRoom && gatewaySocketRef.current) {
+        gatewaySocketRef.current.sendMessage(activeRoom.id, content);
+        return true;
+      }
+      return false;
+    };
 
-    // Send via Gateway WebSocket if team room is selected
-    if (selectedTeamRoom && gatewaySocketRef.current) {
-      gatewaySocketRef.current.sendMessage(selectedTeamRoom.id, content);
-      return;
-    }
+    const sent = sendViaWebSocket();
 
-    // Send via Gateway WebSocket for private rooms
-    if (activeRoom && gatewaySocketRef.current) {
-      gatewaySocketRef.current.sendMessage(activeRoom.id, content);
-    } else {
+    if (!sent) {
       console.error('❌ [SEND ERROR] No active Gateway WebSocket connection');
+      // Mark as error immediately if no socket
+      setOptimisticMessages(prev =>
+        prev.map(m => m.optimisticId === tempId ? { ...m, optimisticStatus: 'error' } : m)
+      );
+      return;
     }
+
+    // 3. The WebSocket echo
+    setTimeout(() => {
+      setOptimisticMessages(prev => {
+        const still = prev.find(m => m.optimisticId === tempId);
+        if (still && still.optimisticStatus === 'sending') {
+          return prev.map(m => m.optimisticId === tempId ? { ...m, optimisticStatus: 'error' } : m);
+        }
+        return prev;
+      });
+    }, 10000);
   };
 
   // Delete Message Mutation
@@ -1210,41 +1332,52 @@ export function TeamChatModern() {
       alert('Failed to update favourite status. Please try again.');
     },
   });
-  
+
   function ToastNotificationComponent({ toast }: { toast: ToastNotification }) {
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      handleClose();
-    }, 5000);
+    useEffect(() => {
+      const timer = setTimeout(() => {
+        handleClose();
+      }, 5000);
 
-    return () => clearTimeout(timer); 
-  }, []);
+      return () => clearTimeout(timer);
+    }, []);
 
-  const handleClose = () => {
-    setToastNotifications(prev => prev.filter(t => t.id !== toast.id));
-  };
+    const handleClose = () => {
+      setToastNotifications(prev => prev.filter(t => t.id !== toast.id));
+    };
 
-  return (
-   <div className="flex items-start gap-3 p-4 bg-white rounded-lg shadow-lg border border-gray-200 min-w-[300px] max-w-[400px] animate-slide-in">
-      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center font-semibold text-blue-700 text-sm flex-shrink-0">
-        {toast.sender_name.charAt(0).toUpperCase()}
+    return (
+      <div className="flex items-start gap-3 p-4 bg-white rounded-lg shadow-lg border border-gray-200 min-w-[300px] max-w-[400px] animate-slide-in">
+        <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center font-semibold text-blue-700 text-sm flex-shrink-0">
+          {toast.sender_name.charAt(0).toUpperCase()}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-sm text-gray-900">{toast.sender_name}</p>
+          <p className="text-xs text-gray-600 mt-0.5 truncate">{toast.message_preview}</p>
+        </div>
+        <button
+          onClick={() => setToastNotifications(prev => prev.filter(t => t.id !== toast.id))}
+          className="text-gray-400 hover:text-gray-600 flex-shrink-0 transition-colors"
+        >
+          <X className="h-4 w-4" />
+        </button>
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="font-semibold text-sm text-gray-900">{toast.sender_name}</p>
-        <p className="text-xs text-gray-600 mt-0.5 truncate">{toast.message_preview}</p>
-      </div>
-      <button
-        onClick={() => setToastNotifications(prev => prev.filter(t => t.id !== toast.id))}
-        className="text-gray-400 hover:text-gray-600 flex-shrink-0 transition-colors"
-      >
-        <X className="h-4 w-4" />
-      </button>
-    </div>
-  );
-}
+    );
+  }
 
   return (
     <div className="flex h-screen bg-[#f3f2f1] overflow-hidden border-2 border-gray-200">
+      {previewDoc && (
+        <div className="fixed inset-0 z-[200]">
+          <DocumentPreview
+            url={previewDoc.url}
+            fileName={previewDoc.fileName}
+            fileType={previewDoc.fileType}
+            onClose={() => setPreviewDoc(null)}
+            defaultFullscreen={false}
+          />
+        </div>
+      )}
       {/* Toast Notifications Container */}
       <div className="fixed top-4 right-4 z-50 space-y-2">
         {toastNotifications.map(toast => (
@@ -1282,7 +1415,7 @@ export function TeamChatModern() {
         </div>
 
         {/* Tab Navigation */}
-       <Tabs.Root value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+        <Tabs.Root value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
           <Tabs.List className="flex items-center gap-1 px-3 py-2 bg-white border-b border-gray-200">
             <Tabs.Trigger
               value="chats"
@@ -1377,7 +1510,9 @@ export function TeamChatModern() {
                                 "text-xs truncate",
                                 hasUnreadMessages ? "font-semibold text-gray-900" : "text-gray-600"
                               )}>
-                                {user.lastMessageContent || 'No messages yet'}
+                                {user.lastMessageContent
+                                  ? user.lastMessageContent.replace(/<[^>]*>/g, '').trim() || 'Sent a message'
+                                  : 'No messages yet'}
                               </p>
                               {unreadCount > 0 && (
                                 <span className="ml-2 flex-shrink-0 h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
@@ -1429,7 +1564,9 @@ export function TeamChatModern() {
                           <div className="flex-1 min-w-0 text-left">
                             <p className="text-sm font-medium text-gray-900 truncate">{project.name}</p>
                             <p className="text-xs text-gray-600 truncate">
-                              {project.last_message?.content_preview || 'No messages yet'}
+                              {project.last_message?.content_preview
+                                ? project.last_message.content_preview.replace(/<[^>]*>/g, '').trim() || 'Sent a message'
+                                : 'No messages yet'}
                             </p>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
@@ -1484,7 +1621,14 @@ export function TeamChatModern() {
                           </div>
                           <div className="flex-1 min-w-0 text-left">
                             <p className="text-sm font-medium text-gray-900 truncate">{team.name}</p>
-                            <p className="text-xs text-gray-600 truncate">Team Chat</p>
+                            <p className="text-xs text-gray-600 truncate">
+                              {(() => {
+                                const lastMsg = (team.last_message as any);
+                                if (!lastMsg) return 'No messages yet';
+                                const raw = lastMsg.content_preview || lastMsg.content || '';
+                                return raw.replace(/<[^>]*>/g, '').trim() || 'Sent a message';
+                              })()}
+                            </p>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
                             {isFavourite && (
@@ -1765,227 +1909,266 @@ export function TeamChatModern() {
                               </div>
                             )}
 
-                          <div
-                            className={cn("flex gap-2 group relative", isOwn ? "flex-row-reverse" : "")}
-                            onMouseEnter={() => setHoveredMessageId(message.id)}
-                            onMouseLeave={() => setHoveredMessageId(null)}
-                          >
-                            {/* Avatar */}
-                            <div className="flex-shrink-0">
-                              {showAvatar ? (
-                                <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center font-semibold text-white text-sm shadow-sm">
-                                  {message.sender.username.charAt(0).toUpperCase()}
-                                </div>
-                              ) : (
-                                <div className="h-9 w-9" />
-                              )}
-                            </div>
+                            <div
+                              className={cn("flex gap-2 group relative", isOwn ? "flex-row-reverse" : "")}
+                              onMouseEnter={() => setHoveredMessageId(message.id)}
+                              onMouseLeave={() => setHoveredMessageId(null)}
+                            >
+                              {/* Avatar */}
+                              <div className="flex-shrink-0">
+                                {showAvatar ? (
+                                  <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center font-semibold text-white text-sm shadow-sm">
+                                    {message.sender.username.charAt(0).toUpperCase()}
+                                  </div>
+                                ) : (
+                                  <div className="h-9 w-9" />
+                                )}
+                              </div>
 
-                            {/* Message Content */}
-                            <div className={cn("flex-1 max-w-[65%]", isOwn ? "flex flex-col items-end" : "flex flex-col items-start")}>
-                              {showAvatar && (
-                                <div className={cn("flex items-baseline gap-2 mb-1", isOwn ? "flex-row-reverse" : "")}>
-                                  <span className={cn(
-                                    "text-xs font-medium",
-                                    isOwn ? "text-gray-700" : "text-gray-900"
-                                  )}>
-                                    {message.sender.full_name || message.sender.username}
-                                  </span>
-                                  <span className="text-[11px] text-gray-400 font-normal">
-                                    {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                  </span>
-                                </div>
-                              )}
+                              {/* Message Content */}
+                              <div className={cn("flex-1 max-w-[65%]", isOwn ? "flex flex-col items-end" : "flex flex-col items-start")}>
+                                {showAvatar && (
+                                  <div className={cn("flex items-baseline gap-2 mb-1", isOwn ? "flex-row-reverse" : "")}>
+                                    <span className={cn(
+                                      "text-xs font-medium",
+                                      isOwn ? "text-gray-700" : "text-gray-900"
+                                    )}>
+                                      {message.sender.full_name || message.sender.username}
+                                    </span>
+                                    <span className="text-[11px] text-gray-400 font-normal">
+                                      {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                  </div>
+                                )}
 
-                              <div className="relative">
-                                <div
-                                  className={cn(
-                                    "px-3 py-2 rounded-lg text-sm break-words shadow-sm max-w-full",
-                                    isOwn
-                                      ? "bg-[#005c4b] text-white rounded-br-none"
-                                      : "bg-white text-gray-900 border border-gray-100 rounded-bl-none"
-                                  )}
-                                  style={{
-                                    minWidth: '60px',
-                                    wordBreak: 'break-word',
-                                    overflowWrap: 'break-word'
-                                  }}
-                                >
-                                  {message.content && <div>{message.content}</div>}
+                                <div className="relative">
+                                  {(() => {
+                                    // Strip HTML tags to get plain text for emoji detection
+                                    const plainText = message.content
+                                      ? message.content.replace(/<[^>]*>/g, '').trim()
+                                      : '';
+                                    const isEmojiOnly = plainText.length > 0 &&
+                                      /^[\p{Emoji}\p{Emoji_Presentation}\p{Emoji_Modifier}\p{Emoji_Component}\s]+$/u.test(plainText) &&
+                                      !/[a-zA-Z0-9]/.test(plainText);
 
-                                  {/* Attachment */}
-                                  {message.attachment && (
-                                    <div className={message.content ? "mt-2 pt-2 border-t border-blue-500" : ""}>
-                                      <a
-                                        href={message.attachment}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex items-center gap-2 text-xs hover:underline"
+                                    return (
+                                      <div
+                                        className={cn(
+                                          "text-sm break-words max-w-full",
+                                          isEmojiOnly
+                                            ? "px-1 py-1"
+                                            : cn(
+                                              "px-3 py-2 rounded-lg shadow-sm",
+                                              isOwn
+                                                ? "bg-[#7699a3] text-white rounded-br-none"
+                                                : "bg-white text-gray-900 border border-gray-100 rounded-bl-none"
+                                            )
+                                        )}
+                                        style={{
+                                          minWidth: isEmojiOnly ? undefined : '60px',
+                                          wordBreak: 'break-word',
+                                          overflowWrap: 'break-word'
+                                        }}
                                       >
-                                        <Paperclip className="h-3 w-3" />
-                                        {message.attachment_name || 'Attachment'}
-                                      </a>
+                                        {message.content && (
+                                          <div
+                                            className={cn(
+                                              "prose prose-sm max-w-none break-words",
+                                              isEmojiOnly
+                                                ? "[&_p]:m-0 [&_p]:text-4xl [&_p]:leading-none"
+                                                : isOwn
+                                                  ? "prose-invert [&_*]:text-white [&_a]:text-blue-200 [&_code]:bg-green-800 [&_code]:text-green-100 [&_blockquote]:border-green-400"
+                                                  : "[&_a]:text-blue-600 [&_code]:bg-gray-100 [&_code]:text-red-600"
+                                            )}
+                                            dangerouslySetInnerHTML={{ __html: message.content }}
+                                          />
+                                        )}
+                                        {/* Attachment */}
+                                        {message.attachment && (
+                                          <div className={message.content ? "mt-2 pt-2 border-t border-blue-500" : ""}>
+                                            {(message as OptimisticChatMessage).optimisticStatus === 'sending' ? (
+                                              <div className="flex items-center gap-2 text-xs opacity-70">
+                                                <Loader2 className="h-3 w-3 animate-spin" />
+                                                <span>{(message as OptimisticChatMessage).attachment_name || 'Uploading file…'}</span>
+                                              </div>
+                                            ) : (
+                                              <DocumentThumbnail
+                                                url={message.attachment}
+                                                fileName={message.attachment_name || 'Attachment'}
+                                                onClick={() => setPreviewDoc({
+                                                  url: message.attachment!,
+                                                  fileName: message.attachment_name || 'Attachment',
+                                                })}
+                                                className="w-40"
+                                              />
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
+
+                                  {/* Optimistic status indicator */}
+                                  {isOwn && (message as OptimisticChatMessage).optimisticStatus === 'sending' && (
+                                    <div className="flex justify-end mt-1">
+                                      <span className="flex items-center gap-1 text-[10px] text-gray-400">
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                        Sending…
+                                      </span>
+                                    </div>
+                                  )}
+                                  {isOwn && (message as OptimisticChatMessage).optimisticStatus === 'error' && (
+                                    <div className="flex justify-end mt-1">
+                                      <button
+                                        onClick={() => handleRetryMessage(message as OptimisticChatMessage)}
+                                        className="flex items-center gap-1 text-[10px] text-red-500 hover:text-red-700 transition-colors"
+                                        title="Failed to send — click to retry"
+                                      >
+                                        <AlertCircle className="h-3 w-3" />
+                                        Failed to send
+                                        <RotateCcw className="h-3 w-3 ml-0.5" />
+                                      </button>
+                                    </div>
+                                  )}
+
+
+                                  {/* Quick Actions on Hover */}
+                                  {(isHovered || menuOpen) && (
+                                    <div
+                                      className={cn(
+                                        "absolute top-0 flex items-center gap-0.5 bg-white border border-gray-200 rounded-lg shadow-sm px-1 py-0.5",
+                                        isOwn ? "right-full mr-2" : "left-full ml-2"
+                                      )}
+                                    >
+                                      {/* Quick Emoji Reactions */}
+                                      <button
+                                        onClick={() => handleQuickReaction(message.id, '👍')}
+                                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                        title="Like"
+                                      >
+                                        <span className="text-xs">👍</span>
+                                      </button>
+                                      <button
+                                        onClick={() => handleQuickReaction(message.id, '❤️')}
+                                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                        title="Love"
+                                      >
+                                        <span className="text-xs">❤️</span>
+                                      </button>
+                                      <button
+                                        onClick={() => handleQuickReaction(message.id, '😊')}
+                                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                        title="Smile"
+                                      >
+                                        <span className="text-xs">😊</span>
+                                      </button>
+
+                                      <div className="h-4 w-px bg-gray-200 mx-0.5" />
+
+                                      {/* More Reactions Button */}
+                                      <button
+                                        onClick={() => setShowReactionPicker(showReactionPicker === message.id ? null : message.id)}
+                                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                        title="More reactions"
+                                      >
+                                        <Smile className="h-3.5 w-3.5 text-gray-600" />
+                                      </button>
+
+                                      {/* More Options Menu */}
+                                      <button
+                                        onClick={() => setOpenMenuMessageId(menuOpen ? null : message.id)}
+                                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                        title="More options"
+                                      >
+                                        <MoreVertical className="h-3.5 w-3.5 text-gray-600" />
+                                      </button>
+
+                                      {/* Dropdown Menu */}
+                                      {menuOpen && (
+                                        <div
+                                          ref={menuRef}
+                                          className={cn(
+                                            "absolute top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-48 z-50",
+                                            isOwn ? "right-0" : "left-0"
+                                          )}
+                                        >
+                                          <button
+                                            onClick={() => handleReplyWithQuote(message)}
+                                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                          >
+                                            <Reply className="h-4 w-4" />
+                                            Reply
+                                          </button>
+                                          <button
+                                            onClick={() => handleForward(message)}
+                                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                          >
+                                            <Forward className="h-4 w-4" />
+                                            Forward
+                                          </button>
+                                          <button
+                                            onClick={() => handleCopyLink(message)}
+                                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                          >
+                                            <Link2 className="h-4 w-4" />
+                                            Copy link
+                                          </button>
+                                          <button
+                                            onClick={() => handlePinMessage(message)}
+                                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                          >
+                                            <Pin className="h-4 w-4" />
+                                            Pin message
+                                          </button>
+                                          <button
+                                            onClick={() => handleSaveMessage(message)}
+                                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                          >
+                                            <Bookmark className="h-4 w-4" />
+                                            Save
+                                          </button>
+                                          <button
+                                            onClick={() => handleMarkAsUnread(message)}
+                                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                          >
+                                            <MailOpen className="h-4 w-4" />
+                                            Mark as unread
+                                          </button>
+                                          <div className="h-px bg-gray-200 my-1" />
+                                          {isOwn && (
+                                            <button
+                                              onClick={() => handleDeleteMessage(message.id)}
+                                              className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
+                                            >
+                                              <Trash2 className="h-4 w-4" />
+                                              Delete
+                                            </button>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* Display Reactions */}
+                                  {reactions && reactions.size > 0 && (
+                                    <div className={cn(
+                                      "flex gap-1 mt-1",
+                                      isOwn ? "justify-end" : ""
+                                    )}>
+                                      {Array.from(reactions.entries()).map(([emoji, count]) => (
+                                        <span
+                                          key={emoji}
+                                          className="inline-flex items-center gap-1 px-2 py-0.5 bg-white border border-gray-200 rounded-full text-xs"
+                                        >
+                                          <span>{emoji}</span>
+                                          <span className="text-gray-600">{count}</span>
+                                        </span>
+                                      ))}
                                     </div>
                                   )}
                                 </div>
-
-                                {/* Quick Actions on Hover */}
-                                {(isHovered || menuOpen) && (
-                                  <div
-                                    className={cn(
-                                      "absolute top-0 flex items-center gap-0.5 bg-white border border-gray-200 rounded-lg shadow-sm px-1 py-0.5",
-                                      isOwn ? "right-full mr-2" : "left-full ml-2"
-                                    )}
-                                  >
-                                    {/* Quick Emoji Reactions */}
-                                    <button
-                                      onClick={() => handleQuickReaction(message.id, '👍')}
-                                      className="p-1 hover:bg-gray-100 rounded transition-colors"
-                                      title="Like"
-                                    >
-                                      <span className="text-xs">👍</span>
-                                    </button>
-                                    <button
-                                      onClick={() => handleQuickReaction(message.id, '❤️')}
-                                      className="p-1 hover:bg-gray-100 rounded transition-colors"
-                                      title="Love"
-                                    >
-                                      <span className="text-xs">❤️</span>
-                                    </button>
-                                    <button
-                                      onClick={() => handleQuickReaction(message.id, '😊')}
-                                      className="p-1 hover:bg-gray-100 rounded transition-colors"
-                                      title="Smile"
-                                    >
-                                      <span className="text-xs">😊</span>
-                                    </button>
-
-                                    <div className="h-4 w-px bg-gray-200 mx-0.5" />
-
-                                    {/* More Reactions Button */}
-                                    <button
-                                      onClick={() => setShowReactionPicker(showReactionPicker === message.id ? null : message.id)}
-                                      className="p-1 hover:bg-gray-100 rounded transition-colors"
-                                      title="More reactions"
-                                    >
-                                      <Smile className="h-3.5 w-3.5 text-gray-600" />
-                                    </button>
-
-                                    {/* More Options Menu */}
-                                    <button
-                                      onClick={() => setOpenMenuMessageId(menuOpen ? null : message.id)}
-                                      className="p-1 hover:bg-gray-100 rounded transition-colors"
-                                      title="More options"
-                                    >
-                                      <MoreVertical className="h-3.5 w-3.5 text-gray-600" />
-                                    </button>
-
-                                    {/* Emoji Picker Popup */}
-                                    {showReactionPicker === message.id && (
-                                      <div
-                                        className={cn(
-                                          "absolute top-full mt-1 z-50",
-                                          isOwn ? "right-0" : "left-0"
-                                        )}
-                                      >
-                                        <Suspense fallback={<div style={{ width: 280, height: 350 }} className="rounded-lg border bg-white shadow-md" />}>
-                                          <EmojiPicker
-                                            onEmojiClick={(emojiData) => handleReactionFromPicker(message.id, emojiData)}
-                                            width={280}
-                                            height={350}
-                                            searchPlaceHolder="Search emoji..."
-                                            previewConfig={{ showPreview: false }}
-                                          />
-                                        </Suspense>
-                                      </div>
-                                    )}
-
-                                    {/* Dropdown Menu */}
-                                    {menuOpen && (
-                                      <div
-                                        ref={menuRef}
-                                        className={cn(
-                                          "absolute top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-48 z-50",
-                                          isOwn ? "right-0" : "left-0"
-                                        )}
-                                      >
-                                        <button
-                                          onClick={() => handleReplyWithQuote(message)}
-                                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
-                                        >
-                                          <Reply className="h-4 w-4" />
-                                          Reply
-                                        </button>
-                                        <button
-                                          onClick={() => handleForward(message)}
-                                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
-                                        >
-                                          <Forward className="h-4 w-4" />
-                                          Forward
-                                        </button>
-                                        <button
-                                          onClick={() => handleCopyLink(message)}
-                                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
-                                        >
-                                          <Link2 className="h-4 w-4" />
-                                          Copy link
-                                        </button>
-                                        <button
-                                          onClick={() => handlePinMessage(message)}
-                                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
-                                        >
-                                          <Pin className="h-4 w-4" />
-                                          Pin message
-                                        </button>
-                                        <button
-                                          onClick={() => handleSaveMessage(message)}
-                                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
-                                        >
-                                          <Bookmark className="h-4 w-4" />
-                                          Save
-                                        </button>
-                                        <button
-                                          onClick={() => handleMarkAsUnread(message)}
-                                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
-                                        >
-                                          <MailOpen className="h-4 w-4" />
-                                          Mark as unread
-                                        </button>
-                                        <div className="h-px bg-gray-200 my-1" />
-                                        {isOwn && (
-                                          <button
-                                            onClick={() => handleDeleteMessage(message.id)}
-                                            className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
-                                          >
-                                            <Trash2 className="h-4 w-4" />
-                                            Delete
-                                          </button>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-
-                                {/* Display Reactions */}
-                                {reactions && reactions.size > 0 && (
-                                  <div className={cn(
-                                    "flex gap-1 mt-1",
-                                    isOwn ? "justify-end" : ""
-                                  )}>
-                                    {Array.from(reactions.entries()).map(([emoji, count]) => (
-                                      <span
-                                        key={emoji}
-                                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-white border border-gray-200 rounded-full text-xs"
-                                      >
-                                        <span>{emoji}</span>
-                                        <span className="text-gray-600">{count}</span>
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
                               </div>
                             </div>
-                          </div>
                           </div>
                         );
                       })}
@@ -1995,152 +2178,43 @@ export function TeamChatModern() {
                 </div>
 
                 {/* Message Input */}
-                <div className="p-4 bg-white border-t border-gray-200"
+                <div className=" bg-white border-t border-gray-200"
                   onDragEnter={handleDragEnter}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
                 >
-                  <div className="flex items-center gap-2">
-                    {/* Attachment Button */}
-                    <>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        onChange={handleFileSelect}
-                        className="hidden"
-                        accept="*"
-                      />
-                      <button
-                        onClick={handleAttachmentClick}
-                        className="p-2 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
-                      >
-                        <Paperclip className="h-5 w-5 text-gray-600" />
-                      </button>
-                    </>
+                  <>
+                    {/* Hidden file input */}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                      accept="*"
+                    />
 
-                    {/* Input Area */}
-                    <div className="flex-1 relative">
-
-                      {/* File Preview */}
-                      {selectedFile && (
-                        <div className="absolute bottom-full left-0 mb-2 bg-white border border-gray-300 rounded-lg shadow-lg overflow-hidden max-w-[300px]">
-                          {filePreviewUrl ? (
-                            // Image Preview
-                            <div className="relative">
-                              <img
-                                src={filePreviewUrl}
-                                alt="Preview"
-                                className="w-full h-auto max-h-[200px] object-contain bg-gray-50"
-                              />
-                              <button
-                                onClick={() => {
-                                  setSelectedFile(null);
-                                  setFilePreviewUrl(null);
-                                  if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
-                                  if (fileInputRef.current) fileInputRef.current.value = '';
-                                }}
-                                className="absolute top-2 right-2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white rounded-full p-1.5 transition-all"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
-                              <div className="px-3 py-2 bg-gray-50 border-t border-gray-200">
-                                <p className="text-xs text-gray-700 truncate font-medium">
-                                  {selectedFile.name}
-                                </p>
-                                <p className="text-[10px] text-gray-500">
-                                  {(selectedFile.size / 1024).toFixed(1)} KB
-                                </p>
-                              </div>
-                            </div>
-                          ) : (
-                            // Non-Image File Preview
-                            <div className="p-3 flex items-center gap-3">
-                              <div className="bg-blue-100 p-2 rounded">
-                                <Paperclip className="h-5 w-5 text-blue-600" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs text-gray-900 font-medium truncate">
-                                  {selectedFile.name}
-                                </p>
-                                <p className="text-[10px] text-gray-500">
-                                  {(selectedFile.size / 1024).toFixed(1)} KB
-                                </p>
-                              </div>
-                              <button
-                                onClick={() => {
-                                  setSelectedFile(null);
-                                  setFilePreviewUrl(null);
-                                  if (fileInputRef.current) fileInputRef.current.value = '';
-                                }}
-                                className="text-gray-400 hover:text-gray-600 flex-shrink-0"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      <textarea
-                        value={messageInput}
-                        onChange={(e) => setMessageInput(e.target.value)}
-                        onKeyPress={handleKeyPress}
-                        placeholder="Type a message"
-                        rows={1}
-                        className="w-full px-3 py-2 pr-24 text-sm border border-gray-300 rounded resize-none focus:outline-none focus:border-blue-500 max-h-32"
-                        style={{ fieldSizing: 'content' } as any}
-                      />
-
-                      {/* Right side buttons in input */}
-                      <div className="absolute right-2 bottom-2 flex items-center gap-1" ref={emojiPickerRef}>
-                        <button
-                          onClick={toggleEmojiPicker}
-                          className={cn(
-                            "p-1.5 rounded transition-colors",
-                            showEmojiPicker ? "bg-blue-100" : "hover:bg-gray-100"
-                          )}
-                        >
-                          <Smile className={cn(
-                            "h-4 w-4",
-                            showEmojiPicker ? "text-blue-600" : "text-gray-600"
-                          )} />
-                        </button>
-
-                        {/* Emoji Picker Popup */}
-                        {showEmojiPicker && (
-                          <div className="absolute bottom-full right-0 mb-2 z-50">
-                            <Suspense fallback={<div style={{ width: 320, height: 400 }} className="rounded-lg border bg-white shadow-md" />}>
-                              <EmojiPicker
-                                onEmojiClick={handleEmojiClick}
-                                width={320}
-                                height={400}
-                                searchPlaceHolder="Search emoji..."
-                                previewConfig={{ showPreview: false }}
-                              />
-                            </Suspense>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Send Button */}
-                    <button
-                      onClick={handleSendMessage}
-                      disabled={(!messageInput.trim() && !selectedFile) || isUploadingFile}
-                      className={cn(
-                        'p-2.5 rounded transition-colors flex-shrink-0',
-                        (messageInput.trim() || selectedFile) && !isUploadingFile
-                          ? 'bg-blue-600 text-white hover:bg-blue-700'
-                          : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                      )}
-                    >
-                      {isUploadingFile ? (
-                        <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <Send className="h-4 w-4" />
-                      )}
-                    </button>
-                  </div>
+                    <ChatMessageInput
+                      value={messageInput}
+                      onChange={(plainText, html) => {
+                        setMessageInput(plainText);
+                        setRichHtmlContent(html);
+                      }}
+                      onSend={handleSendMessage}
+                      onAttachmentClick={handleAttachmentClick}
+                      placeholder="Type a message…"
+                      disabled={false}
+                      isUploading={isUploadingFile}
+                      selectedFile={selectedFile}
+                      filePreviewUrl={filePreviewUrl}
+                      onRemoveFile={() => {
+                        setSelectedFile(null);
+                        setFilePreviewUrl(null);
+                        if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
+                        if (fileInputRef.current) fileInputRef.current.value = '';
+                      }}
+                    />
+                  </>
                 </div>
               </>
             ) : (
