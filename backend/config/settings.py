@@ -53,6 +53,7 @@ LOCAL_APPS = [
     "apps.chat",
     "apps.teams",
     "apps.organizations",
+    "apps.quicknotes",
     
 ]
 

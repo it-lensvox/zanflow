@@ -28,6 +28,7 @@ urlpatterns = [
         path("chat/", include("apps.chat.urls")),
         path("teams/", include("apps.teams.urls")),
         path("organizations/", include("apps.organizations.urls")),
+        path("quicknotes/", include("apps.quicknotes.urls")),
     ])),
     
     # API Documentation
