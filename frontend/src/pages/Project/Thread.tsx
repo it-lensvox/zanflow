@@ -516,7 +516,7 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
           onCancel={closePermissionDenied}
         />
 
-        <div className="fixed bottom-6 right-6 z-50">
+        <div className="z-50">
           <button
             onClick={() => {
               setIsExpanded(true);
@@ -533,7 +533,7 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
               )}
             </div>
             <div className="flex flex-col items-start">
-              <span className="font-medium text-gray-900 text-sm">Threads</span>
+              <span className="font-medium text-gray-900 text-sm">AI BOT</span>
               {totalUnread > 0 && (
                 <span className="text-xs text-red-500 font-medium leading-none">
                   {totalUnread} unread
@@ -753,7 +753,7 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
                     }
                   </button>
                   <div>
-                    <h3 className="font-semibold text-gray-900">Threads</h3>
+                    <h3 className="font-semibold text-gray-900">AI BOT</h3>
                     <p className="text-xs text-gray-500">{projectName}</p>
                   </div>
                 </div>
@@ -781,7 +781,7 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
         </div>
       ) : (
         /* DEFAULT MINI WIDGET */
-        <div className="fixed bottom-6 right-6 z-50">
+        <div className="z-50">
           <div
             className="bg-white rounded-lg shadow-2xl border border-gray-200 flex overflow-hidden"
             style={{ width: isHistoryPanelOpen ? '680px' : '400px', height: '600px', transition: 'width 0.3s ease' }}
@@ -810,7 +810,7 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
                     }
                   </button>
                   <div className="min-w-0">
-                    <h3 className="font-semibold text-gray-900 text-sm truncate">Threads</h3>
+                    <h3 className="font-semibold text-gray-900 text-sm truncate">AI BOT</h3>
                     <p className="text-xs text-gray-500 truncate">{projectName}</p>
                   </div>
                 </div>

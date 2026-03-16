@@ -575,7 +575,7 @@ export function Dashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
-              <h2 className="text-xl font-bold">Recent Projects</h2>
+              <h2 className="text-xl font-bold">Favourite Projects</h2>
             </CardTitle>
             <Link to="/projects">
               <Button variant="ghost" size="sm">

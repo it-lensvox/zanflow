@@ -202,9 +202,10 @@ export const createDocumentsTableColumns = ({ onDeleteClick, onInfoClick }: Docu
 interface DocumentGridCardProps {
   document: Document;
   onDeleteClick: (e: React.MouseEvent, doc: Document) => void;
+  onCardClick?: (doc: Document) => void;
 }
 
-export function DocumentGridCard({ document: doc, onDeleteClick }: DocumentGridCardProps) {
+export function DocumentGridCard({ document: doc, onDeleteClick, onCardClick }: DocumentGridCardProps) {
   const getStatusConfig = (status: DocumentStatus) => {
     const normalizedStatus = status.toLowerCase() as Lowercase<DocumentStatus>;
 
@@ -231,7 +232,7 @@ export function DocumentGridCard({ document: doc, onDeleteClick }: DocumentGridC
 
   return (
     <div
-      onClick={() => window.location.href = `/documents/${doc.id}`}
+      onClick={() => onCardClick ? onCardClick(doc) : (window.location.href = `/documents/${doc.id}`)}
       className="bg-white rounded-xl p-4 transition-all duration-300 cursor-pointer text-gray-800 hover:shadow-lg hover:-translate-y-0.5 border border-[#d0d5dd] relative hover:z-50 h-full group"
     >
       {/* Header */}

@@ -1,4 +1,5 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { Plus, Grid3X3, List, Search, Bell } from 'lucide-react';
 import { useNavigate, Outlet, useLocation, useOutletContext } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -21,6 +22,8 @@ export const MyTask: React.FC = () => {
     const { user } = useAuth();
     const queryClient = useQueryClient();
     const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
+    const [dateField, setDateField] = useState<'end_date' | 'start_date' | 'created_at'>('end_date');
+    const [showDateFieldDropdown, setShowDateFieldDropdown] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [showAITaskModal, setShowAITaskModal] = useState(false);
@@ -70,7 +73,7 @@ export const MyTask: React.FC = () => {
                 label: opt.label
             }))
         },
-        { key: 'end_date', type: 'date' },
+        { key: dateField, type: 'date' },
     ];
 
     // Use the centralized filter hook
@@ -111,10 +114,11 @@ export const MyTask: React.FC = () => {
             return matchesFilter && matchesSearch;
         });
     }, [hookFilteredTasks, activeFilter, searchQuery]);
-
     const handleFilter = useCallback((key: string) => {
+        console.log('[handleFilter] called with key:', key, '| dateField:', dateField, '| will reset showDateFieldDropdown');
+        setShowDateFieldDropdown(false);
         setActiveFilterKey(prev => prev === key ? null : key);
-    }, [setActiveFilterKey]);
+    }, [setActiveFilterKey, dateField]);
 
     const handleAITaskGenerate = useCallback(async (projectId: number, description: string) => {
         console.log('Generating AI task for project:', projectId, 'with description:', description);
@@ -125,7 +129,8 @@ export const MyTask: React.FC = () => {
         onTaskClick: handleTaskClick,
         queryClient,
         user,
-        navigate
+        navigate,
+        dateField,
     });
     const { unreadCount } = useNotifications();
 
@@ -133,6 +138,46 @@ export const MyTask: React.FC = () => {
         isActivityOpen: boolean;
         setIsActivityOpen: (open: boolean) => void;
     }>();
+
+    const DATE_FIELD_OPTIONS: { value: 'end_date' | 'start_date' | 'created_at'; label: string }[] = [
+        { value: 'end_date', label: 'Due Date' },
+        { value: 'start_date', label: 'Start Date' },
+        { value: 'created_at', label: 'Created At' },
+    ];
+    const activeDateLabel = DATE_FIELD_OPTIONS.find(o => o.value === dateField)?.label ?? 'Due Date';
+    const dateTriggerRef = useRef<HTMLButtonElement>(null);
+    const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
+    useEffect(() => {
+        if (!showDateFieldDropdown) return;
+        const handler = (e: MouseEvent) => {
+            setShowDateFieldDropdown(false);
+            setDropdownPos(null);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [showDateFieldDropdown]);
+
+    const DateFieldLabel = useMemo(() => (
+        <button
+            ref={dateTriggerRef}
+            onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                if (dateTriggerRef.current) {
+                    const rect = dateTriggerRef.current.getBoundingClientRect();
+                    setDropdownPos({ top: rect.bottom + window.scrollY + 4, left: rect.left + window.scrollX });
+                }
+                setShowDateFieldDropdown(v => !v);
+            }}
+            className="flex items-center gap-1 text-[14px] font-bold tracking-wide text-gray-700 hover:text-purple-600 transition-colors"
+        >
+            {activeDateLabel}
+            <svg className="w-3 h-3 mt-0.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+        </button>
+    ), [showDateFieldDropdown, dateField, activeDateLabel]);
+
     return (
         <div className="w-full p-8 space-y-8">
             {location.pathname.startsWith('/taskboard') && !location.pathname.endsWith('/create') ? (
@@ -234,11 +279,11 @@ export const MyTask: React.FC = () => {
                                                 /* Auto-Close for both search and dropdowns */
                                                 <div ref={activeFilterKey === col.key ? filterContainerRef : null}>
                                                     <FilterHeaderWrapper
-                                                        columnLabel={col.label as string}
+                                                        columnLabel={col.key === dateField ? DateFieldLabel : col.label as string}
                                                         filterType={
                                                             ['project', 'heading', 'labels'].includes(col.key) ? 'search' :
                                                                 ['status', 'priority'].includes(col.key) ? 'list' :
-                                                                    col.key === 'end_date' ? 'date' : 'none'
+                                                                    col.key === dateField ? 'date' : 'none'
                                                         }
                                                         isActive={activeFilterKey === col.key}
                                                         filterContent={
@@ -270,13 +315,13 @@ export const MyTask: React.FC = () => {
                                                                         containerRef={filterContainerRef}
                                                                     />
                                                                 )}
-                                                                {col.key === 'end_date' && (
+                                                                {col.key === dateField && (
                                                                     <DateFilter
-                                                                        columnKey="end_date"
-                                                                        value={columnFilters.end_date || ''}
-                                                                        onChange={(value) => { setColumnFilters(prev => ({ ...prev, end_date: value })); setActiveFilterKey(null); }}
-                                                                        onClear={() => { clearFilter('end_date'); setActiveFilterKey(null); }}
-                                                                        isActive={activeFilterKey === 'end_date'}
+                                                                        columnKey={dateField}
+                                                                        value={columnFilters[dateField] || ''}
+                                                                        onChange={(value) => { setColumnFilters(prev => ({ ...prev, [dateField]: value })); setActiveFilterKey(null); }}
+                                                                        onClear={() => { clearFilter(dateField); setActiveFilterKey(null); }}
+                                                                        isActive={activeFilterKey === dateField}
                                                                         containerRef={filterContainerRef}
                                                                     />
                                                                 )}
@@ -342,6 +387,31 @@ export const MyTask: React.FC = () => {
                     onClose={() => setIsActivityOpen(false)}
                     defaultFilter="unread"
                 />
+            )}
+            {showDateFieldDropdown && dropdownPos && ReactDOM.createPortal(
+                <div
+                    style={{ position: 'absolute', top: dropdownPos.top, left: dropdownPos.left, zIndex: 9999 }}
+                    className="bg-white border border-gray-200 rounded-lg shadow-lg min-w-[130px] py-1"
+                    onMouseDown={(e) => e.stopPropagation()}
+                >
+                    {DATE_FIELD_OPTIONS.map(opt => (
+                        <button
+                            key={opt.value}
+                            onMouseDown={(e) => {
+                                e.stopPropagation();
+                                setDateField(opt.value);
+                                setShowDateFieldDropdown(false);
+                                setDropdownPos(null);
+                                clearFilter(dateField);
+                                setActiveFilterKey(null);
+                            }}
+                            className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-purple-50 hover:text-purple-700 transition-colors ${dateField === opt.value ? 'font-semibold text-purple-600 bg-purple-50' : 'text-gray-700'}`}
+                        >
+                            {dateField === opt.value && <span className="mr-1.5">✓</span>}{opt.label}
+                        </button>
+                    ))}
+                </div>,
+                document.body
             )}
         </div>
     );

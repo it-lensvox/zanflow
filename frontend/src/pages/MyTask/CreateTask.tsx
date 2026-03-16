@@ -857,7 +857,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                                     <div>
                                         <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
                                             <User className="w-4 h-4" />
-                                            Assignees <span className="text-red-500">*</span>
+                                           Assignees
                                         </label>
                                         <div className="relative" data-dropdown="assignee">
                                             {/* Main input field - shows selected users + allows typing */}
