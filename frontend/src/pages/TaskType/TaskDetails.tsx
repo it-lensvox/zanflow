@@ -924,10 +924,6 @@ export function TaskDetails() {
                     />
                 )
             }
-            {/* Threads Component */}
-            {project && (
-                <Threads projectId={project.id} projectName={project.name} />
-            )}
             <DeleteModal
                 isOpen={!!deleteConfirm}
                 type="confirm"

@@ -1042,10 +1042,6 @@ export function ContentCreation() {
                     onClose={() => setPreviewDocument(null)}
                 />
             )}
-            {/* Threads Component */}
-            {project && (
-                <Threads projectId={project.id} projectName={project.name} />
-            )}
             <DeleteModal
                 isOpen={!!deleteConfirm}
                 type="confirm"

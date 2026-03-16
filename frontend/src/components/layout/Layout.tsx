@@ -1,11 +1,13 @@
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
-import { useState, Suspense } from 'react';
+import { useState, Suspense, useMemo } from 'react';
 import { NotificationsPage } from '@/pages/NotificationsPage';
 import { QuickNotes } from '@/components/QuickNotes';
+import Threads from '@/pages/Project/Thread';
+import { useQuery } from '@tanstack/react-query';
+import { projectsApi } from '@/services/api';
 
-// Skeleton shown inside the content area while a lazy page chunk loads.
-// Sidebar stays fully mounted and visible — only this placeholder swaps in.
+// Sidebar stays fully mounted and visible
 function PageSkeleton() {
   return (
     <div className="h-full flex flex-col animate-pulse p-6 gap-4">
@@ -45,6 +47,36 @@ function PageSkeleton() {
 
 export function Layout() {
   const [isActivityOpen, setIsActivityOpen] = useState(false);
+  const location = useLocation();
+const activeProjectId = useMemo(() => {
+    const projectMatch = location.pathname.match(/\/projects\/(\d+)/);
+    const chatMatch = location.pathname.match(/\/team-chat\/(\d+)/);
+    return projectMatch?.[1] || chatMatch?.[1] || null;
+  }, [location.pathname]);
+
+  // Fetch all projects as fallback for pages with no project in URL
+  const { data: allProjectsData } = useQuery({
+    queryKey: ['projects'],
+    queryFn: () => projectsApi.list(),
+    staleTime: Infinity, // already fetched by Sidebar — reuse cache, no extra request
+  });
+
+  const fallbackProject = useMemo(() => {
+    if (!allProjectsData) return null;
+    const list = Array.isArray(allProjectsData)
+      ? allProjectsData
+      : (allProjectsData as any)?.results || [];
+    return list[0] || null;
+  }, [allProjectsData]);
+
+  // Use URL project if available, else fall back to first project in list
+  const resolvedProjectId = activeProjectId ?? (fallbackProject?.id ? String(fallbackProject.id) : null);
+
+  const { data: activeProject } = useQuery({
+    queryKey: ['project', resolvedProjectId],
+    queryFn: () => projectsApi.get(Number(resolvedProjectId)),
+    enabled: !!resolvedProjectId,
+  });
 
   return (
     <div className="flex h-screen bg-background">
@@ -64,6 +96,14 @@ export function Layout() {
         <NotificationsPage onClose={() => setIsActivityOpen(false)} />
       )}
       <QuickNotes />
+      {resolvedProjectId && activeProject && (
+        <div style={{ position: 'fixed', bottom: '24px', right: '80px', zIndex: 50 }}>
+          <Threads
+            projectId={Number(resolvedProjectId)}
+            projectName={activeProject.name}
+          />
+        </div>
+      )}
     </div>
   );
 }
