@@ -835,6 +835,22 @@ export function TeamChatModern() {
     });
   }, [filteredUsers, chatListVersion, unreadCounts]);
 
+  // Highlight tab when it has unread messages
+  const tabHasUnread = useMemo(() => {
+    const chats = sortedUsers.some(user => {
+      const roomId = userRoomMap.get(user.id);
+      return (roomId && (unreadCounts.get(roomId) || 0) > 0) || (user as any).isUnread;
+    });
+
+    const projects = projectRooms.some(project => (unreadCounts.get(project.id) || 0) > 0);
+
+    const teams = teamRooms.some(team => (unreadCounts.get(team.id) || 0) > 0);
+
+    const unread = unreadUsers.length > 0;
+
+    return { chats, projects, teams, unread };
+  }, [sortedUsers, projectRooms, teamRooms, unreadUsers, unreadCounts, userRoomMap, chatListVersion]);
+
   // Shared documents from messages
   const sharedDocuments = useMemo(() => {
     return messages.filter(msg => msg.attachment).map(msg => ({
@@ -1419,25 +1435,49 @@ export function TeamChatModern() {
           <Tabs.List className="flex items-center gap-1 px-3 py-2 bg-white border-b border-gray-200">
             <Tabs.Trigger
               value="chats"
-              className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+              className={cn(
+                "px-4 py-1.5 text-xs font-medium rounded-full transition-all",
+                "data-[state=active]:bg-blue-600 data-[state=active]:text-white",
+                activeTab !== 'chats' && tabHasUnread.chats
+                  ? "bg-gray-800 text-white hover:bg-gray-700"
+                  : "data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+              )}
             >
               Chats
             </Tabs.Trigger>
             <Tabs.Trigger
               value="projects"
-              className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+              className={cn(
+                "px-4 py-1.5 text-xs font-medium rounded-full transition-all",
+                "data-[state=active]:bg-blue-600 data-[state=active]:text-white",
+                activeTab !== 'projects' && tabHasUnread.projects
+                  ? "bg-gray-800 text-white hover:bg-gray-700"
+                  : "data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+              )}
             >
               Projects
             </Tabs.Trigger>
             <Tabs.Trigger
               value="teams"
-              className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+              className={cn(
+                "px-4 py-1.5 text-xs font-medium rounded-full transition-all",
+                "data-[state=active]:bg-blue-600 data-[state=active]:text-white",
+                activeTab !== 'teams' && tabHasUnread.teams
+                  ? "bg-gray-800 text-white hover:bg-gray-700"
+                  : "data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+              )}
             >
               Teams
             </Tabs.Trigger>
             <Tabs.Trigger
               value="unread"
-              className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+              className={cn(
+                "px-4 py-1.5 text-xs font-medium rounded-full transition-all",
+                "data-[state=active]:bg-blue-600 data-[state=active]:text-white",
+                activeTab !== 'unread' && tabHasUnread.unread
+                  ? "bg-gray-800 text-white hover:bg-gray-700"
+                  : "data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+              )}
             >
               Unread
             </Tabs.Trigger>
@@ -1495,14 +1535,14 @@ export function TeamChatModern() {
                                 {isFavourite && (
                                   <Pin className="h-3.5 w-3.5 text-blue-600" />
                                 )}
-                                {user.lastMessageTime && (
+                                {/* {user.lastMessageTime && (
                                   <span className={cn(
                                     "text-[10px]",
                                     hasUnreadMessages ? "text-blue-600 font-semibold" : "text-gray-500"
                                   )}>
                                     {new Date(user.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                   </span>
-                                )}
+                                )} */}
                               </div>
                             </div>
                             <div className="flex items-center justify-between">
@@ -1681,11 +1721,11 @@ export function TeamChatModern() {
                               <p className="text-sm font-bold text-gray-900 truncate">
                                 {user.first_name || user.username}
                               </p>
-                              {user.lastMessageTime && (
+                              {/* {user.lastMessageTime && (
                                 <span className="text-[10px] ml-2 flex-shrink-0 text-blue-600 font-semibold">
                                   {new Date(user.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </span>
-                              )}
+                              )} */}
                             </div>
                             <div className="flex items-center justify-between">
                               <p className="text-xs font-semibold text-gray-900 truncate">
