@@ -31,6 +31,7 @@ from .views import (
     SendMessageView,
     DeleteMessageView,
     CreateThreadRoomView,
+    GetAIBotRoomView
 )
 
 urlpatterns = [
@@ -52,9 +53,10 @@ urlpatterns = [
     path(
         'rooms/global/',
         GetGlobalRoomView.as_view(),
-        name='chat-room-global'
+        name='chat-room-global' 
     ),
-    
+    # GET /api/v1/chat/rooms/ai-bot/  <-- NEW ROUTE
+    path('rooms/ai-bot/', GetAIBotRoomView.as_view(), name='chat-room-ai-bot'),
     # Create private chat room with another user
     # POST /api/v1/chat/rooms/private/
     path(
@@ -181,4 +183,5 @@ urlpatterns = [
         CreateThreadRoomView.as_view(),
         name='chat-room-create-thread'
     ),
+
 ]

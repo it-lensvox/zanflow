@@ -30,6 +30,27 @@ class ChatRoomService:
     """
     Service class for ChatRoom operations.
     """
+    @staticmethod
+    @transaction.atomic
+    def get_or_create_ai_room(user) -> ChatRoom:
+        """
+        Get or create a dedicated 1-on-1 AI assistant room for the user.
+        """
+        room, created = ChatRoom.objects.get_or_create(
+            room_type=ChatRoom.RoomType.AI_BOT,
+            created_by=user,
+            defaults={
+                'name': 'Zanflow AI Assistant',
+                'slug': f'ai-bot-{user.id}',
+            }
+        )
+        
+        if created:
+            # Add the user to their personal bot room
+            ChatRoomService.add_participant(room, user, 'admin')
+            logger.info(f"AI Bot room created for user {user.id}: {room.id}")
+            
+        return room
     
     @staticmethod
     @transaction.atomic
@@ -444,12 +465,12 @@ class ChatMessageService:
             raise e
     @staticmethod
     def process_zanflow_ai(room_id, prompt_text, user_id):
-        room = ChatRoom.objects.get(id=room_id)
-        
-        # 1. Fetch the current user and their active tasks
         from apps.tasksite.models import Task 
+        
+        room = ChatRoom.objects.get(id=room_id)
         sender_user = User.objects.get(id=user_id)
         
+        # 1. Fetch active tasks for the user
         active_tasks = Task.objects.filter(
             assigned_to=sender_user, 
             status__in=['pending', 'in_progress']
@@ -470,17 +491,27 @@ class ChatMessageService:
             for msg in reversed(history)
         ])
         
-        # 3. ---> NEW: Build a list of users in this project so the AI knows their IDs <---
-        participants = room.participants.all()
-        users_context = "\n".join([f"- Name: {u.get_full_name() or u.username} | Username: {u.username} | ID: {u.id}" for u in participants])
+        # 3. ---> NEW: Adjust Context based on Room Type <---
+        is_global_bot = (room.room_type == ChatRoom.RoomType.AI_BOT)
         
-        # 4. Update the System Instruction with strict JSON tool calling instructions
+        if is_global_bot:
+            # Personal AI Assistant Context
+            users_context = f"- Name: {sender_user.get_full_name() or sender_user.username} | Username: {sender_user.username} | ID: {sender_user.id}"
+            project_context = "This is a global 1-on-1 AI Assistant chat. No specific project is selected. You are directly chatting with the user anywhere in the app."
+        else:
+            # Project/Thread Context
+            participants = room.participants.all()
+            users_context = "\n".join([f"- Name: {u.get_full_name() or u.username} | Username: {u.username} | ID: {u.id}" for u in participants])
+            project_context = f"Project context: {room.project.name if room.project else 'None'}"
+
+        # 4. Update the System Instruction
         system_instruction = (
             "You are @zanflow, an AI assistant inside the Zanflow platform. "
             f"The user speaking to you right now has the ID: {user_id}. "
+            f"{project_context}\n"
             "Always base your task summaries ONLY on the 'Current Real Tasks' provided below.\n\n"
             f"--- CURRENT REAL TASKS ---\n{task_list_str}\n--------------------------\n\n"
-            f"--- AVAILABLE USERS IN THIS PROJECT ---\n{users_context}\n---------------------------------------\n\n"
+            f"--- AVAILABLE USERS IN CONTEXT ---\n{users_context}\n---------------------------------------\n\n"
             "=== TASK CREATION INSTRUCTIONS ===\n"
             "If the user explicitly asks you to CREATE A TASK, you must reply ONLY with a valid JSON block and NO OTHER TEXT. "
             "If they say 'assign it to me', use the ID of the user speaking to you. "
@@ -500,7 +531,7 @@ class ChatMessageService:
         )
 
         model_id = settings.BEDROCK_MODEL_ID
-        logger.info(f"Invoking Bedrock AI using model: {model_id}")
+        logger.info(f"Invoking Bedrock AI using model: {model_id} for room {room.id}")
 
         try:
             client = boto3.client(
@@ -544,7 +575,7 @@ class ChatMessageService:
                 ai_reply_text = "I processed your request, but couldn't parse my own output."
             
             # ==========================================================
-            # 5. ---> NEW: INTERCEPT AI JSON AND CREATE THE TASK <---
+            # 5. INTERCEPT AI JSON AND CREATE THE TASK
             # ==========================================================
             ai_reply_text = ai_reply_text.strip()
             
@@ -566,12 +597,15 @@ class ChatMessageService:
                     if priority not in ['low', 'medium', 'high', 'critical']:
                         priority = 'medium'
                         
-                    # Create the Task in the database!
+                    # ---> NEW: Handle missing project context gracefully <---
+                    project_to_assign = room.project if not is_global_bot else None
+                        
+                    # Create the Task in the database
                     new_task = Task.objects.create(
                         heading=ai_json.get("heading", "AI Generated Task"),
                         description=ai_json.get("description", ""),
                         priority=priority,
-                        project=room.project,
+                        project=project_to_assign, # Will be None if generated from Global bot
                         assigned_by=sender_user,
                         status="pending"
                     )
@@ -595,7 +629,6 @@ class ChatMessageService:
                     )
             except json.JSONDecodeError:
                 # The AI didn't output JSON, it output a normal text reply. 
-                # We just pass the text forward naturally.
                 pass
             except Exception as e:
                 logger.error(f"Failed to create task via AI: {e}")
