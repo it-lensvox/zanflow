@@ -7,11 +7,14 @@ import {
     List, Grid3X3, MessageCircle
 } from 'lucide-react';
 import { projectsApi, taskApi, documentsApi } from '@/services/api';
-import type { Task, AllDocumentsResponse, FilteredDocument, TaskOption } from '@/types'
+import type { Task, AllDocumentsResponse, FilteredDocument, TaskOption, TaskAttachment } from '@/types'
 import { CreateTask } from '@/pages/MyTask/CreateTask';
-import { DualView } from '@/components/layout/DualView/DualView';
+import { DualView, ViewToggle } from '@/components/layout/DualView';
+import { useViewMode } from '@/components/layout/DualView/useViewMode';
+import { createDocumentsTableColumns, DocumentGridCard } from '@/components/layout/DualView/documentsConfig';
 import { TaskGridCard, createTasksTableColumns } from '@/components/layout/DualView/taskConfig';
 import { DocumentPreview, useDocumentPreviewKeyboard } from '@/components/common/DocumentPreview';
+import DeleteModal from '@/components/common/Deletemodal';
 import { TaskDetailModal } from '../MyTask/TaskDetailModal';
 import { useTableFilters, ColumnFilterConfig } from '@/hooks/useTableFilters';
 import { SearchFilter, ListFilter, DateFilter, FilterHeaderWrapper } from '@/components/layout/DualView/FilterComponents';
@@ -134,6 +137,10 @@ export function ContentCreation() {
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState<TabType>('tasks');
     const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+    const { viewMode: docViewMode, setViewMode: setDocViewMode } = useViewMode({
+        defaultMode: 'table',
+        storageKey: 'project-documents-view-mode',
+    });
     const [searchQuery, setSearchQuery] = useState('');
     const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -147,6 +154,8 @@ export function ContentCreation() {
         fileName: string;
         fileType?: string;
     } | null>(null);
+    const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
     const [documentFilter, setDocumentFilter] = useState<'project' | 'task'>('project');
     const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
     const [taskSearchQuery, setTaskSearchQuery] = useState('');
@@ -289,35 +298,42 @@ export function ContentCreation() {
 
     const mediaFiles = allMediaFiles;
 
-    // Fetch all documents (project + task) - ONLY once when tab opens
+    // Fetch project-level documents
     const { data: allDocumentsData, isLoading: isAllDocumentsLoading } = useQuery({
         queryKey: ['all-documents', id],
         queryFn: async (): Promise<AllDocumentsResponse> => {
             return await documentsApi.getAllDocuments(Number(id));
         },
         enabled: activeTab === 'media',
-        staleTime: Infinity,
-        gcTime: Infinity,
+        staleTime: 0,
+        refetchOnMount: true,
+    });
+
+    // Fetch task attachments when a specific task is selected
+    const { data: selectedTaskData, isLoading: isTaskAttachmentsLoading } = useQuery({
+        queryKey: ['task-attachments', selectedTaskId],
+        queryFn: () => taskApi.get(selectedTaskId!),
+        enabled: activeTab === 'media' && documentFilter === 'task' && !!selectedTaskId,
+        staleTime: 0,
+        refetchOnMount: true,
+    });
+
+    // Fetch all tasks attachments when Task button is active but no specific task selected
+    const { data: allTasksData, isLoading: isAllTasksLoading } = useQuery({
+        queryKey: ['all-tasks-attachments', id],
+        queryFn: () => taskApi.list(),
+        enabled: activeTab === 'media' && documentFilter === 'task' && !selectedTaskId,
+        staleTime: 0,
+        refetchOnMount: true,
+        select: (data) => {
+            const allTasks = data.tasks || data.results || [];
+            return allTasks.filter((t: any) => String(t.project) === id);
+        },
     });
 
     const allDocuments: FilteredDocument[] = allDocumentsData?.documents || [];
 
-    // Filter documents based on selected filter
-    const filteredDocuments = React.useMemo(() => {
-        if (documentFilter === 'project') {
-            return allDocuments.filter((doc: FilteredDocument) => doc.source === 'Project');
-        } else if (documentFilter === 'task') {
-            if (selectedTaskId) {
-                return allDocuments.filter((doc: FilteredDocument) =>
-                    doc.source === 'Task' && doc.task_id === selectedTaskId
-                );
-            }
-            return allDocuments.filter((doc: FilteredDocument) => doc.source === 'Task');
-        }
-        return allDocuments;
-    }, [allDocuments, documentFilter, selectedTaskId]);
-
-    // Get unique task options from actual tasks data (not documents)
+    // Must be declared before filteredDocuments
     const taskOptions: TaskOption[] = React.useMemo(() => {
         return tasks.map((task: Task) => ({
             task_id: task.id,
@@ -325,13 +341,51 @@ export function ContentCreation() {
         })).sort((a: TaskOption, b: TaskOption) => a.task_heading.localeCompare(b.task_heading));
     }, [tasks]);
 
+    const selectedTaskName = taskOptions.find(t => t.task_id === selectedTaskId)?.task_heading || 'Select Task';
+
+    // Filter documents based on selected filter
+    const filteredDocuments = React.useMemo(() => {
+        if (documentFilter === 'project') {
+            // Only project-level docs (source === 'Project')
+            return allDocuments.filter((doc: FilteredDocument) => doc.source === 'Project');
+        } else if (documentFilter === 'task') {
+            if (selectedTaskId) {
+                // Specific task selected — show only that task's attachments
+                const taskData = selectedTaskData?.task || selectedTaskData;
+                const attachments: TaskAttachment[] = taskData?.attachments || [];
+                return attachments.map((att: TaskAttachment) => ({
+                    id: att.id,
+                    file_name: att.file_name,
+                    file_url: att.file_url,
+                    uploaded_at: att.uploaded_at,
+                    source: 'Task' as const,
+                    task_id: selectedTaskId,
+                    task_heading: selectedTaskName,
+                }));
+            }
+            // No specific task — show all attachments from all tasks in this project
+            const allTasks = (allTasksData || []) as Task[];
+            return allTasks.flatMap((task: Task) =>
+                (task.attachments || []).map((att: TaskAttachment) => ({
+                    id: att.id,
+                    file_name: att.file_name,
+                    file_url: att.file_url,
+                    uploaded_at: att.uploaded_at,
+                    source: 'Task' as const,
+                    task_id: task.id,
+                    task_heading: task.heading,
+                }))
+            );
+        }
+        return allDocuments;
+    }, [allDocuments, documentFilter, selectedTaskId, selectedTaskData, selectedTaskName, allTasksData]);
+
+    const isDocumentsLoading = isAllDocumentsLoading || isTaskAttachmentsLoading || isAllTasksLoading;
+
     // Filter task options based on search
     const filteredTaskOptions = taskOptions.filter(option =>
         option.task_heading.toLowerCase().includes(taskSearchQuery.toLowerCase())
     );
-
-    // Get selected task name
-    const selectedTaskName = taskOptions.find(t => t.task_id === selectedTaskId)?.task_heading || 'Select Task';
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -387,10 +441,26 @@ export function ContentCreation() {
                 await documentsApi.getDownloadUrl(projectIdNum, { document_id: confirmResponse.id });
             }
 
+            // Optimistically inject created_by from current user for the newly uploaded doc
+            // so "Uploaded By" renders immediately without waiting for allMediaFiles refetch
+            if (confirmResponse.id && user) {
+                setAllMediaFiles(prev => [
+                    ...prev,
+                    {
+                        id: confirmResponse.id,
+                        created_by: {
+                            id: user.id,
+                            username: user.username,
+                            full_name: `${user.first_name} ${user.last_name}`.trim() || user.username,
+                        },
+                        file_type: mappedType,
+                        project_name: project?.name || 'General',
+                    },
+                ]);
+            }
             // Reset pagination state to show new document immediately
             setMediaPage(1);
             setHasMoreMedia(true);
-            setAllMediaFiles([]);
             queryClient.invalidateQueries({ queryKey: ['all-documents', id] });
             if (fileInputRef.current) {
                 fileInputRef.current.value = '';
@@ -462,6 +532,35 @@ export function ContentCreation() {
         });
     };
 
+    const handleDeleteClick = (e: React.MouseEvent, doc: any) => {
+        e.stopPropagation();
+        setDeleteConfirm({ id: String(doc.id), name: doc.name || doc.file_name || 'Document' });
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!deleteConfirm) return;
+        try {
+            setIsDeleting(true);
+            if (documentFilter === 'task') {
+                await taskApi.deleteAttachment(deleteConfirm.id);
+            } else {
+                await documentsApi.delete(deleteConfirm.id);
+            }
+            setDeleteConfirm(null);
+            if (documentFilter === 'project') {
+                queryClient.invalidateQueries({ queryKey: ['all-documents', id] });
+            } else if (selectedTaskId) {
+                queryClient.invalidateQueries({ queryKey: ['task-attachments', selectedTaskId] });
+            } else {
+                queryClient.invalidateQueries({ queryKey: ['all-tasks-attachments', id] });
+            }
+        } catch (error) {
+            console.error('Delete failed:', error);
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
     // Enable keyboard shortcuts for document preview
     useDocumentPreviewKeyboard(() => setPreviewDocument(null));
 
@@ -525,7 +624,6 @@ export function ContentCreation() {
                             </button>
                         ))}
 
-                        {/* View toggle — ml-auto pushes it + everything after it to the right */}
                         {activeTab === 'tasks' && (
                             <div className="flex items-center bg-white p-1 gap-1 ml-auto">
                                 <button
@@ -816,64 +914,97 @@ export function ContentCreation() {
                                     )}
                                 </div>
 
-                                {/* Upload Button */}
+                                {/* Upload Button with View Toggle */}
+                                {documentFilter === 'task' && (
+                                    <ViewToggle viewMode={docViewMode} onViewModeChange={setDocViewMode} />
+                                )}
                                 {documentFilter === 'project' && (
-                                    <label className={`flex items-center gap-2 px-5 py-2.5 bg-black text-white rounded-lg font-medium text-sm cursor-pointer hover:bg-gray-800 transition-all duration-200 shadow-sm ${isUploading ? 'opacity-50 cursor-not-allowed' : ''
-                                        }`}>
-                                        <input
-                                            ref={fileInputRef}
-                                            type="file"
-                                            className="hidden"
-                                            onChange={handleFileUpload}
-                                            disabled={isUploading}
-                                            accept="*"
-                                        />
-                                        {isUploading ? (
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                        ) : (
-                                            <Upload className="w-4 h-4" />
-                                        )}
-                                        <span>{isUploading ? 'Uploading...' : 'Upload Documents'}</span>
-                                    </label>
+                                    <div className="flex items-center gap-2">
+                                        <ViewToggle viewMode={docViewMode} onViewModeChange={setDocViewMode} />
+                                        <label className={`flex items-center gap-2 px-5 py-2.5 bg-black text-white rounded-lg font-medium text-sm cursor-pointer hover:bg-gray-800 transition-all duration-200 shadow-sm ${isUploading ? 'opacity-50 cursor-not-allowed' : ''
+                                            }`}>
+                                            <input
+                                                ref={fileInputRef}
+                                                type="file"
+                                                className="hidden"
+                                                onChange={handleFileUpload}
+                                                disabled={isUploading}
+                                                accept="*"
+                                            />
+                                            {isUploading ? (
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                            ) : (
+                                                <Upload className="w-4 h-4" />
+                                            )}
+                                            <span>{isUploading ? 'Uploading...' : 'Upload Documents'}</span>
+                                        </label>
+                                    </div>
                                 )}
                             </div>
 
-                            {isAllDocumentsLoading ? (
+                            {isDocumentsLoading ? (
                                 <div className="flex justify-center p-12">
                                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-black" />
                                 </div>
-                            ) : filteredDocuments.length > 0 ? (
-                                <div
-                                    className="max-h-[600px] overflow-y-auto"
-                                    onScroll={handleMediaScroll}
-                                    ref={mediaScrollRef}
-                                >
-                                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-6 px-2">
-                                        {filteredDocuments.map((file: any) => (
-                                            <div
-                                                key={file.id}
-                                                className="border rounded-lg p-2 bg-white text-center cursor-pointer hover:shadow-md transition-shadow"
-                                                onClick={() => handleDocumentPreview(file)}
-                                            >
-                                                <div className="aspect-square bg-muted rounded flex items-center justify-center mb-2 overflow-hidden border relative">
-                                                    <MediaThumbnail file={file} projectId={Number(id)} />
-                                                </div>
-                                                <p className="text-xs font-medium truncate">{file.file_name || file.original_file_name || file.name}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    {isMediaFetching && mediaPage > 1 && (
-                                        <div className="flex justify-center py-4">
-                                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
-                                        </div>
-                                    )}
-
-                                </div>
                             ) : (
-                                <div className="content-creation__media-empty">
-                                    <Film className="content-creation__empty-media-icon" />
-                                    <p className="content-creation__empty-text">No media files yet</p>
-                                </div>
+                                <DualView
+                                    viewMode={docViewMode}
+                                    isLoading={isAllDocumentsLoading}
+                                    gridProps={{
+                                        data: (filteredDocuments as any[]).map(doc => {
+                                            const fileName = doc.file_name || doc.original_file_name || doc.name || '';
+                                            const ext = fileName.split('.').pop()?.toLowerCase() || '';
+                                            return {
+                                                ...doc,
+                                                name: fileName,
+                                                status: doc.status ?? 'draft',
+                                                file_type: doc.file_type || ext || 'other',
+                                                project_name: doc.project_name || project?.name || 'General',
+                                                created_by: doc.created_by ?? (doc.uploaded_by ? { full_name: doc.uploaded_by } : null),
+                                                updated_at: doc.updated_at ?? doc.uploaded_at ?? doc.created_at ?? '',
+                                            };
+                                        }),
+                                        renderCard: (doc: any) => (
+                                            <DocumentGridCard
+                                                key={doc.id}
+                                                document={doc}
+                                                onCardClick={(d) => handleDocumentPreview(d as any)}
+                                                onDeleteClick={(e, doc) => handleDeleteClick(e, doc)}
+                                            />
+                                        ),
+                                        gridClassName: 'grid gap-4 md:grid-cols-2 lg:grid-cols-3',
+                                        emptyState: (
+                                            <div className="content-creation__media-empty">
+                                                <p className="content-creation__empty-text">No documents yet</p>
+                                            </div>
+                                        ),
+                                    }}
+                                    tableProps={{
+                                        data: (filteredDocuments as any[]).map(doc => {
+                                            const fileName = doc.file_name || doc.original_file_name || doc.name || '';
+                                            const ext = fileName.split('.').pop()?.toLowerCase() || '';
+                                            return {
+                                                ...doc,
+                                                name: fileName,
+                                                status: doc.status ?? 'draft',
+                                                file_type: doc.file_type || ext || 'other',
+                                                project_name: doc.project_name || project?.name || 'General',
+                                                created_by: doc.created_by ?? (doc.uploaded_by ? { full_name: doc.uploaded_by } : null),
+                                                updated_at: doc.updated_at ?? doc.uploaded_at ?? doc.created_at ?? '',
+                                            };
+                                        }),
+                                        columns: createDocumentsTableColumns({
+                                            onDeleteClick: (e, doc) => handleDeleteClick(e, doc),
+                                        }),
+                                        rowKey: (doc: any) => doc.id,
+                                        onRowClick: (doc: any) => handleDocumentPreview(doc),
+                                        emptyState: (
+                                            <div className="content-creation__media-empty">
+                                                <p className="content-creation__empty-text">No documents yet</p>
+                                            </div>
+                                        ),
+                                    }}
+                                />
                             )}
                             {/* Full-page drag overlay */}
                             {isDragging && (
@@ -918,6 +1049,15 @@ export function ContentCreation() {
             {project && (
                 <Threads projectId={project.id} projectName={project.name} />
             )}
+            <DeleteModal
+                isOpen={!!deleteConfirm}
+                type="confirm"
+                itemType="document"
+                itemName={deleteConfirm?.name}
+                onConfirm={handleDeleteConfirm}
+                onCancel={() => setDeleteConfirm(null)}
+                isDeleting={isDeleting}
+            />
         </div>
     );
 }
