@@ -223,7 +223,7 @@ interface TaskTableColumnsProps {
   navigate: ReturnType<typeof useNavigate>;
 }
 
-export const createTasksTableColumns = ({ onTaskClick, queryClient, user, navigate }: TaskTableColumnsProps): TableColumn<Task>[] => {
+export const createTasksTableColumns = ({ onTaskClick, queryClient, user, navigate, dateField = 'end_date' }: TaskTableColumnsProps & { dateField?: 'end_date' | 'start_date' | 'created_at' }): TableColumn<Task>[] => {
 
   // Status Dropdown Component
   const StatusDropdown = ({ task }: { task: Task }) => {
@@ -372,160 +372,163 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
   };
 
   return [
-  {
-    key: 'type',
-    label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Type</span>,
-    width: '8%', 
-    render: (task: Task) => (
-      <div className="flex items-center gap-1.5">
-        <CheckSquare className="w-4 h-4 text-blue-600" />
-      </div>
-    ),
-  },
-  {
-    key: 'project',
+    {
+      key: 'type',
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Type</span>,
+      width: '8%',
+      render: (task: Task) => (
+        <div className="flex items-center gap-1.5">
+          <CheckSquare className="w-4 h-4 text-blue-600" />
+        </div>
+      ),
+    },
+    {
+      key: 'project',
       label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Project</span>,
       width: '150px',
-    render: (task: Task) => (
+      render: (task: Task) => (
         <span className="text-[12px] text-gray-700 font-medium">
-        {task.project_details?.name || task.project_name || 'No Project'}
-      </span>
-    ),
-  },
-  {
-    key: 'heading',
-    label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Task Title</span>,
-    width: '25%', 
-    render: (task: Task) => (
+          {task.project_details?.name || task.project_name || 'No Project'}
+        </span>
+      ),
+    },
+    {
+      key: 'heading',
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Task Title</span>,
+      width: '25%',
+      render: (task: Task) => (
         <span className="font-medium text-[#172b4d] truncate block max-w-[300px]" title={task.heading}>
-        {task.heading}
-      </span>
-    ),
-  },
-  {
-    key: 'status',
-    label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Status</span>,
-    width: '10%',
-    render: (task: Task) => <StatusDropdown task={task} />,
-  },
-  {
-    key: 'assigned_to',
-    label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Assignee</span>,
-    width: '10%',
-    render: (task: Task) => {
-      const trigger = (
-        <div className="flex -space-x-1.5 cursor-pointer hover:opacity-80">
-          {task.assigned_to_user_details.length > 0 ? (
-            <>
-              {task.assigned_to_user_details.slice(0, 3).map((u) => (
-                <div
-                  key={u.id}
-                  className="w-6 h-6 rounded-full bg-[#8d87b5] text-white flex items-center justify-center text-[10px] font-semibold ring-1 ring-white"
-                  title={`${u.first_name} ${u.last_name}`}
-                >
-                  {u.first_name[0]}{u.last_name[0]}
-                </div>
-              ))}
-              {task.assigned_to_user_details.length > 3 && (
-                <div
-                  className="w-6 h-6 rounded-full bg-gray-400 text-white flex items-center justify-center text-[10px] font-semibold ring-1 ring-white"
-                  title={`+${task.assigned_to_user_details.length - 3} more`}
-                >
-                  +{task.assigned_to_user_details.length - 3}
-                </div>
+          {task.heading}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Status</span>,
+      width: '10%',
+      render: (task: Task) => <StatusDropdown task={task} />,
+    },
+    {
+      key: 'assigned_to',
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Assignee</span>,
+      width: '10%',
+      render: (task: Task) => {
+        const trigger = (
+          <div className="flex -space-x-1.5 cursor-pointer hover:opacity-80">
+            {task.assigned_to_user_details.length > 0 ? (
+              <>
+                {task.assigned_to_user_details.slice(0, 3).map((u) => (
+                  <div
+                    key={u.id}
+                    className="w-6 h-6 rounded-full bg-[#8d87b5] text-white flex items-center justify-center text-[10px] font-semibold ring-1 ring-white"
+                    title={`${u.first_name} ${u.last_name}`}
+                  >
+                    {u.first_name[0]}{u.last_name[0]}
+                  </div>
+                ))}
+                {task.assigned_to_user_details.length > 3 && (
+                  <div
+                    className="w-6 h-6 rounded-full bg-gray-400 text-white flex items-center justify-center text-[10px] font-semibold ring-1 ring-white"
+                    title={`+${task.assigned_to_user_details.length - 3} more`}
+                  >
+                    +{task.assigned_to_user_details.length - 3}
+                  </div>
+                )}
+              </>
+            ) : (
+              <span className="text-gray-300 text-[11px] pl-1">—</span>
+            )}
+          </div>
+        );
+
+        return (
+          <TablePopover trigger={trigger}>
+            <div className="p-2 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-lg">
+              <span className="text-xs font-semibold text-gray-700">Assignees</span>
+              <span className="text-[10px] bg-gray-200 px-1.5 py-0.5 rounded text-gray-600">
+                {task.assigned_to_user_details.length}
+              </span>
+            </div>
+            <div className="max-h-48 overflow-y-auto p-1">
+              {task.assigned_to_user_details.length > 0 ? (
+                task.assigned_to_user_details.map((u) => (
+                  <div key={u.id} className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded">
+                    <div className="w-6 h-6 rounded-full bg-[#8d87b5] text-white flex items-center justify-center text-[10px] font-semibold shrink-0">
+                      {u.first_name[0]}{u.last_name?.[0]}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-medium text-gray-700 truncate">{u.first_name} {u.last_name}</p>
+                      <p className="text-[10px] text-gray-400 truncate capitalize">{u.role}</p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-2 text-center text-xs text-gray-400 italic">No assignees</div>
               )}
-            </>
+            </div>
+          </TablePopover>
+        );
+      },
+    },
+    {
+      key: 'priority',
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Priority</span>,
+      width: '10%',
+      render: (task: Task) => <PriorityDropdown task={task} />,
+    },
+    {
+      key: 'labels',
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Labels</span>,
+      width: '10%',
+      render: (task: Task) => (
+        <div className="flex flex-wrap gap-1.5 items-center h-full min-h-[24px]" onClick={(e) => e.stopPropagation()}>
+          {task.labels && task.labels.length > 0 ? (
+            task.labels.map((label) => (
+              <span
+                key={label.id}
+                className="px-2 py-0.5 rounded text-[10px] font-bold text-white shadow-sm whitespace-nowrap"
+                style={{ backgroundColor: label.color || '#3b82f6' }}
+              >
+                {label.name}
+              </span>
+            ))
           ) : (
             <span className="text-gray-300 text-[11px] pl-1">—</span>
           )}
         </div>
-      );
-
-      return (
-        <TablePopover trigger={trigger}>
-          <div className="p-2 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-lg">
-            <span className="text-xs font-semibold text-gray-700">Assignees</span>
-            <span className="text-[10px] bg-gray-200 px-1.5 py-0.5 rounded text-gray-600">
-              {task.assigned_to_user_details.length}
-            </span>
-          </div>
-          <div className="max-h-48 overflow-y-auto p-1">
-            {task.assigned_to_user_details.length > 0 ? (
-              task.assigned_to_user_details.map((u) => (
-                <div key={u.id} className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded">
-                  <div className="w-6 h-6 rounded-full bg-[#8d87b5] text-white flex items-center justify-center text-[10px] font-semibold shrink-0">
-                    {u.first_name[0]}{u.last_name?.[0]}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-medium text-gray-700 truncate">{u.first_name} {u.last_name}</p>
-                    <p className="text-[10px] text-gray-400 truncate capitalize">{u.role}</p>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="p-2 text-center text-xs text-gray-400 italic">No assignees</div>
-            )}
-          </div>
-        </TablePopover>
-      );
+      ),
     },
-  },
-  {
-    key: 'priority',
-    label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Priority</span>,
-    width: '10%',
-    render: (task: Task) => <PriorityDropdown task={task} />,
-  },
-  {
-    key: 'labels',
-    label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Labels</span>,
-    width: '10%',
-    render: (task: Task) => (
-      <div className="flex flex-wrap gap-1.5 items-center h-full min-h-[24px]" onClick={(e) => e.stopPropagation()}>
-        {task.labels && task.labels.length > 0 ? (
-          task.labels.map((label) => (
-            <span
-              key={label.id}
-                className="px-2 py-0.5 rounded text-[10px] font-bold text-white shadow-sm whitespace-nowrap"
-              style={{ backgroundColor: label.color || '#3b82f6' }}
-            >
-              {label.name}
-            </span>
-          ))
-        ) : (
-          <span className="text-gray-300 text-[11px] pl-1">—</span>
-        )}
-      </div>
-    ),
-  },
-  {
-    key: 'end_date',
-    label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Due Date</span>,
-    width: '10%',
-    render: (task: Task) => <DateInput task={task} field="end_date" />,
-  },
-  {
-    key: 'duration',
-    label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Duration</span>,
-    width: '15%',
-    render: (task: Task) => (
-      <input
-        type="text"
-        defaultValue={(task as any).duration_time || (task as any).duration || ''}
-        placeholder="—"
-        onBlur={async (e) => {
-          const val = e.target.value;
-          try {
-            await taskApi.update(task.id, { duration_time: val } as any);
-            queryClient.invalidateQueries({ queryKey: ['tasks'] });
-          } catch (err) {
-            console.error('Failed to update duration:', err);
-          }
-        }}
-        onClick={(e) => e.stopPropagation()}
-        className="w-full bg-transparent border-none text-[12px] focus:ring-1 focus:ring-blue-400 rounded px-1 py-0.5 placeholder-gray-300"
-      />
-    ),
-  },
-];
+    {
+      key: dateField,
+      label: <span className="text-[14px] font-bold tracking-wide text-gray-700">{dateField === 'end_date' ? 'Due Date' : dateField === 'start_date' ? 'Start Date' : 'Created At'}</span>,
+      width: '10%',
+      render: (task: Task) =>
+        dateField === 'created_at'
+          ? <span className="text-[13px] text-gray-600 pl-1">{formatDate(task.created_at || '')}</span>
+          : <DateInput task={task} field={dateField as 'start_date' | 'end_date'} />,
+    },
+    {
+      key: 'duration',
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Duration</span>,
+      width: '15%',
+      render: (task: Task) => (
+        <input
+          type="text"
+          defaultValue={(task as any).duration_time || (task as any).duration || ''}
+          placeholder="—"
+          onBlur={async (e) => {
+            const val = e.target.value;
+            try {
+              await taskApi.update(task.id, { duration_time: val } as any);
+              queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            } catch (err) {
+              console.error('Failed to update duration:', err);
+            }
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className="w-full bg-transparent border-none text-[12px] focus:ring-1 focus:ring-blue-400 rounded px-1 py-0.5 placeholder-gray-300"
+        />
+      ),
+    },
+  ];
 };
