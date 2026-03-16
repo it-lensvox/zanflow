@@ -440,9 +440,6 @@ export function ContentCreation() {
             if (confirmResponse.id) {
                 await documentsApi.getDownloadUrl(projectIdNum, { document_id: confirmResponse.id });
             }
-
-            // Optimistically inject created_by from current user for the newly uploaded doc
-            // so "Uploaded By" renders immediately without waiting for allMediaFiles refetch
             if (confirmResponse.id && user) {
                 setAllMediaFiles(prev => [
                     ...prev,
