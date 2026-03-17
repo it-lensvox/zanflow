@@ -498,7 +498,7 @@ class ChatMessageService:
 
         # 4. Update the System Instruction
         system_instruction = (
-            "You are @zanflow, an AI assistant inside the Zanflow platform. "
+            "You are @dyuksa, an AI assistant inside the dyuksa platform. "
             f"The user speaking to you right now has the ID: {user_id}. "
             f"{project_context}\n"
             "Always base your task summaries ONLY on the 'Current Real Tasks' provided below.\n\n"

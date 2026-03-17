@@ -290,33 +290,47 @@ Return ONLY a FLAT JSON object with this exact schema:
             print(f"Error refining text: {e}")
             return text
     @staticmethod
-    def execute_global_task_search(user, priority=None, status=None):
+    def execute_global_task_search(user, priority=None, status=None, username=None):
         """
-        The actual Django function the AI will call to search the database globally.
+        Upgraded search to find tasks by priority, status, or assignee.
         """
         if not user or not user.is_authenticated:
-            return "Error: User is not authenticated. Cannot search global tasks."
+            return "Error: User is not authenticated."
 
-        # Start with all tasks assigned to the user
-        tasks = Task.objects.filter(assigned_to=user).select_related('project')
+        # Start with a base queryset
+        tasks = Task.objects.all().select_related('project').prefetch_related('assigned_to')
 
-        # Apply filters if the AI requested them
+        # 1. Handle Assignee Search
+        if username:
+            try:
+                # --- CHANGE THIS LINE BELOW: Use 'User' (the model), not 'user' (the instance) ---
+                from apps.users.models import User # Ensure this is imported
+                target_user = User.objects.get(username__iexact=username) 
+                tasks = tasks.filter(assigned_to=target_user)
+                header_msg = f"Found {tasks.count()} tasks assigned to '{username}':\n"
+            except User.DoesNotExist:
+                return f"I couldn't find a user named '{username}' in the system."
+        else:
+            # Default to current user
+            tasks = tasks.filter(assigned_to=user)
+            header_msg = f"Found {tasks.count()} of your tasks:\n"
+
+        # 2. Apply Priority/Status filters
         if priority:
             tasks = tasks.filter(priority=priority.lower())
         if status:
             tasks = tasks.filter(status=status.lower())
 
         if not tasks.exists():
-            return "No tasks found matching that criteria in the global database."
+            return "No tasks found matching that criteria."
 
-        # Format the results for the AI to read
-        result_text = f"Found {tasks.count()} tasks in the global database:\n"
-        for task in tasks[:20]:  # Limit to 20 so we don't overwhelm the token limit
+        result_text = header_msg
+        for task in tasks[:15]:
             project_name = task.project.name if task.project else "No Project"
-            due_date = task.end_date.strftime('%Y-%m-%d') if task.end_date else "No due date"
+            assignees = ", ".join([u.username for u in task.assigned_to.all()])
             result_text += (
                 f"- [{project_name}] Task: '{task.heading}' | Status: {task.status} | "
-                f"Priority: {task.priority} | Due: {due_date}\n"
+                f"Assigned to: {assignees}\n"
             )
             
         return result_text
@@ -449,13 +463,14 @@ Return ONLY a FLAT JSON object with this exact schema:
             "tools": [{
                 "toolSpec": {
                     "name": "search_global_tasks",
-                    "description": "Search the user's entire ERP database for tasks. Use this if the Screen Context does not contain the tasks the user is looking for.",
+                    "description": "Search for tasks in the database. You can filter by priority, status, or a specific username.",
                     "inputSchema": {
                         "json": {
                             "type": "object",
                             "properties": {
                                 "priority": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
-                                "status": {"type": "string", "enum": ["pending", "in_progress", "completed", "review"]}
+                                "status": {"type": "string", "enum": ["pending", "in_progress", "completed", "review"]},
+                                "username": {"type": "string", "description": "The username of the person the task is assigned to."}
                             }
                         }
                     }
@@ -482,12 +497,12 @@ Return ONLY a FLAT JSON object with this exact schema:
 
             print(f"\n=== AI IS USING TOOL: {tool_name} with args {tool_inputs} ===\n")
 
-            # Execute the Django function
             if tool_name == "search_global_tasks":
                 tool_result_text = TaskAIService.execute_global_task_search(
                     user=user, 
                     priority=tool_inputs.get("priority"), 
-                    status=tool_inputs.get("status")
+                    status=tool_inputs.get("status"),
+                    username=tool_inputs.get("username") # <--- Add this
                 )
             else:
                 tool_result_text = "Tool not found."

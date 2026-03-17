@@ -218,7 +218,7 @@ class SendMessageView(APIView):
                 ).start()
             
             # ---> Optional: Keep your existing @zanflow trigger for other rooms <---
-            elif '@zanflow' in content.lower() and message_type == 'text':
+            elif '@dyuksa' in content.lower() and message_type == 'text':
                 import threading
                 threading.Thread(
                     target=ChatMessageService.process_zanflow_ai,
