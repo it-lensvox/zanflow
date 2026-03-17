@@ -30,27 +30,27 @@ class ChatRoomService:
     """
     Service class for ChatRoom operations.
     """
-    # @staticmethod
-    # @transaction.atomic
-    # def get_or_create_ai_room(user) -> ChatRoom:
-    #     """
-    #     Get or create a dedicated 1-on-1 AI assistant room for the user.
-    #     """
-    #     room, created = ChatRoom.objects.get_or_create(
-    #         room_type=ChatRoom.RoomType.AI_BOT,
-    #         created_by=user,
-    #         defaults={
-    #             'name': 'Zanflow AI Assistant',
-    #             'slug': f'ai-bot-{user.id}',
-    #         }
-    #     )
+    @staticmethod
+    @transaction.atomic
+    def get_or_create_ai_room(user) -> ChatRoom:
+        """
+        Get or create a dedicated 1-on-1 AI assistant room for the user.
+        """
+        room, created = ChatRoom.objects.get_or_create(
+            room_type=ChatRoom.RoomType.AI_BOT,
+            created_by=user,
+            defaults={
+                'name': 'Zanflow AI Assistant',
+                'slug': f'ai-bot-{user.id}',
+            }
+        )
         
-    #     if created:
-    #         # Add the user to their personal bot room
-    #         ChatRoomService.add_participant(room, user, 'admin')
-    #         logger.info(f"AI Bot room created for user {user.id}: {room.id}")
+        if created:
+            # Add the user to their personal bot room
+            ChatRoomService.add_participant(room, user, 'admin')
+            logger.info(f"AI Bot room created for user {user.id}: {room.id}")
             
-    #     return room
+        return room
     
     @staticmethod
     @transaction.atomic
@@ -399,7 +399,7 @@ class ChatMessageService:
                 attachment=attachment,
                 attachment_name=attachment_name,
                 reply_to_id=reply_to_id,
-                # is_ai_generated=is_ai_generated # <-- SO THIS RECOGNIZES IT
+                is_ai_generated=is_ai_generated 
             )
             room.save(update_fields=['updated_at'])
             
@@ -463,193 +463,185 @@ class ChatMessageService:
         except Exception as e:
             print(f"CRITICAL ERROR in create_message: {e}")
             raise e
-    # @staticmethod
-    # def process_zanflow_ai(room_id, prompt_text, user_id):
-    #     from apps.tasksite.models import Task 
+    @staticmethod
+    def process_zanflow_ai(room_id, prompt_text, user_id):
+        from apps.tasksite.models import Task 
         
-    #     room = ChatRoom.objects.get(id=room_id)
-    #     sender_user = User.objects.get(id=user_id)
+        room = ChatRoom.objects.get(id=room_id)
+        sender_user = User.objects.get(id=user_id)
         
-    #     # 1. Fetch active tasks for the user
-    #     active_tasks = Task.objects.filter(
-    #         assigned_to=sender_user, 
-    #         status__in=['pending', 'in_progress']
-    #     )
+        # 1. Fetch active tasks for the user
+        active_tasks = Task.objects.filter(
+            assigned_to=sender_user, 
+            status__in=['pending', 'in_progress']
+        )
         
-    #     if active_tasks.exists():
-    #         task_list_str = "\n".join([
-    #             f"- Task ID: {task.id}, Heading: {task.heading}, Status: {task.status}, Priority: {task.priority}" 
-    #             for task in active_tasks
-    #         ])
-    #     else:
-    #         task_list_str = "The user currently has NO assigned tasks."
+        if active_tasks.exists():
+            task_list_str = "\n".join([
+                f"- Task ID: {task.id}, Heading: {task.heading}, Status: {task.status}, Priority: {task.priority}" 
+                for task in active_tasks
+            ])
+        else:
+            task_list_str = "The user currently has NO assigned tasks."
 
-    #     # 2. Fetch Chat History
-    #     history = ChatMessage.objects.filter(room=room, is_deleted=False).order_by('-created_at')[:15]
-    #     context_str = "\n".join([
-    #         f"{msg.sender.username if msg.sender else '@zanflow'}: {msg.content}" 
-    #         for msg in reversed(history)
-    #     ])
+        # 2. Fetch Chat History
+        history = ChatMessage.objects.filter(room=room, is_deleted=False).order_by('-created_at')[:15]
+        context_str = "\n".join([
+            f"{msg.sender.username if msg.sender else '@zanflow'}: {msg.content}" 
+            for msg in reversed(history)
+        ])
         
-    #     # 3. ---> NEW: Adjust Context based on Room Type <---
-    #     is_global_bot = (room.room_type == ChatRoom.RoomType.AI_BOT)
-        
-    #     if is_global_bot:
-    #         # Personal AI Assistant Context
-    #         users_context = f"- Name: {sender_user.get_full_name() or sender_user.username} | Username: {sender_user.username} | ID: {sender_user.id}"
-    #         project_context = "This is a global 1-on-1 AI Assistant chat. No specific project is selected. You are directly chatting with the user anywhere in the app."
-    #     else:
-    #         # Project/Thread Context
-    #         participants = room.participants.all()
-    #         users_context = "\n".join([f"- Name: {u.get_full_name() or u.username} | Username: {u.username} | ID: {u.id}" for u in participants])
-    #         project_context = f"Project context: {room.project.name if room.project else 'None'}"
+        # Project/Thread Context
+        participants = room.participants.all()
+        users_context = "\n".join([f"- Name: {u.get_full_name() or u.username} | Username: {u.username} | ID: {u.id}" for u in participants])
+        project_context = f"Project context: {room.project.name if room.project else 'None'}"
 
-    #     # 4. Update the System Instruction
-    #     system_instruction = (
-    #         "You are @zanflow, an AI assistant inside the Zanflow platform. "
-    #         f"The user speaking to you right now has the ID: {user_id}. "
-    #         f"{project_context}\n"
-    #         "Always base your task summaries ONLY on the 'Current Real Tasks' provided below.\n\n"
-    #         f"--- CURRENT REAL TASKS ---\n{task_list_str}\n--------------------------\n\n"
-    #         f"--- AVAILABLE USERS IN CONTEXT ---\n{users_context}\n---------------------------------------\n\n"
-    #         "=== TASK CREATION INSTRUCTIONS ===\n"
-    #         "If the user explicitly asks you to CREATE A TASK, you must reply ONLY with a valid JSON block and NO OTHER TEXT. "
-    #         "If they say 'assign it to me', use the ID of the user speaking to you. "
-    #         "Match the user names mentioned to the User IDs provided. "
-    #         "The JSON MUST look exactly like this:\n"
-    #         "```json\n"
-    #         "{\n"
-    #         '  "action": "create_task",\n'
-    #         '  "heading": "Task title",\n'
-    #         '  "description": "Task description",\n'
-    #         '  "priority": "medium",\n'  # priority must be one of: low, medium, high, critical
-    #         '  "assigned_to_ids": [12]\n'
-    #         "}\n"
-    #         "```\n"
-    #         "If they are NOT asking to create a task, reply with normal conversational text to fulfill their request based on the Chat History:\n"
-    #         f"Chat History:\n{context_str}"
-    #     )
+        # 4. Update the System Instruction
+        system_instruction = (
+            "You are @zanflow, an AI assistant inside the Zanflow platform. "
+            f"The user speaking to you right now has the ID: {user_id}. "
+            f"{project_context}\n"
+            "Always base your task summaries ONLY on the 'Current Real Tasks' provided below.\n\n"
+            f"--- CURRENT REAL TASKS ---\n{task_list_str}\n--------------------------\n\n"
+            f"--- AVAILABLE USERS IN CONTEXT ---\n{users_context}\n---------------------------------------\n\n"
+            "=== TASK CREATION INSTRUCTIONS ===\n"
+            "If the user explicitly asks you to CREATE A TASK, you must reply ONLY with a valid JSON block and NO OTHER TEXT. "
+            "If they say 'assign it to me', use the ID of the user speaking to you. "
+            "Match the user names mentioned to the User IDs provided. "
+            "The JSON MUST look exactly like this:\n"
+            "```json\n"
+            "{\n"
+            '  "action": "create_task",\n'
+            '  "heading": "Task title",\n'
+            '  "description": "Task description",\n'
+            '  "priority": "medium",\n'  # priority must be one of: low, medium, high, critical
+            '  "assigned_to_ids": [12]\n'
+            "}\n"
+            "```\n"
+            "If they are NOT asking to create a task, reply with normal conversational text to fulfill their request based on the Chat History:\n"
+            f"Chat History:\n{context_str}"
+        )
 
-    #     model_id = settings.BEDROCK_MODEL_ID
-    #     logger.info(f"Invoking Bedrock AI using model: {model_id} for room {room.id}")
+        model_id = settings.BEDROCK_MODEL_ID
+        logger.info(f"Invoking Bedrock AI using model: {model_id} for room {room.id}")
 
-    #     try:
-    #         client = boto3.client(
-    #             'bedrock-runtime', 
-    #             region_name=settings.AWS_REGION,
-    #             aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-    #             aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
-    #         )
+        try:
+            client = boto3.client(
+                'bedrock-runtime', 
+                region_name=settings.AWS_REGION,
+                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
+            )
             
-    #         # Payload formatting
-    #         if "amazon.nova" in model_id.lower():
-    #             body = json.dumps({
-    #                 "system": [{"text": system_instruction}],
-    #                 "messages": [{"role": "user", "content": [{"text": prompt_text}]}],
-    #                 "inferenceConfig": {"maxTokens": 1024}
-    #             })
-    #         elif "claude-3" in model_id.lower():
-    #             body = json.dumps({
-    #                 "anthropic_version": "bedrock-2023-05-31",
-    #                 "max_tokens": 1024,
-    #                 "system": system_instruction,
-    #                 "messages": [{"role": "user", "content": prompt_text}]
-    #             })
-    #         else:
-    #             raise ValueError(f"Unsupported model family for ID: {model_id}")
+            # Payload formatting
+            if "amazon.nova" in model_id.lower():
+                body = json.dumps({
+                    "system": [{"text": system_instruction}],
+                    "messages": [{"role": "user", "content": [{"text": prompt_text}]}],
+                    "inferenceConfig": {"maxTokens": 1024}
+                })
+            elif "claude-3" in model_id.lower():
+                body = json.dumps({
+                    "anthropic_version": "bedrock-2023-05-31",
+                    "max_tokens": 1024,
+                    "system": system_instruction,
+                    "messages": [{"role": "user", "content": prompt_text}]
+                })
+            else:
+                raise ValueError(f"Unsupported model family for ID: {model_id}")
             
-    #         # Invoke model
-    #         response = client.invoke_model(
-    #             modelId=model_id,
-    #             body=body,
-    #             contentType="application/json",
-    #             accept="application/json"
-    #         )
-    #         response_body = json.loads(response.get('body').read())
+            # Invoke model
+            response = client.invoke_model(
+                modelId=model_id,
+                body=body,
+                contentType="application/json",
+                accept="application/json"
+            )
+            response_body = json.loads(response.get('body').read())
             
-    #         if "amazon.nova" in model_id.lower():
-    #             ai_reply_text = response_body.get('output', {}).get('message', {}).get('content', [{}])[0].get('text', "")
-    #         elif "claude-3" in model_id.lower():
-    #             ai_reply_text = response_body.get('content')[0].get('text')
-    #         else:
-    #             ai_reply_text = "I processed your request, but couldn't parse my own output."
+            if "amazon.nova" in model_id.lower():
+                ai_reply_text = response_body.get('output', {}).get('message', {}).get('content', [{}])[0].get('text', "")
+            elif "claude-3" in model_id.lower():
+                ai_reply_text = response_body.get('content')[0].get('text')
+            else:
+                ai_reply_text = "I processed your request, but couldn't parse my own output."
             
-    #         # ==========================================================
-    #         # 5. INTERCEPT AI JSON AND CREATE THE TASK
-    #         # ==========================================================
-    #         ai_reply_text = ai_reply_text.strip()
+            # ==========================================================
+            # 5. INTERCEPT AI JSON AND CREATE THE TASK
+            # ==========================================================
+            ai_reply_text = ai_reply_text.strip()
             
-    #         try:
-    #             # Check if the AI replied with the JSON block
-    #             cleaned_text = ai_reply_text
-    #             if "```json" in cleaned_text:
-    #                 cleaned_text = cleaned_text.split("```json")[1].split("```")[0].strip()
-    #             elif "```" in cleaned_text:
-    #                 cleaned_text = cleaned_text.split("```")[1].split("```")[0].strip()
+            try:
+                # Check if the AI replied with the JSON block
+                cleaned_text = ai_reply_text
+                if "```json" in cleaned_text:
+                    cleaned_text = cleaned_text.split("```json")[1].split("```")[0].strip()
+                elif "```" in cleaned_text:
+                    cleaned_text = cleaned_text.split("```")[1].split("```")[0].strip()
                     
-    #             ai_json = json.loads(cleaned_text)
+                ai_json = json.loads(cleaned_text)
                 
-    #             # Check if the AI wants to execute the 'create_task' action
-    #             if isinstance(ai_json, dict) and ai_json.get("action") == "create_task":
+                # Check if the AI wants to execute the 'create_task' action
+                if isinstance(ai_json, dict) and ai_json.get("action") == "create_task":
                     
-    #                 # Ensure priority matches Django model choices
-    #                 priority = str(ai_json.get("priority", "medium")).lower()
-    #                 if priority not in ['low', 'medium', 'high', 'critical']:
-    #                     priority = 'medium'
+                    # Ensure priority matches Django model choices
+                    priority = str(ai_json.get("priority", "medium")).lower()
+                    if priority not in ['low', 'medium', 'high', 'critical']:
+                        priority = 'medium'
                         
-    #                 # ---> NEW: Handle missing project context gracefully <---
-    #                 project_to_assign = room.project if not is_global_bot else None
+                    # ---> NEW: Handle missing project context gracefully <---
+                    project_to_assign = room.project
                         
-    #                 # Create the Task in the database
-    #                 new_task = Task.objects.create(
-    #                     heading=ai_json.get("heading", "AI Generated Task"),
-    #                     description=ai_json.get("description", ""),
-    #                     priority=priority,
-    #                     project=project_to_assign, # Will be None if generated from Global bot
-    #                     assigned_by=sender_user,
-    #                     status="pending"
-    #                 )
+                    # Create the Task in the database
+                    new_task = Task.objects.create(
+                        heading=ai_json.get("heading", "AI Generated Task"),
+                        description=ai_json.get("description", ""),
+                        priority=priority,
+                        project=project_to_assign, # Will be None if generated from Global bot
+                        assigned_by=sender_user,
+                        status="pending"
+                    )
                     
-    #                 # Assign the users
-    #                 assignee_ids = ai_json.get("assigned_to_ids", [])
-    #                 if not assignee_ids:
-    #                     assignee_ids = [user_id] # Default to the person who asked if AI fails
-    #                 new_task.assigned_to.add(*assignee_ids)
+                    # Assign the users
+                    assignee_ids = ai_json.get("assigned_to_ids", [])
+                    if not assignee_ids:
+                        assignee_ids = [user_id] # Default to the person who asked if AI fails
+                    new_task.assigned_to.add(*assignee_ids)
                     
-    #                 # Format a nice success message to show in the chat
-    #                 assignees = new_task.assigned_to.all()
-    #                 assignee_names = ", ".join([u.username for u in assignees])
+                    # Format a nice success message to show in the chat
+                    assignees = new_task.assigned_to.all()
+                    assignee_names = ", ".join([u.username for u in assignees])
                     
-    #                 ai_reply_text = (
-    #                     f"✅ **Task Created Successfully!**\n\n"
-    #                     f"**ID:** #{new_task.id}\n"
-    #                     f"**Heading:** {new_task.heading}\n"
-    #                     f"**Priority:** {new_task.priority.capitalize()}\n"
-    #                     f"**Assigned To:** {assignee_names}"
-    #                 )
-    #         except json.JSONDecodeError:
-    #             # The AI didn't output JSON, it output a normal text reply. 
-    #             pass
-    #         except Exception as e:
-    #             logger.error(f"Failed to create task via AI: {e}")
-    #             ai_reply_text = "I understood your request to create a task, but a system error occurred while saving it to the database."
+                    ai_reply_text = (
+                        f"✅ **Task Created Successfully!**\n\n"
+                        f"**ID:** #{new_task.id}\n"
+                        f"**Heading:** {new_task.heading}\n"
+                        f"**Priority:** {new_task.priority.capitalize()}\n"
+                        f"**Assigned To:** {assignee_names}"
+                    )
+            except json.JSONDecodeError:
+                # The AI didn't output JSON, it output a normal text reply. 
+                pass
+            except Exception as e:
+                logger.error(f"Failed to create task via AI: {e}")
+                ai_reply_text = "I understood your request to create a task, but a system error occurred while saving it to the database."
 
-    #         # 6. Push the final message back to the chat room
-    #         ChatMessageService.create_message(
-    #             room=room,
-    #             sender=None,
-    #             content=ai_reply_text,
-    #             is_ai_generated=True
-    #         )
+            # 6. Push the final message back to the chat room
+            ChatMessageService.create_message(
+                room=room,
+                sender=None,
+                content=ai_reply_text,
+                is_ai_generated=True
+            )
             
-    #     except Exception as e:
-    #         logger.error(f"Failed to invoke Bedrock AI: {e}")
-    #         ChatMessageService.create_message(
-    #             room=room,
-    #             sender=None,
-    #             content="I'm sorry, my AI processing failed. Please check the server logs.",
-    #             is_ai_generated=True
-    #         )
+        except Exception as e:
+            logger.error(f"Failed to invoke Bedrock AI: {e}")
+            ChatMessageService.create_message(
+                room=room,
+                sender=None,
+                content="I'm sorry, my AI processing failed. Please check the server logs.",
+                is_ai_generated=True
+            )
     @staticmethod
     def _send_notification(message: ChatMessage):
         """
