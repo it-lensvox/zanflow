@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import ReactDOM from 'react-dom';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
@@ -6,7 +7,7 @@ import {
     ArrowLeft, Plus, Upload, Search, Film, Loader2, FileText, FileJson, Settings,
     List, Grid3X3, MessageCircle
 } from 'lucide-react';
-import { projectsApi, taskApi, documentsApi } from '@/services/api';
+import { projectsApi, taskApi, documentsApi, chatApi } from '@/services/api';
 import type { Task, AllDocumentsResponse, FilteredDocument, TaskOption, TaskAttachment } from '@/types'
 import { CreateTask } from '@/pages/MyTask/CreateTask';
 import { DualView, ViewToggle } from '@/components/layout/DualView';
@@ -159,6 +160,9 @@ export function ContentCreation() {
     const [documentFilter, setDocumentFilter] = useState<'project' | 'task'>('project');
     const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
     const [taskSearchQuery, setTaskSearchQuery] = useState('');
+    const [dateField, setDateField] = useState<'end_date' | 'start_date' | 'created_at'>('end_date');
+    const [showDateFieldDropdown, setShowDateFieldDropdown] = useState(false);
+    const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
     const [showTaskDropdown, setShowTaskDropdown] = useState(false);
     const taskDropdownRef = useRef<HTMLDivElement>(null);
     const { data: tasksData, isLoading: isTasksLoading } = useQuery({
@@ -193,7 +197,7 @@ export function ContentCreation() {
                 label: opt.label
             }))
         },
-        { key: 'end_date', type: 'date' },
+        { key: dateField, type: 'date' },
     ];
 
     // Initialize filter hook
@@ -214,6 +218,8 @@ export function ContentCreation() {
 
     // Handle filter toggle
     const handleFilter = useCallback((key: string) => {
+        setShowDateFieldDropdown(false);
+        setDropdownPos(null);
         setActiveFilterKey(prev => prev === key ? null : key);
     }, [setActiveFilterKey]);
 
@@ -228,7 +234,11 @@ export function ContentCreation() {
             return list.find((p: any) => p.id === Number(id));
         }
     });
-
+    const { data: projectRoomsData } = useQuery({
+        queryKey: ['project-chat-rooms'],
+        queryFn: () => chatApi.getProjectRooms(),
+        staleTime: 5 * 60 * 1000,
+    });
     const [mediaPage, setMediaPage] = useState(1);
     const [allMediaFiles, setAllMediaFiles] = useState<any[]>([]);
     const [hasMoreMedia, setHasMoreMedia] = useState(true);
@@ -279,6 +289,41 @@ export function ContentCreation() {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+
+    const DATE_FIELD_OPTIONS: { value: 'end_date' | 'start_date' | 'created_at'; label: string }[] = [
+        { value: 'end_date', label: 'Due Date' },
+        { value: 'start_date', label: 'Start Date' },
+        { value: 'created_at', label: 'Created At' },
+    ];
+    const activeDateLabel = DATE_FIELD_OPTIONS.find(o => o.value === dateField)?.label ?? 'Due Date';
+    const dateTriggerRef = useRef<HTMLButtonElement>(null);
+    useEffect(() => {
+        if (!showDateFieldDropdown) return;
+        const handler = () => { setShowDateFieldDropdown(false); setDropdownPos(null); };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [showDateFieldDropdown]);
+
+    const DateFieldLabel = useMemo(() => (
+        <button
+            ref={dateTriggerRef}
+            onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                if (dateTriggerRef.current) {
+                    const rect = dateTriggerRef.current.getBoundingClientRect();
+                    setDropdownPos({ top: rect.bottom + window.scrollY + 4, left: rect.left + window.scrollX });
+                }
+                setShowDateFieldDropdown(v => !v);
+            }}
+            className="flex items-center gap-1 text-[14px] font-bold tracking-wide text-gray-700 hover:text-purple-600 transition-colors"
+        >
+            {activeDateLabel}
+            <svg className="w-3 h-3 mt-0.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+        </button>
+    ), [showDateFieldDropdown, dateField, activeDateLabel]);
 
     // Handle filter change
     const handleFilterChange = (filter: 'project' | 'task') => {
@@ -648,13 +693,21 @@ export function ContentCreation() {
                             Create Task
                         </button>
 
-                        <button
-                            onClick={() => navigate('/team-chat', { state: { projectId: Number(id) } })}
+                       <button
+                            onClick={() => {
+                                const projectRoom = projectRoomsData?.find(room => room.project === Number(id));
+                                if (projectRoom) {
+                                    navigate(`/team-chat/${id}/${projectRoom.id}`);
+                                } else {
+                                    navigate('/team-chat', { state: { projectId: Number(id) } });
+                                }
+                            }}
                             className="p-2 hover:bg-gray-100 rounded-full transition-colors flex items-center gap-2 text-gray-600 hover:text-black"
                             title="Team Chat"
                         >
                             <MessageCircle className="h-4 w-4" />
                         </button>
+
 
                         <button
                             onClick={() => navigate(`/projects/${id}/settings`)}
@@ -691,18 +744,19 @@ export function ContentCreation() {
                                                         onTaskClick: (t) => setSelectedTask(t as unknown as Task),
                                                         queryClient,
                                                         user,
-                                                        navigate
+                                                        navigate,
+                                                        dateField,
                                                     }).map(col => ({
                                                         ...col,
                                                         headerClassName: `relative ${activeFilterKey === col.key ? 'z-[100]' : ''}`,
                                                         label: (
                                                             <div ref={activeFilterKey === col.key ? filterContainerRef : null}>
                                                                 <FilterHeaderWrapper
-                                                                    columnLabel={col.label as string}
+                                                                    columnLabel={col.key === dateField ? DateFieldLabel : col.label as string}
                                                                     filterType={
                                                                         ['project', 'heading', 'labels'].includes(col.key) ? 'search' :
                                                                             ['status', 'priority'].includes(col.key) ? 'list' :
-                                                                                col.key === 'end_date' ? 'date' : 'none'
+                                                                                col.key === dateField ? 'date' : 'none'
                                                                     }
                                                                     isActive={activeFilterKey === col.key}
                                                                     filterContent={
@@ -750,19 +804,19 @@ export function ContentCreation() {
                                                                                     containerRef={filterContainerRef}
                                                                                 />
                                                                             )}
-                                                                            {col.key === 'end_date' && (
+                                                                            {col.key === dateField && (
                                                                                 <DateFilter
-                                                                                    columnKey="end_date"
-                                                                                    value={columnFilters.end_date || ''}
+                                                                                    columnKey={dateField}
+                                                                                    value={columnFilters[dateField] || ''}
                                                                                     onChange={(value) => {
-                                                                                        setColumnFilters(prev => ({ ...prev, end_date: value }));
+                                                                                        setColumnFilters(prev => ({ ...prev, [dateField]: value }));
                                                                                         setActiveFilterKey(null);
                                                                                     }}
                                                                                     onClear={() => {
-                                                                                        clearFilter('end_date');
+                                                                                        clearFilter(dateField);
                                                                                         setActiveFilterKey(null);
                                                                                     }}
-                                                                                    isActive={activeFilterKey === 'end_date'}
+                                                                                    isActive={activeFilterKey === dateField}
                                                                                     containerRef={filterContainerRef}
                                                                                 />
                                                                             )}
@@ -1042,7 +1096,11 @@ export function ContentCreation() {
                     onClose={() => setPreviewDocument(null)}
                 />
             )}
-            <DeleteModal
+            {/* Threads Component */}
+            {project && (
+                <Threads projectId={project.id} projectName={project.name} />
+            )}
+           <DeleteModal
                 isOpen={!!deleteConfirm}
                 type="confirm"
                 itemType="document"
@@ -1051,6 +1109,31 @@ export function ContentCreation() {
                 onCancel={() => setDeleteConfirm(null)}
                 isDeleting={isDeleting}
             />
+            {showDateFieldDropdown && dropdownPos && ReactDOM.createPortal(
+                <div
+                    style={{ position: 'absolute', top: dropdownPos.top, left: dropdownPos.left, zIndex: 9999 }}
+                    className="bg-white border border-gray-200 rounded-lg shadow-lg min-w-[130px] py-1"
+                    onMouseDown={(e) => e.stopPropagation()}
+                >
+                    {DATE_FIELD_OPTIONS.map(opt => (
+                        <button
+                            key={opt.value}
+                            onMouseDown={(e) => {
+                                e.stopPropagation();
+                                setDateField(opt.value);
+                                setShowDateFieldDropdown(false);
+                                setDropdownPos(null);
+                                clearFilter(dateField);
+                                setActiveFilterKey(null);
+                            }}
+                            className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-purple-50 hover:text-purple-700 transition-colors ${dateField === opt.value ? 'font-semibold text-purple-600 bg-purple-50' : 'text-gray-700'}`}
+                        >
+                            {dateField === opt.value && <span className="mr-1.5">✓</span>}{opt.label}
+                        </button>
+                    ))}
+                </div>,
+                document.body
+            )}
         </div>
     );
 }
