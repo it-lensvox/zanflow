@@ -783,7 +783,7 @@ export function TeamChatModern() {
         return unreadB - unreadA;
       }
 
-      // Priority 2: Last Message Timestamp (Most recent first)
+      // Priority 2: Last Message Timestamp
       const timeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
       const timeB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
       const activityA = (a as any).activityTimestamp || 0;
@@ -1168,7 +1168,6 @@ export function TeamChatModern() {
 
   // Send Message
   const handleSendMessage = async () => {
-    // Prevent multiple submissions while uploading
     if (isUploadingFile) {
       return;
     }
@@ -1957,7 +1956,7 @@ export function TeamChatModern() {
                               {/* Avatar */}
                               <div className="flex-shrink-0">
                                 {showAvatar ? (
-                                  <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center font-semibold text-white text-sm shadow-sm">
+                                  <div className="h-6 w-6 rounded-full bg-gradient-to-br from-blue-400 to-blue-500 flex items-center justify-center font-semibold text-white text-sm shadow-sm">
                                     {message.sender.username.charAt(0).toUpperCase()}
                                   </div>
                                 ) : (
@@ -2273,12 +2272,10 @@ export function TeamChatModern() {
                   ) : (
                     <div className="grid grid-cols-1 gap-3">
                       {sharedDocuments.map((doc) => (
-                        <a
+                        <button
                           key={doc.id}
-                          href={doc.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-4 p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all group"
+                          onClick={() => setPreviewDoc({ url: doc.url, fileName: doc.name })}
+                          className="w-full flex items-center gap-4 p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all group text-left"
                         >
                           <div className="h-12 w-12 rounded bg-blue-100 flex items-center justify-center flex-shrink-0">
                             <Paperclip className="h-6 w-6 text-blue-600" />
@@ -2291,7 +2288,7 @@ export function TeamChatModern() {
                               Shared by {doc.sender.full_name || doc.sender.username} • {new Date(doc.created_at).toLocaleDateString()}
                             </p>
                           </div>
-                        </a>
+                        </button>
                       ))}
                     </div>
                   )}
