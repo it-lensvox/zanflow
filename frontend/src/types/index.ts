@@ -1035,3 +1035,42 @@ export interface TaskOption {
   task_heading: string;
 }
 
+
+// AI BOT TYPES
+
+// Page context sent with every AI Bot message
+export interface AIBotContext {
+  page: string;
+  id: number | string | null;
+}
+
+// Outgoing message payload to WebSocket
+export interface AIBotSendPayload {
+  message: string;
+  context: AIBotContext;
+}
+
+// Incoming message types from backend WebSocket
+export type AIBotMessageType = 'system' | 'ai_chunk' | 'ai_done' | 'ai_complete' | 'ai_response' | 'chat_title' | 'error';
+
+export interface AIBotIncomingMessage {
+  type: AIBotMessageType;
+  text: string;
+}
+
+// UI message stored in session history
+export interface AIBotUIMessage {
+  id: string;
+  text: string;
+  sender: 'user' | 'bot';
+  timestamp: Date;
+}
+
+// AI Bot chat session
+export interface AIBotSession {
+  id: string;
+  title: string;
+  messages: AIBotUIMessage[];
+  createdAt: Date;
+  updatedAt: Date;
+}

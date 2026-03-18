@@ -183,7 +183,7 @@ export const MyTask: React.FC = () => {
             {location.pathname.startsWith('/taskboard') && !location.pathname.endsWith('/create') ? (
                 loading ? (
                     <div className="flex items-center justify-center h-64">
-                        <div className="animate-spin h-8 w-8 border-b-2 border-blue-600" />
+                        {/* <div className="animate-spin h-8 w-8 border-b-2 border-blue-600" /> */}
                     </div>
                 ) : (
                     <>

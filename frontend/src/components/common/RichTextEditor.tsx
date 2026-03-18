@@ -853,11 +853,46 @@ export const ChatMessageInput: React.FC<ChatMessageInputProps> = ({
 
 // UTILITY
 
-/*
- * @example
- *   const plain = htmlToPlainText('<p><strong>Hello</strong> world</p>');
- *   // → "Hello world"
+/**
+ * Converts a subset of Markdown (##/###/** bold **) to HTML
+ * so it can be fed directly into Tiptap's readOnly RichTextEditor.
  */
+export function markdownToHtml(markdown: string): string {
+  if (!markdown) return '';
+  const lines = markdown.split('\n');
+  const htmlLines = lines.map(line => {
+    // ### heading → <h3>, ## heading → <h2>, # heading → <h1>
+    const h3 = line.match(/^###\s+(.*)/);
+    if (h3) return `<h3>${h3[1]}</h3>`;
+    const h2 = line.match(/^##\s+(.*)/);
+    if (h2) return `<h2>${h2[1]}</h2>`;
+    const h1 = line.match(/^#\s+(.*)/);
+    if (h1) return `<h1>${h1[1]}</h1>`;
+
+    // Bullet list items
+    const bullet = line.match(/^[-*]\s+(.*)/);
+    if (bullet) return `<li>${applyInline(bullet[1])}</li>`;
+
+    // Numbered list items
+    const numbered = line.match(/^\d+\.\s+(.*)/);
+    if (numbered) return `<li>${applyInline(numbered[1])}</li>`;
+
+    // Empty line → paragraph break
+    if (line.trim() === '') return '<br>';
+
+    return `<p>${applyInline(line)}</p>`;
+  });
+
+  // Wrap consecutive <li> in <ul>
+  const joined = htmlLines.join('');
+  return joined.replace(/(<li>.*?<\/li>)+/gs, match => `<ul>${match}</ul>`);
+}
+
+function applyInline(text: string): string {
+  // **bold** → <strong>bold</strong>
+  return text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+}
+
 export function htmlToPlainText(html: string): string {
   if (typeof document === 'undefined') return html;
   const div = document.createElement('div');

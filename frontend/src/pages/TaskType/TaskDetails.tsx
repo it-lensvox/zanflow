@@ -1,9 +1,10 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import ReactDOM from 'react-dom';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { ArrowLeft, Loader2, Upload, FileText, List, Grid3X3, Settings, MessageCircle, Search } from 'lucide-react';
-import { projectsApi, taskApi, documentsApi } from '@/services/api';
+import { projectsApi, taskApi, documentsApi, chatApi } from '@/services/api';
 import { DualView, ViewToggle } from '@/components/layout/DualView';
 import { useViewMode } from '@/components/layout/DualView/useViewMode';
 import { createDocumentsTableColumns, DocumentGridCard } from '@/components/layout/DualView/documentsConfig';
@@ -58,6 +59,9 @@ export function TaskDetails() {
     const [documentFilter, setDocumentFilter] = useState<'project' | 'task'>('project');
     const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
     const [taskSearchQuery, setTaskSearchQuery] = useState('');
+    const [dateField, setDateField] = useState<'end_date' | 'start_date' | 'created_at'>('end_date');
+    const [showDateFieldDropdown, setShowDateFieldDropdown] = useState(false);
+    const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
     const [showTaskDropdown, setShowTaskDropdown] = useState(false);
     const taskDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -72,7 +76,11 @@ export function TaskDetails() {
             return list.find((p: any) => p.id === Number(id));
         }
     });
-
+     const { data: projectRoomsData } = useQuery({
+        queryKey: ['project-chat-rooms'],
+        queryFn: () => chatApi.getProjectRooms(),
+        staleTime: 5 * 60 * 1000,
+    });
     // Fetch documents for the grid
     const [mediaPage, setMediaPage] = useState(1);
     const [allMediaFiles, setAllMediaFiles] = useState<any[]>([]);
@@ -286,7 +294,7 @@ export function TaskDetails() {
                 label: opt.label
             }))
         },
-        { key: 'end_date', type: 'date' },
+        { key: dateField, type: 'date' },
     ];
 
     // Initialize filter hook
@@ -307,8 +315,46 @@ export function TaskDetails() {
 
     // Handle filter toggle
     const handleFilter = useCallback((key: string) => {
+        setShowDateFieldDropdown(false);
+        setDropdownPos(null);
         setActiveFilterKey(prev => prev === key ? null : key);
     }, [setActiveFilterKey]);
+
+    const DATE_FIELD_OPTIONS: { value: 'end_date' | 'start_date' | 'created_at'; label: string }[] = [
+        { value: 'end_date', label: 'Due Date' },
+        { value: 'start_date', label: 'Start Date' },
+        { value: 'created_at', label: 'Created At' },
+    ];
+    const activeDateLabel = DATE_FIELD_OPTIONS.find(o => o.value === dateField)?.label ?? 'Due Date';
+    const dateTriggerRef = useRef<HTMLButtonElement>(null);
+    useEffect(() => {
+        if (!showDateFieldDropdown) return;
+        const handler = () => { setShowDateFieldDropdown(false); setDropdownPos(null); };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [showDateFieldDropdown]);
+
+    const DateFieldLabel = useMemo(() => (
+        <button
+            ref={dateTriggerRef}
+            onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                if (dateTriggerRef.current) {
+                    const rect = dateTriggerRef.current.getBoundingClientRect();
+                    setDropdownPos({ top: rect.bottom + window.scrollY + 4, left: rect.left + window.scrollX });
+                }
+                setShowDateFieldDropdown(v => !v);
+            }}
+            className="flex items-center gap-1 text-[14px] font-bold tracking-wide text-gray-700 hover:text-purple-600 transition-colors"
+        >
+            {activeDateLabel}
+            <svg className="w-3 h-3 mt-0.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+        </button>
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    ), [showDateFieldDropdown, dateField, activeDateLabel]);
 
 
     // Reusable Upload Flow
@@ -544,8 +590,15 @@ export function TaskDetails() {
                         Create Task
                     </button>
 
-                    <button
-                        onClick={() => navigate('/team-chat', { state: { projectId: Number(id) } })}
+                 <button
+                        onClick={() => {
+                            const projectRoom = projectRoomsData?.find(room => room.project === Number(id));
+                            if (projectRoom) {
+                                navigate(`/team-chat/${id}/${projectRoom.id}`);
+                            } else {
+                                navigate('/team-chat', { state: { projectId: Number(id) } });
+                            }
+                        }}
                         className="p-2 hover:bg-gray-100 rounded-full transition-colors flex items-center gap-2 text-gray-600 hover:text-black"
                         title="Team Chat"
                     >
@@ -582,18 +635,19 @@ export function TaskDetails() {
                                                         onTaskClick: setSelectedTask,
                                                         queryClient,
                                                         user,
-                                                        navigate
+                                                        navigate,
+                                                        dateField,
                                                     }).map(col => ({
                                                         ...col,
                                                         headerClassName: `relative ${activeFilterKey === col.key ? 'z-[100]' : ''}`,
                                                         label: (
                                                             <div ref={activeFilterKey === col.key ? filterContainerRef : null}>
                                                                 <FilterHeaderWrapper
-                                                                    columnLabel={col.label as string}
+                                                                    columnLabel={col.key === dateField ? DateFieldLabel : col.label as string}
                                                                     filterType={
                                                                         ['project', 'heading', 'labels'].includes(col.key) ? 'search' :
                                                                             ['status', 'priority'].includes(col.key) ? 'list' :
-                                                                                col.key === 'end_date' ? 'date' : 'none'
+                                                                                col.key === dateField ? 'date' : 'none'
                                                                     }
                                                                     isActive={activeFilterKey === col.key}
                                                                     filterContent={
@@ -641,19 +695,19 @@ export function TaskDetails() {
                                                                                     containerRef={filterContainerRef}
                                                                                 />
                                                                             )}
-                                                                            {col.key === 'end_date' && (
+                                                                            {col.key === dateField && (
                                                                                 <DateFilter
-                                                                                    columnKey="end_date"
-                                                                                    value={columnFilters.end_date || ''}
+                                                                                    columnKey={dateField}
+                                                                                    value={columnFilters[dateField] || ''}
                                                                                     onChange={(value) => {
-                                                                                        setColumnFilters(prev => ({ ...prev, end_date: value }));
+                                                                                        setColumnFilters(prev => ({ ...prev, [dateField]: value }));
                                                                                         setActiveFilterKey(null);
                                                                                     }}
                                                                                     onClear={() => {
-                                                                                        clearFilter('end_date');
+                                                                                        clearFilter(dateField);
                                                                                         setActiveFilterKey(null);
                                                                                     }}
-                                                                                    isActive={activeFilterKey === 'end_date'}
+                                                                                    isActive={activeFilterKey === dateField}
                                                                                     containerRef={filterContainerRef}
                                                                                 />
                                                                             )}
@@ -924,6 +978,10 @@ export function TaskDetails() {
                     />
                 )
             }
+            {/* Threads Component */}
+            {project && (
+                <Threads projectId={project.id} projectName={project.name} />
+            )}
             <DeleteModal
                 isOpen={!!deleteConfirm}
                 type="confirm"
@@ -933,6 +991,31 @@ export function TaskDetails() {
                 onCancel={() => setDeleteConfirm(null)}
                 isDeleting={isDeleting}
             />
+            {showDateFieldDropdown && dropdownPos && ReactDOM.createPortal(
+                <div
+                    style={{ position: 'absolute', top: dropdownPos.top, left: dropdownPos.left, zIndex: 9999 }}
+                    className="bg-white border border-gray-200 rounded-lg shadow-lg min-w-[130px] py-1"
+                    onMouseDown={(e) => e.stopPropagation()}
+                >
+                    {DATE_FIELD_OPTIONS.map(opt => (
+                        <button
+                            key={opt.value}
+                            onMouseDown={(e) => {
+                                e.stopPropagation();
+                                setDateField(opt.value);
+                                setShowDateFieldDropdown(false);
+                                setDropdownPos(null);
+                                clearFilter(dateField);
+                                setActiveFilterKey(null);
+                            }}
+                            className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-purple-50 hover:text-purple-700 transition-colors ${dateField === opt.value ? 'font-semibold text-purple-600 bg-purple-50' : 'text-gray-700'}`}
+                        >
+                            {dateField === opt.value && <span className="mr-1.5">✓</span>}{opt.label}
+                        </button>
+                    ))}
+                </div>,
+                document.body
+            )}
         </div >
     );
 }

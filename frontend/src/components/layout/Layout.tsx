@@ -1,13 +1,9 @@
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useMatch } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
-import { useState, Suspense, useMemo } from 'react';
+import { useState, Suspense } from 'react';
 import { NotificationsPage } from '@/pages/NotificationsPage';
 import { QuickNotes } from '@/components/QuickNotes';
-import Threads from '@/pages/Project/Thread';
-import { useQuery } from '@tanstack/react-query';
-import { projectsApi } from '@/services/api';
-
-// Sidebar stays fully mounted and visible
+import { AIBot } from '@/pages/AI BOT/AI BOT';
 function PageSkeleton() {
   return (
     <div className="h-full flex flex-col animate-pulse p-6 gap-4">
@@ -47,45 +43,14 @@ function PageSkeleton() {
 
 export function Layout() {
   const [isActivityOpen, setIsActivityOpen] = useState(false);
-  const location = useLocation();
-const activeProjectId = useMemo(() => {
-    const projectMatch = location.pathname.match(/\/projects\/(\d+)/);
-    const chatMatch = location.pathname.match(/\/team-chat\/(\d+)/);
-    return projectMatch?.[1] || chatMatch?.[1] || null;
-  }, [location.pathname]);
-
-  // Fetch all projects as fallback for pages with no project in URL
-  const { data: allProjectsData } = useQuery({
-    queryKey: ['projects'],
-    queryFn: () => projectsApi.list(),
-    staleTime: Infinity, // already fetched by Sidebar — reuse cache, no extra request
-  });
-
-  const fallbackProject = useMemo(() => {
-    if (!allProjectsData) return null;
-    const list = Array.isArray(allProjectsData)
-      ? allProjectsData
-      : (allProjectsData as any)?.results || [];
-    return list[0] || null;
-  }, [allProjectsData]);
-
-  // Use URL project if available, else fall back to first project in list
-  const resolvedProjectId = activeProjectId ?? (fallbackProject?.id ? String(fallbackProject.id) : null);
-
-  const { data: activeProject } = useQuery({
-    queryKey: ['project', resolvedProjectId],
-    queryFn: () => projectsApi.get(Number(resolvedProjectId)),
-    enabled: !!resolvedProjectId,
-  });
+  const isProjectDetailPage = useMatch('/projects/:id');
 
   return (
     <div className="flex h-screen bg-background">
-      {/* Sidebar is OUTSIDE Suspense — it never unmounts on page transitions */}
       <Sidebar />
 
       <main className="flex-1 overflow-auto flex flex-col">
         <div id="layout-wrapper" className="container flex-1 flex flex-col">
-          {/* Suspense only covers the page content, not the sidebar */}
           <Suspense fallback={<PageSkeleton />}>
             <Outlet context={{ isActivityOpen, setIsActivityOpen }} />
           </Suspense>
@@ -95,15 +60,8 @@ const activeProjectId = useMemo(() => {
       {isActivityOpen && (
         <NotificationsPage onClose={() => setIsActivityOpen(false)} />
       )}
+      {!isProjectDetailPage && <AIBot />}
       <QuickNotes />
-      {resolvedProjectId && activeProject && (
-        <div style={{ position: 'fixed', bottom: '24px', right: '80px', zIndex: 50 }}>
-          <Threads
-            projectId={Number(resolvedProjectId)}
-            projectName={activeProject.name}
-          />
-        </div>
-      )}
     </div>
   );
 }

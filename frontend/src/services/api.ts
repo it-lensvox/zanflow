@@ -4,36 +4,17 @@ import type {
   TaskComment, CreateTaskCommentPayload, AITaskSuggestionResponse, AITaskSuggestionPayload, ProjectCreatePayload, Label, DocumentStatus, ChatMessage, ChatRoom, ChatRoomMessagesResponse, CreatePrivateChatPayload,
   GatewaySendMessagePayload, GatewayIncomingMessage, RefineTextPayload, RefineTextResponse, TaskResponse, TeamTypeChoicesResponse,
   CreateTeamPayload, ProjectChatRoom, TeamChatRoom, ChatUnreadResponse, NotificationData, NotificationCallback, Team, ThreadRoom, ThreadSession, ThreadStorage, ThreadUIMessage, CreateThreadRoomPayload, WSJoinRoomCommand, WSSendMessageCommand, WSIncomingThreadMessage, WSUnreadUpdateSignal, ThreadMessagesResponse,
-  InviteUserPayload, InviteUserResponse, InviteVerifyResponse, InviteAcceptPayload, InviteAcceptResponse
+  InviteUserPayload, InviteUserResponse, InviteVerifyResponse, InviteAcceptPayload, InviteAcceptResponse, AIBotSendPayload, AIBotIncomingMessage
 } from '@/types';
 
-
-
-//export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.4:8000/api/v1';
-//const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://192.168.1.4:8000/ws/gateway';
-
-//export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.14:8000/api/v1';
-//const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://192.168.1.14:8000/ws/gateway';
 
 export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000';
 const WS_GATEWAY_URL = import.meta.env.VITE_WS_GATEWAY_URL || 'ws://localhost:8000/ws/gateway';
-
-//export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://localhost:8000/api/v1';
-//const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://localhost:8000/ws/gateway';
-
-
-//export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.6:8000/api/v1';
-//const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://192.168.1.6:8000/ws/gateway';
-
-
-//export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.18:8000/api/v1';
-//const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://192.168.1.12:8000/ws/gateway';
- 
+const WS_AI_BOT_URL = import.meta.env.VITE_WS_AI_BOT_URL || 'ws://localhost:8000/ws/ai-bot/';
 
 // export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://zanflow.lensvox.com/api/v1';
-
 export const api = axios.create({
   baseURL: API_URL,
   headers: {
@@ -1225,5 +1206,31 @@ export const threadsStorageApi = {
   },
 };
 
+// AI BOT WEBSOCKET API
+export const aiBotApi = {
+  // Connect to the AI Bot WebSocket using JWT token
+  connect: (): WebSocket => {
+    const tokens = getTokens();
+    const token = tokens?.access ?? '';
+    return new WebSocket(`${WS_AI_BOT_URL}?token=${token}`);
+  },
+
+  // Send a message with page context
+  sendMessage: (socket: WebSocket, payload: AIBotSendPayload): void => {
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify(payload));
+    }
+  },
+
+  parseMessage: (event: MessageEvent): AIBotIncomingMessage | null => {
+    try {
+      const parsed = JSON.parse(event.data) as AIBotIncomingMessage;
+      if (parsed?.type) return parsed;
+      return null;
+    } catch {
+      return null;
+    }
+  },
+};
 
 export default api;
