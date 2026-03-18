@@ -5,6 +5,9 @@ from django.conf import settings
 from datetime import date
 import io
 import PyPDF2
+from apps.projects.models import Project
+from apps.tasksite.models import Task
+from django.utils import timezone
 
 class TaskAIService:
     @staticmethod
@@ -240,6 +243,7 @@ Return ONLY a FLAT JSON object with this exact schema:
              matching_members.append(users[0]['id'])
         
         return matching_members if matching_members else []
+    
     @staticmethod
     def refine_text(text, task_type):
         """
@@ -285,3 +289,291 @@ Return ONLY a FLAT JSON object with this exact schema:
         except Exception as e:
             print(f"Error refining text: {e}")
             return text
+    @staticmethod
+    def execute_global_task_search(user, priority=None, status=None, username=None):
+        """
+        Upgraded search to find tasks by priority, status, or assignee.
+        """
+        if not user or not user.is_authenticated:
+            return "Error: User is not authenticated."
+
+        # Start with a base queryset
+        tasks = Task.objects.all().select_related('project').prefetch_related('assigned_to')
+
+        # 1. Handle Assignee Search
+        if username:
+            try:
+                # --- CHANGE THIS LINE BELOW: Use 'User' (the model), not 'user' (the instance) ---
+                from apps.users.models import User # Ensure this is imported
+                target_user = User.objects.get(username__iexact=username) 
+                tasks = tasks.filter(assigned_to=target_user)
+                header_msg = f"Found {tasks.count()} tasks assigned to '{username}':\n"
+            except User.DoesNotExist:
+                return f"I couldn't find a user named '{username}' in the system."
+        else:
+            # Default to current user
+            tasks = tasks.filter(assigned_to=user)
+            header_msg = f"Found {tasks.count()} of your tasks:\n"
+
+        # 2. Apply Priority/Status filters
+        if priority:
+            tasks = tasks.filter(priority=priority.lower())
+        if status:
+            tasks = tasks.filter(status=status.lower())
+
+        if not tasks.exists():
+            return "No tasks found matching that criteria."
+
+        result_text = header_msg
+        for task in tasks[:15]:
+            project_name = task.project.name if task.project else "No Project"
+            assignees = ", ".join([u.username for u in task.assigned_to.all()])
+            result_text += (
+                f"- [{project_name}] Task: '{task.heading}' | Status: {task.status} | "
+                f"Assigned to: {assignees}\n"
+            )
+            
+        return result_text
+    
+    @staticmethod
+    def get_page_context(user, context_data):
+        """
+        Determines what data to fetch based on the frontend's current page context.
+        """
+        page = context_data.get("page", "dashboard")
+        page_id = context_data.get("id", None)
+        
+        context_text = f"The user is currently on the {page.capitalize()} page.\n\n"
+
+        try:
+            # --- TASKBOARD PAGE CONTEXT ---
+            if page == "taskboard" and page_id:
+                project = Project.objects.get(id=page_id)
+                context_text += f"Project Name: {project.name}\n"
+                
+                # Fetch tasks and use prefetch_related for the ManyToMany 'assigned_to' field to prevent N+1 query issues
+                tasks = Task.objects.filter(project=project).prefetch_related('assigned_to')
+                
+                context_text += f"Total Tasks in Project: {tasks.count()}\n"
+                context_text += "Current Tasks:\n"
+                
+                for task in tasks:
+                    # Get assigned usernames
+                    assignees = ", ".join([u.username for u in task.assigned_to.all()])
+                    if not assignees:
+                        assignees = "Unassigned"
+                        
+                    # Format the due date safely
+                    due_date = task.end_date.strftime('%Y-%m-%d') if task.end_date else "No due date"
+                    
+                    context_text += (
+                        f"- Task: '{task.heading}' | Status: {task.status} | "
+                        f"Priority: {task.priority} | Assigned to: {assignees} | Due: {due_date}\n"
+                    )
+
+            # --- DASHBOARD PAGE CONTEXT ---
+            elif page == "dashboard":
+                context_text += "Here is the user's current personalized data:\n"
+                
+                # UPDATE THIS LINE to explicitly check is_authenticated
+                if user and user.is_authenticated:
+                    
+                    # Fetch tasks assigned to the current user that are NOT completed
+                    active_tasks = Task.objects.filter(
+                        assigned_to=user,
+                        status__in=['pending', 'in_progress', 'review']
+                    ).select_related('project').order_by('end_date')[:10] 
+                    
+                    context_text += f"User's Active Tasks: {active_tasks.count()}\n"
+                    
+                    for task in active_tasks:
+                        project_name = task.project.name if task.project else "No Project"
+                        due_date = task.end_date.strftime('%Y-%m-%d') if task.end_date else "No due date"
+                        
+                        context_text += (
+                            f"- [{project_name}] Task: '{task.heading}' | Status: {task.status} | "
+                            f"Priority: {task.priority} | Due: {due_date}\n"
+                        )
+                elif page == "calendar":
+                    context_text += "Here is the user's schedule data:\n"
+                    
+                    if user and user.is_authenticated:
+                        today = timezone.now().date()
+                        context_text += f"Today's Date is {today}.\n"
+                        
+                        # Fetch tasks due today for the current user
+                        todays_tasks = Task.objects.filter(
+                            assigned_to=user,
+                            end_date__date=today, # Filters for tasks ending exactly today
+                            status__in=['pending', 'in_progress', 'review']
+                        ).select_related('project')
+                        
+                        context_text += f"Total active tasks due today: {todays_tasks.count()}\n"
+                        
+                        if todays_tasks.exists():
+                            for task in todays_tasks:
+                                project_name = task.project.name if task.project else "No Project"
+                                context_text += (
+                                    f"- [{project_name}] Task: '{task.heading}' | "
+                                    f"Status: {task.status} | Priority: {task.priority}\n"
+                                )
+                        
+                else:
+                    context_text += "User is not authenticated. Cannot load personal tasks.\n"
+
+        except Project.DoesNotExist:
+            context_text += f" (Note: Project with ID {page_id} could not be found).\n"
+        except Exception as e:
+            print(f"Error fetching context data: {e}")
+            context_text += " (An error occurred while loading specific database records for this page).\n"
+            
+        return context_text
+
+    @staticmethod
+    def generate_chat_stream(user_message, system_context, chat_history=None, user=None):
+        if chat_history is None:
+            chat_history = []
+
+        client = boto3.client(
+            "bedrock-runtime",
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region_name=settings.AWS_REGION
+        )
+
+        prompt = f"""You are the ZanFlow ERP AI Assistant. 
+        You have two ways to answer:
+        1. Look at the "Screen Context" below. If the answer is there, use it.
+        2. If the user asks for tasks NOT on the screen (like "Find all my critical tasks" across the app), you MUST use the `search_global_tasks` tool.
+        
+        Screen Context:
+        {system_context}
+        """
+
+        # 1. Format the conversation history
+        formatted_messages = []
+        for msg in chat_history:
+            role = msg.get("role", "user") if msg.get("role") in ["user", "assistant"] else "user"
+            formatted_messages.append({"role": role, "content": [{"text": msg.get("text", "")}]})
+            
+        formatted_messages.append({"role": "user", "content": [{"text": user_message}]})
+
+        # 2. Define the Tool for Bedrock
+        tool_config = {
+            "tools": [{
+                "toolSpec": {
+                    "name": "search_global_tasks",
+                    "description": "Search for tasks in the database. You can filter by priority, status, or a specific username.",
+                    "inputSchema": {
+                        "json": {
+                            "type": "object",
+                            "properties": {
+                                "priority": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
+                                "status": {"type": "string", "enum": ["pending", "in_progress", "completed", "review"]},
+                                "username": {"type": "string", "description": "The username of the person the task is assigned to."}
+                            }
+                        }
+                    }
+                }
+            }]
+        }
+
+        # 3. First API Call: Let Bedrock decide if it needs the tool or can just answer
+        response = client.converse(
+            modelId=settings.BEDROCK_MODEL_ID,
+            messages=formatted_messages,
+            system=[{"text": prompt}],
+            toolConfig=tool_config
+        )
+
+        output_message = response['output']['message']
+        
+        # 4. Check if Bedrock decided to use the tool
+        if output_message['content'] and 'toolUse' in output_message['content'][-1]:
+            tool_use = output_message['content'][-1]['toolUse']
+            tool_name = tool_use['name']
+            tool_inputs = tool_use['input']
+            tool_use_id = tool_use['toolUseId']
+
+            print(f"\n=== AI IS USING TOOL: {tool_name} with args {tool_inputs} ===\n")
+
+            if tool_name == "search_global_tasks":
+                tool_result_text = TaskAIService.execute_global_task_search(
+                    user=user, 
+                    priority=tool_inputs.get("priority"), 
+                    status=tool_inputs.get("status"),
+                    username=tool_inputs.get("username") # <--- Add this
+                )
+            else:
+                tool_result_text = "Tool not found."
+
+            # Append the AI's tool request and our Django tool result to the conversation
+            formatted_messages.append(output_message)
+            formatted_messages.append({
+                "role": "user",
+                "content": [{"toolResult": {"toolUseId": tool_use_id, "content": [{"text": tool_result_text}]}}]
+            })
+
+            # 5. Second API Call: Stream the final answer back to the user now that the AI has the database results
+            stream_response = client.converse_stream(
+                modelId=settings.BEDROCK_MODEL_ID,
+                messages=formatted_messages,
+                system=[{"text": prompt}],
+                toolConfig=tool_config
+            )
+            
+            for chunk in stream_response['stream']:
+                if 'contentBlockDelta' in chunk:
+                    yield chunk['contentBlockDelta']['delta'].get('text', '')
+
+        else:
+            # 6. If no tool was needed, just yield the text directly (Screen Reader mode)
+            # Since converse() already generated the text, we can just yield it as one chunk,
+            # or you can refactor to use converse_stream initially if you prefer.
+            for content_block in output_message['content']:
+                if 'text' in content_block:
+                    yield content_block['text']
+
+    @staticmethod
+    def generate_chat_title(first_message):
+        """
+        Takes the first message of a chat and uses AWS Bedrock to generate a short title.
+        """
+        client = boto3.client(
+            "bedrock-runtime",
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region_name=settings.AWS_REGION
+        )
+
+        prompt = f"""
+        Read the following user message and generate a short, descriptive title for the chat session.
+        RULES:
+        1. Maximum 4 words.
+        2. Return ONLY the title text. No quotes, no periods, no introductory words like "Title:".
+        
+        User Message: "{first_message}"
+        """
+
+        native_request = {
+            "system": [{"text": "You are a helpful assistant that only outputs short titles."}],
+            "messages": [{"role": "user", "content": [{"text": prompt}]}],
+            "inferenceConfig": {"maxTokens": 20, "temperature": 0.3} # Low tokens and temp for a strict, short response
+        }
+
+        try:
+            response = client.converse(
+                modelId=settings.BEDROCK_MODEL_ID,
+                messages=native_request["messages"],
+                system=native_request["system"],
+                inferenceConfig=native_request["inferenceConfig"]
+            )
+            
+            raw_title = response['output']['message']['content'][0]['text']
+            
+            # Clean up just in case the AI added quotes anyway
+            return raw_title.strip().strip('"').strip("'")
+            
+        except Exception as e:
+            print(f"Error generating chat title: {e}")
+            return "New Conversation" # Safe fallback

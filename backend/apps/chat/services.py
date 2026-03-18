@@ -399,7 +399,7 @@ class ChatMessageService:
                 attachment=attachment,
                 attachment_name=attachment_name,
                 reply_to_id=reply_to_id,
-                is_ai_generated=is_ai_generated # <-- SO THIS RECOGNIZES IT
+                is_ai_generated=is_ai_generated 
             )
             room.save(update_fields=['updated_at'])
             
@@ -491,22 +491,14 @@ class ChatMessageService:
             for msg in reversed(history)
         ])
         
-        # 3. ---> NEW: Adjust Context based on Room Type <---
-        is_global_bot = (room.room_type == ChatRoom.RoomType.AI_BOT)
-        
-        if is_global_bot:
-            # Personal AI Assistant Context
-            users_context = f"- Name: {sender_user.get_full_name() or sender_user.username} | Username: {sender_user.username} | ID: {sender_user.id}"
-            project_context = "This is a global 1-on-1 AI Assistant chat. No specific project is selected. You are directly chatting with the user anywhere in the app."
-        else:
-            # Project/Thread Context
-            participants = room.participants.all()
-            users_context = "\n".join([f"- Name: {u.get_full_name() or u.username} | Username: {u.username} | ID: {u.id}" for u in participants])
-            project_context = f"Project context: {room.project.name if room.project else 'None'}"
+        # Project/Thread Context
+        participants = room.participants.all()
+        users_context = "\n".join([f"- Name: {u.get_full_name() or u.username} | Username: {u.username} | ID: {u.id}" for u in participants])
+        project_context = f"Project context: {room.project.name if room.project else 'None'}"
 
         # 4. Update the System Instruction
         system_instruction = (
-            "You are @zanflow, an AI assistant inside the Zanflow platform. "
+            "You are @dyuksa, an AI assistant inside the dyuksa platform. "
             f"The user speaking to you right now has the ID: {user_id}. "
             f"{project_context}\n"
             "Always base your task summaries ONLY on the 'Current Real Tasks' provided below.\n\n"
@@ -598,7 +590,7 @@ class ChatMessageService:
                         priority = 'medium'
                         
                     # ---> NEW: Handle missing project context gracefully <---
-                    project_to_assign = room.project if not is_global_bot else None
+                    project_to_assign = room.project
                         
                     # Create the Task in the database
                     new_task = Task.objects.create(

@@ -218,7 +218,7 @@ class SendMessageView(APIView):
                 ).start()
             
             # ---> Optional: Keep your existing @zanflow trigger for other rooms <---
-            elif '@zanflow' in content.lower() and message_type == 'text':
+            elif '@dyuksa' in content.lower() and message_type == 'text':
                 import threading
                 threading.Thread(
                     target=ChatMessageService.process_zanflow_ai,
@@ -922,15 +922,15 @@ class CreateThreadRoomView(APIView):
         )
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
     
-class GetAIBotRoomView(APIView):
-    """
-    Get or create the personal AI Assistant room for the current user.
-    GET /api/v1/chat/rooms/ai-bot/
-    """
-    permission_classes = [IsAuthenticated]
+# class GetAIBotRoomView(APIView):
+#     """
+#     Get or create the personal AI Assistant room for the current user.
+#     GET /api/v1/chat/rooms/ai-bot/
+#     """
+#     permission_classes = [IsAuthenticated]
 
-    @extend_schema(summary="Get or create personal AI Bot room", responses={200: ChatRoomDetailSerializer})
-    def get(self, request):
-        room = ChatRoomService.get_or_create_ai_room(request.user)
-        serializer = ChatRoomDetailSerializer(room, context={'request': request})
-        return Response(serializer.data)
+#     @extend_schema(summary="Get or create personal AI Bot room", responses={200: ChatRoomDetailSerializer})
+#     def get(self, request):
+#         room = ChatRoomService.get_or_create_ai_room(request.user)
+#         serializer = ChatRoomDetailSerializer(room, context={'request': request})
+#         return Response(serializer.data)
