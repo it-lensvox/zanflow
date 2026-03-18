@@ -39,6 +39,11 @@ jobs:
             VITE_WS_URL=wss://zanflow.lensvox.com
             VITE_WS_GATEWAY_URL=wss://zanflow.lensvox.com/ws/gateway
             EOF
+
+            echo "🔧 Setting production URLs in api.ts..."
+            sed -i "s|http://localhost:8000/api/v1|https://zanflow.lensvox.com/api/v1|g" frontend/src/services/api.ts
+            sed -i "s|http://localhost:8000|https://zanflow.lensvox.com|g" frontend/src/services/api.ts
+            sed -i "s|ws://localhost:8000|wss://zanflow.lensvox.com|g" frontend/src/services/api.ts
             
             echo "🔍 Validating docker-compose.yml..."
             sudo docker-compose config > /dev/null
