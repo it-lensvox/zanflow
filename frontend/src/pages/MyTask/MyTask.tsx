@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import { Plus, Grid3X3, List, Search, Bell } from 'lucide-react';
 import { useNavigate, Outlet, useLocation, useOutletContext } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { taskApi } from '@/services/api';
+import { taskApi, usersApi } from '@/services/api';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { TaskDetailModal } from './TaskDetailModal';
 import { AITask } from './AITask';
@@ -28,6 +28,12 @@ export const MyTask: React.FC = () => {
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [showAITaskModal, setShowAITaskModal] = useState(false);
     const activeFilter = location.pathname.split('/').filter(p => p)[1]?.toUpperCase() || 'ALL';
+
+    const { data: usersData } = useQuery({
+        queryKey: ['all-users'],
+        queryFn: () => usersApi.listAll(),
+        enabled: !!user,
+    });
 
     const { data: tasksData, isLoading: loading } = useQuery({
         queryKey: ['tasks'],
@@ -111,9 +117,12 @@ export const MyTask: React.FC = () => {
             const matchesFilter = activeFilter === 'ALL' || task.status.toUpperCase() === activeFilter;
             const matchesSearch = searchQuery.trim() === '' ||
                 task.heading.toLowerCase().includes(searchQuery.toLowerCase());
-            return matchesFilter && matchesSearch;
+            const assigneeFilterValue = columnFilters['assigned_to'];
+            const matchesAssignee = !assigneeFilterValue ||
+                task.assigned_to.map(String).includes(String(assigneeFilterValue));
+            return matchesFilter && matchesSearch && matchesAssignee;
         });
-    }, [hookFilteredTasks, activeFilter, searchQuery]);
+    }, [hookFilteredTasks, activeFilter, searchQuery, columnFilters]);
     const handleFilter = useCallback((key: string) => {
         console.log('[handleFilter] called with key:', key, '| dateField:', dateField, '| will reset showDateFieldDropdown');
         setShowDateFieldDropdown(false);
@@ -282,7 +291,7 @@ export const MyTask: React.FC = () => {
                                                         columnLabel={col.key === dateField ? DateFieldLabel : col.label as string}
                                                         filterType={
                                                             ['project', 'heading', 'labels'].includes(col.key) ? 'search' :
-                                                                ['status', 'priority'].includes(col.key) ? 'list' :
+                                                                ['status', 'priority', 'assigned_to'].includes(col.key) ? 'list' :
                                                                     col.key === dateField ? 'date' : 'none'
                                                         }
                                                         isActive={activeFilterKey === col.key}
@@ -312,6 +321,20 @@ export const MyTask: React.FC = () => {
                                                                         onSelect={(value) => { setColumnFilters(prev => ({ ...prev, priority: value })); setActiveFilterKey(null); }}
                                                                         onClear={() => { clearFilter('priority'); setActiveFilterKey(null); }}
                                                                         isActive={activeFilterKey === 'priority'}
+                                                                        containerRef={filterContainerRef}
+                                                                    />
+                                                                )}
+                                                                {col.key === 'assigned_to' && (
+                                                                    <ListFilter
+                                                                        columnKey="assigned_to"
+                                                                        options={(usersData || []).map(u => ({
+                                                                            value: String(u.id),
+                                                                            label: `${u.first_name} ${u.last_name}`.trim() || u.username,
+                                                                        }))}
+                                                                        selectedValue={columnFilters['assigned_to'] || ''}
+                                                                        onSelect={(value) => { setColumnFilters(prev => ({ ...prev, assigned_to: value })); setActiveFilterKey(null); }}
+                                                                        onClear={() => { clearFilter('assigned_to'); setActiveFilterKey(null); }}
+                                                                        isActive={activeFilterKey === 'assigned_to'}
                                                                         containerRef={filterContainerRef}
                                                                     />
                                                                 )}

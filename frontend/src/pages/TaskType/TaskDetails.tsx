@@ -4,7 +4,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { ArrowLeft, Loader2, Upload, FileText, List, Grid3X3, Settings, MessageCircle, Search } from 'lucide-react';
-import { projectsApi, taskApi, documentsApi, chatApi } from '@/services/api';
+import { projectsApi, taskApi, documentsApi, chatApi, usersApi } from '@/services/api';
 import { DualView, ViewToggle } from '@/components/layout/DualView';
 import { useViewMode } from '@/components/layout/DualView/useViewMode';
 import { createDocumentsTableColumns, DocumentGridCard } from '@/components/layout/DualView/documentsConfig';
@@ -76,7 +76,7 @@ export function TaskDetails() {
             return list.find((p: any) => p.id === Number(id));
         }
     });
-     const { data: projectRoomsData } = useQuery({
+    const { data: projectRoomsData } = useQuery({
         queryKey: ['project-chat-rooms'],
         queryFn: () => chatApi.getProjectRooms(),
         staleTime: 5 * 60 * 1000,
@@ -156,6 +156,12 @@ export function TaskDetails() {
     });
 
     const tasks = (tasksData || []) as Task[];
+
+    const { data: usersData } = useQuery({
+        queryKey: ['all-users'],
+        queryFn: () => usersApi.listAll(),
+        enabled: !!user,
+    });
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -299,7 +305,7 @@ export function TaskDetails() {
 
     // Initialize filter hook
     const {
-        filteredData: filteredTasks,
+        filteredData: filteredTasksFromHook,
         handleSort,
         columnFilters,
         setColumnFilters,
@@ -312,6 +318,14 @@ export function TaskDetails() {
         columns: filterConfig,
         globalSearchFields: ['heading', 'description'],
     });
+
+    const filteredTasks = React.useMemo(() => {
+        const assigneeFilterValue = columnFilters['assigned_to'];
+        if (!assigneeFilterValue) return filteredTasksFromHook;
+        return filteredTasksFromHook.filter((task: Task) =>
+            task.assigned_to.map(String).includes(String(assigneeFilterValue))
+        );
+    }, [filteredTasksFromHook, columnFilters]);
 
     // Handle filter toggle
     const handleFilter = useCallback((key: string) => {
@@ -590,7 +604,7 @@ export function TaskDetails() {
                         Create Task
                     </button>
 
-                 <button
+                    <button
                         onClick={() => {
                             const projectRoom = projectRoomsData?.find(room => room.project === Number(id));
                             if (projectRoom) {
@@ -646,7 +660,7 @@ export function TaskDetails() {
                                                                     columnLabel={col.key === dateField ? DateFieldLabel : col.label as string}
                                                                     filterType={
                                                                         ['project', 'heading', 'labels'].includes(col.key) ? 'search' :
-                                                                            ['status', 'priority'].includes(col.key) ? 'list' :
+                                                                            ['status', 'priority', 'assigned_to'].includes(col.key) ? 'list' :
                                                                                 col.key === dateField ? 'date' : 'none'
                                                                     }
                                                                     isActive={activeFilterKey === col.key}
@@ -692,6 +706,26 @@ export function TaskDetails() {
                                                                                         setActiveFilterKey(null);
                                                                                     }}
                                                                                     isActive={activeFilterKey === 'priority'}
+                                                                                    containerRef={filterContainerRef}
+                                                                                />
+                                                                            )}
+                                                                            {col.key === 'assigned_to' && (
+                                                                                <ListFilter
+                                                                                    columnKey="assigned_to"
+                                                                                    options={(usersData || []).map(u => ({
+                                                                                        value: String(u.id),
+                                                                                        label: `${u.first_name} ${u.last_name}`.trim() || u.username,
+                                                                                    }))}
+                                                                                    selectedValue={columnFilters['assigned_to'] || ''}
+                                                                                    onSelect={(value) => {
+                                                                                        setColumnFilters(prev => ({ ...prev, assigned_to: value }));
+                                                                                        setActiveFilterKey(null);
+                                                                                    }}
+                                                                                    onClear={() => {
+                                                                                        clearFilter('assigned_to');
+                                                                                        setActiveFilterKey(null);
+                                                                                    }}
+                                                                                    isActive={activeFilterKey === 'assigned_to'}
                                                                                     containerRef={filterContainerRef}
                                                                                 />
                                                                             )}

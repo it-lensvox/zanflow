@@ -149,7 +149,7 @@ export function Login() {
 
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Welcome to Dyuksa</CardTitle>
+          <CardTitle className="text-2xl">Welcome To DYUKSA</CardTitle>
           <p className="text-muted-foreground">
             Sign in to your account to continue
           </p>

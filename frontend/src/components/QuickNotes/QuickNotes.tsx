@@ -1,111 +1,152 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  NotebookPen, Plus, FolderPlus, Maximize2, X, Folder, FileText,
+  NotebookPen, Plus, FolderPlus, Maximize2, X, Folder, FileText, MoreVertical,
 } from 'lucide-react';
 import { cn, formatRelativeTime } from '@/lib/utils';
+import { quickNotesApi } from '@/services/api';
+import type { QuickNote, QuickNoteFolder } from '@/types';
 
-// ─── Data model ───────────────────────────────────────────────────────────────
-
-const STORAGE_KEY = 'zanflow_quick_notes';
-
-export interface QuickNote {
-  id: string;
-  folderId: string;
-  content: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface QuickNoteFolder {
-  id: string;
-  name: string;
-  createdAt: string;
-}
+// UI State model
 
 export interface QuickNotesState {
   folders: QuickNoteFolder[];
   notes: QuickNote[];
-  selectedFolderId: string;
-  selectedNoteId: string | null;
+  selectedFolderId: number | 'all';
+  selectedNoteId: number | null;
+  isLoading: boolean;
 }
 
 function getDefaultState(): QuickNotesState {
   return {
-    folders: [{ id: 'default', name: 'Notes', createdAt: new Date().toISOString() }],
+    folders: [],
     notes: [],
     selectedFolderId: 'all',
     selectedNoteId: null,
+    isLoading: true,
   };
 }
 
-// ─── Internal hook (exported so page can reuse) ───────────────────────────────
-
 export function useQuickNotes() {
-  const [state, setState] = useState<QuickNotesState>(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return JSON.parse(raw) as QuickNotesState;
-    } catch { /* ignore */ }
-    return getDefaultState();
-  });
+  const [state, setState] = useState<QuickNotesState>(getDefaultState);
 
+  // Load folders + notes from backend on mount
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, [state]);
+    let cancelled = false;
+    async function load() {
+      try {
+        const [folders, notesResp] = await Promise.all([
+          quickNotesApi.getFolders(),
+          quickNotesApi.getNotes(),
+        ]);
+        if (cancelled) return;
+        setState((prev) => ({
+          ...prev,
+          folders,
+          notes: notesResp.results,
+          isLoading: false,
+        }));
+      } catch {
+        if (!cancelled) setState((prev) => ({ ...prev, isLoading: false }));
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, []);
 
-  const getNotesForFolder = (folderId: string): QuickNote[] => {
+  const getNotesForFolder = (folderId: number | 'all'): QuickNote[] => {
     const sorted = [...state.notes].sort(
-      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
     );
     if (folderId === 'all') return sorted;
-    return sorted.filter((n) => n.folderId === folderId);
+    return sorted.filter((n) => n.folder === folderId);
   };
 
-  const getNoteTitle = (content: string): string => {
-    const firstLine = content.split('\n').find((l) => l.trim()) ?? '';
-    return firstLine.slice(0, 40) || 'Untitled';
+  const getNoteTitle = (note: QuickNote): string => {
+    if (note.title && note.title.trim()) return note.title;
+    const firstLine = note.content.split('\n').find((l) => l.trim());
+    return firstLine?.trim().slice(0, 40) || 'Untitled';
   };
 
-  const createNote = (folderId: string): string => {
-    const id = Date.now().toString();
-    const now = new Date().toISOString();
-    const targetFolder = folderId === 'all' ? 'default' : folderId;
-    const newNote: QuickNote = { id, folderId: targetFolder, content: '', createdAt: now, updatedAt: now };
-    setState((prev) => ({ ...prev, notes: [...prev.notes, newNote], selectedNoteId: id }));
-    return id;
-  };
-
-  const updateNote = (id: string, content: string): void => {
+  const createNote = async (folderId: number | 'all'): Promise<void> => {
+    const targetFolder = folderId === 'all' ? null : folderId;
+    const newNote = await quickNotesApi.createNote({
+      content: '',
+      folder: targetFolder,
+    });
     setState((prev) => ({
       ...prev,
-      notes: prev.notes.map((n) =>
-        n.id === id ? { ...n, content, updatedAt: new Date().toISOString() } : n,
-      ),
+      notes: [...prev.notes, newNote],
+      selectedNoteId: newNote.id,
     }));
   };
 
-  const createFolder = (name: string): void => {
-    const id = Date.now().toString();
-    const folder: QuickNoteFolder = { id, name, createdAt: new Date().toISOString() };
-    setState((prev) => ({ ...prev, folders: [...prev.folders, folder], selectedFolderId: id }));
+  const updateNote = async (id: number, content: string): Promise<void> => {
+    setState((prev) => ({
+      ...prev,
+      notes: prev.notes.map((n) =>
+        n.id === id ? { ...n, content, updated_at: new Date().toISOString() } : n,
+      ),
+    }));
+    try {
+      const updated = await quickNotesApi.updateNote(id, { content });
+      setState((prev) => ({
+        ...prev,
+        notes: prev.notes.map((n) =>
+          n.id === id ? { ...n, ...updated } : n,
+        ),
+      }));
+    } catch (err) {
+      console.error('[QuickNotes] updateNote failed:', err);
+    }
   };
 
-  const selectFolder = (folderId: string): void => {
+  const renameNote = async (noteId: number, newTitle: string): Promise<void> => {
+    setState((prev) => ({
+      ...prev,
+      notes: prev.notes.map((n) =>
+        n.id === noteId ? { ...n, title: newTitle, updated_at: new Date().toISOString() } : n,
+      ),
+    }));
+    await quickNotesApi.updateNote(noteId, { title: newTitle });
+  };
+
+  const deleteNote = async (noteId: number): Promise<void> => {
+    setState((prev) => {
+      const remaining = prev.notes.filter((n) => n.id !== noteId);
+      const newSelected =
+        prev.selectedNoteId === noteId
+          ? (remaining.find((n) => n.folder === prev.selectedFolderId || prev.selectedFolderId === 'all')?.id ?? null)
+          : prev.selectedNoteId;
+      return { ...prev, notes: remaining, selectedNoteId: newSelected };
+    });
+    await quickNotesApi.deleteNote(noteId);
+  };
+
+  const createFolder = async (name: string): Promise<void> => {
+    const folder = await quickNotesApi.createFolder({ name });
+    setState((prev) => ({
+      ...prev,
+      folders: [...prev.folders, folder],
+      selectedFolderId: folder.id,
+    }));
+  };
+
+  const selectFolder = (folderId: number | 'all'): void => {
     setState((prev) => {
       const notes =
         folderId === 'all'
           ? [...prev.notes].sort(
-              (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-            )
+            (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+          )
           : [...prev.notes]
-              .filter((n) => n.folderId === folderId)
-              .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+            .filter((n) => n.folder === folderId)
+            .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
       return { ...prev, selectedFolderId: folderId, selectedNoteId: notes[0]?.id ?? null };
     });
   };
 
-  const selectNote = (noteId: string): void => {
+  const selectNote = (noteId: number): void => {
     setState((prev) => ({ ...prev, selectedNoteId: noteId }));
   };
 
@@ -115,13 +156,15 @@ export function useQuickNotes() {
     getNoteTitle,
     createNote,
     updateNote,
+    renameNote,
+    deleteNote,
     createFolder,
     selectFolder,
     selectNote,
   };
 }
 
-// ─── Shared toolbar icon button (mini window only) ────────────────────────────
+// Shared toolbar icon button (mini window only)
 
 function ToolbarBtn({
   icon,
@@ -147,8 +190,8 @@ function ToolbarBtn({
 
 interface FolderSidebarProps {
   state: QuickNotesState;
-  getNotesForFolder: (folderId: string) => QuickNote[];
-  onSelectFolder: (folderId: string) => void;
+  getNotesForFolder: (folderId: number | 'all') => QuickNote[];
+  onSelectFolder: (folderId: number | 'all') => void;
   onCreateFolder: (name: string) => void;
   triggerFolderCreate?: boolean;
   onAcknowledgeFolderCreate?: () => void;
@@ -190,7 +233,7 @@ export function FolderSidebar({
   };
 
   const allFolderItems = [
-    { id: 'all', name: 'All Notes', count: state.notes.length },
+    { id: 'all' as const, name: 'All Notes', count: state.notes.length },
     ...state.folders.map((f) => ({
       id: f.id,
       name: f.name,
@@ -262,9 +305,11 @@ export function FolderSidebar({
 interface NotesListProps {
   state: QuickNotesState;
   visibleNotes: QuickNote[];
-  getNoteTitle: (content: string) => string;
-  onSelectNote: (noteId: string) => void;
+  getNoteTitle: (note: QuickNote) => string;
+  onSelectNote: (noteId: number) => void;
   onNewNote: () => void;
+  onRenameNote: (noteId: number, newTitle: string) => void;
+  onDeleteNote: (noteId: number) => void;
 }
 
 export function NotesList({
@@ -273,7 +318,59 @@ export function NotesList({
   getNoteTitle,
   onSelectNote,
   onNewNote,
+  onRenameNote,
+  onDeleteNote,
 }: NotesListProps) {
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const [renamingId, setRenamingId] = useState<number | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const renameInputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!openMenuId) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpenMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [openMenuId]);
+
+  useEffect(() => {
+    if (renamingId) renameInputRef.current?.focus();
+  }, [renamingId]);
+
+  const handleEllipsisClick = (e: React.MouseEvent, noteId: number) => {
+    e.stopPropagation();
+    setOpenMenuId((prev) => (prev === noteId ? null : noteId));
+  };
+
+  const handleRenameClick = (note: QuickNote) => {
+    setOpenMenuId(null);
+    setRenamingId(note.id);
+    setRenameValue(getNoteTitle(note));
+  };
+
+  const commitRename = (noteId: number) => {
+    const trimmed = renameValue.trim();
+    if (trimmed) onRenameNote(noteId, trimmed);
+    setRenamingId(null);
+    setRenameValue('');
+  };
+
+  const handleRenameKeyDown = (e: React.KeyboardEvent, noteId: number) => {
+    if (e.key === 'Enter') commitRename(noteId);
+    if (e.key === 'Escape') { setRenamingId(null); setRenameValue(''); }
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent, noteId: number) => {
+    e.stopPropagation();
+    setOpenMenuId(null);
+    onDeleteNote(noteId);
+  };
+
   return (
     <div className="w-[280px] shrink-0 border-r border-border flex flex-col bg-muted/30">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
@@ -290,33 +387,92 @@ export function NotesList({
       </div>
 
       <div className="flex-1 overflow-y-auto py-1">
-        {visibleNotes.length === 0 ? (
+        {state.isLoading ? (
+          <div className="flex flex-col items-center justify-center h-full text-muted-foreground/40 gap-2 py-12">
+            <p className="text-xs">Loading…</p>
+          </div>
+        ) : visibleNotes.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground/40 gap-2 py-12">
             <FileText className="h-8 w-8" />
             <p className="text-xs">No notes yet</p>
           </div>
         ) : (
           visibleNotes.map((note) => {
-            const title = getNoteTitle(note.content);
+            const title = getNoteTitle(note);
             const preview = note.content.replace(/\n/g, ' ').slice(0, 80);
             const isSelected = state.selectedNoteId === note.id;
+            const isMenuOpen = openMenuId === note.id;
+            const isRenaming = renamingId === note.id;
+
             return (
-              <button
-                key={note.id}
-                onClick={() => onSelectNote(note.id)}
-                className={cn(
-                  'w-full text-left px-4 py-3 border-b border-border/50 transition-colors hover:bg-accent',
-                  isSelected && 'bg-primary/8 border-l-2 border-l-primary',
+              <div key={note.id} className="relative">
+                <button
+                  onClick={() => onSelectNote(note.id)}
+                  className={cn(
+                    'w-full text-left px-4 py-3 border-b border-border/50 transition-colors hover:bg-accent',
+                    isSelected && 'bg-primary/8 border-l-2 border-l-primary',
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-1">
+                    <div className="flex-1 min-w-0">
+                      {isRenaming ? (
+                        <input
+                          ref={renameInputRef}
+                          value={renameValue}
+                          onChange={(e) => setRenameValue(e.target.value)}
+                          onKeyDown={(e) => handleRenameKeyDown(e, note.id)}
+                          onBlur={() => commitRename(note.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-full text-sm font-medium text-foreground bg-background border border-primary rounded px-1 py-0.5 focus:outline-none leading-tight"
+                        />
+                      ) : (
+                        <p className="text-sm font-medium text-foreground truncate leading-tight">{title}</p>
+                      )}
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        {formatRelativeTime(note.updated_at)}
+                      </p>
+                      {/* {preview && !isRenaming && (
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2 leading-snug">{preview}</p>
+                      )} */}
+                    </div>
+
+                    {/* Ellipsis trigger */}
+                    <button
+                      onClick={(e) => handleEllipsisClick(e, note.id)}
+                      title="More options"
+                      className={cn(
+                        'shrink-0 flex h-6 w-6 items-center justify-center rounded transition-colors mt-0.5',
+                        isMenuOpen
+                          ? 'bg-accent text-foreground'
+                          : 'text-muted-foreground hover:bg-accent',
+                      )}
+                    >
+                      <MoreVertical className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </button>
+
+                {/* Dropdown menu */}
+                {isMenuOpen && (
+                  <div
+                    ref={menuRef}
+                    className="absolute right-2 top-8 z-50 min-w-[130px] rounded-lg border border-border bg-popover shadow-md py-1 animate-in fade-in slide-in-from-top-1 duration-100"
+                  >
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleRenameClick(note); }}
+                      className="w-full text-left px-3 py-1.5 text-xs text-foreground hover:bg-accent transition-colors"
+                    >
+                      Rename
+                    </button>
+                    <button
+                      onClick={(e) => handleDeleteClick(e, note.id)}
+                      className="w-full text-left px-3 py-1.5 text-xs text-destructive hover:bg-accent transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 )}
-              >
-                <p className="text-sm font-medium text-foreground truncate leading-tight">{title}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">
-                  {formatRelativeTime(note.updatedAt)}
-                </p>
-                {preview && (
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2 leading-snug">{preview}</p>
-                )}
-              </button>
+              </div>
             );
           })
         )}
@@ -329,8 +485,8 @@ export function NotesList({
 
 interface NoteEditorProps {
   selectedNote: QuickNote | null;
-  getNoteTitle: (content: string) => string;
-  onUpdateNote: (id: string, content: string) => void;
+  getNoteTitle: (note: QuickNote) => string;
+  onUpdateNote: (id: number, content: string) => void;
   editorRef?: React.RefObject<HTMLTextAreaElement>;
 }
 
@@ -353,10 +509,10 @@ export function NoteEditor({
     <div className="flex-1 flex flex-col bg-background overflow-hidden">
       <div className="px-8 pt-6 pb-2 shrink-0 border-b border-border">
         <p className="text-lg font-semibold text-foreground truncate">
-          {getNoteTitle(selectedNote.content)}
+          {getNoteTitle(selectedNote)}
         </p>
         <p className="text-[10px] text-muted-foreground mt-1">
-          {formatRelativeTime(selectedNote.updatedAt)}
+          {formatRelativeTime(selectedNote.updated_at)}
         </p>
       </div>
       <textarea
@@ -376,12 +532,14 @@ export function NoteEditor({
 interface QuickNotesContentProps {
   onNewNote: () => void;
   onCreateFolder: (name: string) => void;
-  onSelectFolder: (folderId: string) => void;
-  onSelectNote: (noteId: string) => void;
-  onUpdateNote: (id: string, content: string) => void;
+  onSelectFolder: (folderId: number | 'all') => void;
+  onSelectNote: (noteId: number) => void;
+  onUpdateNote: (id: number, content: string) => void;
+  onRenameNote: (noteId: number, newTitle: string) => void;
+  onDeleteNote: (noteId: number) => void;
   state: QuickNotesState;
-  getNotesForFolder: (folderId: string) => QuickNote[];
-  getNoteTitle: (content: string) => string;
+  getNotesForFolder: (folderId: number | 'all') => QuickNote[];
+  getNoteTitle: (note: QuickNote) => string;
   triggerFolderCreate?: boolean;
   onAcknowledgeFolderCreate?: () => void;
 }
@@ -392,6 +550,8 @@ export function QuickNotesContent({
   onSelectFolder,
   onSelectNote,
   onUpdateNote,
+  onRenameNote,
+  onDeleteNote,
   state,
   getNotesForFolder,
   getNoteTitle,
@@ -422,6 +582,8 @@ export function QuickNotesContent({
         getNoteTitle={getNoteTitle}
         onSelectNote={onSelectNote}
         onNewNote={onNewNote}
+        onRenameNote={onRenameNote}
+        onDeleteNote={onDeleteNote}
       />
       <NoteEditor
         selectedNote={selectedNote}
@@ -437,12 +599,12 @@ export function QuickNotesContent({
 
 interface MiniWindowProps {
   selectedNote: QuickNote | null;
-  getNoteTitle: (content: string) => string;
+  getNoteTitle: (note: QuickNote) => string;
   onClose: () => void;
   onMaximize: () => void;
   onNewNote: () => void;
   onNewFolder: () => void;
-  onUpdateNote: (id: string, content: string) => void;
+  onUpdateNote: (id: number, content: string) => void;
   textareaRef: React.RefObject<HTMLTextAreaElement>;
 }
 
@@ -459,7 +621,7 @@ function MiniWindow({
   return (
     <div
       className={cn(
-        'fixed bottom-24 right-6 z-[60] w-[340px] rounded-2xl border border-border',
+        'w-[340px] rounded-2xl border border-border',
         'bg-card shadow-2xl flex flex-col overflow-hidden',
         'animate-in fade-in slide-in-from-bottom-4 duration-200',
       )}
@@ -504,33 +666,93 @@ function MiniWindow({
       {/* Footer hint */}
       <div className="px-4 py-1.5 text-[10px] text-muted-foreground border-t border-border bg-muted/40 flex items-center justify-between">
         <span className="truncate">
-          {selectedNote ? getNoteTitle(selectedNote.content) : 'No note selected'}
+          {selectedNote ? getNoteTitle(selectedNote) : 'No note selected'}
         </span>
         {selectedNote && (
-          <span className="shrink-0 ml-2">{formatRelativeTime(selectedNote.updatedAt)}</span>
+          <span className="shrink-0 ml-2">{formatRelativeTime(selectedNote.updated_at)}</span>
         )}
       </div>
     </div>
   );
 }
 
-// ─── FAB + mini window (mounted in Layout) ────────────────────────────────────
+// FAB + mini window 
+
+const FAB_SIZE = 48;
+const MINI_W = 340;
+const MINI_H = 260;
+const FAB_POS_KEY = 'zanflow_fab_pos';
+
+function clamp(val: number, min: number, max: number) {
+  return Math.min(Math.max(val, min), max);
+}
+
+function getInitialFabPos(): { x: number; y: number } {
+  try {
+    const raw = localStorage.getItem(FAB_POS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { }
+  return {
+    x: window.innerWidth - FAB_SIZE * 2 - 24 - 12,
+    y: window.innerHeight - FAB_SIZE - 24,
+  };
+}
 
 export function QuickNotes() {
   const navigate = useNavigate();
   const [isMiniOpen, setIsMiniOpen] = useState(false);
   const miniTextareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const {
-    state,
-    getNoteTitle,
-    createNote,
-    updateNote,
-  } = useQuickNotes();
+  const [fabPos, setFabPos] = useState<{ x: number; y: number }>(getInitialFabPos);
+  const dragging = useRef(false);
+  const didDrag = useRef(false);
+  const dragStart = useRef<{ mx: number; my: number; fx: number; fy: number } | null>(null);
 
+  useEffect(() => {
+    localStorage.setItem(FAB_POS_KEY, JSON.stringify(fabPos));
+  }, [fabPos]);
+
+  useEffect(() => {
+    const onResize = () => {
+      setFabPos((prev) => ({
+        x: clamp(prev.x, 0, window.innerWidth - FAB_SIZE),
+        y: clamp(prev.y, 0, window.innerHeight - FAB_SIZE),
+      }));
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const onMouseMove = useCallback((e: MouseEvent) => {
+    if (!dragging.current || !dragStart.current) return;
+    const dx = e.clientX - dragStart.current.mx;
+    const dy = e.clientY - dragStart.current.my;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) didDrag.current = true;
+    setFabPos({
+      x: clamp(dragStart.current.fx + dx, 0, window.innerWidth - FAB_SIZE),
+      y: clamp(dragStart.current.fy + dy, 0, window.innerHeight - FAB_SIZE),
+    });
+  }, []);
+
+  const onMouseUp = useCallback(() => {
+    dragging.current = false;
+    dragStart.current = null;
+    window.removeEventListener('mousemove', onMouseMove);
+    window.removeEventListener('mouseup', onMouseUp);
+  }, [onMouseMove]);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    didDrag.current = false;
+    dragging.current = true;
+    dragStart.current = { mx: e.clientX, my: e.clientY, fx: fabPos.x, fy: fabPos.y };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  }, [fabPos, onMouseMove, onMouseUp]);
+
+  const { state, getNoteTitle, createNote, updateNote } = useQuickNotes();
   const selectedNote = state.notes.find((n) => n.id === state.selectedNoteId) ?? null;
 
-  // Auto-focus mini textarea only when it opens
   useEffect(() => {
     if (isMiniOpen) {
       const id = setTimeout(() => miniTextareaRef.current?.focus(), 50);
@@ -538,53 +760,52 @@ export function QuickNotes() {
     }
   }, [isMiniOpen]);
 
-  const handleNewNote = () => {
-    createNote(state.selectedFolderId);
-  };
+  const handleNewNote = () => { createNote(state.selectedFolderId); };
 
   const handleFabClick = () => {
+    if (didDrag.current) return;
     if (!isMiniOpen && !selectedNote) createNote(state.selectedFolderId);
     setIsMiniOpen((prev) => !prev);
   };
 
-  const handleMaximize = () => {
-    setIsMiniOpen(false);
-    navigate('/quick-notes');
-  };
+  const handleMaximize = () => { setIsMiniOpen(false); navigate('/quick-notes'); };
+  const handleNewFolder = () => { setIsMiniOpen(false); navigate('/quick-notes'); };
 
-  const handleNewFolder = () => {
-    setIsMiniOpen(false);
-    navigate('/quick-notes');
-  };
+  const miniLeft = clamp(fabPos.x + FAB_SIZE / 2 - MINI_W / 2, 8, window.innerWidth - MINI_W - 8);
+  const miniTop = clamp(fabPos.y - MINI_H - 12, 8, window.innerHeight - MINI_H - 8);
 
   return (
     <>
       {/* FAB */}
       <button
+        onMouseDown={handleMouseDown}
         onClick={handleFabClick}
-        title="Quick Notes"
+        title="Quick Notes (drag to reposition)"
+        style={{ left: fabPos.x, top: fabPos.y }}
         className={cn(
-          'fixed bottom-6 right-6 z-[60] flex h-12 w-12 items-center justify-center rounded-full',
+          'fixed z-[60] flex h-12 w-12 items-center justify-center rounded-full',
           'bg-primary text-primary-foreground shadow-lg',
-          'hover:opacity-90 hover:scale-105 transition-all duration-200',
-          'focus:outline-none',
+          'hover:opacity-90 transition-opacity duration-200',
+          'focus:outline-none cursor-grab active:cursor-grabbing select-none',
         )}
       >
-        <NotebookPen className="h-5 w-5" />
+        <NotebookPen className="h-5 w-5 pointer-events-none" />
       </button>
 
       {/* Mini window */}
       {isMiniOpen && (
-        <MiniWindow
-          selectedNote={selectedNote}
-          getNoteTitle={getNoteTitle}
-          onClose={() => setIsMiniOpen(false)}
-          onMaximize={handleMaximize}
-          onNewNote={handleNewNote}
-          onNewFolder={handleNewFolder}
-          onUpdateNote={updateNote}
-          textareaRef={miniTextareaRef}
-        />
+        <div style={{ position: 'fixed', left: miniLeft, top: miniTop, zIndex: 60 }}>
+          <MiniWindow
+            selectedNote={selectedNote}
+            getNoteTitle={getNoteTitle}
+            onClose={() => setIsMiniOpen(false)}
+            onMaximize={handleMaximize}
+            onNewNote={handleNewNote}
+            onNewFolder={handleNewFolder}
+            onUpdateNote={updateNote}
+            textareaRef={miniTextareaRef}
+          />
+        </div>
       )}
     </>
   );
