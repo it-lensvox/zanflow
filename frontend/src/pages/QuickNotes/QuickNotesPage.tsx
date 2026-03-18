@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import { useQuickNotes, QuickNotesContent } from '@/components/QuickNotes/QuickNotes';
 
 export function QuickNotesPage() {
   const [triggerFolderCreate, setTriggerFolderCreate] = useState(false);
+  const location = useLocation();
 
   const {
     state,
@@ -12,11 +14,21 @@ export function QuickNotesPage() {
     createNote,
     updateNote,
     createFolder,
+    renameFolder,
+    deleteFolder,
     selectFolder,
     selectNote,
     renameNote,
     deleteNote,
   } = useQuickNotes();
+
+  // When navigating from mini view, auto-select the note that was active there
+  useEffect(() => {
+    const incoming = (location.state as { selectedNoteId?: number } | null)?.selectedNoteId;
+    if (incoming && !state.isLoading) {
+      selectNote(incoming);
+    }
+  }, [location.state, state.isLoading]);
 
   const handleNewNote = () => {
     createNote(state.selectedFolderId);
@@ -28,9 +40,10 @@ export function QuickNotesPage() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <div className="flex-1 overflow-y-auto w-full p-8 space-y-8">
+      <div className="flex-1 flex flex-col w-full overflow-hidden">
+
         {/* Page header */}
-        <div className="flex items-center justify-between">
+        <div className="px-8 pt-8 pb-4 shrink-0 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Quick Notes</h1>
             <p className="text-muted-foreground">Your personal notes and folders.</p>
@@ -54,13 +67,15 @@ export function QuickNotesPage() {
         </div>
 
         {/* 3-column notes UI */}
-        <div className="rounded-xl border border-border overflow-hidden" style={{ height: 'calc(100vh - 180px)' }}>
+        <div className="flex-1 overflow-hidden mx-8 mb-8 rounded-xl border border-border">
           <QuickNotesContent
             state={state}
             getNotesForFolder={getNotesForFolder}
             getNoteTitle={getNoteTitle}
             onNewNote={handleNewNote}
             onCreateFolder={createFolder}
+            onRenameFolder={renameFolder}
+            onDeleteFolder={deleteFolder}
             onSelectFolder={selectFolder}
             onSelectNote={selectNote}
             onUpdateNote={updateNote}
@@ -70,6 +85,7 @@ export function QuickNotesPage() {
             onAcknowledgeFolderCreate={() => setTriggerFolderCreate(false)}
           />
         </div>
+
       </div>
     </div>
   );

@@ -1108,6 +1108,11 @@ export interface CreateQuickNoteFolderPayload {
   name: string;
 }
 
+// Payload for renaming a folder
+export interface UpdateQuickNoteFolderPayload {
+  name: string;
+}
+
 // Payload for creating a note
 export interface CreateQuickNotePayload {
   content: string;

@@ -1230,7 +1230,7 @@ export const aiBotApi = {
   },
 };
 
-// ─── Quick Notes API ──────────────────────────────────────────────────────────
+// Quick Notes API
 export const quickNotesApi = {
   // Folders
   getFolders: async (): Promise<import('@/types').QuickNoteFolder[]> => {
@@ -1243,9 +1243,25 @@ export const quickNotesApi = {
     return response.data;
   },
 
+  // PATCH /quicknotes/folders/{id}/
+   updateFolder: async (id: number, data: { name: string }): Promise<import('@/types').QuickNoteFolder> => {
+    const response = await api.patch(`/quicknotes/folders/${id}/`, data);
+    return response.data;
+  },
+
+  // DELETE /quicknotes/folders/{id}/
+  deleteFolder: async (id: number): Promise<void> => {
+    await api.delete(`/quicknotes/folders/${id}/`);
+  },
+
   // Notes
   getNotes: async (): Promise<import('@/types').PaginatedQuickNotesResponse> => {
     const response = await api.get('/quicknotes/notes/');
+    return response.data;
+  },
+
+  getNote: async (id: number): Promise<import('@/types').QuickNote> => {
+    const response = await api.get(`/quicknotes/notes/${id}/`);
     return response.data;
   },
 

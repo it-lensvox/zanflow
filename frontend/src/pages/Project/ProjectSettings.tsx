@@ -89,9 +89,11 @@ export function ProjectSettings() {
   const [isProjectDataLoaded, setIsProjectDataLoaded] = useState(false);
 
   if (project && !isProjectDataLoaded) {
+    const rawDescription = project.description || '';
+    const strippedDescription = rawDescription.replace(/<[^>]*>/g, '').trim();
     setFormData({
       name: project.name,
-      description: project.description || '',
+      description: strippedDescription,
       task_type: project.task_type,
     });
     setIsProjectDataLoaded(true);
@@ -237,10 +239,6 @@ export function ProjectSettings() {
   if (!project) {
     return (
       <div className="text-center py-12">
-        {/* <h2 className="text-xl font-semibold">Project not found</h2>
-        <Link to="/projects" className="text-primary hover:underline">
-          Back to projects
-        </Link> */}
       </div>
     );
   }
@@ -248,7 +246,7 @@ export function ProjectSettings() {
   const labels = project.labels || [];
 
   return (
-    <div className="max-w-4xl mx-auto p-8 space-y-6">
+    <div className="w-full max-w-3xl mx-auto px-6 py-8 space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4 mb-8">
         <Link
@@ -337,39 +335,7 @@ export function ProjectSettings() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="col-span-2 space-y-2">
-                <label className="text-sm font-medium">
-                  Members
-                </label>
-                <div className="min-h-[40px] w-full rounded-md border border-input bg-muted/20 px-3 py-2">
-                  {project.members && project.members.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {project.members.map((member: any) => {
-                        const displayName =
-                          member.full_name ||
-                          member.user?.full_name ||
-                          member.user?.username ||
-                          member.user?.first_name + ' ' + member.user?.last_name;
-                        return (
-                          <Badge
-                            key={member.id}
-                            variant="secondary"
-                            className="font-normal"
-                          >
-                            {displayName}
-                          </Badge>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-muted-foreground h-full flex items-center">
-                      No members assigned
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+
 
             <div className="space-y-2">
               <label htmlFor="description" className="text-sm font-medium">
@@ -391,6 +357,32 @@ export function ProjectSettings() {
               <label className="text-sm font-medium">
                 Assigned To <span className="text-destructive">*</span>
               </label>
+
+              {/* Existing project members */}
+             {project.members && project.members.length > 0 && (
+                <div className="rounded-md border bg-muted/20 text-sm overflow-hidden">
+                  {project.members.map((member: any, index: number) => {
+                    const displayName =
+                      member.full_name ||
+                      member.user?.full_name ||
+                      (member.user?.first_name && member.user?.last_name
+                        ? `${member.user.first_name} ${member.user.last_name}`
+                        : member.user?.username) ||
+                      '—';
+                    const roleLabel =
+                      PROJECT_ROLES.find((r) => r.value === member.role)?.label || member.role || '—';
+                    return (
+                      <div
+                        key={member.id}
+                        className={`flex items-center justify-between px-3 py-2 ${index !== project.members.length - 1 ? 'border-b' : ''}`}
+                      >
+                        <span className="font-medium">{displayName}</span>
+                        <span className="text-muted-foreground">{roleLabel}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
               <div className="flex gap-3">
                 {/* Left */}
@@ -505,7 +497,7 @@ export function ProjectSettings() {
               )}
             </div>
 
-            {/* Task Type - Reused from ProjectCreate */}
+            {/* Task Type */}
             <div className="relative space-y-2" ref={taskTypeDropdownRef}>
               <label className="text-sm font-medium">
                 Task Type <span className="text-destructive">*</span>
