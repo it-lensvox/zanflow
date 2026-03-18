@@ -2,6 +2,7 @@ from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from .models import Folder, Note
 from .serializers import FolderSerializer, NoteSerializer
+from .utils import generate_title_from_content
 
 class FolderViewSet(viewsets.ModelViewSet):
     serializer_class = FolderSerializer
@@ -20,16 +21,32 @@ class NoteViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # Only return notes belonging to the logged-in user
         queryset = Note.objects.filter(user=self.request.user)
-        
-        # Optional: Allow filtering notes by folder ID (e.g., /api/v1/quicknotes/notes/?folder=1)
         folder_id = self.request.query_params.get('folder')
         if folder_id is not None:
             queryset = queryset.filter(folder_id=folder_id)
-            
         return queryset
 
     def perform_create(self, serializer):
-        # Automatically attach the logged-in user to the note
-        serializer.save(user=self.request.user)
+        # Extract the title and content the user sent
+        title = serializer.validated_data.get('title', '').strip()
+        content = serializer.validated_data.get('content', '').strip()
+
+        # If the user left the title blank, let the AI generate it!
+        if not title and content:
+            title = generate_title_from_content(content)
+
+        # Save the note with the user and the (potentially AI-generated) title
+        serializer.save(user=self.request.user, title=title)
+
+    def perform_update(self, serializer):
+        # We can also do the same for updates if the user deletes the title
+        title = serializer.validated_data.get('title', '').strip()
+        content = serializer.validated_data.get('content', '').strip()
+        
+        # Check if 'title' is in the request but is empty
+        if 'title' in self.request.data and not title and content:
+             title = generate_title_from_content(content)
+             serializer.save(title=title)
+        else:
+             serializer.save()

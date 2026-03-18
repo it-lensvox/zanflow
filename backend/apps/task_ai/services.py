@@ -204,7 +204,28 @@ Return ONLY a FLAT JSON object with this exact schema:
         except Exception as e:
             print(f"Error calling AWS Bedrock: {e}")
             return raw_text  # Return original if AI fails
-
+    @staticmethod
+    def execute_project_search(user):
+        """
+        Retrieves the list and count of projects the current user is enrolled in.
+        """
+        if not user or not user.is_authenticated:
+            return "Error: User is not authenticated."
+            
+        from apps.projects.models import Project
+        
+        # Assuming your Project model has a 'members' ManyToMany field
+        projects = Project.objects.filter(members=user)
+        count = projects.count()
+        
+        if count == 0:
+            return "You are currently not enrolled in any projects."
+            
+        result_text = f"You are enrolled in {count} projects:\n"
+        for project in projects:
+            result_text += f"- {project.name}\n"
+            
+        return result_text
     @staticmethod
     def fallback_assignment(members_with_skills, task_category='general'):
         """
@@ -290,47 +311,49 @@ Return ONLY a FLAT JSON object with this exact schema:
             print(f"Error refining text: {e}")
             return text
     @staticmethod
-    def execute_global_task_search(user, priority=None, status=None, username=None):
-        """
-        Upgraded search to find tasks by priority, status, or assignee.
-        """
+    def execute_global_task_search(user, priority=None, status=None, username=None, date_filter=None):
         if not user or not user.is_authenticated:
             return "Error: User is not authenticated."
 
-        # Start with a base queryset
         tasks = Task.objects.all().select_related('project').prefetch_related('assigned_to')
 
-        # 1. Handle Assignee Search
+        # 1. Apply Assignee Filter
         if username:
             try:
-                # --- CHANGE THIS LINE BELOW: Use 'User' (the model), not 'user' (the instance) ---
-                from apps.users.models import User # Ensure this is imported
-                target_user = User.objects.get(username__iexact=username) 
+                from apps.users.models import User
+                target_user = User.objects.get(username__iexact=username)
                 tasks = tasks.filter(assigned_to=target_user)
-                header_msg = f"Found {tasks.count()} tasks assigned to '{username}':\n"
             except User.DoesNotExist:
                 return f"I couldn't find a user named '{username}' in the system."
         else:
-            # Default to current user
             tasks = tasks.filter(assigned_to=user)
-            header_msg = f"Found {tasks.count()} of your tasks:\n"
 
-        # 2. Apply Priority/Status filters
+        # 2. Apply Status/Priority/Date Filters
         if priority:
             tasks = tasks.filter(priority=priority.lower())
         if status:
             tasks = tasks.filter(status=status.lower())
+            
+        if date_filter == 'today':
+            from django.utils import timezone
+            today = timezone.now().date()
+            tasks = tasks.filter(end_date__date=today)
 
-        if not tasks.exists():
-            return "No tasks found matching that criteria."
+        # 3. GET THE TRUE EXACT COUNT BEFORE SLICING
+        total_count = tasks.count()
 
-        result_text = header_msg
-        for task in tasks[:15]:
+        if total_count == 0:
+            return "DATABASE RESULT: 0 tasks found matching that criteria."
+
+        # 4. Return the exact count, plus a small sample so the AI can name a few tasks if asked
+        result_text = f"DATABASE RESULT: There are exactly {total_count} tasks matching this criteria.\n"
+        result_text += "Here is a sample of the first 5 for context:\n"
+        
+        for task in tasks[:5]: # Safe to slice to 5 now, because the AI already knows the true total
             project_name = task.project.name if task.project else "No Project"
             assignees = ", ".join([u.username for u in task.assigned_to.all()])
             result_text += (
-                f"- [{project_name}] Task: '{task.heading}' | Status: {task.status} | "
-                f"Assigned to: {assignees}\n"
+                f"- Task: '{task.heading}' (Project: {project_name}) | Status: {task.status} | Priority: {task.priority}\n"
             )
             
         return result_text
@@ -430,7 +453,7 @@ Return ONLY a FLAT JSON object with this exact schema:
         return context_text
 
     @staticmethod
-    def generate_chat_stream(user_message, system_context, chat_history=None, user=None):
+    def generate_chat_stream(user_message, chat_history=None, user=None):
         if chat_history is None:
             chat_history = []
 
@@ -441,16 +464,15 @@ Return ONLY a FLAT JSON object with this exact schema:
             region_name=settings.AWS_REGION
         )
 
-        prompt = f"""You are the ZanFlow ERP AI Assistant. 
-        You have two ways to answer:
-        1. Look at the "Screen Context" below. If the answer is there, use it.
-        2. If the user asks for tasks NOT on the screen (like "Find all my critical tasks" across the app), you MUST use the `search_global_tasks` tool.
+        prompt = """You are the Dyuksa ERP AI Assistant. 
         
-        Screen Context:
-        {system_context}
+        CRITICAL RULES:
+        1. Answer directly and concisely. DO NOT narrate your actions (never say "I will search the database" or "Let me check"). Just give the answer.
+        2. You have NO direct access to the user's screen or data. 
+        3. You MUST use your tools to fetch real-time database information whenever the user asks about tasks, projects, or schedules.
+        4. When a tool returns a "Total Count", use that exact number in your response.
         """
 
-        # 1. Format the conversation history
         formatted_messages = []
         for msg in chat_history:
             role = msg.get("role", "user") if msg.get("role") in ["user", "assistant"] else "user"
@@ -458,27 +480,41 @@ Return ONLY a FLAT JSON object with this exact schema:
             
         formatted_messages.append({"role": "user", "content": [{"text": user_message}]})
 
-        # 2. Define the Tool for Bedrock
+        # --- UPDATED TOOL CONFIGURATION ---
         tool_config = {
-            "tools": [{
-                "toolSpec": {
-                    "name": "search_global_tasks",
-                    "description": "Search for tasks in the database. You can filter by priority, status, or a specific username.",
-                    "inputSchema": {
-                        "json": {
-                            "type": "object",
-                            "properties": {
-                                "priority": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
-                                "status": {"type": "string", "enum": ["pending", "in_progress", "completed", "review"]},
-                                "username": {"type": "string", "description": "The username of the person the task is assigned to."}
+            "tools": [
+                {
+                    "toolSpec": {
+                        "name": "search_global_tasks",
+                        "description": "Search for tasks. Use this when the user asks about pending, critical, or today's tasks.",
+                        "inputSchema": {
+                            "json": {
+                                "type": "object",
+                                "properties": {
+                                    "priority": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
+                                    "status": {"type": "string", "enum": ["pending", "in_progress", "completed", "review"]},
+                                    "username": {"type": "string", "description": "The username of the assignee."},
+                                    "date_filter": {"type": "string", "enum": ["today"], "description": "Use 'today' if the user asks for tasks due today or tasks they are working on today."}
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "toolSpec": {
+                        "name": "search_user_projects",
+                        "description": "Use this tool to find out how many projects the user is enrolled in or what projects they belong to.",
+                        "inputSchema": {
+                            "json": {
+                                "type": "object",
+                                "properties": {} # No inputs needed, we use the authenticated user
                             }
                         }
                     }
                 }
-            }]
+            ]
         }
 
-        # 3. First API Call: Let Bedrock decide if it needs the tool or can just answer
         response = client.converse(
             modelId=settings.BEDROCK_MODEL_ID,
             messages=formatted_messages,
@@ -488,7 +524,6 @@ Return ONLY a FLAT JSON object with this exact schema:
 
         output_message = response['output']['message']
         
-        # 4. Check if Bedrock decided to use the tool
         if output_message['content'] and 'toolUse' in output_message['content'][-1]:
             tool_use = output_message['content'][-1]['toolUse']
             tool_name = tool_use['name']
@@ -497,24 +532,26 @@ Return ONLY a FLAT JSON object with this exact schema:
 
             print(f"\n=== AI IS USING TOOL: {tool_name} with args {tool_inputs} ===\n")
 
+            # --- UPDATED TOOL ROUTING ---
             if tool_name == "search_global_tasks":
                 tool_result_text = TaskAIService.execute_global_task_search(
                     user=user, 
                     priority=tool_inputs.get("priority"), 
                     status=tool_inputs.get("status"),
-                    username=tool_inputs.get("username") # <--- Add this
+                    username=tool_inputs.get("username"),
+                    date_filter=tool_inputs.get("date_filter") 
                 )
+            elif tool_name == "search_user_projects":
+                tool_result_text = TaskAIService.execute_project_search(user=user)
             else:
                 tool_result_text = "Tool not found."
 
-            # Append the AI's tool request and our Django tool result to the conversation
             formatted_messages.append(output_message)
             formatted_messages.append({
                 "role": "user",
                 "content": [{"toolResult": {"toolUseId": tool_use_id, "content": [{"text": tool_result_text}]}}]
             })
 
-            # 5. Second API Call: Stream the final answer back to the user now that the AI has the database results
             stream_response = client.converse_stream(
                 modelId=settings.BEDROCK_MODEL_ID,
                 messages=formatted_messages,
@@ -527,9 +564,6 @@ Return ONLY a FLAT JSON object with this exact schema:
                     yield chunk['contentBlockDelta']['delta'].get('text', '')
 
         else:
-            # 6. If no tool was needed, just yield the text directly (Screen Reader mode)
-            # Since converse() already generated the text, we can just yield it as one chunk,
-            # or you can refactor to use converse_stream initially if you prefer.
             for content_block in output_message['content']:
                 if 'text' in content_block:
                     yield content_block['text']
