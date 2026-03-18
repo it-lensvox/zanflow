@@ -48,11 +48,11 @@ jobs:
             echo "🔍 Validating docker-compose.yml..."
             sudo docker-compose config > /dev/null
             
-            echo "🛑 Stopping old containers..."
-            sudo docker-compose down
-            
-            echo "🚀 Building and starting..."
-            sudo docker-compose up --build -d
+            echo "🔨 Building new images..."
+            sudo docker-compose build
+
+            echo "🚀 Restarting with new images..."
+            sudo docker-compose up -d --force-recreate --no-build
             
             echo "⏳ Waiting for services..."
             sleep 15
