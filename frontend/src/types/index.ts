@@ -347,6 +347,25 @@ export interface AuthTokens {
   refresh: string;
 }
 
+// Sign Up page
+export interface OrganizationSignupPayload {
+  company_name: string;
+  admin_email: string;
+  password: string;
+  password_confirm: string;
+}
+
+export interface OrganizationSignupResponse {
+  message: string;
+  organization: {
+    id: number;
+    name: string;
+    slug: string;
+  };
+  user: Pick<User, 'id' | 'username' | 'email' | 'role'>;
+  tokens: AuthTokens;
+}
+
 // Tool: PdfVsHtml types
 export interface ToolDocumentListPayload {
   documents: string[];

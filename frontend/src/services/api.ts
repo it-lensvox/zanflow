@@ -4,7 +4,7 @@ import type {
   TaskComment, CreateTaskCommentPayload, AITaskSuggestionResponse, AITaskSuggestionPayload, ProjectCreatePayload, Label, DocumentStatus, ChatMessage, ChatRoom, ChatRoomMessagesResponse, CreatePrivateChatPayload,
   GatewaySendMessagePayload, GatewayIncomingMessage, RefineTextPayload, RefineTextResponse, TaskResponse, TeamTypeChoicesResponse,
   CreateTeamPayload, ProjectChatRoom, TeamChatRoom, ChatUnreadResponse, NotificationData, NotificationCallback, Team, ThreadRoom, ThreadSession, ThreadStorage, ThreadUIMessage, CreateThreadRoomPayload, WSJoinRoomCommand, WSSendMessageCommand, WSIncomingThreadMessage, WSUnreadUpdateSignal, ThreadMessagesResponse,
-  InviteUserPayload, InviteUserResponse, InviteVerifyResponse, InviteAcceptPayload, InviteAcceptResponse, AIBotSendPayload, AIBotIncomingMessage
+  InviteUserPayload, InviteUserResponse, InviteVerifyResponse, InviteAcceptPayload, InviteAcceptResponse, AIBotSendPayload, AIBotIncomingMessage, OrganizationSignupPayload, OrganizationSignupResponse
 } from '@/types';
 
 export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.164:8000/api/v1';
@@ -126,13 +126,13 @@ export const authApi = {
     delete api.defaults.headers.common['Authorization'];
   },
 
-  register: async (data: {
-    username: string;
-    email: string;
-    password: string;
-    password_confirm: string;
-  }) => {
-    const response = await api.post('/auth/register/', data);
+  register: async (data: OrganizationSignupPayload): Promise<OrganizationSignupResponse> => {
+    const response = await api.post<OrganizationSignupResponse>(
+      '/organizations/signup/',
+      data
+    );
+    setTokens(response.data.tokens);
+    api.defaults.headers.common['Authorization'] = `Bearer ${response.data.tokens.access}`;
     return response.data;
   },
 
@@ -182,6 +182,7 @@ export const authApi = {
     const response = await api.post('/auth/reset-password/', data);
     return response.data;
   },
+
 };
 
 
@@ -1244,7 +1245,7 @@ export const quickNotesApi = {
   },
 
   // PATCH /quicknotes/folders/{id}/
-   updateFolder: async (id: number, data: { name: string }): Promise<import('@/types').QuickNoteFolder> => {
+  updateFolder: async (id: number, data: { name: string }): Promise<import('@/types').QuickNoteFolder> => {
     const response = await api.patch(`/quicknotes/folders/${id}/`, data);
     return response.data;
   },

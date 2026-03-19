@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   LayoutDashboard, FolderKanban, FileText, Settings, LogOut,
   Users, ChevronDown, ChevronUp, Plus, CheckSquare, CheckCircle,
-  Clock, PlayCircle, Pause, Crown, TrendingUp, ListTodo, Calendar, Eye, MessageSquare, UserPlus, NotebookPen
+  Clock, PlayCircle, Pause, TrendingUp, ListTodo, Calendar, Eye, MessageSquare, UserPlus, NotebookPen
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -154,7 +154,7 @@ export function Sidebar() {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* "Z" Toggle Button */}
+      {/* "D" Toggle Button */}
       <div className="flex h-16 items-center px-4 border-b">
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
