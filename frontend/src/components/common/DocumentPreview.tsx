@@ -50,8 +50,8 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
     const isPDF = extension === 'pdf' || fileType?.includes('pdf');
     const isOfficeDoc = ['doc', 'docx'].includes(extension);
     const isPresentation = ['ppt', 'pptx'].includes(extension);
-    const isSpreadsheet = ['xls', 'xlsx', 'csv'].includes(extension);
-    const isText = ['txt', 'md', 'log'].includes(extension);
+const isSpreadsheet = ['xls', 'xlsx'].includes(extension);
+    const isText = ['txt', 'md', 'log', 'csv'].includes(extension);
     const isCode = ['js', 'jsx', 'ts', 'tsx', 'json', 'html', 'css', 'py', 'java', 'cpp', 'c', 'sh', 'yml', 'yaml', 'xml'].includes(extension);
     const isVideo = ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'].includes(extension) || fileType?.startsWith('video/') || false;
     const isAudio = ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a'].includes(extension) || fileType?.startsWith('audio/') || false;
@@ -479,8 +479,8 @@ export const DocumentThumbnail: React.FC<DocumentThumbnailProps> = ({
     const isPDF = extension === 'pdf' || fileType?.includes('pdf');
     const isOfficeDoc = ['doc', 'docx'].includes(extension);
     const isPresentation = ['ppt', 'pptx'].includes(extension);
-    const isSpreadsheet = ['xls', 'xlsx', 'csv'].includes(extension);
-    const isText = ['txt', 'md', 'log'].includes(extension);
+    const isSpreadsheet = ['xls', 'xlsx'].includes(extension);
+    const isText = ['txt', 'md', 'log', 'csv'].includes(extension);
     const isCode = ['js', 'jsx', 'ts', 'tsx', 'json', 'html', 'css', 'py', 'java', 'cpp', 'c', 'sh', 'yml', 'yaml', 'xml'].includes(extension);
     const isVideo = ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'].includes(extension) || fileType?.startsWith('video/') || false;
     const isAudio = ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a'].includes(extension) || fileType?.startsWith('audio/') || false;
