@@ -214,7 +214,8 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = f'email-smtp.{os.getenv("SES_REGION")}.amazonaws.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-
+# Fetch the URL from environment, fallback to a default if not found
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 # Fetching credentials from .env
 EMAIL_HOST_USER = os.getenv('SES_SMTP_USER')
 EMAIL_HOST_PASSWORD = os.getenv('SES_SMTP_PASSWORD')
