@@ -26,6 +26,7 @@ jobs:
             echo "📥 Pulling latest code..."
             git fetch origin
             git checkout ${{ github.ref_name }}
+            git stash 2>/dev/null || true
             git pull origin ${{ github.ref_name }}
             
             echo "🔧 Replacing localhost URLs with production URLs..."
