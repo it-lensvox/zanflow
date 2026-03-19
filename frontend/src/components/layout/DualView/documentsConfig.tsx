@@ -170,22 +170,32 @@ export const createDocumentsTableColumns = ({ onDeleteClick, onInfoClick }: Docu
       key: 'file_type',
       label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Type</span>,
       width: '120px',
-      render: (doc: Document) => (
-        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600 uppercase border border-gray-200">
-          {doc.file_type}
-        </span>
-      ),
+     render: (doc: Document) => {
+  const getFileType = (doc: Document): string => {
+    if (doc.name) {
+      const ext = doc.name.split('.').pop()?.toLowerCase();
+      if (ext) return ext;
+    }
+    return doc.file_type || 'unknown';
+  };
+
+  return (
+    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600 uppercase border border-gray-200">
+      {getFileType(doc)}
+    </span>
+  );
+},
     },
     {
       key: 'status',
       label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Status</span>,
-      width: '120px',  // Reduced from 140px
+      width: '120px',
       render: (doc: Document) => <StatusDropdown doc={doc} />,
     },
     {
       key: 'created_by',
       label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Uploaded By</span>,
-      width: '180px',  // Added width
+      width: '180px',
       render: (doc: Document) => (
         <div className="flex items-center gap-2">
           <div className="h-6 w-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-700">

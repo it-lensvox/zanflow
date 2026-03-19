@@ -372,20 +372,20 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
   };
 
   return [
-    {
-      key: 'type',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Type</span>,
-      width: '8%',
-      render: (task: Task) => (
-        <div className="flex items-center gap-1.5">
-          <CheckSquare className="w-4 h-4 text-blue-600" />
-        </div>
-      ),
-    },
+    // {
+    //   key: 'type',
+    //   label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Type</span>,
+    //   width: '8%',
+    //   render: (task: Task) => (
+    //     <div className="flex items-center gap-1.5">
+    //       <CheckSquare className="w-4 h-4 text-blue-600" />
+    //     </div>
+    //   ),
+    // },
     {
       key: 'project',
       label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Project</span>,
-      width: '150px',
+      width: '10%',
       render: (task: Task) => (
         <span className="text-[12px] text-gray-700 font-medium">
           {task.project_details?.name || task.project_name || 'No Project'}
@@ -395,7 +395,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     {
       key: 'heading',
       label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Task Title</span>,
-      width: '25%',
+      width: '20%',
       render: (task: Task) => (
         <span className="font-medium text-[#172b4d] truncate block max-w-[300px]" title={task.heading}>
           {task.heading}
@@ -405,13 +405,13 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     {
       key: 'status',
       label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Status</span>,
-      width: '10%',
+      width: '8%',
       render: (task: Task) => <StatusDropdown task={task} />,
     },
     {
       key: 'assigned_to',
       label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Assignee</span>,
-      width: '10%',
+      width: '8%',
       render: (task: Task) => {
         const trigger = (
           <div className="flex -space-x-1.5 cursor-pointer hover:opacity-80">
@@ -473,13 +473,13 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     {
       key: 'priority',
       label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Priority</span>,
-      width: '10%',
+      width: '8%',
       render: (task: Task) => <PriorityDropdown task={task} />,
     },
     {
       key: 'labels',
       label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Labels</span>,
-      width: '10%',
+      width: '8%',
       render: (task: Task) => (
         <div className="flex flex-wrap gap-1.5 items-center h-full min-h-[24px]" onClick={(e) => e.stopPropagation()}>
           {task.labels && task.labels.length > 0 ? (
@@ -501,16 +501,26 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     {
       key: dateField,
       label: <span className="text-[14px] font-bold tracking-wide text-gray-700">{dateField === 'end_date' ? 'Due Date' : dateField === 'start_date' ? 'Start Date' : 'Created At'}</span>,
-      width: '10%',
+      width: '8%',
       render: (task: Task) =>
         dateField === 'created_at'
           ? <span className="text-[13px] text-gray-600 pl-1">{formatDate(task.created_at || '')}</span>
           : <DateInput task={task} field={dateField as 'start_date' | 'end_date'} />,
     },
+     {
+      key: 'updated_at',
+      label: <span className="text-[14px] font-bold tracking-wide text-gray-700">Updated</span>,
+      width: '8%',
+      render: (task: Task) => (
+        <span className="text-[13px] text-gray-600 pl-1" title={formatDate(task.updated_at || '')}>
+          {task.updated_at ? formatRelativeTime(task.updated_at) : '—'}
+        </span>
+      ),
+    },
     {
       key: 'duration',
       label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Duration</span>,
-      width: '15%',
+      width: '8%',
       render: (task: Task) => (
         <input
           type="text"

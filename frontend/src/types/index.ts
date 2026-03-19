@@ -1074,3 +1074,54 @@ export interface AIBotSession {
   createdAt: Date;
   updatedAt: Date;
 }
+
+// ─── Quick Notes Types
+
+// Backend folder shape 
+export interface QuickNoteFolder {
+  id: number;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Backend note shape 
+export interface QuickNote {
+  id: number;
+  folder: number | null;
+  title: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Paginated notes list response
+export interface PaginatedQuickNotesResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: QuickNote[];
+}
+
+// Payload for creating a folder
+export interface CreateQuickNoteFolderPayload {
+  name: string;
+}
+
+// Payload for renaming a folder
+export interface UpdateQuickNoteFolderPayload {
+  name: string;
+}
+
+// Payload for creating a note
+export interface CreateQuickNotePayload {
+  content: string;
+  folder?: number | null;
+}
+
+// Payload for updating a note
+export interface UpdateQuickNotePayload {
+  title?: string;
+  content?: string;
+  folder?: number | null;
+}
