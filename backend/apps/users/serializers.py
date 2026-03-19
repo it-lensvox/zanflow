@@ -14,9 +14,9 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             "id", "username", "email", "first_name", "last_name",
-            "role", "avatar", "skills", "is_active", "date_joined",
+            "role", "avatar", "skills", "is_active", "date_joined","is_superuser",
         ]
-        read_only_fields = ["id", "date_joined"]
+        read_only_fields = ["id", "date_joined", "is_superuser"]
 
     def validate_skills(self, value):
         """

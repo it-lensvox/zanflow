@@ -223,3 +223,59 @@ class TenantOnboardingService:
             "chat_rooms": ChatRoom.original_objects.filter(organization=org).count(),
             "chat_messages": ChatMessage.original_objects.filter(organization=org).count(),
         }
+
+    # ─────────────────────────────────────────────────────────────────
+    # 7. DELETE A TENANT (PERMANENT)
+    # ─────────────────────────────────────────────────────────────────
+    @staticmethod
+    @transaction.atomic
+    def delete_tenant(organization_id: int) -> dict:
+        """
+        Permanently delete a tenant and ALL its data.
+        This is irreversible — use deactivate_tenant for soft removal.
+
+        Deletes in order:
+          1. All tenant-scoped model records
+          2. All users in this org
+          3. The organization itself
+
+        Returns:
+            dict with deletion summary.
+        """
+        from django.apps import apps
+        from apps.organizations.models import TenantModel
+
+        User = get_user_model()
+        org = Organization.objects.get(id=organization_id)
+        summary = {"organization": org.name, "deleted": {}}
+
+        # Delete all TenantModel records for this org
+        tenant_models = []
+        for model in apps.get_models():
+            if (
+                issubclass(model, TenantModel)
+                and not model._meta.abstract
+                and model is not TenantModel
+            ):
+                tenant_models.append(model)
+
+        for model in tenant_models:
+            label = f"{model._meta.app_label}.{model.__name__}"
+            count, _ = model.original_objects.filter(organization=org).delete()
+            summary["deleted"][label] = count
+
+        # Delete all users in this org
+        user_count, _ = User.objects.filter(organization=org).delete()
+        summary["deleted"]["users"] = user_count
+
+        # Delete the organization itself
+        org.delete()
+
+        logger.info(
+            "Tenant permanently deleted: %s (ID=%s) — %s",
+            summary["organization"],
+            organization_id,
+            summary["deleted"],
+        )
+
+        return summary

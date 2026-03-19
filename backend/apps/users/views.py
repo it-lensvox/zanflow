@@ -327,8 +327,7 @@ class SendInvitationView(APIView):
         )
 
         # 1. Set your frontend URL here. 
-        # (Change this to https://dyuksa.lensvox.com when deploying to production)
-        frontend_url = "http://192.168.1.10:5173"  # Update with your actual frontend URL
+        frontend_url = settings.FRONTEND_URL # Update with your actual frontend URL
         invite_link = f"{frontend_url}/setup-account?token={invitation.token}"
 
         # 2. Pass the data to the HTML template
