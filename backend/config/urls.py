@@ -29,6 +29,7 @@ urlpatterns = [
         path("teams/", include("apps.teams.urls")),
         path("organizations/", include("apps.organizations.urls")),
         path("quicknotes/", include("apps.quicknotes.urls")),
+        # path("ai-ops/", include("apps.ai_ops.urls")),
     ])),
     
     # API Documentation
