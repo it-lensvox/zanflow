@@ -29,7 +29,10 @@ const ResetPassword = lazy(() => import('@/pages/ResetPassword').then(m => ({ de
 const TeamChatModern = lazy(() => import('@/pages/TeamsChat/TeamChatModern').then(m => ({ default: m.TeamChatModern })));
 const Settings = lazy(() => import('@/pages/Settings').then(m => ({ default: m.Settings })));
 const SetupAccount = lazy(() => import('@/pages/TeamManagement/SetupAccount').then(m => ({ default: m.SetupAccount })));
+const WorkSpace = lazy(() => import('@/pages/TeamManagement/Workspace/Workspace').then(m => ({ default: m.WorkSpace })));
 const QuickNotesPage = lazy(() => import('@/pages/QuickNotes/QuickNotesPage').then(m => ({ default: m.QuickNotesPage })));
+const LandingPage = lazy(() => import('@/pages/LandingPage/LandingPage').then(m => ({ default: m.LandingPage })));
+const Signup = lazy(() => import('@/pages/SignUp/SignUp').then(m => ({ default: m.Signup })));
 
 function PageLoader() {
   return (
@@ -120,16 +123,30 @@ function AppRoutes() {
 
   return (
     <Routes>
+      {/* Root: unauthenticated → landing, authenticated → dashboard */}
+      <Route
+        path="/"
+        element={
+          isAuthenticated
+            ? <Navigate to="/dashboard" replace />
+            : <Suspense fallback={<PageLoader />}><LandingPage /></Suspense>
+        }
+      />
+
       <Route
         path="/login"
         element={
           isAuthenticated
-            ? <Navigate to="/users" replace />
+            ? <Navigate to="/dashboard" replace />
             : <Suspense fallback={<PageLoader />}><Login /></Suspense>
         }
       />
 
-       {/* Public — no auth required — invited user has no account yet */}
+      <Route path="/welcome" element={<Suspense fallback={<PageLoader />}><LandingPage /></Suspense>} />
+      <Route path="/signup" element={<Suspense fallback={<PageLoader />}><Signup /></Suspense>} />
+
+
+      {/* Public — no auth required — invited user has no account yet */}
       <Route
         path="/setup-account"
         element={<Suspense fallback={<PageLoader />}><SetupAccount /></Suspense>}
@@ -143,7 +160,7 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route path="/" element={<Dashboard />} />
+        <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/resetPassword" element={<ResetPassword />} />
         <Route path="/projects" element={<Projects />} />
@@ -185,6 +202,7 @@ function AppRoutes() {
           <Route path="teams" element={<Teams />} />
           <Route path="user-roles" element={<UserManagement />} />
           <Route path="team-performance" element={<TeamPerformance />} />
+          <Route path="workspace" element={<WorkSpace />} />
           <Route index element={<Navigate to="teams" replace />} />
         </Route>
 

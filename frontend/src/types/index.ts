@@ -8,6 +8,7 @@ export interface User {
   role: 'admin' | 'manager' | 'annotator' | 'viewer';
   avatar?: string;
   is_active: boolean;
+  is_superuser?: boolean;
   date_joined: string;
   skills?: string[];
 }
@@ -345,6 +346,25 @@ export interface LoginCredentials {
 export interface AuthTokens {
   access: string;
   refresh: string;
+}
+
+// Sign Up page
+export interface OrganizationSignupPayload {
+  company_name: string;
+  admin_email: string;
+  password: string;
+  password_confirm: string;
+}
+
+export interface OrganizationSignupResponse {
+  message: string;
+  organization: {
+    id: number;
+    name: string;
+    slug: string;
+  };
+  user: Pick<User, 'id' | 'username' | 'email' | 'role'>;
+  tokens: AuthTokens;
 }
 
 // Tool: PdfVsHtml types
@@ -1073,6 +1093,67 @@ export interface AIBotSession {
   messages: AIBotUIMessage[];
   createdAt: Date;
   updatedAt: Date;
+}
+
+// ─── Organization / Workspace Types (Superuser only)
+
+export interface OrgAdmin {
+  id: number;
+  username: string;
+  email: string;
+}
+
+export interface OrgRecentUser {
+  id: number;
+  username: string;
+  email: string;
+  last_login: string;
+  role: string;
+}
+
+export interface OrgStats {
+  users: number;
+  projects: number;
+  tasks: number;
+  teams: number;
+  chat_rooms: number;
+  chat_messages: number;
+}
+
+export interface Tenant {
+  id: number;
+  name: string;
+  slug: string;
+  is_active: boolean;
+  created_at: string;
+  stats: OrgStats;
+  admins: OrgAdmin[];
+  recent_active_users: OrgRecentUser[];
+}
+
+export interface PlatformSummary {
+  total_organizations: number;
+  active_organizations: number;
+  inactive_organizations: number;
+  total_users: number;
+}
+
+export interface OrganizationsOverviewResponse {
+  platform_summary: PlatformSummary;
+  tenants: Tenant[];
+}
+
+export interface OrganizationDeleteResponse {
+  message: string;
+  summary: {
+    organization: string;
+    deleted: Record<string, number>;
+  };
+}
+
+export interface OrganizationToggleStatusResponse {
+  message: string;
+  is_active: boolean;
 }
 
 // ─── Quick Notes Types
