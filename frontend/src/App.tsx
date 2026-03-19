@@ -29,6 +29,7 @@ const ResetPassword = lazy(() => import('@/pages/ResetPassword').then(m => ({ de
 const TeamChatModern = lazy(() => import('@/pages/TeamsChat/TeamChatModern').then(m => ({ default: m.TeamChatModern })));
 const Settings = lazy(() => import('@/pages/Settings').then(m => ({ default: m.Settings })));
 const SetupAccount = lazy(() => import('@/pages/TeamManagement/SetupAccount').then(m => ({ default: m.SetupAccount })));
+const WorkSpace = lazy(() => import('@/pages/TeamManagement/Workspace/Workspace').then(m => ({ default: m.WorkSpace })));
 const QuickNotesPage = lazy(() => import('@/pages/QuickNotes/QuickNotesPage').then(m => ({ default: m.QuickNotesPage })));
 const LandingPage = lazy(() => import('@/pages/LandingPage/LandingPage').then(m => ({ default: m.LandingPage })));
 const Signup = lazy(() => import('@/pages/SignUp/SignUp').then(m => ({ default: m.Signup })));
@@ -201,6 +202,7 @@ function AppRoutes() {
           <Route path="teams" element={<Teams />} />
           <Route path="user-roles" element={<UserManagement />} />
           <Route path="team-performance" element={<TeamPerformance />} />
+          <Route path="workspace" element={<WorkSpace />} />
           <Route index element={<Navigate to="teams" replace />} />
         </Route>
 

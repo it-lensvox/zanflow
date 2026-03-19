@@ -2,9 +2,8 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  LayoutDashboard, FolderKanban, FileText, Settings, LogOut,
-  Users, ChevronDown, ChevronUp, Plus, CheckSquare, CheckCircle,
-  Clock, PlayCircle, Pause, TrendingUp, ListTodo, Calendar, Eye, MessageSquare, UserPlus, NotebookPen
+  LayoutDashboard, FolderKanban, FileText, Settings, LogOut, Users, ChevronDown, ChevronUp, Plus, CheckSquare, CheckCircle, Clock, PlayCircle, Pause,
+  TrendingUp, ListTodo, Calendar, Eye, MessageSquare, UserPlus, NotebookPen, Building2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -21,7 +20,7 @@ import {
   DialogFooter,
 } from '@/components/common/diaog';
 
-const ADMIN_ROLES = ['admin', 'manager', 'annotator'];
+const ADMIN_ROLES = ['admin', 'manager', 'annotator', 'superuser'];
 
 // Favourite Projects within the accordion
 const FavouriteProjectsAccordion = ({ projects }: { projects: Project[] }) => {
@@ -110,6 +109,7 @@ export function Sidebar() {
   const [isAdminOpen, setIsAdminOpen] = useState(location.pathname.startsWith('/admin'));
   const [isTeamsOpen, setIsTeamsOpen] = useState(location.pathname.startsWith('/admin/teams'));
   const showAdmin = user?.role && ADMIN_ROLES.includes(user.role);
+  const isSuperuser = !!user?.is_superuser;
   const { data: projectsData } = useQuery({
     queryKey: ['projects'],
     queryFn: () => projectsApi.list(),
@@ -326,7 +326,7 @@ export function Sidebar() {
         ))}
 
         {/* Team Management Accordion */}
-        {showAdmin && (
+        {(showAdmin || isSuperuser) && (
           <div className="space-y-1">
             <div
               className={cn('flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors cursor-pointer',
@@ -387,6 +387,16 @@ export function Sidebar() {
                 >
                   <TrendingUp className="h-3.5 w-3.5" /> Performance
                 </NavLink>
+
+                {isSuperuser && (
+                  <NavLink
+                    to="/admin/workspace"
+                    className={({ isActive }) => cn("flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs transition-colors",
+                      isActive ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-primary")}
+                  >
+                    <Building2 className="h-3.5 w-3.5" /> Workspace
+                  </NavLink>
+                )}
               </div>
             )}
           </div>

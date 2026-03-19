@@ -545,6 +545,26 @@ export const teamsApi = {
   },
 };
 
+// Organizations Overview API (Superuser only)
+export const organizationsApi = {
+  overview: async (): Promise<import('@/types').OrganizationsOverviewResponse> => {
+    const response = await api.get('/organizations/overview/');
+    return response.data;
+  },
+
+  delete: async (id: number): Promise<import('@/types').OrganizationDeleteResponse> => {
+    const response = await api.delete(`/organizations/overview/${id}/delete/`, {
+      data: { confirm: 'DELETE' },
+    });
+    return response.data;
+  },
+
+  toggleStatus: async (id: number): Promise<import('@/types').OrganizationToggleStatusResponse> => {
+    const response = await api.post(`/organizations/overview/${id}/toggle-status/`);
+    return response.data;
+  },
+};
+
 // User ManagementAPI
 export const usersApi = {
   list: async () => {
