@@ -738,12 +738,13 @@ export interface GatewaySendMessagePayload {
 }
 
 export interface GatewayIncomingMessage {
-  type: 'CHAT_MESSAGE' | 'SIGNAL' | 'GATEWAY_CONNECTED' | 'PRESENCE' | 'room_created';
+ type: 'CHAT_MESSAGE' | 'SIGNAL' | 'GATEWAY_CONNECTED' | 'PRESENCE' | 'PRESENCE_SYNC' | 'room_created';
   event?: 'NEW_NOTIFICATION' | 'CHAT_UNREAD_UPDATE';
   message?: ChatMessage;
   data?: ChatMessage | NotificationData | any;
   room_id?: string;
   user_id?: number;
+  online_users?: number[]; 
   status?: 'online' | 'offline';
   username?: string;
   room?: any;
@@ -818,6 +819,14 @@ export interface ChatUnreadResponse {
     last_message_at?: string;
     project_id?: string;
   }>;
+}
+
+// Presence event from WebSocket gateway
+export interface PresenceEvent {
+  type: 'PRESENCE';
+  status: 'online' | 'offline';
+  user_id: number;
+  username: string | null;
 }
 
 // Chat unread update WebSocket event
