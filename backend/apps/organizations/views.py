@@ -10,7 +10,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from .models import Organization
 from .serializers import OrganizationSerializer, TenantSignupSerializer
 from .services import TenantOnboardingService
-
+from .throttles import GlobalSignupDailyThrottle  #Apply limit to signup endpoint to prevent abuse(3).
 logger = logging.getLogger(__name__)
 
 
@@ -57,7 +57,8 @@ class TenantSignupView(APIView):
     """
 
     permission_classes = [permissions.AllowAny]
-    throttle_scope = "signup"  # Rate limiting (configure in settings)
+    # throttle_scope = "signup"  # Rate limiting (configure in settings)    Open to everyone (unlimited signups)
+    throttle_classes = [GlobalSignupDailyThrottle]    #Apply limit to signup endpoint to prevent abuse(3).
 
     def post(self, request):
         serializer = TenantSignupSerializer(data=request.data)
