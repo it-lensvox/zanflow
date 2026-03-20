@@ -148,7 +148,7 @@ export function Sidebar() {
         }
 
         // Subscribe to chat unread updates
-       const unsubscribe = notificationSocket.onChatUnreadUpdate((updateData) => {
+        const unsubscribe = notificationSocket.onChatUnreadUpdate((updateData) => {
           const activeRoomId = (window as any).__activeTeamChatRoomId as string | undefined;
           const roomUnread = updateData.room_unread || 0;
           const isActiveRoom = activeRoomId && updateData.room_id === activeRoomId;
@@ -311,8 +311,6 @@ export function Sidebar() {
           { name: 'Documents', href: '/documents', icon: FileText },
           { name: 'Calendar', href: '/calendar', icon: Calendar },
           { name: 'Quick Notes', href: '/quick-notes', icon: NotebookPen },
-          // { name: 'Activity', href: '/notifications', icon: Bell },
-          // { name: 'Test Runs', href: '/test-runs', icon: TestTube2 },
         ].map((item) => (
           <NavLink
             key={item.name}
@@ -430,11 +428,16 @@ export function Sidebar() {
       {/* Profile & Footer */}
       <div className="border-t p-4">
         <div className={cn("flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-accent cursor-pointer", !isExpanded && "justify-center px-0")} onClick={() => navigate('/profile')}>
-          <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-primary-foreground font-bold",
-            !isCollapsed
-              ? "bg-indigo-300 text-white"
-              : "bg-primary text-primary-foreground hover:opacity-90")}>
-            {user?.username?.charAt(0).toUpperCase()}
+          <div className="relative shrink-0 h-9 w-9">
+            <div className={cn("flex h-9 w-9 items-center justify-center rounded-full text-primary-foreground font-bold",
+              !isCollapsed
+                ? "bg-indigo-300 text-white"
+                : "bg-primary text-primary-foreground hover:opacity-90")}>
+              {user?.username?.charAt(0).toUpperCase()}
+            </div>
+            {user?.is_active && (
+              <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-card" />
+            )}
           </div>
           {isExpanded && (
             <div className="min-w-0 flex-1">

@@ -157,7 +157,7 @@ export function LandingPage() {
                         <span style={{ background: 'linear-gradient(135deg,#6EE7F7,#A78BFA)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>team</span>
                         {' '}actually loves.
                     </h1>
-                    <p style={{ fontSize: 18, color: muted, maxWidth: 520, margin: '0 auto 40px', lineHeight: 1.6 }}>Tasks, documents, AI assistance, and team chat — unified in DYUKSA, powered by Zanflow.</p>
+                    <p style={{ fontSize: 18, color: muted, maxWidth: 520, margin: '0 auto 40px', lineHeight: 1.6 }}>Tasks, documents, AI assistance, and team chat — unified in DYUKSA, </p>
                     <div style={{ display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap' }}>
                         <button onClick={() => navigate('/projects')} style={{ padding: '12px 28px', borderRadius: 12, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 14, background: 'linear-gradient(135deg,#6EE7F7,#A78BFA)', color: '#0D1117' }}>
                             Create Project →
@@ -294,7 +294,7 @@ export function LandingPage() {
 
             {/* Footer */}
             <footer style={{ borderTop: `1px solid ${border}`, padding: '32px 24px', textAlign: 'center', fontSize: 12, color: muted }}>
-                © {new Date().getFullYear()} DYUKSA · Powered by Zanflow
+                © {new Date().getFullYear()} DYUKSA
             </footer>
         </div>
     );
