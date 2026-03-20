@@ -148,10 +148,15 @@ export function Sidebar() {
         }
 
         // Subscribe to chat unread updates
-        const unsubscribe = notificationSocket.onChatUnreadUpdate((updateData) => {
-          setChatUnreadCount(updateData.total_unread);
+       const unsubscribe = notificationSocket.onChatUnreadUpdate((updateData) => {
+          const activeRoomId = (window as any).__activeTeamChatRoomId as string | undefined;
+          const roomUnread = updateData.room_unread || 0;
+          const isActiveRoom = activeRoomId && updateData.room_id === activeRoomId;
+          const correctedTotal = isActiveRoom
+            ? Math.max(0, updateData.total_unread - roomUnread)
+            : updateData.total_unread;
+          setChatUnreadCount(correctedTotal);
         });
-
         return () => {
           unsubscribe();
         };

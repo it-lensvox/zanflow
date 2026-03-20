@@ -56,7 +56,9 @@ function MemberListContent({ roomId, roomType }: { roomId: string; roomType: 'te
           className="flex items-center gap-2 p-2 rounded hover:bg-gray-50 transition-colors"
         >
           <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center font-semibold text-white text-xs flex-shrink-0">
-            {member.user.full_name?.charAt(0).toUpperCase() || member.user.username.charAt(0).toUpperCase()}
+            {member.user.full_name
+              ? ((member.user.full_name.split(' ')[0]?.charAt(0) || '') + (member.user.full_name.split(' ')[1]?.charAt(0) || '')).toUpperCase()
+              : member.user.username.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-gray-900 truncate">
@@ -434,7 +436,7 @@ export function TeamChatModern() {
     }
   }, [privateRoomsData, currentUser, usersData]);
 
-// Subscribe to global presence map from the singleton
+  // Subscribe to global presence map from the singleton
   useEffect(() => {
     const currentMap = gatewaySocket.presenceMap;
     if (currentMap.size > 0) {
@@ -613,19 +615,32 @@ export function TeamChatModern() {
       }
 
       // Handle chat unread updates from WebSocket SIGNAL
-      if (data.type === 'SIGNAL' && (data as any).event === 'CHAT_UNREAD_UPDATE') {
+     if (data.type === 'SIGNAL' && (data as any).event === 'CHAT_UNREAD_UPDATE') {
         const unreadData = (data as any).data;
         const roomId = unreadData.room_id;
         const roomUnread = unreadData.room_unread || 0;
+        const isCurrentlyActiveRoom = roomId === activeRoomRef.current?.id;
+        if (isCurrentlyActiveRoom) {
+          const userId = roomUserMapRef.current.get(roomId);
+          if (userId) {
+            setLastMessages(prev => {
+              const newMap = new Map(prev);
+              const existing = newMap.get(userId);
+              if (existing?.isUnread) {
+                newMap.set(userId, { ...existing, isUnread: false });
+              }
+              return newMap;
+            });
+          }
+          return;
+        }
 
-        // Update unread counts
+        // Update unread counts only for rooms not currently open
         setUnreadCounts(prev => {
           const newMap = new Map(prev);
           newMap.set(roomId, roomUnread);
           return newMap;
         });
-
-        // Use Ref to get userId (bypasses stale closure)
         const userId = roomUserMapRef.current.get(roomId);
 
         if (userId) {
@@ -654,20 +669,22 @@ export function TeamChatModern() {
 
     gateway.onMessage(handler);
 
-    // Cleanup: detach only this handler, do NOT disconnect the shared singleton
+   //  only this handler, do NOT disconnect the shared singleton
     return () => {
       gateway.offMessage(handler);
       isGatewayInitialized.current = false;
       gatewaySocketRef.current = null;
+      (window as any).__activeTeamChatRoomId = undefined;
     };
   }, [currentUser?.id, queryClient]);
 
   // 3. Mutation: Create or Get Private Room
   const createRoomMutation = useMutation({
     mutationFn: (userId: number) => chatApi.createPrivateRoom(userId),
-    onSuccess: (roomData, userId) => {
+onSuccess: (roomData, userId) => {
       setActiveRoom(roomData);
       activeRoomRef.current = roomData;
+      (window as any).__activeTeamChatRoomId = roomData.id;
       queryClient.setQueryData(['chat-room', roomData.id], roomData);
 
       // Prefetch room details for favourite status
@@ -878,7 +895,7 @@ export function TeamChatModern() {
       type: 'chat' as const,
       id: String(user.id),
       name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username,
-      avatar: user.username.charAt(0).toUpperCase(),
+      avatar: (((user.first_name?.charAt(0) || '') + (user.last_name?.charAt(0) || '')).toUpperCase() || user.username.charAt(0).toUpperCase()),
       avatarClass: 'bg-blue-100 text-blue-700 rounded-full',
       preview: (user.lastMessageContent || 'No messages yet').replace(/<[^>]*>/g, '').trim(),
       unreadCount: getUserUnreadCount(user.id),
@@ -1474,7 +1491,7 @@ export function TeamChatModern() {
   }
 
   // Reusable presence dot — green circle for online, grey ✕ for offline
-const PresenceIndicator = ({ userId, size = 'md' }: { userId: number; size?: 'sm' | 'md' }) => {
+  const PresenceIndicator = ({ userId, size = 'md' }: { userId: number; size?: 'sm' | 'md' }) => {
     const status = userPresence.get(userId) ?? 'offline';
     const isOnline = status === 'online';
     const sizeClass = size === 'sm' ? 'h-2.5 w-2.5' : 'h-3 w-3';
@@ -1642,7 +1659,7 @@ const PresenceIndicator = ({ userId, size = 'md' }: { userId: number; size?: 'sm
                               "h-10 w-10 rounded-full flex items-center justify-center font-semibold text-sm",
                               isSelected ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-700"
                             )}>
-                              {user.username.charAt(0).toUpperCase()}
+                              {((user.first_name?.charAt(0) || '') + (user.last_name?.charAt(0) || '')).toUpperCase() || user.username.charAt(0).toUpperCase()}
                             </div>
                             <PresenceIndicator userId={user.id} size="md" />
                           </div>
@@ -1870,7 +1887,7 @@ const PresenceIndicator = ({ userId, size = 'md' }: { userId: number; size?: 'sm
                     ) : selectedUser ? (
                       <div className="relative">
                         <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center font-semibold text-blue-700 text-sm">
-                          {selectedUser.username.charAt(0).toUpperCase()}
+                          {((selectedUser.first_name?.charAt(0) || '') + (selectedUser.last_name?.charAt(0) || '')).toUpperCase() || selectedUser.username.charAt(0).toUpperCase()}
                         </div>
                         <PresenceIndicator userId={selectedUser.id} size="md" />
                       </div>
@@ -2060,7 +2077,9 @@ const PresenceIndicator = ({ userId, size = 'md' }: { userId: number; size?: 'sm
                               <div className="flex-shrink-0">
                                 {showAvatar ? (
                                   <div className="h-6 w-6 rounded-full bg-gradient-to-br from-blue-400 to-blue-500 flex items-center justify-center font-semibold text-white text-sm shadow-sm">
-                                    {message.sender.username.charAt(0).toUpperCase()}
+                                    {message.sender.full_name
+                                      ? (message.sender.full_name.split(' ')[0]?.charAt(0) || '') + (message.sender.full_name.split(' ')[1]?.charAt(0) || '')
+                                      : message.sender.username.charAt(0).toUpperCase()}
                                   </div>
                                 ) : (
                                   <div className="h-9 w-9" />

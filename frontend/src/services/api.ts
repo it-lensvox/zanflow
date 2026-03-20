@@ -887,7 +887,7 @@ export const gatewaySocket = new GatewayWebSocketService();
 export class NotificationWebSocketService {
   private ws: WebSocket | null = null;
   private notificationCallbacks: Set<NotificationCallback> = new Set();
-  private chatUnreadCallbacks: Set<(data: { total_unread: number; room_id: string }) => void> = new Set();
+  private chatUnreadCallbacks: Set<(data: { total_unread: number; room_id: string; room_unread: number }) => void> = new Set();
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
@@ -995,7 +995,7 @@ export class NotificationWebSocketService {
       this.notificationCallbacks.delete(callback);
     };
   }
-  onChatUnreadUpdate(callback: (data: { total_unread: number; room_id: string }) => void): () => void {
+  onChatUnreadUpdate(callback: (data: { total_unread: number; room_id: string; room_unread: number }) => void): () => void {
     this.chatUnreadCallbacks.add(callback);
     return () => {
       this.chatUnreadCallbacks.delete(callback);
