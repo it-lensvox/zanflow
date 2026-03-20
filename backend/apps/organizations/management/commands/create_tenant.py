@@ -63,9 +63,10 @@ class Command(BaseCommand):
             self.stdout.write(f"  Admin User:    {user.username}")
             self.stdout.write(f"  Admin Email:   {user.email}")
             self.stdout.write(f"  Role:          {user.role}")
-            self.stdout.write(f"  Superuser:     Yes")
+            self.stdout.write(f"  Superuser:     No (tenant admin only)")
             self.stdout.write(f"\n  This user has full power to manage members, projects,")
-            self.stdout.write(f"  and all data within '{org.name}'.\n")
+            self.stdout.write(f"  and all data within '{org.name}'.")
+            self.stdout.write(f"  Cannot access other tenants or platform settings.\n")
 
         except ValueError as e:
             raise CommandError(str(e))

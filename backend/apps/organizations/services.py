@@ -70,14 +70,19 @@ class TenantOnboardingService:
             slug=slug,  # auto-generated in model.save() if None
         )
 
-        # Create the first user as a superuser with full power
-        # This user can then add/manage all other members via the app
-        admin_user = User.objects.create_superuser(
+        # Create the first user as a tenant admin (NOT superuser)
+        # Superuser is reserved ONLY for the platform owner (Production Team)
+        # Tenant admins have full power within their org but cannot access
+        # other tenants or platform-level endpoints like /overview/
+        admin_user = User.objects.create_user(
             username=admin_username,
             email=admin_email,
             password=admin_password,
             organization=org,
         )
+        admin_user.role = "admin"
+        admin_user.is_staff = True
+        admin_user.save(update_fields=["role", "is_staff"])
 
         logger.info(
             "Tenant provisioned: org=%s (ID=%s), admin=%s",

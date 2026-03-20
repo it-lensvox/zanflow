@@ -10,6 +10,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from .models import Organization
 from .serializers import OrganizationSerializer, TenantSignupSerializer
 from .services import TenantOnboardingService
+from .throttles import GlobalSignupDailyThrottle
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +58,7 @@ class TenantSignupView(APIView):
     """
 
     permission_classes = [permissions.AllowAny]
-    throttle_scope = "signup"  # Rate limiting (configure in settings)
+    throttle_classes = [GlobalSignupDailyThrottle]
 
     def post(self, request):
         serializer = TenantSignupSerializer(data=request.data)
@@ -96,6 +97,9 @@ class TenantSignupView(APIView):
             admin_user.username,
         )
 
+        # Notify all platform superusers about the new signup
+        self._notify_superusers(org, admin_user)
+
         return Response(
             {
                 "message": "Organization created successfully.",
@@ -117,6 +121,75 @@ class TenantSignupView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+    @staticmethod
+    def _notify_superusers(org, admin_user):
+        """
+        Send email alert to all platform superusers when a new tenant signs up.
+        Runs silently — signup succeeds even if email fails.
+        """
+        from django.core.mail import send_mail
+        from django.conf import settings as django_settings
+        from django.utils import timezone
+
+        User = get_user_model()
+
+        # Get all superuser emails
+        superuser_emails = list(
+            User.objects.filter(
+                is_superuser=True,
+                is_active=True,
+            ).exclude(
+                email=""
+            ).values_list("email", flat=True)
+        )
+
+        if not superuser_emails:
+            return
+
+        signup_time = timezone.now().strftime("%B %d, %Y at %I:%M %p UTC")
+        total_orgs = Organization.objects.count()
+
+        subject = f"🔔 New Tenant Signup: {org.name}"
+
+        message = (
+            f"A new organization has signed up on ZanFlow.\n\n"
+            f"────────────────────────────────\n"
+            f"Organization:  {org.name}\n"
+            f"Slug:          {org.slug}\n"
+            f"Org ID:        {org.id}\n"
+            f"────────────────────────────────\n"
+            f"Admin User:    {admin_user.username}\n"
+            f"Admin Email:   {admin_user.email}\n"
+            f"User ID:       {admin_user.id}\n"
+            f"────────────────────────────────\n"
+            f"Signup Time:   {signup_time}\n"
+            f"Total Tenants: {total_orgs}\n"
+            f"────────────────────────────────\n\n"
+            f"You can view this tenant at:\n"
+            f"  API: /api/v1/organizations/overview/{org.id}/\n\n"
+            f"— ZanFlow Platform"
+        )
+
+        try:
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=django_settings.DEFAULT_FROM_EMAIL,
+                recipient_list=superuser_emails,
+                fail_silently=True,  # Don't break signup if email fails
+            )
+            logger.info(
+                "Signup alert sent to %d superuser(s) for org=%s",
+                len(superuser_emails),
+                org.name,
+            )
+        except Exception as e:
+            logger.warning(
+                "Failed to send signup alert for org=%s: %s",
+                org.name,
+                str(e),
+            )
 
 
 class TenantDashboardView(APIView):
