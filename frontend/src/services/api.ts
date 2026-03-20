@@ -121,6 +121,8 @@ export const authApi = {
     });
     setTokens(response.data);
     api.defaults.headers.common['Authorization'] = `Bearer ${response.data.access}`;
+    notificationSocket.connect();
+    gatewaySocket.connect();
     return response.data;
   },
 
@@ -136,6 +138,8 @@ export const authApi = {
     );
     setTokens(response.data.tokens);
     api.defaults.headers.common['Authorization'] = `Bearer ${response.data.tokens.access}`;
+    notificationSocket.connect();
+    gatewaySocket.connect();
     return response.data;
   },
 
@@ -732,11 +736,13 @@ export const chatApi = {
 // Gateway  WebSocket Service - Receives all messages across all rooms
 export class GatewayWebSocketService {
   private ws: WebSocket | null = null;
-  private messageCallback: ((msg: GatewayIncomingMessage) => void) | null = null;
+  private messageCallbacks: Set<(msg: GatewayIncomingMessage) => void> = new Set();
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private userId: number | null = null;
+  public presenceMap: Map<number, 'online' | 'offline'> = new Map();
+  private presenceListeners: Set<(map: Map<number, 'online' | 'offline'>) => void> = new Set();
 
   connect() {
     // Prevent multiple connections
@@ -757,6 +763,7 @@ export class GatewayWebSocketService {
 
     this.ws.onopen = () => {
       this.reconnectAttempts = 0;
+      this.requestOnlineUsers();
     };
 
     this.ws.onmessage = (event) => {
@@ -768,10 +775,23 @@ export class GatewayWebSocketService {
           this.userId = data.user_id || null;
         }
 
-        // Forward all messages to callback
-        if (this.messageCallback) {
-          this.messageCallback(data);
+        // Handle individual presence update (single user status change)
+        if (data.type === 'PRESENCE' && data.user_id) {
+          const status = data.status as 'online' | 'offline';
+          this.presenceMap = new Map(this.presenceMap);
+          this.presenceMap.set(data.user_id, status);
+          this.presenceListeners.forEach(cb => cb(this.presenceMap));
         }
+        if (data.type === 'PRESENCE_SYNC') {
+          const onlineUserIds: number[] = data.online_users || [];
+          const updatedMap = new Map(this.presenceMap);
+          onlineUserIds.forEach(uid => updatedMap.set(uid, 'online'));
+          this.presenceMap = updatedMap;
+          this.presenceListeners.forEach(cb => cb(this.presenceMap));
+        }
+
+        // Forward all messages to all registered callbacks
+        this.messageCallbacks.forEach(cb => cb(data));
       } catch (err) {
         console.error('Gateway WS Message Parse Error', err);
       }
@@ -799,6 +819,13 @@ export class GatewayWebSocketService {
     }, delay);
   }
 
+  // Request all currently online users from backend.
+  requestOnlineUsers() {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ command: 'get_online_users' }));
+    }
+  }
+
   // Send message using new command structure
   sendMessage(roomId: string, content: string) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -814,7 +841,21 @@ export class GatewayWebSocketService {
   }
 
   onMessage(callback: (msg: GatewayIncomingMessage) => void) {
-    this.messageCallback = callback;
+    this.messageCallbacks.add(callback);
+    // Return unsubscribe function
+    return () => this.messageCallbacks.delete(callback);
+  }
+
+  offMessage(callback: (msg: GatewayIncomingMessage) => void) {
+    this.messageCallbacks.delete(callback);
+  }
+
+  // Subscribe to presence updates — fires immediately with current map, then on every change
+  onPresenceUpdate(callback: (map: Map<number, 'online' | 'offline'>) => void) {
+    this.presenceListeners.add(callback);
+    // Fire immediately with current state so the UI hydrates on mount
+    callback(this.presenceMap);
+    return () => this.presenceListeners.delete(callback);
   }
 
   disconnect() {
@@ -827,9 +868,11 @@ export class GatewayWebSocketService {
       this.ws.onclose = null;
       this.ws.close();
       this.ws = null;
-      this.messageCallback = null;
       this.userId = null;
     }
+    this.messageCallbacks.clear();
+    this.presenceListeners.clear();
+    this.presenceMap = new Map();
   }
 
   isConnected(): boolean {
@@ -847,7 +890,7 @@ export const gatewaySocket = new GatewayWebSocketService();
 export class NotificationWebSocketService {
   private ws: WebSocket | null = null;
   private notificationCallbacks: Set<NotificationCallback> = new Set();
-  private chatUnreadCallbacks: Set<(data: { total_unread: number; room_id: string }) => void> = new Set();
+  private chatUnreadCallbacks: Set<(data: { total_unread: number; room_id: string; room_unread: number }) => void> = new Set();
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
@@ -955,7 +998,7 @@ export class NotificationWebSocketService {
       this.notificationCallbacks.delete(callback);
     };
   }
-  onChatUnreadUpdate(callback: (data: { total_unread: number; room_id: string }) => void): () => void {
+  onChatUnreadUpdate(callback: (data: { total_unread: number; room_id: string; room_unread: number }) => void): () => void {
     this.chatUnreadCallbacks.add(callback);
     return () => {
       this.chatUnreadCallbacks.delete(callback);

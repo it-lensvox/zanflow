@@ -1,13 +1,20 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { notificationSocket, api } from '@/services/api';
 import type { NotificationData } from '@/types';
+import notificationSoundFile from '../public/assets/notification-sound.mp3';
 
 export function useNotifications() {
   const [notifications, setNotifications] = useState<NotificationData[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
   const queryClient = useQueryClient();
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // 3. Initialize the audio object on mount using the imported file
+  useEffect(() => {
+    audioRef.current = new Audio(notificationSoundFile);
+  }, []);
 
   // Trigger notification refetch
   const triggerRefetch = useCallback(() => {
@@ -18,16 +25,26 @@ export function useNotifications() {
     // Connect to notification WebSocket
     notificationSocket.connect();
     setIsConnected(notificationSocket.isConnected());
+    
     const unsubscribe = notificationSocket.onNotification((notification) => {
       
+      // 4. Play the sound when a new notification arrives
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+        audioRef.current.play().catch((error) => {
+          console.warn('Browser prevented audio playback:', error);
+        });
+      }
+
       // Update unread count from WebSocket notification
       if (notification.unread_count !== undefined) {
         setUnreadCount(notification.unread_count);
       }
 
-      // Step C: Force refetch with resetQueries to ensure fresh data
+      // Force refetch with resetQueries to ensure fresh data
       queryClient.resetQueries({ queryKey: ['notifications-initial'] });
     });
+    
     return () => {
       unsubscribe();
     };
@@ -37,7 +54,6 @@ export function useNotifications() {
   useEffect(() => {
     const initializeUnreadCount = async () => {
       try {
-        // Prefetch notifications to populate cache and get unread count
         const data = await queryClient.fetchQuery({
           queryKey: ['notifications-initial'],
           queryFn: async () => {
@@ -57,7 +73,6 @@ export function useNotifications() {
 
     initializeUnreadCount();
 
-    // Listen for query cache updates
     const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
       if (
         event?.query.queryKey[0] === 'notifications-initial' && 

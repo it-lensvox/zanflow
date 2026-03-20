@@ -1,9 +1,11 @@
 import { Outlet, useMatch } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
-import { useState, Suspense } from 'react';
+import { useState, Suspense, useEffect, useRef } from 'react';
 import { NotificationsPage } from '@/pages/NotificationsPage';
 import { QuickNotes } from '@/components/QuickNotes';
 import { AIBot } from '@/pages/AI BOT/AI BOT';
+import { useNotifications } from '@/hooks/useNotifications';
+
 function PageSkeleton() {
   return (
     <div className="h-full flex flex-col animate-pulse p-6 gap-4">
@@ -44,6 +46,49 @@ function PageSkeleton() {
 export function Layout() {
   const [isActivityOpen, setIsActivityOpen] = useState(false);
   const isProjectDetailPage = useMatch('/projects/:id');
+  const { unreadCount } = useNotifications();
+
+   const faviconImgRef = useRef<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    const drawFavicon = (img: HTMLImageElement) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 64;
+      canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      ctx.drawImage(img, 0, 0, 64, 64);
+
+      if (unreadCount > 0) {
+        ctx.beginPath();
+        ctx.arc(52, 12, 10, 0, 2 * Math.PI);
+        ctx.fillStyle = '#ef4444';
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+      }
+
+      const link = document.querySelector<HTMLLinkElement>("link[rel='icon']")
+        || Object.assign(document.createElement('link'), { rel: 'icon' });
+      document.head.appendChild(link);
+      link.type = 'image/png';
+      link.href = canvas.toDataURL('image/png');
+    };
+
+    // If image already loaded (cached), draw immediately — no waiting for onload
+    if (faviconImgRef.current?.complete) {
+      drawFavicon(faviconImgRef.current);
+    } else {
+      const img = new Image();
+      img.src = './src/public/assets/logo.png';
+      img.onload = () => {
+        faviconImgRef.current = img;
+        drawFavicon(img);
+      };
+    }
+  }, [unreadCount]);
 
   return (
     <div className="flex h-screen bg-background">

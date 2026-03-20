@@ -170,27 +170,37 @@ export const createDocumentsTableColumns = ({ onDeleteClick, onInfoClick }: Docu
       key: 'file_type',
       label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Type</span>,
       width: '120px',
-     render: (doc: Document) => {
-  const getFileType = (doc: Document): string => {
-    if (doc.name) {
-      const ext = doc.name.split('.').pop()?.toLowerCase();
-      if (ext) return ext;
-    }
-    return doc.file_type || 'unknown';
-  };
+      render: (doc: Document) => {
+        const getFileType = (doc: Document): string => {
+          if (doc.name) {
+            const ext = doc.name.split('.').pop()?.toLowerCase();
+            if (ext) return ext;
+          }
+          return doc.file_type || 'unknown';
+        };
 
-  return (
-    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600 uppercase border border-gray-200">
-      {getFileType(doc)}
-    </span>
-  );
-},
+        return (
+          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600 uppercase border border-gray-200">
+            {getFileType(doc)}
+          </span>
+        );
+      },
     },
     {
       key: 'status',
       label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Status</span>,
       width: '120px',
       render: (doc: Document) => <StatusDropdown doc={doc} />,
+    },
+    {
+      key: 'updated_at',
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Updated</span>,
+      width: '120px',
+      render: (doc: Document) => (
+        <span className="text-[12px] text-gray-500">
+          {formatRelativeTime(doc.updated_at)}
+        </span>
+      ),
     },
     {
       key: 'created_by',

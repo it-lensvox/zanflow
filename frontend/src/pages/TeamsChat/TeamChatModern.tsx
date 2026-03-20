@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
-import { usersApi, chatApi, GatewayWebSocketService } from '@/services/api';
+import { usersApi, chatApi, GatewayWebSocketService, gatewaySocket } from '@/services/api';
 import type { ChatRoom, ChatMessage, ChatRoomMessagesResponse, ToastNotification, GatewayIncomingMessage, ProjectChatRoom, TeamChatRoom, User, OptimisticChatMessage } from '@/types';
 import { CreateTeamModal } from '@/pages/TeamManagement/Createteammodal';
 import { ChatMessageInput } from '@/components/common/RichTextEditor';
@@ -56,7 +56,9 @@ function MemberListContent({ roomId, roomType }: { roomId: string; roomType: 'te
           className="flex items-center gap-2 p-2 rounded hover:bg-gray-50 transition-colors"
         >
           <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center font-semibold text-white text-xs flex-shrink-0">
-            {member.user.full_name?.charAt(0).toUpperCase() || member.user.username.charAt(0).toUpperCase()}
+            {member.user.full_name
+              ? ((member.user.full_name.split(' ')[0]?.charAt(0) || '') + (member.user.full_name.split(' ')[1]?.charAt(0) || '')).toUpperCase()
+              : member.user.username.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-gray-900 truncate">
@@ -105,7 +107,7 @@ export function TeamChatModern() {
   const dragCounter = useRef(0);
   const [optimisticMessages, setOptimisticMessages] = useState<OptimisticChatMessage[]>([]);
   const [previewDoc, setPreviewDoc] = useState<{ url: string; fileName: string; fileType?: string } | null>(null);
-
+  const [userPresence, setUserPresence] = useState<Map<number, 'online' | 'offline'>>(new Map());
   // Unread tracking & notifications
   const [unreadCounts, setUnreadCounts] = useState<Map<string, number>>(new Map());
   const [toastNotifications, setToastNotifications] = useState<ToastNotification[]>([]);
@@ -360,7 +362,6 @@ export function TeamChatModern() {
               // Force unread status on the user in the sidebar
               if (data.unread_count > 0) {
                 const prevMsg = newLastMessages.get(user.id);
-                // Only update if not already marked unread
                 if (!prevMsg?.isUnread) {
                   newLastMessages.set(user.id, {
                     content: prevMsg?.content || 'Unread messages',
@@ -435,26 +436,40 @@ export function TeamChatModern() {
     }
   }, [privateRoomsData, currentUser, usersData]);
 
-  // Initialize Gateway WebSocket ONCE on Mount
+  // Subscribe to global presence map from the singleton
+  useEffect(() => {
+    const currentMap = gatewaySocket.presenceMap;
+    if (currentMap.size > 0) {
+      setUserPresence(new Map(currentMap));
+    }
+    if (gatewaySocket.isConnected()) {
+      gatewaySocket.requestOnlineUsers();
+    }
+
+    const unsubscribePresence = gatewaySocket.onPresenceUpdate((map) => {
+      setUserPresence(new Map(map));
+    });
+    return () => { unsubscribePresence(); };
+  }, []);
+
+  // Attach message handler to the app-level 
   useEffect(() => {
     if (!currentUser || isGatewayInitialized.current) {
       return;
     }
 
     isGatewayInitialized.current = true;
-
-    const gateway = new GatewayWebSocketService();
-    gateway.connect();
+    const gateway = gatewaySocket;
     gatewaySocketRef.current = gateway;
 
-    gateway.onMessage((data: GatewayIncomingMessage) => {
+    const handler = (data: GatewayIncomingMessage) => {
 
       // Handle connection acknowledgement
       if (data.type === 'GATEWAY_CONNECTED') {
         return;
       }
 
-      // Handle presence events
+      // Presence is handled globally by the singleton via onPresenceUpdate
       if (data.type === 'PRESENCE') {
         return;
       }
@@ -600,19 +615,32 @@ export function TeamChatModern() {
       }
 
       // Handle chat unread updates from WebSocket SIGNAL
-      if (data.type === 'SIGNAL' && (data as any).event === 'CHAT_UNREAD_UPDATE') {
+     if (data.type === 'SIGNAL' && (data as any).event === 'CHAT_UNREAD_UPDATE') {
         const unreadData = (data as any).data;
         const roomId = unreadData.room_id;
         const roomUnread = unreadData.room_unread || 0;
+        const isCurrentlyActiveRoom = roomId === activeRoomRef.current?.id;
+        if (isCurrentlyActiveRoom) {
+          const userId = roomUserMapRef.current.get(roomId);
+          if (userId) {
+            setLastMessages(prev => {
+              const newMap = new Map(prev);
+              const existing = newMap.get(userId);
+              if (existing?.isUnread) {
+                newMap.set(userId, { ...existing, isUnread: false });
+              }
+              return newMap;
+            });
+          }
+          return;
+        }
 
-        // Update unread counts
+        // Update unread counts only for rooms not currently open
         setUnreadCounts(prev => {
           const newMap = new Map(prev);
           newMap.set(roomId, roomUnread);
           return newMap;
         });
-
-        // Use Ref to get userId (bypasses stale closure)
         const userId = roomUserMapRef.current.get(roomId);
 
         if (userId) {
@@ -637,21 +665,26 @@ export function TeamChatModern() {
         }
       }
 
-    });
+    };
 
-    // Cleanup on unmount
+    gateway.onMessage(handler);
+
+   //  only this handler, do NOT disconnect the shared singleton
     return () => {
-      gateway.disconnect();
+      gateway.offMessage(handler);
       isGatewayInitialized.current = false;
+      gatewaySocketRef.current = null;
+      (window as any).__activeTeamChatRoomId = undefined;
     };
   }, [currentUser?.id, queryClient]);
 
   // 3. Mutation: Create or Get Private Room
   const createRoomMutation = useMutation({
     mutationFn: (userId: number) => chatApi.createPrivateRoom(userId),
-    onSuccess: (roomData, userId) => {
+onSuccess: (roomData, userId) => {
       setActiveRoom(roomData);
       activeRoomRef.current = roomData;
+      (window as any).__activeTeamChatRoomId = roomData.id;
       queryClient.setQueryData(['chat-room', roomData.id], roomData);
 
       // Prefetch room details for favourite status
@@ -692,6 +725,26 @@ export function TeamChatModern() {
       try {
         await chatApi.markAsRead(roomId);
         queryClient.invalidateQueries({ queryKey: ['chat-unread-counts'] });
+
+        // Clear local unread count immediately so the highlight drops without waiting for the API refetch
+        setUnreadCounts(prev => {
+          const newMap = new Map(prev);
+          newMap.set(roomId, 0);
+          return newMap;
+        });
+
+        // Clear the isUnread flag on the lastMessages entry for this room's user (private chats)
+        const userId = roomUserMapRef.current.get(roomId);
+        if (userId) {
+          setLastMessages(prev => {
+            const newMap = new Map(prev);
+            const existing = newMap.get(userId);
+            if (existing?.isUnread) {
+              newMap.set(userId, { ...existing, isUnread: false });
+            }
+            return newMap;
+          });
+        }
       } catch (error) {
         console.error('Failed to mark messages as read:', error);
       }
@@ -828,6 +881,7 @@ export function TeamChatModern() {
   };
 
   // Unread users filter
+  // Unread users filter (chat tab only — used for badge counts)
   const unreadUsers = useMemo(() => {
     return filteredUsers.filter(user => {
       const unreadCount = getUserUnreadCount(user.id);
@@ -835,21 +889,70 @@ export function TeamChatModern() {
     });
   }, [filteredUsers, chatListVersion, unreadCounts]);
 
-  // Highlight tab when it has unread messages
-  const tabHasUnread = useMemo(() => {
-    const chats = sortedUsers.some(user => {
+  // Combined unread items across Chat + Project + Team (for Unread tab content)
+  const allUnreadItems = useMemo(() => {
+    const chatItems = unreadUsers.map(user => ({
+      type: 'chat' as const,
+      id: String(user.id),
+      name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username,
+      avatar: (((user.first_name?.charAt(0) || '') + (user.last_name?.charAt(0) || '')).toUpperCase() || user.username.charAt(0).toUpperCase()),
+      avatarClass: 'bg-blue-100 text-blue-700 rounded-full',
+      preview: (user.lastMessageContent || 'No messages yet').replace(/<[^>]*>/g, '').trim(),
+      unreadCount: getUserUnreadCount(user.id),
+      onClick: () => handleUserSelect(user.id),
+      isSelected: selectedUserId === user.id,
+    }));
+
+    const projectItems = projectRooms
+      .filter(p => (unreadCounts.get(p.id) || 0) > 0)
+      .map(p => ({
+        type: 'project' as const,
+        id: p.id,
+        name: p.name,
+        avatar: p.name.charAt(0).toUpperCase(),
+        avatarClass: 'bg-purple-100 text-purple-700 rounded',
+        preview: (p.last_message?.content_preview || 'No messages yet').replace(/<[^>]*>/g, '').trim(),
+        unreadCount: unreadCounts.get(p.id) || 0,
+        onClick: () => handleProjectClick(p),
+        isSelected: selectedProjectRoom?.id === p.id,
+      }));
+
+    const teamItems = teamRooms
+      .filter(t => (unreadCounts.get(t.id) || 0) > 0)
+      .map(t => {
+        const lastMsg = (t.last_message as any);
+        const preview = lastMsg ? (lastMsg.content_preview || lastMsg.content || '').replace(/<[^>]*>/g, '').trim() || 'Sent a message' : 'No messages yet';
+        return {
+          type: 'team' as const,
+          id: t.id,
+          name: t.name,
+          avatar: t.name.charAt(0).toUpperCase(),
+          avatarClass: 'bg-green-100 text-green-700 rounded',
+          preview,
+          unreadCount: unreadCounts.get(t.id) || 0,
+          onClick: () => handleTeamClick(t),
+          isSelected: selectedTeamRoom?.id === t.id,
+        };
+      });
+
+    return [...chatItems, ...projectItems, ...teamItems];
+  }, [unreadUsers, projectRooms, teamRooms, unreadCounts, selectedUserId, selectedProjectRoom, selectedTeamRoom, chatListVersion]);
+
+  // Unread count per tab (replaces bold/highlight with badge counts)
+  const tabUnreadCounts = useMemo(() => {
+    const chats = sortedUsers.reduce((sum, user) => {
       const roomId = userRoomMap.get(user.id);
-      return (roomId && (unreadCounts.get(roomId) || 0) > 0) || (user as any).isUnread;
-    });
+      return sum + (roomId ? (unreadCounts.get(roomId) || 0) : 0);
+    }, 0);
 
-    const projects = projectRooms.some(project => (unreadCounts.get(project.id) || 0) > 0);
+    const projects = projectRooms.reduce((sum, project) => sum + (unreadCounts.get(project.id) || 0), 0);
 
-    const teams = teamRooms.some(team => (unreadCounts.get(team.id) || 0) > 0);
+    const teams = teamRooms.reduce((sum, team) => sum + (unreadCounts.get(team.id) || 0), 0);
 
-    const unread = unreadUsers.length > 0;
+    const unread = chats + projects + teams;
 
     return { chats, projects, teams, unread };
-  }, [sortedUsers, projectRooms, teamRooms, unreadUsers, unreadCounts, userRoomMap, chatListVersion]);
+  }, [sortedUsers, projectRooms, teamRooms, unreadCounts, userRoomMap, chatListVersion]);
 
   // Shared documents from messages
   const sharedDocuments = useMemo(() => {
@@ -873,7 +976,7 @@ export function TeamChatModern() {
     setSelectedTeamRoom(null);
     setSelectedUserId(userId);
 
-    // Clear unread status for this user
+    // Clear unread status for this user (both isUnread flag and unread count)
     setLastMessages(prev => {
       const newMap = new Map(prev);
       const existing = newMap.get(userId);
@@ -882,6 +985,14 @@ export function TeamChatModern() {
       }
       return newMap;
     });
+    const existingRoomId = userRoomMap.get(userId);
+    if (existingRoomId) {
+      setUnreadCounts(prev => {
+        const newMap = new Map(prev);
+        newMap.set(existingRoomId, 0);
+        return newMap;
+      });
+    }
     setActiveRoom(null);
     activeRoomRef.current = null;
     queryClient.resetQueries({ queryKey: ['chat-messages'] });
@@ -1235,7 +1346,6 @@ export function TeamChatModern() {
         queryClient.invalidateQueries({ queryKey: ['chat-messages', roomId], refetchType: 'active' });
       } catch (error) {
         console.error('❌ [SEND ERROR] Failed to send message with attachment:', error);
-        // 5. Mark optimistic message as errored
         setOptimisticMessages(prev =>
           prev.map(m => m.optimisticId === tempId ? { ...m, optimisticStatus: 'error' } : m)
         );
@@ -1380,6 +1490,32 @@ export function TeamChatModern() {
     );
   }
 
+  // Reusable presence dot — green circle for online, grey ✕ for offline
+  const PresenceIndicator = ({ userId, size = 'md' }: { userId: number; size?: 'sm' | 'md' }) => {
+    const status = userPresence.get(userId) ?? 'offline';
+    const isOnline = status === 'online';
+    const sizeClass = size === 'sm' ? 'h-2.5 w-2.5' : 'h-3 w-3';
+    const offsetClass = size === 'sm' ? '-bottom-0.5 -right-0.5' : '-bottom-0.5 -right-0.5';
+    return (
+      <span
+        title={isOnline ? 'Online' : 'Offline'}
+        className={cn(
+          'absolute rounded-full border-2 border-white flex items-center justify-center',
+          sizeClass,
+          offsetClass,
+          isOnline ? 'bg-green-500' : 'bg-gray-400'
+        )}
+      >
+        {!isOnline && (
+          <svg viewBox="0 0 8 8" className="w-1.5 h-1.5" fill="none">
+            <line x1="1.5" y1="1.5" x2="6.5" y2="6.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+            <line x1="6.5" y1="1.5" x2="1.5" y2="6.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        )}
+      </span>
+    );
+  };
+
   return (
     <div className="flex h-screen bg-[#f3f2f1] overflow-hidden border-2 border-gray-200">
       {previewDoc && (
@@ -1432,54 +1568,58 @@ export function TeamChatModern() {
         {/* Tab Navigation */}
         <Tabs.Root value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
           <Tabs.List className="flex items-center gap-1 px-3 py-2 bg-white border-b border-gray-200">
-            <Tabs.Trigger
-              value="chats"
-              className={cn(
-                "px-4 py-1.5 text-xs font-medium rounded-full transition-all",
-                "data-[state=active]:bg-blue-600 data-[state=active]:text-white",
-                activeTab !== 'chats' && tabHasUnread.chats
-                  ? "bg-gray-800 text-white hover:bg-gray-700"
-                  : "data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+            <div className="relative inline-flex">
+              <Tabs.Trigger
+                value="chats"
+                className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+              >
+                Chats
+              </Tabs.Trigger>
+              {tabUnreadCounts.chats > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 h-4 min-w-[16px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none pointer-events-none z-10">
+                  {tabUnreadCounts.chats > 99 ? '99+' : tabUnreadCounts.chats}
+                </span>
               )}
-            >
-              Chats
-            </Tabs.Trigger>
-            <Tabs.Trigger
-              value="projects"
-              className={cn(
-                "px-4 py-1.5 text-xs font-medium rounded-full transition-all",
-                "data-[state=active]:bg-blue-600 data-[state=active]:text-white",
-                activeTab !== 'projects' && tabHasUnread.projects
-                  ? "bg-gray-800 text-white hover:bg-gray-700"
-                  : "data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+            </div>
+            <div className="relative inline-flex">
+              <Tabs.Trigger
+                value="projects"
+                className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+              >
+                Projects
+              </Tabs.Trigger>
+              {tabUnreadCounts.projects > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 h-4 min-w-[16px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none pointer-events-none z-10">
+                  {tabUnreadCounts.projects > 99 ? '99+' : tabUnreadCounts.projects}
+                </span>
               )}
-            >
-              Projects
-            </Tabs.Trigger>
-            <Tabs.Trigger
-              value="teams"
-              className={cn(
-                "px-4 py-1.5 text-xs font-medium rounded-full transition-all",
-                "data-[state=active]:bg-blue-600 data-[state=active]:text-white",
-                activeTab !== 'teams' && tabHasUnread.teams
-                  ? "bg-gray-800 text-white hover:bg-gray-700"
-                  : "data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+            </div>
+            <div className="relative inline-flex">
+              <Tabs.Trigger
+                value="teams"
+                className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+              >
+                Teams
+              </Tabs.Trigger>
+              {tabUnreadCounts.teams > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 h-4 min-w-[16px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none pointer-events-none z-10">
+                  {tabUnreadCounts.teams > 99 ? '99+' : tabUnreadCounts.teams}
+                </span>
               )}
-            >
-              Teams
-            </Tabs.Trigger>
-            <Tabs.Trigger
-              value="unread"
-              className={cn(
-                "px-4 py-1.5 text-xs font-medium rounded-full transition-all",
-                "data-[state=active]:bg-blue-600 data-[state=active]:text-white",
-                activeTab !== 'unread' && tabHasUnread.unread
-                  ? "bg-gray-800 text-white hover:bg-gray-700"
-                  : "data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+            </div>
+            <div className="relative inline-flex">
+              <Tabs.Trigger
+                value="unread"
+                className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+              >
+                Unread
+              </Tabs.Trigger>
+              {tabUnreadCounts.unread > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 h-4 min-w-[16px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none pointer-events-none z-10">
+                  {tabUnreadCounts.unread > 99 ? '99+' : tabUnreadCounts.unread}
+                </span>
               )}
-            >
-              Unread
-            </Tabs.Trigger>
+            </div>
           </Tabs.List>
 
           {/* Scrollable Lists */}
@@ -1519,8 +1659,9 @@ export function TeamChatModern() {
                               "h-10 w-10 rounded-full flex items-center justify-center font-semibold text-sm",
                               isSelected ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-700"
                             )}>
-                              {user.username.charAt(0).toUpperCase()}
+                              {((user.first_name?.charAt(0) || '') + (user.last_name?.charAt(0) || '')).toUpperCase() || user.username.charAt(0).toUpperCase()}
                             </div>
+                            <PresenceIndicator userId={user.id} size="md" />
                           </div>
                           <div className="flex-1 min-w-0 text-left">
                             <div className="flex items-center justify-between mb-0.5">
@@ -1534,14 +1675,6 @@ export function TeamChatModern() {
                                 {isFavourite && (
                                   <Pin className="h-3.5 w-3.5 text-blue-600" />
                                 )}
-                                {/* {user.lastMessageTime && (
-                                  <span className={cn(
-                                    "text-[10px]",
-                                    hasUnreadMessages ? "text-blue-600 font-semibold" : "text-gray-500"
-                                  )}>
-                                    {new Date(user.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                  </span>
-                                )} */}
                               </div>
                             </div>
                             <div className="flex items-center justify-between">
@@ -1688,58 +1821,44 @@ export function TeamChatModern() {
             </Tabs.Content>
 
             <Tabs.Content value="unread">
-              {/* Unread Section */}
+              {/* Unread Section — aggregates Chat + Project + Team */}
               <div className="bg-white">
                 <div className="border-t border-gray-100">
-                  {unreadUsers.length === 0 ? (
+                  {allUnreadItems.length === 0 ? (
                     <div className="p-4 text-center text-sm text-gray-500">No unread messages</div>
                   ) : (
-                    unreadUsers.map(user => {
-                      const isSelected = selectedUserId === user.id;
-                      const unreadCount = getUserUnreadCount(user.id);
-
-                      return (
-                        <button
-                          key={user.id}
-                          onClick={() => handleUserSelect(user.id)}
-                          className={cn(
-                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
-                            isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
-                          )}
-                        >
-                          <div className="relative flex-shrink-0">
-                            <div className={cn(
-                              "h-10 w-10 rounded-full flex items-center justify-center font-semibold text-sm",
-                              isSelected ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-700"
-                            )}>
-                              {user.username.charAt(0).toUpperCase()}
-                            </div>
+                    allUnreadItems.map(item => (
+                      <button
+                        key={`${item.type}-${item.id}`}
+                        onClick={item.onClick}
+                        className={cn(
+                          "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
+                          item.isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
+                        )}
+                      >
+                        <div className="relative flex-shrink-0">
+                          <div className={cn(
+                            "h-10 w-10 flex items-center justify-center font-semibold text-sm",
+                            item.isSelected ? "bg-blue-600 text-white rounded-full" : item.avatarClass
+                          )}>
+                            {item.avatar}
                           </div>
-                          <div className="flex-1 min-w-0 text-left">
-                            <div className="flex items-center justify-between mb-0.5">
-                              <p className="text-sm font-bold text-gray-900 truncate">
-                                {user.first_name || user.username}
-                              </p>
-                              {/* {user.lastMessageTime && (
-                                <span className="text-[10px] ml-2 flex-shrink-0 text-blue-600 font-semibold">
-                                  {new Date(user.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </span>
-                              )} */}
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <p className="text-xs font-semibold text-gray-900 truncate">
-                                {user.lastMessageContent || 'No messages yet'}
-                              </p>
-                              {unreadCount > 0 && (
-                                <span className="ml-2 flex-shrink-0 h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
-                                  {unreadCount}
-                                </span>
-                              )}
-                            </div>
+                        </div>
+                        <div className="flex-1 min-w-0 text-left">
+                          <div className="flex items-center justify-between mb-0.5">
+                            <p className="text-sm font-bold text-gray-900 truncate">{item.name}</p>
                           </div>
-                        </button>
-                      );
-                    })
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-semibold text-gray-900 truncate">{item.preview}</p>
+                            {item.unreadCount > 0 && (
+                              <span className="ml-2 flex-shrink-0 h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
+                                {item.unreadCount}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    ))
                   )}
                 </div>
               </div>
@@ -1766,11 +1885,12 @@ export function TeamChatModern() {
                         {selectedTeamRoom.name.charAt(0).toUpperCase()}
                       </div>
                     ) : selectedUser ? (
-                      <>
+                      <div className="relative">
                         <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center font-semibold text-blue-700 text-sm">
-                          {selectedUser.username.charAt(0).toUpperCase()}
+                          {((selectedUser.first_name?.charAt(0) || '') + (selectedUser.last_name?.charAt(0) || '')).toUpperCase() || selectedUser.username.charAt(0).toUpperCase()}
                         </div>
-                      </>
+                        <PresenceIndicator userId={selectedUser.id} size="md" />
+                      </div>
                     ) : null}
                   </div>
                   <div>
@@ -1913,9 +2033,9 @@ export function TeamChatModern() {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {messages.map((message, index) => {
+                      {messages.filter(m => m.sender != null).map((message, index, visibleMessages) => {
                         const isOwn = message.is_own_message;
-                        const showAvatar = index === 0 || messages[index - 1].sender.id !== message.sender.id;
+                        const showAvatar = index === 0 || visibleMessages[index - 1].sender.id !== message.sender.id;
                         const isHovered = hoveredMessageId === message.id;
 
                         // — Date separator logic —
@@ -1957,7 +2077,9 @@ export function TeamChatModern() {
                               <div className="flex-shrink-0">
                                 {showAvatar ? (
                                   <div className="h-6 w-6 rounded-full bg-gradient-to-br from-blue-400 to-blue-500 flex items-center justify-center font-semibold text-white text-sm shadow-sm">
-                                    {message.sender.username.charAt(0).toUpperCase()}
+                                    {message.sender.full_name
+                                      ? (message.sender.full_name.split(' ')[0]?.charAt(0) || '') + (message.sender.full_name.split(' ')[1]?.charAt(0) || '')
+                                      : message.sender.username.charAt(0).toUpperCase()}
                                   </div>
                                 ) : (
                                   <div className="h-9 w-9" />
