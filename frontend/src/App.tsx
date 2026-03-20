@@ -216,14 +216,14 @@ const preloadDashboard = () => import('@/pages/Dashboard');
 function WebSocketProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
 
-  // Connect/disconnect when auth state hydrates (handles page refresh while logged in)
+  // Connect/disconnect when auth state hydrates 
   useEffect(() => {
     if (isAuthenticated) {
       notificationSocket.connect();
       gatewaySocket.connect();
       preloadDashboard();
       return () => {
-        notificationSocket.disconnect(); // ✅ also disconnect notificationSocket on logout
+        notificationSocket.disconnect();
         gatewaySocket.disconnect();
       };
     }
