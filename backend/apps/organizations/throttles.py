@@ -27,7 +27,7 @@ class GlobalSignupDailyThrottle(BaseThrottle):
     CACHE_TIMEOUT = 86400  # 24 hours in seconds
 
     def get_daily_limit(self):
-        return getattr(settings, "SIGNUP_DAILY_LIMIT", 3)
+        return getattr(settings, "SIGNUP_DAILY_LIMIT", 4)
 
     def allow_request(self, request, view):
         # Only throttle POST requests (actual signups)
