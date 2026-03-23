@@ -1,17 +1,18 @@
-import { useState, useMemo, useEffect, useRef, lazy, Suspense } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Tabs from '@radix-ui/react-tabs';
 import {
-  MessageSquare, Search, Send, Paperclip, Smile, Phone, Video, Plus, X, Users as UsersIcon,
-  MoreVertical, Reply, Forward, Link2, Bookmark, Trash2, Pin, MailOpen, PinOff,
+  MessageSquare, Search, Plus, X, Users as UsersIcon, Paperclip, Smile,
+  MoreVertical, Reply, Forward, Link2, Bookmark, Trash2, Pin, MailOpen, PinOff, Loader2, AlertCircle, RotateCcw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
-import { usersApi, chatApi, GatewayWebSocketService } from '@/services/api';
-import type { ChatRoom, ChatMessage, ChatRoomMessagesResponse, ToastNotification, GatewayIncomingMessage, ProjectChatRoom, TeamChatRoom, User } from '@/types';
-const EmojiPicker = lazy(() => import('emoji-picker-react'));
-import type { EmojiClickData } from 'emoji-picker-react';
+import { usersApi, chatApi, GatewayWebSocketService, gatewaySocket } from '@/services/api';
+import type { ChatRoom, ChatMessage, ChatRoomMessagesResponse, ToastNotification, GatewayIncomingMessage, ProjectChatRoom, TeamChatRoom, User, OptimisticChatMessage } from '@/types';
 import { CreateTeamModal } from '@/pages/TeamManagement/Createteammodal';
+import { ChatMessageInput } from '@/components/common/RichTextEditor';
+import { DocumentThumbnail, DocumentPreview } from '@/components/common/DocumentPreview';
 
 // Extended user type with last message info
 interface UserWithActivity extends User {
@@ -55,7 +56,9 @@ function MemberListContent({ roomId, roomType }: { roomId: string; roomType: 'te
           className="flex items-center gap-2 p-2 rounded hover:bg-gray-50 transition-colors"
         >
           <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center font-semibold text-white text-xs flex-shrink-0">
-            {member.user.full_name?.charAt(0).toUpperCase() || member.user.username.charAt(0).toUpperCase()}
+            {member.user.full_name
+              ? ((member.user.full_name.split(' ')[0]?.charAt(0) || '') + (member.user.full_name.split(' ')[1]?.charAt(0) || '')).toUpperCase()
+              : member.user.username.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-gray-900 truncate">
@@ -78,12 +81,10 @@ function MemberListContent({ roomId, roomType }: { roomId: string; roomType: 'te
 
 export function TeamChatModern() {
   const { user: currentUser } = useAuth();
+  const navigate = useNavigate();
+  const { projectId: urlProjectId, roomId: urlRoomId } = useParams<{ projectId: string; roomId: string }>();
   const queryClient = useQueryClient();
 
-  useEffect(() => {
-    const prefetch = () => import('emoji-picker-react');
-    prefetch();
-  }, []);
 
   // UI State
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
@@ -91,12 +92,11 @@ export function TeamChatModern() {
   const [selectedProjectRoom, setSelectedProjectRoom] = useState<ProjectChatRoom | null>(null);
   const [selectedTeamRoom, setSelectedTeamRoom] = useState<TeamChatRoom | null>(null);
   const [messageInput, setMessageInput] = useState('');
+  const [richHtmlContent, setRichHtmlContent] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const emojiPickerRef = useRef<HTMLDivElement>(null);
   const [hoveredMessageId, setHoveredMessageId] = useState<string | number | null>(null);
   const [openMenuMessageId, setOpenMenuMessageId] = useState<string | number | null>(null);
   const [showReactionPicker, setShowReactionPicker] = useState<string | number | null>(null);
@@ -105,7 +105,9 @@ export function TeamChatModern() {
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const dragCounter = useRef(0);
-
+  const [optimisticMessages, setOptimisticMessages] = useState<OptimisticChatMessage[]>([]);
+  const [previewDoc, setPreviewDoc] = useState<{ url: string; fileName: string; fileType?: string } | null>(null);
+  const [userPresence, setUserPresence] = useState<Map<number, 'online' | 'offline'>>(new Map());
   // Unread tracking & notifications
   const [unreadCounts, setUnreadCounts] = useState<Map<string, number>>(new Map());
   const [toastNotifications, setToastNotifications] = useState<ToastNotification[]>([]);
@@ -234,6 +236,25 @@ export function TeamChatModern() {
     }
   }, [privateRoomsData, projectRoomsData, teamRoomsData, queryClient, roomDetailsLoaded]);
 
+  // Auto-select project room from URL params
+  useEffect(() => {
+    if (urlRoomId && projectRoomsData && projectRoomsData.length > 0 && !selectedProjectRoom) {
+      const matchedRoom = projectRoomsData.find(room => room.id === urlRoomId);
+      if (matchedRoom) {
+        setSelectedUserId(null);
+        setSelectedTeamRoom(null);
+        setActiveRoom(null);
+        setSelectedProjectRoom(matchedRoom);
+        activeRoomRef.current = { id: matchedRoom.id } as ChatRoom;
+        queryClient.prefetchQuery({
+          queryKey: ['chat-room-details', matchedRoom.id],
+          queryFn: () => chatApi.getRoomDetails(matchedRoom.id),
+        });
+        queryClient.invalidateQueries({ queryKey: ['chat-messages', matchedRoom.id] });
+      }
+    }
+  }, [urlRoomId, projectRoomsData]);
+
   // Sort Teams by Last Message Time 
   const teamRooms = useMemo(() => {
     if (!teamRoomsData) return [];
@@ -341,7 +362,6 @@ export function TeamChatModern() {
               // Force unread status on the user in the sidebar
               if (data.unread_count > 0) {
                 const prevMsg = newLastMessages.get(user.id);
-                // Only update if not already marked unread
                 if (!prevMsg?.isUnread) {
                   newLastMessages.set(user.id, {
                     content: prevMsg?.content || 'Unread messages',
@@ -396,7 +416,7 @@ export function TeamChatModern() {
               // Only update if this data is newer or doesn't exist
               if (roomTime > existingTime) {
                 newLastMessages.set(otherUserId, {
-                  content: room.last_message.content_preview || 'Sent a message',
+                  content: (room.last_message.content_preview || room.last_message.content || 'Sent a message').replace(/<[^>]*>/g, '').trim() || 'Sent a message',
                   timestamp: room.last_message.created_at,
                   isUnread: room.unread_count > 0
                 });
@@ -416,26 +436,40 @@ export function TeamChatModern() {
     }
   }, [privateRoomsData, currentUser, usersData]);
 
-  // Initialize Gateway WebSocket ONCE on Mount
+  // Subscribe to global presence map from the singleton
+  useEffect(() => {
+    const currentMap = gatewaySocket.presenceMap;
+    if (currentMap.size > 0) {
+      setUserPresence(new Map(currentMap));
+    }
+    if (gatewaySocket.isConnected()) {
+      gatewaySocket.requestOnlineUsers();
+    }
+
+    const unsubscribePresence = gatewaySocket.onPresenceUpdate((map) => {
+      setUserPresence(new Map(map));
+    });
+    return () => { unsubscribePresence(); };
+  }, []);
+
+  // Attach message handler to the app-level 
   useEffect(() => {
     if (!currentUser || isGatewayInitialized.current) {
       return;
     }
 
     isGatewayInitialized.current = true;
-
-    const gateway = new GatewayWebSocketService();
-    gateway.connect();
+    const gateway = gatewaySocket;
     gatewaySocketRef.current = gateway;
 
-    gateway.onMessage((data: GatewayIncomingMessage) => {
+    const handler = (data: GatewayIncomingMessage) => {
 
       // Handle connection acknowledgement
       if (data.type === 'GATEWAY_CONNECTED') {
         return;
       }
 
-      // Handle presence events
+      // Presence is handled globally by the singleton via onPresenceUpdate
       if (data.type === 'PRESENCE') {
         return;
       }
@@ -488,7 +522,7 @@ export function TeamChatModern() {
           setLastMessages(prev => {
             const newMap = new Map(prev);
             newMap.set(chatListUserId!, {
-              content: enrichedMessage.content,
+              content: enrichedMessage.content.replace(/<[^>]*>/g, '').trim() || enrichedMessage.content,
               timestamp: enrichedMessage.created_at,
               isUnread: shouldMarkUnread
             });
@@ -530,6 +564,18 @@ export function TeamChatModern() {
           };
         });
 
+        // Remove any matching optimistic message for own confirmed messages
+        if (isOwnMessage) {
+          setOptimisticMessages(prev =>
+            prev.filter(m =>
+              !(m.room === actualRoomId &&
+                m.optimisticStatus !== 'error' &&
+                m.content === enrichedMessage.content &&
+                m.message_type === enrichedMessage.message_type)
+            )
+          );
+        }
+
         // 4. Verify cache update
         const afterUpdate = queryClient.getQueryData<ChatRoomMessagesResponse>(['chat-messages', actualRoomId]);
 
@@ -560,7 +606,7 @@ export function TeamChatModern() {
             id: `${Date.now()}`,
             room_id: actualRoomId,
             sender_name: enrichedMessage.sender.full_name || enrichedMessage.sender.username,
-            message_preview: enrichedMessage.content,
+            message_preview: enrichedMessage.content.replace(/<[^>]*>/g, '').trim() || enrichedMessage.content,
             timestamp: enrichedMessage.created_at
           };
           setToastNotifications(prev => [...prev, toast]);
@@ -569,19 +615,32 @@ export function TeamChatModern() {
       }
 
       // Handle chat unread updates from WebSocket SIGNAL
-      if (data.type === 'SIGNAL' && (data as any).event === 'CHAT_UNREAD_UPDATE') {
+     if (data.type === 'SIGNAL' && (data as any).event === 'CHAT_UNREAD_UPDATE') {
         const unreadData = (data as any).data;
         const roomId = unreadData.room_id;
         const roomUnread = unreadData.room_unread || 0;
+        const isCurrentlyActiveRoom = roomId === activeRoomRef.current?.id;
+        if (isCurrentlyActiveRoom) {
+          const userId = roomUserMapRef.current.get(roomId);
+          if (userId) {
+            setLastMessages(prev => {
+              const newMap = new Map(prev);
+              const existing = newMap.get(userId);
+              if (existing?.isUnread) {
+                newMap.set(userId, { ...existing, isUnread: false });
+              }
+              return newMap;
+            });
+          }
+          return;
+        }
 
-        // Update unread counts
+        // Update unread counts only for rooms not currently open
         setUnreadCounts(prev => {
           const newMap = new Map(prev);
           newMap.set(roomId, roomUnread);
           return newMap;
         });
-
-        // Use Ref to get userId (bypasses stale closure)
         const userId = roomUserMapRef.current.get(roomId);
 
         if (userId) {
@@ -606,21 +665,26 @@ export function TeamChatModern() {
         }
       }
 
-    });
+    };
 
-    // Cleanup on unmount
+    gateway.onMessage(handler);
+
+   //  only this handler, do NOT disconnect the shared singleton
     return () => {
-      gateway.disconnect();
+      gateway.offMessage(handler);
       isGatewayInitialized.current = false;
+      gatewaySocketRef.current = null;
+      (window as any).__activeTeamChatRoomId = undefined;
     };
   }, [currentUser?.id, queryClient]);
 
   // 3. Mutation: Create or Get Private Room
   const createRoomMutation = useMutation({
     mutationFn: (userId: number) => chatApi.createPrivateRoom(userId),
-    onSuccess: (roomData, userId) => {
+onSuccess: (roomData, userId) => {
       setActiveRoom(roomData);
       activeRoomRef.current = roomData;
+      (window as any).__activeTeamChatRoomId = roomData.id;
       queryClient.setQueryData(['chat-room', roomData.id], roomData);
 
       // Prefetch room details for favourite status
@@ -661,6 +725,26 @@ export function TeamChatModern() {
       try {
         await chatApi.markAsRead(roomId);
         queryClient.invalidateQueries({ queryKey: ['chat-unread-counts'] });
+
+        // Clear local unread count immediately so the highlight drops without waiting for the API refetch
+        setUnreadCounts(prev => {
+          const newMap = new Map(prev);
+          newMap.set(roomId, 0);
+          return newMap;
+        });
+
+        // Clear the isUnread flag on the lastMessages entry for this room's user (private chats)
+        const userId = roomUserMapRef.current.get(roomId);
+        if (userId) {
+          setLastMessages(prev => {
+            const newMap = new Map(prev);
+            const existing = newMap.get(userId);
+            if (existing?.isUnread) {
+              newMap.set(userId, { ...existing, isUnread: false });
+            }
+            return newMap;
+          });
+        }
       } catch (error) {
         console.error('Failed to mark messages as read:', error);
       }
@@ -684,15 +768,21 @@ export function TeamChatModern() {
   }, [activeRoom?.id]);
 
   const messages = useMemo(() => {
-    if (!messagesData?.messages) {
-      return [];
-    }
+    const confirmedMessages: OptimisticChatMessage[] = (messagesData?.messages || []).map(m => ({
+      ...m,
+      optimisticStatus: 'sent' as const,
+    }));
 
-    const sortedMessages = [...messagesData.messages].sort((a, b) =>
+    const currentRoomId = activeRoom?.id || selectedProjectRoom?.id || selectedTeamRoom?.id;
+    const confirmedIds = new Set(confirmedMessages.map(m => String(m.id)));
+    const pendingOptimistic = optimisticMessages.filter(om =>
+      om.room === currentRoomId && !confirmedIds.has(String(om.id))
+    );
+
+    return [...confirmedMessages, ...pendingOptimistic].sort((a, b) =>
       new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     );
-    return sortedMessages;
-  }, [messagesData?.messages]);
+  }, [messagesData?.messages, optimisticMessages, activeRoom?.id, selectedProjectRoom?.id, selectedTeamRoom?.id]);
 
   // Log when messages array changes
   useEffect(() => {
@@ -722,14 +812,13 @@ export function TeamChatModern() {
   }, [users, lastMessages, userLastActivity]);
 
   // unread first, then by timestamp (Last Message), then alphabetically
-  // unread first, then by timestamp (Last Message), then alphabetically
   const sortedUsers = useMemo(() => {
     return [...usersWithActivity].sort((a, b) => {
       // Get room IDs for both users
       const roomA = userRoomMap.get(a.id);
       const roomB = userRoomMap.get(b.id);
 
-      // Priority 0: Favourite status (favourites first)
+      // Priority 0: Favourite status
       const roomDetailsA = roomA ? (queryClient.getQueryData(['chat-room-details', roomA]) as ChatRoom | undefined) : undefined;
       const roomDetailsB = roomB ? (queryClient.getQueryData(['chat-room-details', roomB]) as ChatRoom | undefined) : undefined;
       const isFavouriteA = roomDetailsA?.current_user_membership?.is_favourite || false;
@@ -747,7 +836,7 @@ export function TeamChatModern() {
         return unreadB - unreadA;
       }
 
-      // Priority 2: Last Message Timestamp (Most recent first)
+      // Priority 2: Last Message Timestamp
       const timeA = a.lastMessageTime ? new Date(a.lastMessageTime).getTime() : 0;
       const timeB = b.lastMessageTime ? new Date(b.lastMessageTime).getTime() : 0;
       const activityA = (a as any).activityTimestamp || 0;
@@ -792,12 +881,78 @@ export function TeamChatModern() {
   };
 
   // Unread users filter
+  // Unread users filter (chat tab only — used for badge counts)
   const unreadUsers = useMemo(() => {
     return filteredUsers.filter(user => {
       const unreadCount = getUserUnreadCount(user.id);
       return (user as any).isUnread || unreadCount > 0;
     });
   }, [filteredUsers, chatListVersion, unreadCounts]);
+
+  // Combined unread items across Chat + Project + Team (for Unread tab content)
+  const allUnreadItems = useMemo(() => {
+    const chatItems = unreadUsers.map(user => ({
+      type: 'chat' as const,
+      id: String(user.id),
+      name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username,
+      avatar: (((user.first_name?.charAt(0) || '') + (user.last_name?.charAt(0) || '')).toUpperCase() || user.username.charAt(0).toUpperCase()),
+      avatarClass: 'bg-blue-100 text-blue-700 rounded-full',
+      preview: (user.lastMessageContent || 'No messages yet').replace(/<[^>]*>/g, '').trim(),
+      unreadCount: getUserUnreadCount(user.id),
+      onClick: () => handleUserSelect(user.id),
+      isSelected: selectedUserId === user.id,
+    }));
+
+    const projectItems = projectRooms
+      .filter(p => (unreadCounts.get(p.id) || 0) > 0)
+      .map(p => ({
+        type: 'project' as const,
+        id: p.id,
+        name: p.name,
+        avatar: p.name.charAt(0).toUpperCase(),
+        avatarClass: 'bg-purple-100 text-purple-700 rounded',
+        preview: (p.last_message?.content_preview || 'No messages yet').replace(/<[^>]*>/g, '').trim(),
+        unreadCount: unreadCounts.get(p.id) || 0,
+        onClick: () => handleProjectClick(p),
+        isSelected: selectedProjectRoom?.id === p.id,
+      }));
+
+    const teamItems = teamRooms
+      .filter(t => (unreadCounts.get(t.id) || 0) > 0)
+      .map(t => {
+        const lastMsg = (t.last_message as any);
+        const preview = lastMsg ? (lastMsg.content_preview || lastMsg.content || '').replace(/<[^>]*>/g, '').trim() || 'Sent a message' : 'No messages yet';
+        return {
+          type: 'team' as const,
+          id: t.id,
+          name: t.name,
+          avatar: t.name.charAt(0).toUpperCase(),
+          avatarClass: 'bg-green-100 text-green-700 rounded',
+          preview,
+          unreadCount: unreadCounts.get(t.id) || 0,
+          onClick: () => handleTeamClick(t),
+          isSelected: selectedTeamRoom?.id === t.id,
+        };
+      });
+
+    return [...chatItems, ...projectItems, ...teamItems];
+  }, [unreadUsers, projectRooms, teamRooms, unreadCounts, selectedUserId, selectedProjectRoom, selectedTeamRoom, chatListVersion]);
+
+  // Unread count per tab (replaces bold/highlight with badge counts)
+  const tabUnreadCounts = useMemo(() => {
+    const chats = sortedUsers.reduce((sum, user) => {
+      const roomId = userRoomMap.get(user.id);
+      return sum + (roomId ? (unreadCounts.get(roomId) || 0) : 0);
+    }, 0);
+
+    const projects = projectRooms.reduce((sum, project) => sum + (unreadCounts.get(project.id) || 0), 0);
+
+    const teams = teamRooms.reduce((sum, team) => sum + (unreadCounts.get(team.id) || 0), 0);
+
+    const unread = chats + projects + teams;
+
+    return { chats, projects, teams, unread };
+  }, [sortedUsers, projectRooms, teamRooms, unreadCounts, userRoomMap, chatListVersion]);
 
   // Shared documents from messages
   const sharedDocuments = useMemo(() => {
@@ -814,12 +969,14 @@ export function TeamChatModern() {
   const handleUserSelect = (userId: number) => {
     if (selectedUserId === userId) return;
 
+    navigate('/team-chat');
+
     // Reset project/team selections
     setSelectedProjectRoom(null);
     setSelectedTeamRoom(null);
     setSelectedUserId(userId);
 
-    // Clear unread status for this user
+    // Clear unread status for this user (both isUnread flag and unread count)
     setLastMessages(prev => {
       const newMap = new Map(prev);
       const existing = newMap.get(userId);
@@ -828,6 +985,14 @@ export function TeamChatModern() {
       }
       return newMap;
     });
+    const existingRoomId = userRoomMap.get(userId);
+    if (existingRoomId) {
+      setUnreadCounts(prev => {
+        const newMap = new Map(prev);
+        newMap.set(existingRoomId, 0);
+        return newMap;
+      });
+    }
     setActiveRoom(null);
     activeRoomRef.current = null;
     queryClient.resetQueries({ queryKey: ['chat-messages'] });
@@ -858,10 +1023,17 @@ export function TeamChatModern() {
 
     queryClient.resetQueries({ queryKey: ['chat-messages'] });
     queryClient.invalidateQueries({ queryKey: ['chat-messages', projectRoom.id] });
+
+    // Navigate to the project chat room URL
+    const projectId = (projectRoom as any).project_id ?? (projectRoom as any).project ?? '';
+    if (projectId) {
+      navigate(`/team-chat/${projectId}/${projectRoom.id}`);
+    }
   };
 
   // Handler for team room click
   const handleTeamClick = async (teamRoom: TeamChatRoom) => {
+    navigate('/team-chat');
     setSelectedUserId(null);
     setSelectedProjectRoom(null);
     setActiveRoom(null);
@@ -886,13 +1058,6 @@ export function TeamChatModern() {
     queryClient.invalidateQueries({ queryKey: ['chat-messages', teamRoom.id] });
   };
 
-
-  // handler for emoji click
-  const handleEmojiClick = (emojiData: EmojiClickData) => {
-    setMessageInput((prev) => prev + emojiData.emoji);
-    setShowEmojiPicker(false);
-  };
-
   // Handle quick emoji reaction
   const handleQuickReaction = (messageId: string | number, emoji: string) => {
     setMessageReactions(prev => {
@@ -905,15 +1070,12 @@ export function TeamChatModern() {
     });
   };
 
-  // Handle reaction from picker
-  const handleReactionFromPicker = (messageId: string | number, emojiData: EmojiClickData) => {
-    handleQuickReaction(messageId, emojiData.emoji);
-    setShowReactionPicker(null);
-  };
-
   // Handle message actions
   const handleReplyWithQuote = (message: ChatMessage) => {
-    setMessageInput(`> ${message.content}\n\n`);
+    const plainPreview = message.content.replace(/<[^>]*>/g, '').trim().slice(0, 120);
+    const quoteHtml = `<blockquote>${plainPreview}</blockquote><p></p>`;
+    setRichHtmlContent(quoteHtml);
+    setMessageInput(plainPreview);
     setOpenMenuMessageId(null);
   };
 
@@ -964,40 +1126,6 @@ export function TeamChatModern() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [openMenuMessageId, showReactionPicker]);
-
-  const toggleEmojiPicker = () => {
-    setShowEmojiPicker((prev) => !prev);
-  };
-
-  // Close emoji picker when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        emojiPickerRef.current &&
-        !emojiPickerRef.current.contains(event.target as Node)
-      ) {
-        setShowEmojiPicker(false);
-      }
-    };
-
-    if (showEmojiPicker) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showEmojiPicker]);
-
-  // Send on Enter key
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      if (messageInput.trim() || selectedFile) {
-        handleSendMessage();
-      }
-    }
-  };
 
   // Handle file selection
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1079,13 +1207,84 @@ export function TeamChatModern() {
   }, [filePreviewUrl]);
 
   // Send Message
+  const buildOptimisticMessage = (
+    roomId: string,
+    content: string,
+    tempId: string,
+    file?: File | null
+  ): OptimisticChatMessage => ({
+    id: tempId,
+    room: roomId,
+    sender: {
+      id: currentUser!.id,
+      username: currentUser!.username,
+      full_name: `${currentUser!.first_name} ${currentUser!.last_name}`.trim() || currentUser!.username,
+      email: currentUser!.email,
+    },
+    content,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    is_own_message: true,
+    message_type: file ? 'file' : 'text',
+    attachment: file ? URL.createObjectURL(file) : null,
+    attachment_name: file ? file.name : '',
+    reply_to: null,
+    reply_to_preview: null,
+    is_deleted: false,
+    optimisticStatus: 'sending',
+    optimisticId: tempId,
+  });
+
+  // Retry sending a failed optimistic message
+  const handleRetryMessage = async (optimisticMsg: OptimisticChatMessage) => {
+    const roomId = optimisticMsg.room;
+
+    // Mark as sending again
+    setOptimisticMessages(prev =>
+      prev.map(m => m.optimisticId === optimisticMsg.optimisticId
+        ? { ...m, optimisticStatus: 'sending' }
+        : m
+      )
+    );
+
+    try {
+      if (optimisticMsg.message_type === 'file' && optimisticMsg.attachment) {
+        setOptimisticMessages(prev =>
+          prev.filter(m => m.optimisticId !== optimisticMsg.optimisticId)
+        );
+        return;
+      }
+
+      const gatewaySocket = gatewaySocketRef.current;
+      if (gatewaySocket) {
+        gatewaySocket.sendMessage(roomId, optimisticMsg.content);
+        setTimeout(() => {
+          setOptimisticMessages(prev =>
+            prev.map(m => m.optimisticId === optimisticMsg.optimisticId
+              ? { ...m, optimisticStatus: 'sent' }
+              : m
+            )
+          );
+        }, 5000);
+      }
+    } catch {
+      setOptimisticMessages(prev =>
+        prev.map(m => m.optimisticId === optimisticMsg.optimisticId
+          ? { ...m, optimisticStatus: 'error' }
+          : m
+        )
+      );
+    }
+  };
+
+  // Send Message
   const handleSendMessage = async () => {
-    // Prevent multiple submissions while uploading
     if (isUploadingFile) {
       return;
     }
 
-    const content = messageInput.trim();
+    // Use rich HTML if available (Tiptap), fall back to plain text
+    const content = richHtmlContent && richHtmlContent !== '<p></p>' ? richHtmlContent : messageInput.trim();
     const hasFile = selectedFile !== null;
 
     if (!content && !hasFile) {
@@ -1096,22 +1295,42 @@ export function TeamChatModern() {
 
     // If there's a file attachment, use HTTP POST
     if (hasFile && roomId) {
+      const tempId = `optimistic-${Date.now()}-${Math.random()}`;
+      const optimisticMsg = buildOptimisticMessage(roomId, content, tempId, selectedFile);
+
+      // 1. Immediately render optimistic message
+      setOptimisticMessages(prev => [...prev, optimisticMsg]);
+
+      // 2. Clear input right away
+      setMessageInput('');
+      setRichHtmlContent('');
+      const capturedFile = selectedFile!;
+      setSelectedFile(null);
+      if (filePreviewUrl) {
+        URL.revokeObjectURL(filePreviewUrl);
+        setFilePreviewUrl(null);
+      }
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+
       try {
         setIsUploadingFile(true);
         const response = await chatApi.sendMessageWithAttachment(roomId, {
           content: content,
-          attachment: selectedFile!
+          attachment: capturedFile,
         });
 
-        // Update messages in cache
+        // 3. Confirmed: replace optimistic with real message in cache
         queryClient.setQueryData(
           ['chat-messages', roomId],
           (oldData: ChatRoomMessagesResponse | undefined) => {
             const existingMessages = oldData?.messages || [];
+            const isDuplicate = existingMessages.some(m => m.id === response.id);
+            if (isDuplicate) return oldData;
             const updatedMessages = [...existingMessages, response].sort(
               (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
             );
-
             return {
               ...oldData,
               messages: updatedMessages,
@@ -1120,47 +1339,75 @@ export function TeamChatModern() {
             };
           }
         );
+        // 4. Remove the optimistic entry and force re-render in one state batch
+        setOptimisticMessages(prev => prev.filter(m => m.optimisticId !== tempId));
 
-        // Trigger re-render without refetch
-        queryClient.invalidateQueries({ queryKey: ['chat-messages', roomId], refetchType: 'none' });
-
-        // Reset states
-        setMessageInput('');
-        setSelectedFile(null);
-        if (filePreviewUrl) {
-          URL.revokeObjectURL(filePreviewUrl);
-          setFilePreviewUrl(null);
-        }
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
+        // 5. Force React Query to notify subscribers of the cache change
+        queryClient.invalidateQueries({ queryKey: ['chat-messages', roomId], refetchType: 'active' });
       } catch (error) {
         console.error('❌ [SEND ERROR] Failed to send message with attachment:', error);
+        setOptimisticMessages(prev =>
+          prev.map(m => m.optimisticId === tempId ? { ...m, optimisticStatus: 'error' } : m)
+        );
       } finally {
         setIsUploadingFile(false);
       }
       return;
     }
+
+    // Text-only via WebSocket 
+    if (!roomId) {
+      console.error('❌ [SEND ERROR] No active room');
+      return;
+    }
+
+    const tempId = `optimistic-${Date.now()}-${Math.random()}`;
+    const optimisticMsg = buildOptimisticMessage(roomId, content, tempId);
+
+    // 1. Immediately render optimistic message
+    setOptimisticMessages(prev => [...prev, optimisticMsg]);
+
+    // 2. Clear input immediately
     setMessageInput('');
+    setRichHtmlContent('');
 
-    // Send via Gateway WebSocket if project room is selected
-    if (selectedProjectRoom && gatewaySocketRef.current) {
-      gatewaySocketRef.current.sendMessage(selectedProjectRoom.id, content);
-      return;
-    }
+    const sendViaWebSocket = () => {
+      if (selectedProjectRoom && gatewaySocketRef.current) {
+        gatewaySocketRef.current.sendMessage(selectedProjectRoom.id, content);
+        return true;
+      }
+      if (selectedTeamRoom && gatewaySocketRef.current) {
+        gatewaySocketRef.current.sendMessage(selectedTeamRoom.id, content);
+        return true;
+      }
+      if (activeRoom && gatewaySocketRef.current) {
+        gatewaySocketRef.current.sendMessage(activeRoom.id, content);
+        return true;
+      }
+      return false;
+    };
 
-    // Send via Gateway WebSocket if team room is selected
-    if (selectedTeamRoom && gatewaySocketRef.current) {
-      gatewaySocketRef.current.sendMessage(selectedTeamRoom.id, content);
-      return;
-    }
+    const sent = sendViaWebSocket();
 
-    // Send via Gateway WebSocket for private rooms
-    if (activeRoom && gatewaySocketRef.current) {
-      gatewaySocketRef.current.sendMessage(activeRoom.id, content);
-    } else {
+    if (!sent) {
       console.error('❌ [SEND ERROR] No active Gateway WebSocket connection');
+      // Mark as error immediately if no socket
+      setOptimisticMessages(prev =>
+        prev.map(m => m.optimisticId === tempId ? { ...m, optimisticStatus: 'error' } : m)
+      );
+      return;
     }
+
+    // 3. The WebSocket echo
+    setTimeout(() => {
+      setOptimisticMessages(prev => {
+        const still = prev.find(m => m.optimisticId === tempId);
+        if (still && still.optimisticStatus === 'sending') {
+          return prev.map(m => m.optimisticId === tempId ? { ...m, optimisticStatus: 'error' } : m);
+        }
+        return prev;
+      });
+    }, 10000);
   };
 
   // Delete Message Mutation
@@ -1210,41 +1457,78 @@ export function TeamChatModern() {
       alert('Failed to update favourite status. Please try again.');
     },
   });
-  
+
   function ToastNotificationComponent({ toast }: { toast: ToastNotification }) {
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      handleClose();
-    }, 5000);
+    useEffect(() => {
+      const timer = setTimeout(() => {
+        handleClose();
+      }, 5000);
 
-    return () => clearTimeout(timer); 
-  }, []);
+      return () => clearTimeout(timer);
+    }, []);
 
-  const handleClose = () => {
-    setToastNotifications(prev => prev.filter(t => t.id !== toast.id));
+    const handleClose = () => {
+      setToastNotifications(prev => prev.filter(t => t.id !== toast.id));
+    };
+
+    return (
+      <div className="flex items-start gap-3 p-4 bg-white rounded-lg shadow-lg border border-gray-200 min-w-[300px] max-w-[400px] animate-slide-in">
+        <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center font-semibold text-blue-700 text-sm flex-shrink-0">
+          {toast.sender_name.charAt(0).toUpperCase()}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-sm text-gray-900">{toast.sender_name}</p>
+          <p className="text-xs text-gray-600 mt-0.5 truncate">{toast.message_preview}</p>
+        </div>
+        <button
+          onClick={() => setToastNotifications(prev => prev.filter(t => t.id !== toast.id))}
+          className="text-gray-400 hover:text-gray-600 flex-shrink-0 transition-colors"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+    );
+  }
+
+  // Reusable presence dot — green circle for online, grey ✕ for offline
+  const PresenceIndicator = ({ userId, size = 'md' }: { userId: number; size?: 'sm' | 'md' }) => {
+    const status = userPresence.get(userId) ?? 'offline';
+    const isOnline = status === 'online';
+    const sizeClass = size === 'sm' ? 'h-2.5 w-2.5' : 'h-3 w-3';
+    const offsetClass = size === 'sm' ? '-bottom-0.5 -right-0.5' : '-bottom-0.5 -right-0.5';
+    return (
+      <span
+        title={isOnline ? 'Online' : 'Offline'}
+        className={cn(
+          'absolute rounded-full border-2 border-white flex items-center justify-center',
+          sizeClass,
+          offsetClass,
+          isOnline ? 'bg-green-500' : 'bg-gray-400'
+        )}
+      >
+        {!isOnline && (
+          <svg viewBox="0 0 8 8" className="w-1.5 h-1.5" fill="none">
+            <line x1="1.5" y1="1.5" x2="6.5" y2="6.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+            <line x1="6.5" y1="1.5" x2="1.5" y2="6.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        )}
+      </span>
+    );
   };
 
   return (
-   <div className="flex items-start gap-3 p-4 bg-white rounded-lg shadow-lg border border-gray-200 min-w-[300px] max-w-[400px] animate-slide-in">
-      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center font-semibold text-blue-700 text-sm flex-shrink-0">
-        {toast.sender_name.charAt(0).toUpperCase()}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="font-semibold text-sm text-gray-900">{toast.sender_name}</p>
-        <p className="text-xs text-gray-600 mt-0.5 truncate">{toast.message_preview}</p>
-      </div>
-      <button
-        onClick={() => setToastNotifications(prev => prev.filter(t => t.id !== toast.id))}
-        className="text-gray-400 hover:text-gray-600 flex-shrink-0 transition-colors"
-      >
-        <X className="h-4 w-4" />
-      </button>
-    </div>
-  );
-}
-
-  return (
-    <div className="flex h-screen bg-[#f3f2f1] dark:bg-background overflow-hidden border-2 border-gray-200 dark:border-border">
+    <div className="flex h-screen bg-[#f3f2f1] overflow-hidden border-2 border-gray-200">
+      {previewDoc && (
+        <div className="fixed inset-0 z-[200]">
+          <DocumentPreview
+            url={previewDoc.url}
+            fileName={previewDoc.fileName}
+            fileType={previewDoc.fileType}
+            onClose={() => setPreviewDoc(null)}
+            defaultFullscreen={false}
+          />
+        </div>
+      )}
       {/* Toast Notifications Container */}
       <div className="fixed top-4 right-4 z-50 space-y-2">
         {toastNotifications.map(toast => (
@@ -1252,70 +1536,98 @@ export function TeamChatModern() {
         ))}
       </div>
       {/* Left Sidebar */}
-      <div className="w-80 bg-[#f3f2f1] dark:bg-card border-r border-gray-200 dark:border-border flex flex-col h-full overflow-hidden">
+      <div className="w-80 bg-[#f3f2f1] border-r border-gray-200 flex flex-col h-full overflow-hidden">
         {/* Sidebar Header */}
-        <div className="h-14 px-4 flex items-center justify-between bg-white dark:bg-card border-b border-gray-200 dark:border-border">
-          <h2 className="font-semibold text-base text-gray-900 dark:text-foreground">Chat</h2>
+        <div className="h-14 px-4 flex items-center justify-between bg-white border-b border-gray-200">
+          <h2 className="font-semibold text-base text-gray-900">Chat</h2>
           <div className="flex items-center gap-1">
             <button
               onClick={() => setIsCreateTeamModalOpen(true)}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-secondary rounded transition-colors"
+              className="p-2 hover:bg-gray-100 rounded transition-colors"
               title="Create Team"
             >
-              <Plus className="h-4 w-4 text-gray-600 dark:text-muted-foreground" />
+              <Plus className="h-4 w-4 text-gray-600" />
             </button>
           </div>
         </div>
 
         {/* Search Bar */}
-        <div className="px-3 py-3 bg-white dark:bg-card border-b border-gray-200 dark:border-border">
+        <div className="px-3 py-3 bg-white border-b border-gray-200">
           <div className="relative">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400 dark:text-muted-foreground" />
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search"
-              className="w-full pl-9 pr-3 py-2 text-sm bg-[#f3f2f1] dark:bg-secondary dark:text-foreground rounded border-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-9 pr-3 py-2 text-sm bg-[#f3f2f1] rounded border-none focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
         </div>
 
         {/* Tab Navigation */}
-       <Tabs.Root value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-          <Tabs.List className="flex items-center gap-1 px-3 py-2 bg-white dark:bg-card border-b border-gray-200 dark:border-border">
-            <Tabs.Trigger
-              value="chats"
-              className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 dark:data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-gray-100 dark:data-[state=inactive]:hover:bg-secondary"
-            >
-              Chats
-            </Tabs.Trigger>
-            <Tabs.Trigger
-              value="projects"
-              className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 dark:data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-gray-100 dark:data-[state=inactive]:hover:bg-secondary"
-            >
-              Projects
-            </Tabs.Trigger>
-            <Tabs.Trigger
-              value="teams"
-              className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 dark:data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-gray-100 dark:data-[state=inactive]:hover:bg-secondary"
-            >
-              Teams
-            </Tabs.Trigger>
-            <Tabs.Trigger
-              value="unread"
-              className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 dark:data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-gray-100 dark:data-[state=inactive]:hover:bg-secondary"
-            >
-              Unread
-            </Tabs.Trigger>
+        <Tabs.Root value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+          <Tabs.List className="flex items-center gap-1 px-3 py-2 bg-white border-b border-gray-200">
+            <div className="relative inline-flex">
+              <Tabs.Trigger
+                value="chats"
+                className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+              >
+                Chats
+              </Tabs.Trigger>
+              {tabUnreadCounts.chats > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 h-4 min-w-[16px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none pointer-events-none z-10">
+                  {tabUnreadCounts.chats > 99 ? '99+' : tabUnreadCounts.chats}
+                </span>
+              )}
+            </div>
+            <div className="relative inline-flex">
+              <Tabs.Trigger
+                value="projects"
+                className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+              >
+                Projects
+              </Tabs.Trigger>
+              {tabUnreadCounts.projects > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 h-4 min-w-[16px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none pointer-events-none z-10">
+                  {tabUnreadCounts.projects > 99 ? '99+' : tabUnreadCounts.projects}
+                </span>
+              )}
+            </div>
+            <div className="relative inline-flex">
+              <Tabs.Trigger
+                value="teams"
+                className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+              >
+                Teams
+              </Tabs.Trigger>
+              {tabUnreadCounts.teams > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 h-4 min-w-[16px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none pointer-events-none z-10">
+                  {tabUnreadCounts.teams > 99 ? '99+' : tabUnreadCounts.teams}
+                </span>
+              )}
+            </div>
+            <div className="relative inline-flex">
+              <Tabs.Trigger
+                value="unread"
+                className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+              >
+                Unread
+              </Tabs.Trigger>
+              {tabUnreadCounts.unread > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 h-4 min-w-[16px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none pointer-events-none z-10">
+                  {tabUnreadCounts.unread > 99 ? '99+' : tabUnreadCounts.unread}
+                </span>
+              )}
+            </div>
           </Tabs.List>
 
           {/* Scrollable Lists */}
-          <div className="flex-1 overflow-y-auto scrollbar-hide min-h-0 bg-white dark:bg-card">
+          <div className="flex-1 overflow-y-auto scrollbar-hide min-h-0 bg-white">
             <Tabs.Content value="chats">
               {/* Chats Section */}
-              <div className="bg-white dark:bg-card">
-                <div className="border-t border-gray-100 dark:border-border">
+              <div className="bg-white">
+                <div className="border-t border-gray-100">
                   {isLoadingUsers ? (
                     <div className="p-4 text-center">
                       <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
@@ -1338,7 +1650,7 @@ export function TeamChatModern() {
                           key={user.id}
                           onClick={() => handleUserSelect(user.id)}
                           className={cn(
-                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-secondary transition-colors border-l-2",
+                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
                             isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
                           )}
                         >
@@ -1347,28 +1659,21 @@ export function TeamChatModern() {
                               "h-10 w-10 rounded-full flex items-center justify-center font-semibold text-sm",
                               isSelected ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-700"
                             )}>
-                              {user.username.charAt(0).toUpperCase()}
+                              {((user.first_name?.charAt(0) || '') + (user.last_name?.charAt(0) || '')).toUpperCase() || user.username.charAt(0).toUpperCase()}
                             </div>
+                            <PresenceIndicator userId={user.id} size="md" />
                           </div>
                           <div className="flex-1 min-w-0 text-left">
-                            <div className="flex items-center justify-between mb-0.5 dark:text-foreground">
+                            <div className="flex items-center justify-between mb-0.5">
                               <p className={cn(
                                 "text-sm truncate flex-1",
-                                hasUnreadMessages ? "font-bold text-gray-900 dark:text-foreground" : "font-medium text-gray-900 dark:text-foreground"
+                                hasUnreadMessages ? "font-bold text-gray-900" : "font-medium text-gray-900"
                               )}>
                                 {user?.first_name} {user?.last_name}
                               </p>
                               <div className="flex items-center gap-2 flex-shrink-0">
                                 {isFavourite && (
                                   <Pin className="h-3.5 w-3.5 text-blue-600" />
-                                )}
-                                {user.lastMessageTime && (
-                                  <span className={cn(
-                                    "text-[10px]",
-                                    hasUnreadMessages ? "text-blue-600 font-semibold" : "text-gray-500"
-                                  )}>
-                                    {new Date(user.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                  </span>
                                 )}
                               </div>
                             </div>
@@ -1377,7 +1682,9 @@ export function TeamChatModern() {
                                 "text-xs truncate",
                                 hasUnreadMessages ? "font-semibold text-gray-900" : "text-gray-600"
                               )}>
-                                {user.lastMessageContent || 'No messages yet'}
+                                {user.lastMessageContent
+                                  ? user.lastMessageContent.replace(/<[^>]*>/g, '').trim() || 'Sent a message'
+                                  : 'No messages yet'}
                               </p>
                               {unreadCount > 0 && (
                                 <span className="ml-2 flex-shrink-0 h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
@@ -1397,8 +1704,8 @@ export function TeamChatModern() {
             <Tabs.Content value="projects">
 
               {/* Projects Section */}
-              <div className="bg-white dark:bg-card">
-                <div className="border-t border-gray-100 dark:border-border">
+              <div className="bg-white">
+                <div className="border-t border-gray-100">
                   {isLoadingProjects ? (
                     <div className="p-4 text-center">
                       <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
@@ -1419,7 +1726,7 @@ export function TeamChatModern() {
                           key={project.id}
                           onClick={() => handleProjectClick(project)}
                           className={cn(
-                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-secondary transition-colors border-l-2",
+                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
                             isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
                           )}
                         >
@@ -1427,9 +1734,11 @@ export function TeamChatModern() {
                             {project.name.charAt(0).toUpperCase()}
                           </div>
                           <div className="flex-1 min-w-0 text-left">
-                            <p className="text-sm font-medium text-gray-900 truncate dark:text-foreground">{project.name}</p>
+                            <p className="text-sm font-medium text-gray-900 truncate">{project.name}</p>
                             <p className="text-xs text-gray-600 truncate">
-                              {project.last_message?.content_preview || 'No messages yet'}
+                              {project.last_message?.content_preview
+                                ? project.last_message.content_preview.replace(/<[^>]*>/g, '').trim() || 'Sent a message'
+                                : 'No messages yet'}
                             </p>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
@@ -1453,8 +1762,8 @@ export function TeamChatModern() {
             <Tabs.Content value="teams">
 
               {/* Teams Section */}
-              <div className="bg-white dark:bg-card">
-                <div className="border-t border-gray-100 dark:border-border">
+              <div className="bg-white">
+                <div className="border-t border-gray-100">
                   {isLoadingTeams ? (
                     <div className="p-4 text-center">
                       <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
@@ -1475,7 +1784,7 @@ export function TeamChatModern() {
                           key={team.id}
                           onClick={() => handleTeamClick(team)}
                           className={cn(
-                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-secondary transition-colors border-l-2",
+                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
                             isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
                           )}
                         >
@@ -1483,8 +1792,15 @@ export function TeamChatModern() {
                             {team.name.charAt(0).toUpperCase()}
                           </div>
                           <div className="flex-1 min-w-0 text-left">
-                            <p className="text-sm font-medium text-gray-900 truncate dark:text-foreground">{team.name}</p>
-                            <p className="text-xs text-gray-600 truncate">Team Chat</p>
+                            <p className="text-sm font-medium text-gray-900 truncate">{team.name}</p>
+                            <p className="text-xs text-gray-600 truncate">
+                              {(() => {
+                                const lastMsg = (team.last_message as any);
+                                if (!lastMsg) return 'No messages yet';
+                                const raw = lastMsg.content_preview || lastMsg.content || '';
+                                return raw.replace(/<[^>]*>/g, '').trim() || 'Sent a message';
+                              })()}
+                            </p>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
                             {isFavourite && (
@@ -1505,58 +1821,44 @@ export function TeamChatModern() {
             </Tabs.Content>
 
             <Tabs.Content value="unread">
-              {/* Unread Section */}
-              <div className="bg-white dark:bg-card">
-                <div className="border-t border-gray-100 dark:border-border">
-                  {unreadUsers.length === 0 ? (
+              {/* Unread Section — aggregates Chat + Project + Team */}
+              <div className="bg-white">
+                <div className="border-t border-gray-100">
+                  {allUnreadItems.length === 0 ? (
                     <div className="p-4 text-center text-sm text-gray-500">No unread messages</div>
                   ) : (
-                    unreadUsers.map(user => {
-                      const isSelected = selectedUserId === user.id;
-                      const unreadCount = getUserUnreadCount(user.id);
-
-                      return (
-                        <button
-                          key={user.id}
-                          onClick={() => handleUserSelect(user.id)}
-                          className={cn(
-                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-secondary transition-colors border-l-2",
-                            isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
-                          )}
-                        >
-                          <div className="relative flex-shrink-0">
-                            <div className={cn(
-                              "h-10 w-10 rounded-full flex items-center justify-center font-semibold text-sm",
-                              isSelected ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-700"
-                            )}>
-                              {user.username.charAt(0).toUpperCase()}
-                            </div>
+                    allUnreadItems.map(item => (
+                      <button
+                        key={`${item.type}-${item.id}`}
+                        onClick={item.onClick}
+                        className={cn(
+                          "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
+                          item.isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
+                        )}
+                      >
+                        <div className="relative flex-shrink-0">
+                          <div className={cn(
+                            "h-10 w-10 flex items-center justify-center font-semibold text-sm",
+                            item.isSelected ? "bg-blue-600 text-white rounded-full" : item.avatarClass
+                          )}>
+                            {item.avatar}
                           </div>
-                          <div className="flex-1 min-w-0 text-left">
-                            <div className="flex items-center justify-between mb-0.5 ">
-                              <p className="text-sm font-bold text-gray-900 truncate dark:text-foreground">
-                                {user.first_name || user.username}
-                              </p>
-                              {user.lastMessageTime && (
-                                <span className="text-[10px] ml-2 flex-shrink-0 text-blue-600 font-semibold">
-                                  {new Date(user.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <p className="text-xs font-semibold text-gray-900 truncate">
-                                {user.lastMessageContent || 'No messages yet'}
-                              </p>
-                              {unreadCount > 0 && (
-                                <span className="ml-2 flex-shrink-0 h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
-                                  {unreadCount}
-                                </span>
-                              )}
-                            </div>
+                        </div>
+                        <div className="flex-1 min-w-0 text-left">
+                          <div className="flex items-center justify-between mb-0.5">
+                            <p className="text-sm font-bold text-gray-900 truncate">{item.name}</p>
                           </div>
-                        </button>
-                      );
-                    })
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-semibold text-gray-900 truncate">{item.preview}</p>
+                            {item.unreadCount > 0 && (
+                              <span className="ml-2 flex-shrink-0 h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
+                                {item.unreadCount}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    ))
                   )}
                 </div>
               </div>
@@ -1566,11 +1868,11 @@ export function TeamChatModern() {
       </div>
 
       {/* Right Panel - Chat View */}
-      <div className="flex-1 flex flex-col bg-white dark:bg-background h-full overflow-hidden">
+      <div className="flex-1 flex flex-col bg-white h-full overflow-hidden">
         {(activeRoom || selectedProjectRoom || selectedTeamRoom) ? (
           <>
             {/* Chat Header */}
-            <div className="h-14 px-6 flex items-center justify-between bg-white dark:bg-card border-b border-gray-200 dark:border-border">
+            <div className="h-14 px-6 flex items-center justify-between bg-white border-b border-gray-200">
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-3">
                   <div className="relative">
@@ -1583,15 +1885,16 @@ export function TeamChatModern() {
                         {selectedTeamRoom.name.charAt(0).toUpperCase()}
                       </div>
                     ) : selectedUser ? (
-                      <>
+                      <div className="relative">
                         <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center font-semibold text-blue-700 text-sm">
-                          {selectedUser.username.charAt(0).toUpperCase()}
+                          {((selectedUser.first_name?.charAt(0) || '') + (selectedUser.last_name?.charAt(0) || '')).toUpperCase() || selectedUser.username.charAt(0).toUpperCase()}
                         </div>
-                      </>
+                        <PresenceIndicator userId={selectedUser.id} size="md" />
+                      </div>
                     ) : null}
                   </div>
                   <div>
-                    <h3 className="font-semibold text-sm text-gray-900 dark:text-foreground">
+                    <h3 className="font-semibold text-sm text-gray-900">
                       {selectedProjectRoom?.name || selectedTeamRoom?.name || (selectedUser ? `${selectedUser.first_name || selectedUser.username}` : '')}
                     </h3>
                     {selectedProjectRoom && (
@@ -1631,13 +1934,13 @@ export function TeamChatModern() {
                 <div className="relative" ref={headerMenuRef}>
                   <button
                     onClick={() => setShowHeaderMenu(!showHeaderMenu)}
-                    className="p-2 hover:bg-gray-100 dark:hover:bg-secondary rounded transition-colors"
+                    className="p-2 hover:bg-gray-100 rounded transition-colors"
                   >
-                    <MoreVertical className="h-4 w-4 text-gray-600 dark:text-muted-foreground" />
+                    <MoreVertical className="h-4 w-4 text-gray-600" />
                   </button>
 
                   {showHeaderMenu && (
-                    <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-card rounded-lg shadow-lg border border-gray-200 dark:border-border py-1 z-50">
+                    <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
                       <button
                         onClick={() => {
                           const roomId = selectedProjectRoom?.id || selectedTeamRoom?.id || activeRoom?.id;
@@ -1650,7 +1953,7 @@ export function TeamChatModern() {
                             console.error('❌ No room ID available for favourite toggle');
                           }
                         }}
-                        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-foreground hover:bg-gray-50 dark:hover:bg-muted flex items-center gap-2"
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                       >
                         {(() => {
                           const roomId = selectedProjectRoom?.id || selectedTeamRoom?.id || activeRoom?.id;
@@ -1670,7 +1973,7 @@ export function TeamChatModern() {
                         <>
                           <button
                             onClick={() => setShowMemberList(!showMemberList)}
-                            className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-foreground hover:bg-gray-50 dark:hover:bg-muted flex items-center gap-2"
+                            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                           >
                             <UsersIcon className="h-4 w-4" />
                             Member list
@@ -1699,7 +2002,7 @@ export function TeamChatModern() {
               <>
                 {/* Messages Area */}
                 <div
-                  className="flex-1 overflow-y-auto bg-[#efeae2] dark:bg-card scrollbar-hide p-6"
+                  className="flex-1 overflow-y-auto bg-[#efeae2] scrollbar-hide p-6"
                   onDragEnter={handleDragEnter}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
@@ -1730,9 +2033,9 @@ export function TeamChatModern() {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {messages.map((message, index) => {
+                      {messages.filter(m => m.sender != null).map((message, index, visibleMessages) => {
                         const isOwn = message.is_own_message;
-                        const showAvatar = index === 0 || messages[index - 1].sender.id !== message.sender.id;
+                        const showAvatar = index === 0 || visibleMessages[index - 1].sender.id !== message.sender.id;
                         const isHovered = hoveredMessageId === message.id;
 
                         // — Date separator logic —
@@ -1765,227 +2068,268 @@ export function TeamChatModern() {
                               </div>
                             )}
 
-                          <div
-                            className={cn("flex gap-2 group relative", isOwn ? "flex-row-reverse" : "")}
-                            onMouseEnter={() => setHoveredMessageId(message.id)}
-                            onMouseLeave={() => setHoveredMessageId(null)}
-                          >
-                            {/* Avatar */}
-                            <div className="flex-shrink-0">
-                              {showAvatar ? (
-                                <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center font-semibold text-white text-sm shadow-sm">
-                                  {message.sender.username.charAt(0).toUpperCase()}
-                                </div>
-                              ) : (
-                                <div className="h-9 w-9" />
-                              )}
-                            </div>
+                            <div
+                              className={cn("flex gap-2 group relative", isOwn ? "flex-row-reverse" : "")}
+                              onMouseEnter={() => setHoveredMessageId(message.id)}
+                              onMouseLeave={() => setHoveredMessageId(null)}
+                            >
+                              {/* Avatar */}
+                              <div className="flex-shrink-0">
+                                {showAvatar ? (
+                                  <div className="h-6 w-6 rounded-full bg-gradient-to-br from-blue-400 to-blue-500 flex items-center justify-center font-semibold text-white text-sm shadow-sm">
+                                    {message.sender.full_name
+                                      ? (message.sender.full_name.split(' ')[0]?.charAt(0) || '') + (message.sender.full_name.split(' ')[1]?.charAt(0) || '')
+                                      : message.sender.username.charAt(0).toUpperCase()}
+                                  </div>
+                                ) : (
+                                  <div className="h-9 w-9" />
+                                )}
+                              </div>
 
-                            {/* Message Content */}
-                            <div className={cn("flex-1 max-w-[65%]", isOwn ? "flex flex-col items-end" : "flex flex-col items-start")}>
-                              {showAvatar && (
-                                <div className={cn("flex items-baseline gap-2 mb-1", isOwn ? "flex-row-reverse" : "")}>
-                                  <span className={cn(
-                                    "text-xs font-medium",
-                                    isOwn ? "text-gray-700" : "text-gray-900"
-                                  )}>
-                                    {message.sender.full_name || message.sender.username}
-                                  </span>
-                                  <span className="text-[11px] text-gray-400 font-normal">
-                                    {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                  </span>
-                                </div>
-                              )}
+                              {/* Message Content */}
+                              <div className={cn("flex-1 max-w-[65%]", isOwn ? "flex flex-col items-end" : "flex flex-col items-start")}>
+                                {showAvatar && (
+                                  <div className={cn("flex items-baseline gap-2 mb-1", isOwn ? "flex-row-reverse" : "")}>
+                                    <span className={cn(
+                                      "text-xs font-medium",
+                                      isOwn ? "text-gray-700" : "text-gray-900"
+                                    )}>
+                                      {message.sender.full_name || message.sender.username}
+                                    </span>
+                                    <span className="text-[11px] text-gray-400 font-normal">
+                                      {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                  </div>
+                                )}
 
-                              <div className="relative">
-                                <div
-                                  className={cn(
-                                    "px-3 py-2 rounded-lg text-sm break-words shadow-sm max-w-full",
-                                    isOwn
-                                      ? "bg-[#005c4b] text-white rounded-br-none"
-                                      : "bg-white dark:bg-card text-gray-900 dark:text-foreground border border-gray-100 dark:border-border rounded-bl-none"
-                                  )}
-                                  style={{
-                                    minWidth: '60px',
-                                    wordBreak: 'break-word',
-                                    overflowWrap: 'break-word'
-                                  }}
-                                >
-                                  {message.content && <div>{message.content}</div>}
+                                <div className="relative">
+                                  {(() => {
+                                    // Strip HTML tags to get plain text for emoji detection
+                                    const plainText = message.content
+                                      ? message.content.replace(/<[^>]*>/g, '').trim()
+                                      : '';
+                                    const isEmojiOnly = plainText.length > 0 &&
+                                      /^[\p{Emoji}\p{Emoji_Presentation}\p{Emoji_Modifier}\p{Emoji_Component}\s]+$/u.test(plainText) &&
+                                      !/[a-zA-Z0-9]/.test(plainText);
 
-                                  {/* Attachment */}
-                                  {message.attachment && (
-                                    <div className={message.content ? "mt-2 pt-2 border-t border-blue-500" : ""}>
-                                      <a
-                                        href={message.attachment}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex items-center gap-2 text-xs hover:underline"
+                                    return (
+                                      <div
+                                        className={cn(
+                                          "text-sm break-words max-w-full",
+                                          isEmojiOnly
+                                            ? "px-1 py-1"
+                                            : cn(
+                                              "px-3 py-2 rounded-lg shadow-sm",
+                                              isOwn
+                                                ? "bg-[#7699a3] text-white rounded-br-none"
+                                                : "bg-white text-gray-900 border border-gray-100 rounded-bl-none"
+                                            )
+                                        )}
+                                        style={{
+                                          minWidth: isEmojiOnly ? undefined : '60px',
+                                          wordBreak: 'break-word',
+                                          overflowWrap: 'break-word'
+                                        }}
                                       >
-                                        <Paperclip className="h-3 w-3" />
-                                        {message.attachment_name || 'Attachment'}
-                                      </a>
+                                        {message.content && (
+                                          <div
+                                            className={cn(
+                                              "prose prose-sm max-w-none break-words",
+                                              isEmojiOnly
+                                                ? "[&_p]:m-0 [&_p]:text-4xl [&_p]:leading-none"
+                                                : isOwn
+                                                  ? "prose-invert [&_*]:text-white [&_a]:text-blue-200 [&_code]:bg-green-800 [&_code]:text-green-100 [&_blockquote]:border-green-400"
+                                                  : "[&_a]:text-blue-600 [&_code]:bg-gray-100 [&_code]:text-red-600"
+                                            )}
+                                            dangerouslySetInnerHTML={{ __html: message.content }}
+                                          />
+                                        )}
+                                        {/* Attachment */}
+                                        {message.attachment && (
+                                          <div className={message.content ? "mt-2 pt-2 border-t border-blue-500" : ""}>
+                                            {(message as OptimisticChatMessage).optimisticStatus === 'sending' ? (
+                                              <div className="flex items-center gap-2 text-xs opacity-70">
+                                                <Loader2 className="h-3 w-3 animate-spin" />
+                                                <span>{(message as OptimisticChatMessage).attachment_name || 'Uploading file…'}</span>
+                                              </div>
+                                            ) : (
+                                              <DocumentThumbnail
+                                                url={message.attachment}
+                                                fileName={message.attachment_name || 'Attachment'}
+                                                onClick={() => setPreviewDoc({
+                                                  url: message.attachment!,
+                                                  fileName: message.attachment_name || 'Attachment',
+                                                })}
+                                                className="w-40"
+                                              />
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
+
+                                  {/* Optimistic status indicator */}
+                                  {isOwn && (message as OptimisticChatMessage).optimisticStatus === 'sending' && (
+                                    <div className="flex justify-end mt-1">
+                                      <span className="flex items-center gap-1 text-[10px] text-gray-400">
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                        Sending…
+                                      </span>
+                                    </div>
+                                  )}
+                                  {isOwn && (message as OptimisticChatMessage).optimisticStatus === 'error' && (
+                                    <div className="flex justify-end mt-1">
+                                      <button
+                                        onClick={() => handleRetryMessage(message as OptimisticChatMessage)}
+                                        className="flex items-center gap-1 text-[10px] text-red-500 hover:text-red-700 transition-colors"
+                                        title="Failed to send — click to retry"
+                                      >
+                                        <AlertCircle className="h-3 w-3" />
+                                        Failed to send
+                                        <RotateCcw className="h-3 w-3 ml-0.5" />
+                                      </button>
+                                    </div>
+                                  )}
+
+
+                                  {/* Quick Actions on Hover */}
+                                  {(isHovered || menuOpen) && (
+                                    <div
+                                      className={cn(
+                                        "absolute top-0 flex items-center gap-0.5 bg-white border border-gray-200 rounded-lg shadow-sm px-1 py-0.5",
+                                        isOwn ? "right-full mr-2" : "left-full ml-2"
+                                      )}
+                                    >
+                                      {/* Quick Emoji Reactions */}
+                                      <button
+                                        onClick={() => handleQuickReaction(message.id, '👍')}
+                                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                        title="Like"
+                                      >
+                                        <span className="text-xs">👍</span>
+                                      </button>
+                                      <button
+                                        onClick={() => handleQuickReaction(message.id, '❤️')}
+                                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                        title="Love"
+                                      >
+                                        <span className="text-xs">❤️</span>
+                                      </button>
+                                      <button
+                                        onClick={() => handleQuickReaction(message.id, '😊')}
+                                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                        title="Smile"
+                                      >
+                                        <span className="text-xs">😊</span>
+                                      </button>
+
+                                      <div className="h-4 w-px bg-gray-200 mx-0.5" />
+
+                                      {/* More Reactions Button */}
+                                      <button
+                                        onClick={() => setShowReactionPicker(showReactionPicker === message.id ? null : message.id)}
+                                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                        title="More reactions"
+                                      >
+                                        <Smile className="h-3.5 w-3.5 text-gray-600" />
+                                      </button>
+
+                                      {/* More Options Menu */}
+                                      <button
+                                        onClick={() => setOpenMenuMessageId(menuOpen ? null : message.id)}
+                                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                        title="More options"
+                                      >
+                                        <MoreVertical className="h-3.5 w-3.5 text-gray-600" />
+                                      </button>
+
+                                      {/* Dropdown Menu */}
+                                      {menuOpen && (
+                                        <div
+                                          ref={menuRef}
+                                          className={cn(
+                                            "absolute top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-48 z-50",
+                                            isOwn ? "right-0" : "left-0"
+                                          )}
+                                        >
+                                          <button
+                                            onClick={() => handleReplyWithQuote(message)}
+                                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                          >
+                                            <Reply className="h-4 w-4" />
+                                            Reply
+                                          </button>
+                                          <button
+                                            onClick={() => handleForward(message)}
+                                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                          >
+                                            <Forward className="h-4 w-4" />
+                                            Forward
+                                          </button>
+                                          <button
+                                            onClick={() => handleCopyLink(message)}
+                                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                          >
+                                            <Link2 className="h-4 w-4" />
+                                            Copy link
+                                          </button>
+                                          <button
+                                            onClick={() => handlePinMessage(message)}
+                                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                          >
+                                            <Pin className="h-4 w-4" />
+                                            Pin message
+                                          </button>
+                                          <button
+                                            onClick={() => handleSaveMessage(message)}
+                                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                          >
+                                            <Bookmark className="h-4 w-4" />
+                                            Save
+                                          </button>
+                                          <button
+                                            onClick={() => handleMarkAsUnread(message)}
+                                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                          >
+                                            <MailOpen className="h-4 w-4" />
+                                            Mark as unread
+                                          </button>
+                                          <div className="h-px bg-gray-200 my-1" />
+                                          {isOwn && (
+                                            <button
+                                              onClick={() => handleDeleteMessage(message.id)}
+                                              className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
+                                            >
+                                              <Trash2 className="h-4 w-4" />
+                                              Delete
+                                            </button>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* Display Reactions */}
+                                  {reactions && reactions.size > 0 && (
+                                    <div className={cn(
+                                      "flex gap-1 mt-1",
+                                      isOwn ? "justify-end" : ""
+                                    )}>
+                                      {Array.from(reactions.entries()).map(([emoji, count]) => (
+                                        <span
+                                          key={emoji}
+                                          className="inline-flex items-center gap-1 px-2 py-0.5 bg-white border border-gray-200 rounded-full text-xs"
+                                        >
+                                          <span>{emoji}</span>
+                                          <span className="text-gray-600">{count}</span>
+                                        </span>
+                                      ))}
                                     </div>
                                   )}
                                 </div>
-
-                                {/* Quick Actions on Hover */}
-                                {(isHovered || menuOpen) && (
-                                  <div
-                                    className={cn(
-                                      "absolute top-0 flex items-center gap-0.5 bg-white dark:bg-card border border-gray-200 dark:border-border rounded-lg shadow-sm px-1 py-0.5",
-                                      isOwn ? "right-full mr-2" : "left-full ml-2"
-                                    )}
-                                  >
-                                    {/* Quick Emoji Reactions */}
-                                    <button
-                                      onClick={() => handleQuickReaction(message.id, '👍')}
-                                      className="p-1 hover:bg-gray-100 dark:hover:bg-secondary rounded transition-colors"
-                                      title="Like"
-                                    >
-                                      <span className="text-xs">👍</span>
-                                    </button>
-                                    <button
-                                      onClick={() => handleQuickReaction(message.id, '❤️')}
-                                      className="p-1 hover:bg-gray-100 dark:hover:bg-secondary rounded transition-colors"
-                                      title="Love"
-                                    >
-                                      <span className="text-xs">❤️</span>
-                                    </button>
-                                    <button
-                                      onClick={() => handleQuickReaction(message.id, '😊')}
-                                      className="p-1 hover:bg-gray-100 dark:hover:bg-secondary rounded transition-colors"
-                                      title="Smile"
-                                    >
-                                      <span className="text-xs">😊</span>
-                                    </button>
-
-                                    <div className="h-4 w-px bg-gray-200 dark:bg-border mx-0.5" />
-
-                                    {/* More Reactions Button */}
-                                    <button
-                                      onClick={() => setShowReactionPicker(showReactionPicker === message.id ? null : message.id)}
-                                      className="p-1 hover:bg-gray-100 dark:hover:bg-secondary rounded transition-colors"
-                                      title="More reactions"
-                                    >
-                                      <Smile className="h-3.5 w-3.5 text-gray-600" />
-                                    </button>
-
-                                    {/* More Options Menu */}
-                                    <button
-                                      onClick={() => setOpenMenuMessageId(menuOpen ? null : message.id)}
-                                      className="p-1 hover:bg-gray-100 dark:hover:bg-secondary rounded transition-colors"
-                                      title="More options"
-                                    >
-                                      <MoreVertical className="h-3.5 w-3.5 text-gray-600" />
-                                    </button>
-
-                                    {/* Emoji Picker Popup */}
-                                    {showReactionPicker === message.id && (
-                                      <div
-                                        className={cn(
-                                          "absolute top-full mt-1 z-50",
-                                          isOwn ? "right-0" : "left-0"
-                                        )}
-                                      >
-                                        <Suspense fallback={<div style={{ width: 280, height: 350 }} className="rounded-lg border bg-white shadow-md" />}>
-                                          <EmojiPicker
-                                            onEmojiClick={(emojiData) => handleReactionFromPicker(message.id, emojiData)}
-                                            width={280}
-                                            height={350}
-                                            searchPlaceHolder="Search emoji..."
-                                            previewConfig={{ showPreview: false }}
-                                          />
-                                        </Suspense>
-                                      </div>
-                                    )}
-
-                                    {/* Dropdown Menu */}
-                                    {menuOpen && (
-                                      <div
-                                        ref={menuRef}
-                                        className={cn(
-                                          "absolute top-full mt-1 bg-white dark:bg-card border border-gray-200 dark:border-border rounded-lg shadow-lg py-1 w-48 z-50",
-                                          isOwn ? "right-0" : "left-0"
-                                        )}
-                                      >
-                                        <button
-                                          onClick={() => handleReplyWithQuote(message)}
-                                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-muted flex items-center gap-2 text-gray-700 dark:text-foreground"
-                                        >
-                                          <Reply className="h-4 w-4" />
-                                          Reply
-                                        </button>
-                                        <button
-                                          onClick={() => handleForward(message)}
-                                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-muted flex items-center gap-2 text-gray-700 dark:text-foreground"
-                                        >
-                                          <Forward className="h-4 w-4" />
-                                          Forward
-                                        </button>
-                                        <button
-                                          onClick={() => handleCopyLink(message)}
-                                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-muted flex items-center gap-2 text-gray-700 dark:text-foreground"
-                                        >
-                                          <Link2 className="h-4 w-4" />
-                                          Copy link
-                                        </button>
-                                        <button
-                                          onClick={() => handlePinMessage(message)}
-                                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-muted flex items-center gap-2 text-gray-700 dark:text-foreground"
-                                        >
-                                          <Pin className="h-4 w-4" />
-                                          Pin message
-                                        </button>
-                                        <button
-                                          onClick={() => handleSaveMessage(message)}
-                                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-muted flex items-center gap-2 text-gray-700 dark:text-foreground"
-                                        >
-                                          <Bookmark className="h-4 w-4" />
-                                          Save
-                                        </button>
-                                        <button
-                                          onClick={() => handleMarkAsUnread(message)}
-                                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-muted flex items-center gap-2 text-gray-700 dark:text-foreground"
-                                        >
-                                          <MailOpen className="h-4 w-4" />
-                                          Mark as unread
-                                        </button>
-                                        <div className="h-px bg-gray-200 dark:bg-border my-1" />
-                                        {isOwn && (
-                                          <button
-                                            onClick={() => handleDeleteMessage(message.id)}
-                                            className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
-                                          >
-                                            <Trash2 className="h-4 w-4" />
-                                            Delete
-                                          </button>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-
-                                {/* Display Reactions */}
-                                {reactions && reactions.size > 0 && (
-                                  <div className={cn(
-                                    "flex gap-1 mt-1",
-                                    isOwn ? "justify-end" : ""
-                                  )}>
-                                    {Array.from(reactions.entries()).map(([emoji, count]) => (
-                                      <span
-                                        key={emoji}
-                                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-white dark:bg-card border border-gray-200 dark:border-border rounded-full text-xs"
-                                      >
-                                        <span>{emoji}</span>
-                                        <span className="text-gray-600">{count}</span>
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
                               </div>
                             </div>
-                          </div>
                           </div>
                         );
                       })}
@@ -1995,159 +2339,50 @@ export function TeamChatModern() {
                 </div>
 
                 {/* Message Input */}
-                <div className="p-4 bg-white dark:bg-card border-t border-gray-200 dark:border-border"
+                <div className=" bg-white border-t border-gray-200"
                   onDragEnter={handleDragEnter}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
                 >
-                  <div className="flex items-center gap-2">
-                    {/* Attachment Button */}
-                    <>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        onChange={handleFileSelect}
-                        className="hidden"
-                        accept="*"
-                      />
-                      <button
-                        onClick={handleAttachmentClick}
-                        className="p-2 hover:bg-gray-100 dark:hover:bg-secondary rounded transition-colors flex-shrink-0"
-                      >
-                        <Paperclip className="h-5 w-5 text-gray-600 dark:text-muted-foreground" />
-                      </button>
-                    </>
+                  <>
+                    {/* Hidden file input */}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                      accept="*"
+                    />
 
-                    {/* Input Area */}
-                    <div className="flex-1 relative">
-
-                      {/* File Preview */}
-                      {selectedFile && (
-                        <div className="absolute bottom-full left-0 mb-2 bg-white dark:bg-card border border-gray-300 dark:border-border rounded-lg shadow-lg overflow-hidden max-w-[300px]">
-                          {filePreviewUrl ? (
-                            // Image Preview
-                            <div className="relative">
-                              <img
-                                src={filePreviewUrl}
-                                alt="Preview"
-                                className="w-full h-auto max-h-[200px] object-contain bg-gray-50"
-                              />
-                              <button
-                                onClick={() => {
-                                  setSelectedFile(null);
-                                  setFilePreviewUrl(null);
-                                  if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
-                                  if (fileInputRef.current) fileInputRef.current.value = '';
-                                }}
-                                className="absolute top-2 right-2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white rounded-full p-1.5 transition-all"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
-                              <div className="px-3 py-2 bg-gray-50 dark:bg-secondary border-t border-gray-200 dark:border-border">
-                                <p className="text-xs text-gray-700 dark:text-foreground truncate font-medium">
-                                  {selectedFile.name}
-                                </p>
-                                <p className="text-[10px] text-gray-500 dark:text-muted-foreground">
-                                  {(selectedFile.size / 1024).toFixed(1)} KB
-                                </p>
-                              </div>
-                            </div>
-                          ) : (
-                            // Non-Image File Preview
-                            <div className="p-3 flex items-center gap-3">
-                              <div className="bg-blue-100 p-2 rounded">
-                                <Paperclip className="h-5 w-5 text-blue-600" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs text-gray-900 dark:text-foreground font-medium truncate">
-                                  {selectedFile.name}
-                                </p>
-                                <p className="text-[10px] text-gray-500 dark:text-muted-foreground">
-                                  {(selectedFile.size / 1024).toFixed(1)} KB
-                                </p>
-                              </div>
-                              <button
-                                onClick={() => {
-                                  setSelectedFile(null);
-                                  setFilePreviewUrl(null);
-                                  if (fileInputRef.current) fileInputRef.current.value = '';
-                                }}
-                                className="text-gray-400 hover:text-gray-600 flex-shrink-0"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      <textarea
-                        value={messageInput}
-                        onChange={(e) => setMessageInput(e.target.value)}
-                        onKeyPress={handleKeyPress}
-                        placeholder="Type a message"
-                        rows={1}
-                        className="w-full px-3 py-2 pr-24 text-sm border border-gray-300 dark:border-border bg-white dark:bg-muted text-gray-900 dark:text-foreground rounded resize-none focus:outline-none focus:border-blue-500 max-h-32"
-                        style={{ fieldSizing: 'content' } as any}
-                      />
-
-                      {/* Right side buttons in input */}
-                      <div className="absolute right-2 bottom-2 flex items-center gap-1" ref={emojiPickerRef}>
-                        <button
-                          onClick={toggleEmojiPicker}
-                          className={cn(
-                            "p-1.5 rounded transition-colors",
-                            showEmojiPicker ? "bg-blue-100 dark:bg-blue-900/40" : "hover:bg-gray-100 dark:hover:bg-secondary"
-                          )}
-                        >
-                          <Smile className={cn(
-                            "h-4 w-4",
-                            showEmojiPicker ? "text-blue-600" : "text-gray-600"
-                          )} />
-                        </button>
-
-                        {/* Emoji Picker Popup */}
-                        {showEmojiPicker && (
-                          <div className="absolute bottom-full right-0 mb-2 z-50">
-                            <Suspense fallback={<div style={{ width: 320, height: 400 }} className="rounded-lg border bg-white shadow-md" />}>
-                              <EmojiPicker
-                                onEmojiClick={handleEmojiClick}
-                                width={320}
-                                height={400}
-                                searchPlaceHolder="Search emoji..."
-                                previewConfig={{ showPreview: false }}
-                              />
-                            </Suspense>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Send Button */}
-                    <button
-                      onClick={handleSendMessage}
-                      disabled={(!messageInput.trim() && !selectedFile) || isUploadingFile}
-                      className={cn(
-                        'p-2.5 rounded transition-colors flex-shrink-0',
-                        (messageInput.trim() || selectedFile) && !isUploadingFile
-                          ? 'bg-blue-600 text-white hover:bg-blue-700'
-                          : 'bg-gray-200 dark:bg-secondary text-gray-400 dark:text-muted-foreground cursor-not-allowed'
-                      )}
-                    >
-                      {isUploadingFile ? (
-                        <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <Send className="h-4 w-4" />
-                      )}
-                    </button>
-                  </div>
+                    <ChatMessageInput
+                      value={messageInput}
+                      onChange={(plainText, html) => {
+                        setMessageInput(plainText);
+                        setRichHtmlContent(html);
+                      }}
+                      onSend={handleSendMessage}
+                      onAttachmentClick={handleAttachmentClick}
+                      placeholder="Type a message…"
+                      disabled={false}
+                      isUploading={isUploadingFile}
+                      selectedFile={selectedFile}
+                      filePreviewUrl={filePreviewUrl}
+                      onRemoveFile={() => {
+                        setSelectedFile(null);
+                        setFilePreviewUrl(null);
+                        if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
+                        if (fileInputRef.current) fileInputRef.current.value = '';
+                      }}
+                    />
+                  </>
                 </div>
               </>
             ) : (
               /* Shared Documents Panel */
-              <div className="flex-1 overflow-y-auto bg-[#f3f2f1] dark:bg-background p-6">
+              <div className="flex-1 overflow-y-auto bg-[#f3f2f1] p-6">
                 <div className="max-w-4xl mx-auto">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-foreground mb-4">Shared Documents</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Shared Documents</h3>
                   {sharedDocuments.length === 0 ? (
                     <div className="flex items-center justify-center h-64">
                       <div className="text-center">
@@ -2159,25 +2394,23 @@ export function TeamChatModern() {
                   ) : (
                     <div className="grid grid-cols-1 gap-3">
                       {sharedDocuments.map((doc) => (
-                        <a
+                        <button
                           key={doc.id}
-                          href={doc.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-4 p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all group"
+                          onClick={() => setPreviewDoc({ url: doc.url, fileName: doc.name })}
+                          className="w-full flex items-center gap-4 p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all group text-left"
                         >
                           <div className="h-12 w-12 rounded bg-blue-100 flex items-center justify-center flex-shrink-0">
                             <Paperclip className="h-6 w-6 text-blue-600" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate group-hover:text-blue-600 dark:text-foreground">
+                            <p className="text-sm font-medium text-gray-900 truncate group-hover:text-blue-600">
                               {doc.name}
                             </p>
-                            <p className="text-xs text-gray-500 mt-1 dark:text-muted-foreground">
+                            <p className="text-xs text-gray-500 mt-1">
                               Shared by {doc.sender.full_name || doc.sender.username} • {new Date(doc.created_at).toLocaleDateString()}
                             </p>
                           </div>
-                        </a>
+                        </button>
                       ))}
                     </div>
                   )}
@@ -2187,16 +2420,16 @@ export function TeamChatModern() {
           </>
         ) : (
           /* Empty State */
-          <div className="flex-1 flex items-center justify-center bg-[#f3f2f1] dark:bg-background">
+          <div className="flex-1 flex items-center justify-center bg-[#f3f2f1]">
             <div className="text-center max-w-sm">
               <div className="h-20 w-20 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-4">
                 <MessageSquare className="h-10 w-10 text-blue-600" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2 dark:text-foreground">Welcome to Chat</h3>
-              <p className="text-gray-600 text-sm dark:text-muted-foreground">
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Welcome to Chat</h3>
+              <p className="text-gray-600 text-sm">
                 Select a user from the list to start messaging
               </p>
-              <p className="text-xs text-gray-400 mt-4 dark:text-muted-foreground">
+              <p className="text-xs text-gray-400 mt-4">
                 {users.length} {users.length === 1 ? 'user' : 'users'} available
               </p>
             </div>

@@ -170,22 +170,42 @@ export const createDocumentsTableColumns = ({ onDeleteClick, onInfoClick }: Docu
       key: 'file_type',
       label: <span className="text-[14px] font-bold tracking-wide text-foreground">Type</span>,
       width: '120px',
+      render: (doc: Document) => {
+        const getFileType = (doc: Document): string => {
+          if (doc.name) {
+            const ext = doc.name.split('.').pop()?.toLowerCase();
+            if (ext) return ext;
+          }
+          return doc.file_type || 'unknown';
+        };
+
+        return (
+          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600 uppercase border border-gray-200">
+            {getFileType(doc)}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'status',
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Status</span>,
+      width: '120px',
+      render: (doc: Document) => <StatusDropdown doc={doc} />,
+    },
+    {
+      key: 'updated_at',
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Updated</span>,
+      width: '120px',
       render: (doc: Document) => (
-        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-muted text-muted-foreground uppercase border border-border">
-          {doc.file_type}
+        <span className="text-[12px] text-gray-500">
+          {formatRelativeTime(doc.updated_at)}
         </span>
       ),
     },
     {
-      key: 'status',
-      label: <span className="text-[14px] font-bold tracking-wide text-foreground">Status</span>,
-      width: '120px',  // Reduced from 140px
-      render: (doc: Document) => <StatusDropdown doc={doc} />,
-    },
-    {
       key: 'created_by',
-      label: <span className="text-[14px] font-bold tracking-wide text-foreground">Uploaded By</span>,
-      width: '180px',  // Added width
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Uploaded By</span>,
+      width: '180px',
       render: (doc: Document) => (
         <div className="flex items-center gap-2">
           <div className="h-6 w-6 rounded-full bg-blue-500/20 flex items-center justify-center text-[10px] font-bold text-blue-500">
@@ -202,9 +222,10 @@ export const createDocumentsTableColumns = ({ onDeleteClick, onInfoClick }: Docu
 interface DocumentGridCardProps {
   document: Document;
   onDeleteClick: (e: React.MouseEvent, doc: Document) => void;
+  onCardClick?: (doc: Document) => void;
 }
 
-export function DocumentGridCard({ document: doc, onDeleteClick }: DocumentGridCardProps) {
+export function DocumentGridCard({ document: doc, onDeleteClick, onCardClick }: DocumentGridCardProps) {
   const getStatusConfig = (status: DocumentStatus) => {
     const normalizedStatus = status.toLowerCase() as Lowercase<DocumentStatus>;
 
@@ -231,8 +252,8 @@ export function DocumentGridCard({ document: doc, onDeleteClick }: DocumentGridC
 
   return (
     <div
-      onClick={() => window.location.href = `/documents/${doc.id}`}
-      className="bg-card rounded-xl p-4 transition-all duration-300 cursor-pointer hover:shadow-lg hover:-translate-y-0.5 border border-border relative hover:z-50 h-full group text-card-foreground"
+      onClick={() => onCardClick ? onCardClick(doc) : (window.location.href = `/documents/${doc.id}`)}
+      className="bg-white rounded-xl p-4 transition-all duration-300 cursor-pointer text-gray-800 hover:shadow-lg hover:-translate-y-0.5 border border-[#d0d5dd] relative hover:z-50 h-full group"
     >
       {/* Header */}
       <div className="flex justify-between items-start gap-2 mb-3">

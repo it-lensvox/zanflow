@@ -8,6 +8,7 @@ export interface User {
   role: 'admin' | 'manager' | 'annotator' | 'viewer';
   avatar?: string;
   is_active: boolean;
+  is_superuser?: boolean;
   date_joined: string;
   skills?: string[];
 }
@@ -345,6 +346,25 @@ export interface LoginCredentials {
 export interface AuthTokens {
   access: string;
   refresh: string;
+}
+
+// Sign Up page
+export interface OrganizationSignupPayload {
+  company_name: string;
+  admin_email: string;
+  password: string;
+  password_confirm: string;
+}
+
+export interface OrganizationSignupResponse {
+  message: string;
+  organization: {
+    id: number;
+    name: string;
+    slug: string;
+  };
+  user: Pick<User, 'id' | 'username' | 'email' | 'role'>;
+  tokens: AuthTokens;
 }
 
 // Tool: PdfVsHtml types
@@ -718,12 +738,13 @@ export interface GatewaySendMessagePayload {
 }
 
 export interface GatewayIncomingMessage {
-  type: 'CHAT_MESSAGE' | 'SIGNAL' | 'GATEWAY_CONNECTED' | 'PRESENCE' | 'room_created';
+ type: 'CHAT_MESSAGE' | 'SIGNAL' | 'GATEWAY_CONNECTED' | 'PRESENCE' | 'PRESENCE_SYNC' | 'room_created';
   event?: 'NEW_NOTIFICATION' | 'CHAT_UNREAD_UPDATE';
   message?: ChatMessage;
   data?: ChatMessage | NotificationData | any;
   room_id?: string;
   user_id?: number;
+  online_users?: number[]; 
   status?: 'online' | 'offline';
   username?: string;
   room?: any;
@@ -798,6 +819,14 @@ export interface ChatUnreadResponse {
     last_message_at?: string;
     project_id?: string;
   }>;
+}
+
+// Presence event from WebSocket gateway
+export interface PresenceEvent {
+  type: 'PRESENCE';
+  status: 'online' | 'offline';
+  user_id: number;
+  username: string | null;
 }
 
 // Chat unread update WebSocket event
@@ -1035,3 +1064,163 @@ export interface TaskOption {
   task_heading: string;
 }
 
+
+// AI BOT TYPES
+
+// Page context sent with every AI Bot message
+export interface AIBotContext {
+  page: string;
+  id: number | string | null;
+}
+
+// Outgoing message payload to WebSocket
+export interface AIBotSendPayload {
+  message: string;
+  context: AIBotContext;
+}
+
+// Incoming message types from backend WebSocket
+export type AIBotMessageType = 'system' | 'ai_chunk' | 'ai_done' | 'ai_complete' | 'ai_response' | 'chat_title' | 'error';
+
+export interface AIBotIncomingMessage {
+  type: AIBotMessageType;
+  text: string;
+}
+
+// UI message stored in session history
+export interface AIBotUIMessage {
+  id: string;
+  text: string;
+  sender: 'user' | 'bot';
+  timestamp: Date;
+}
+
+// AI Bot chat session
+export interface AIBotSession {
+  id: string;
+  title: string;
+  messages: AIBotUIMessage[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ─── Organization / Workspace Types (Superuser only)
+
+export interface OrgAdmin {
+  id: number;
+  username: string;
+  email: string;
+}
+
+export interface OrgRecentUser {
+  id: number;
+  username: string;
+  email: string;
+  last_login: string;
+  role: string;
+}
+
+export interface OrgStats {
+  users: number;
+  projects: number;
+  tasks: number;
+  teams: number;
+  chat_rooms: number;
+  chat_messages: number;
+}
+
+export interface Tenant {
+  id: number;
+  name: string;
+  slug: string;
+  is_active: boolean;
+  created_at: string;
+  stats: OrgStats;
+  admins: OrgAdmin[];
+  recent_active_users: OrgRecentUser[];
+}
+
+export interface PlatformSummary {
+  total_organizations: number;
+  active_organizations: number;
+  inactive_organizations: number;
+  total_users: number;
+}
+
+export interface OrganizationsOverviewResponse {
+  platform_summary: PlatformSummary;
+  tenants: Tenant[];
+}
+
+export interface OrganizationDeleteResponse {
+  message: string;
+  summary: {
+    organization: string;
+    deleted: Record<string, number>;
+  };
+}
+
+export interface OrganizationToggleStatusResponse {
+  message: string;
+  is_active: boolean;
+}
+
+// ─── Quick Notes Types
+
+// Backend folder shape 
+export interface QuickNoteFolder {
+  id: number;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QuickNoteAttachment {
+  id: number;
+  note: number;
+  file: string;
+  filename: string;
+  created_at: string;
+}
+
+// Backend note shape 
+export interface QuickNote {
+  id: number;
+  folder: number | null;
+  title: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+  attachments?: QuickNoteAttachment[];
+}
+
+// Paginated notes list response
+export interface PaginatedQuickNotesResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: QuickNote[];
+}
+
+// Payload for creating a folder
+export interface CreateQuickNoteFolderPayload {
+  name: string;
+}
+
+// Payload for renaming a folder
+export interface UpdateQuickNoteFolderPayload {
+  name: string;
+}
+
+// Payload for creating a note
+export interface CreateQuickNotePayload {
+  content: string;
+  folder?: number | null;
+}
+
+// Payload for updating a note
+export interface UpdateQuickNotePayload {
+  title?: string;
+  content?: string;
+  folder?: number | null;
+}

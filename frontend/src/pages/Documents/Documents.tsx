@@ -232,6 +232,7 @@ export function Documents() {
   const fileTypeFilter = searchParams.get('file_type') || '';
 
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, setSortBy] = useState<'updated_at' | 'created_at'>('updated_at');
 
   // Reset to page 1 when filters change
   React.useEffect(() => {
@@ -240,7 +241,7 @@ export function Documents() {
 
   React.useEffect(() => {
     queryClient.invalidateQueries({ queryKey: ['documents'] });
-  }, [queryClient]);
+  }, []);
 
   const { data: projectsData } = useQuery({
     queryKey: ['projects'],
@@ -258,6 +259,8 @@ export function Documents() {
     enabled: true,
     placeholderData: keepPreviousData,
     refetchOnWindowFocus: true,
+    refetchOnMount: 'always',
+    staleTime: 0,
   });
   const rawProjects = projectsData?.results || projectsData || [];
   const projects = (Array.isArray(rawProjects) ? rawProjects : []) as Project[];
@@ -270,14 +273,45 @@ export function Documents() {
     acc[project.id] = project.name;
     return acc;
   }, {});
-  const displayedDocuments = allDocs.map((doc: Document) => ({
-    ...doc,
-    project_name: projectLookup[doc.project] || doc.project_name || 'General'
-  })).filter((doc: Document) => {
-    if (statusFilter && doc.status !== statusFilter) return false;
-    if (searchTerm && !doc.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-    return true;
-  });
+  const displayedDocuments = (() => {
+    const nameCount: Record<string, number> = {};
+    const nameIndex: Record<string, number> = {};
+
+    // Count how many times each name appears
+    allDocs.forEach((doc: Document) => {
+      const baseName = (doc as any).file_name || doc.original_file_name || doc.name || '';
+      nameCount[baseName] = (nameCount[baseName] || 0) + 1;
+    });
+
+    return allDocs.map((doc: Document) => {
+      const baseName = (doc as any).file_name || doc.original_file_name || doc.name || '';
+      let displayName = baseName;
+
+      if (nameCount[baseName] > 1) {
+        if (nameIndex[baseName] === undefined) nameIndex[baseName] = 0;
+        else nameIndex[baseName] += 1;
+
+        if (nameIndex[baseName] > 0) {
+          const dotIndex = baseName.lastIndexOf('.');
+          displayName = dotIndex !== -1
+            ? `${baseName.slice(0, dotIndex)} (${nameIndex[baseName]})${baseName.slice(dotIndex)}`
+            : `${baseName} (${nameIndex[baseName]})`;
+        }
+      }
+
+      return {
+        ...doc,
+        name: displayName,
+        project_name: projectLookup[doc.project] || doc.project_name || 'General'
+      };
+    }).filter((doc: Document) => {
+      if (statusFilter && doc.status !== statusFilter) return false;
+      if (searchTerm && !doc.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+      return true;
+    }).sort((a: Document, b: Document) => {
+      return new Date(b[sortBy]).getTime() - new Date(a[sortBy]).getTime();
+    });
+  })();
 
   const updateFilter = (key: string, value: string) => {
     const newParams = new URLSearchParams(searchParams);

@@ -53,6 +53,8 @@ export function TaskDetailPage() {
     const [projectMembers, setProjectMembers] = useState<{ user: { id: number; username: string; full_name: string } }[]>([]);
     const [isEditingDescription, setIsEditingDescription] = useState(false);
     const [editableDescription, setEditableDescription] = useState('');
+    const [isEditingTitle, setIsEditingTitle] = useState(false);
+    const [editableTitle, setEditableTitle] = useState('');
     const [links, setLinks] = useState<string[]>([]);
     const [linkInput, setLinkInput] = useState('');
     const [startDate, setStartDate] = useState('');
@@ -78,6 +80,7 @@ export function TaskDetailPage() {
         if (task) {
             setSelectedStatus(task.status);
             setEditableDescription(task.description || '');
+            setEditableTitle(task.heading || '');
             setStartDate(task.start_date?.split('T')[0] || '');
             setEndDate(task.end_date?.split('T')[0] || '');
             setLinks(getInitialLinks(task.links));
@@ -201,8 +204,9 @@ export function TaskDetailPage() {
         const originalLinks = getInitialLinks(task.links);
         const linksChanged = JSON.stringify(links) !== JSON.stringify(originalLinks);
 
-        setHasUnsavedChanges(statusChanged || usersChanged || descriptionChanged || datesChanged || linksChanged);
-    }, [selectedStatus, task, newUsers.length, editableDescription, startDate, endDate, links]);
+        const titleChanged = editableTitle !== (task.heading || '');
+        setHasUnsavedChanges(statusChanged || usersChanged || descriptionChanged || datesChanged || linksChanged || titleChanged);
+    }, [selectedStatus, task, newUsers.length, editableDescription, startDate, endDate, links, editableTitle]);
 
     // Mutations
     const updateTaskMutation = useMutation({
@@ -210,9 +214,11 @@ export function TaskDetailPage() {
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
             queryClient.invalidateQueries({ queryKey: ['task', id] });
+            queryClient.invalidateQueries({ queryKey: ['task-detail', Number(id)] });
             setHasUnsavedChanges(false);
             setNewUsers([]);
             setIsEditingDescription(false);
+            setIsEditingTitle(false);
         },
         onError: (error) => {
             console.error('Failed to update task:', error);
@@ -253,6 +259,7 @@ export function TaskDetailPage() {
 
         try {
             const updates: any = {};
+            if (editableTitle !== (task.heading || '')) updates.heading = editableTitle;
             if (selectedStatus !== task.status) updates.status = selectedStatus;
             if (newUsers.length > 0) updates.assigned_to = [...task.assigned_to, ...newUsers];
             if (editableDescription !== task.description) updates.description = editableDescription;
@@ -447,7 +454,27 @@ export function TaskDetailPage() {
                                 <Edit3 className="w-5 h-5 text-purple-600" />
                             </div>
                             <div>
-                                <h1 className="text-2xl font-bold">{task.heading || 'Untitled Task'}</h1>
+                                <div className="flex items-center gap-1">
+                                    {isEditingTitle ? (
+                                        <input
+                                            autoFocus
+                                            value={editableTitle}
+                                            onChange={(e) => setEditableTitle(e.target.value)}
+                                            onBlur={() => setIsEditingTitle(false)}
+                                            onKeyDown={(e) => e.key === 'Enter' && setIsEditingTitle(false)}
+                                            className="text-2xl font-bold border-b-2 border-purple-400 outline-none bg-transparent w-full"
+                                        />
+                                    ) : (
+                                        <h1 className="text-2xl font-bold">{editableTitle || 'Untitled Task'}</h1>
+                                    )}
+                                    <button
+                                        onClick={() => setIsEditingTitle(true)}
+                                        className="p-1 text-gray-400 hover:text-purple-600 rounded transition-colors flex-shrink-0"
+                                        title="Edit title"
+                                    >
+                                        <Edit3 className="w-4 h-4" />
+                                    </button>
+                                </div>
                                 <p className="text-sm text-muted-foreground">
                                     {task.project_details?.name || task.project_name || 'No Project'}
                                 </p>
@@ -670,19 +697,19 @@ export function TaskDetailPage() {
                                 {(() => {
                                     // Calculate available unassigned users
                                     let availableUnassignedUsers = availableUsers;
-                                    
+
                                     // Filter to project members only
                                     if (projectMembers.length > 0) {
                                         const projectMemberIds = projectMembers.map(member => member.user.id);
                                         availableUnassignedUsers = availableUsers.filter(u => projectMemberIds.includes(u.id));
                                     }
-                                    
+
                                     // Remove already assigned users
                                     availableUnassignedUsers = availableUnassignedUsers.filter(u =>
                                         !task.assigned_to_user_details?.some(a => a.id === u.id) &&
                                         !newUsers.includes(u.id)
                                     );
-                                    
+
                                     // Only render if there are users available to assign
                                     return availableUnassignedUsers.length > 0 && (
                                         <div className="relative">

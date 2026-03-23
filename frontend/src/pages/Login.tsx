@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { Button, Input, Card, CardHeader, CardTitle, CardContent } from '@/components/common';
@@ -9,15 +10,13 @@ import { authApi } from '@/services/api';
 function Toast({ message, type, onClose }: { message: string; type: 'success' | 'error'; onClose: () => void }) {
   return (
     <div className="fixed top-4 right-4 z-[100] animate-in slide-in-from-top-5 duration-300">
-      <div className={`rounded-lg shadow-lg p-4 min-w-[300px] max-w-md ${
-        type === 'success' 
-          ? 'bg-green-50 border border-green-200' 
+      <div className={`rounded-lg shadow-lg p-4 min-w-[300px] max-w-md ${type === 'success'
+          ? 'bg-green-50 border border-green-200'
           : 'bg-red-50 border border-red-200'
-      }`}>
+        }`}>
         <div className="flex items-start gap-3">
-          <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${
-            type === 'success' ? 'bg-green-500' : 'bg-red-500'
-          }`}>
+          <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${type === 'success' ? 'bg-green-500' : 'bg-red-500'
+            }`}>
             {type === 'success' ? (
               <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -29,19 +28,17 @@ function Toast({ message, type, onClose }: { message: string; type: 'success' | 
             )}
           </div>
           <div className="flex-1">
-            <p className={`text-sm font-medium ${
-              type === 'success' ? 'text-green-900' : 'text-red-900'
-            }`}>
+            <p className={`text-sm font-medium ${type === 'success' ? 'text-green-900' : 'text-red-900'
+              }`}>
               {message}
             </p>
           </div>
           <button
             onClick={onClose}
-            className={`flex-shrink-0 ${
-              type === 'success' 
-                ? 'text-green-400 hover:text-green-600' 
+            className={`flex-shrink-0 ${type === 'success'
+                ? 'text-green-400 hover:text-green-600'
                 : 'text-red-400 hover:text-red-600'
-            }`}
+              }`}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -55,6 +52,7 @@ function Toast({ message, type, onClose }: { message: string; type: 'success' | 
 
 export function Login() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { login } = useAuth();
   const savedCredentials = getCredentials();
   const [username, setUsername] = useState(savedCredentials?.username || '');
@@ -68,7 +66,7 @@ export function Login() {
   const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  
+
   // Toast state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
@@ -149,7 +147,7 @@ export function Login() {
 
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Welcome to Dyuksa</CardTitle>
+          <CardTitle className="text-2xl">Welcome To DYUKSA</CardTitle>
           <p className="text-muted-foreground">
             Sign in to your account to continue
           </p>
@@ -193,6 +191,16 @@ export function Login() {
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? 'Signing in...' : 'Sign in'}
             </Button>
+            <p className="text-center text-sm text-muted-foreground">
+              Don't have an account?{' '}
+              <button
+                type="button"
+                onClick={() => navigate('/signup')}
+                className="text-primary hover:underline font-bold"
+              >
+                Sign Up
+              </button>
+            </p>
           </form>
         </CardContent>
       </Card>
@@ -201,8 +209,8 @@ export function Login() {
           <Card className="w-full max-w-md">
             <CardHeader className="text-center relative">
               <button
-                onClick={() => { 
-                  setShowForgotPassword(false); 
+                onClick={() => {
+                  setShowForgotPassword(false);
                   setStep(1);
                   setForgotEmail('');
                   setOtp('');

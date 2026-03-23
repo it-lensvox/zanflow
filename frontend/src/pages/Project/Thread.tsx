@@ -58,12 +58,10 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
         const storage = threadsStorageApi.getProjectThreads(projectId);
 
         // 3. Fetch authoritative unread counts from API scoped to this project
-        //    (covers offline / missed WS events and project switching)
         let apiUnreadMap: Record<string, number> = {};
         try {
           apiUnreadMap = await threadsApi.getThreadUnreadCounts(projectId);
         } catch {
-          // Non-fatal — fall back to room.unread_count from thread list response
         }
 
         // 4. Map backend threads to UI state, merging API unread counts
@@ -136,8 +134,6 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
   useEffect(() => {
     const tokens = getTokens();
     if (!tokens?.access || !currentUserId) return;
-
-    // Only create connection if not already connected
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       return;
     }
@@ -516,7 +512,7 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
           onCancel={closePermissionDenied}
         />
 
-        <div className="fixed bottom-6 right-6 z-50">
+        <div className="fixed bottom-5 right-20 z-50">
           <button
             onClick={() => {
               setIsExpanded(true);
@@ -533,7 +529,7 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
               )}
             </div>
             <div className="flex flex-col items-start">
-              <span className="font-medium text-gray-900 text-sm">Threads</span>
+              <span className="font-medium text-gray-900 text-sm">Thread</span>
               {totalUnread > 0 && (
                 <span className="text-xs text-red-500 font-medium leading-none">
                   {totalUnread} unread
@@ -586,8 +582,8 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
               key={session.id}
               onClick={() => switchSession(session.id)}
               className={`w-full px-3 py-2.5 text-left hover:bg-gray-50 transition-colors border-l-2 flex items-start justify-between gap-1 group ${session.id === activeSessionId
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-transparent'
+                ? 'border-blue-500 bg-blue-50'
+                : 'border-transparent'
                 }`}
             >
               <div className="flex-1 min-w-0">
@@ -690,12 +686,6 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
           </div>
         ) : (
           <div className="text-center py-2">
-            <button
-              onClick={createNewSession}
-              className="w-full px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors text-sm font-medium"
-            >
-              Start New Thread
-            </button>
           </div>
         )}
       </div>
@@ -759,7 +749,7 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
                     }
                   </button>
                   <div>
-                    <h3 className="font-semibold text-gray-900">Threads</h3>
+                    <h3 className="font-semibold text-gray-900">Thread</h3>
                     <p className="text-xs text-gray-500">{projectName}</p>
                   </div>
                 </div>
@@ -787,7 +777,7 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
         </div>
       ) : (
         /* DEFAULT MINI WIDGET */
-        <div className="fixed bottom-6 right-6 z-50">
+        <div className="fixed bottom-20 right-4 z-50">
           <div
             className="bg-white rounded-lg shadow-2xl border border-gray-200 flex overflow-hidden"
             style={{ width: isHistoryPanelOpen ? '680px' : '400px', height: '600px', transition: 'width 0.3s ease' }}
@@ -816,7 +806,7 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
                     }
                   </button>
                   <div className="min-w-0">
-                    <h3 className="font-semibold text-gray-900 text-sm truncate">Threads</h3>
+                    <h3 className="font-semibold text-gray-900 text-sm truncate">Thread</h3>
                     <p className="text-xs text-gray-500 truncate">{projectName}</p>
                   </div>
                 </div>

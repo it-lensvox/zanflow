@@ -1,10 +1,9 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  LayoutDashboard, FolderKanban, FileText, Settings, LogOut,
-  Users, ChevronDown, ChevronUp, Plus, CheckSquare, CheckCircle,
-  Clock, PlayCircle, Pause, Crown, TrendingUp, ListTodo, Calendar, Eye, MessageSquare, UserPlus, NotebookPen
+  LayoutDashboard, FolderKanban, FileText, Settings, LogOut, Users, ChevronDown, ChevronUp, Plus, CheckSquare, CheckCircle, Clock, PlayCircle, Pause,
+  TrendingUp, ListTodo, Calendar, Eye, MessageSquare, UserPlus, NotebookPen, Building2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -21,7 +20,7 @@ import {
   DialogFooter,
 } from '@/components/common/diaog';
 
-const ADMIN_ROLES = ['admin', 'manager', 'annotator'];
+const ADMIN_ROLES = ['admin', 'manager', 'annotator', 'superuser'];
 
 // Favourite Projects within the accordion
 const FavouriteProjectsAccordion = ({ projects }: { projects: Project[] }) => {
@@ -85,12 +84,32 @@ export function Sidebar() {
   const [isHovered, setIsHovered] = useState(false);
   const isExpanded = !isCollapsed || isHovered;
 
+  // Ref to track pending single-click timer
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleLogoClick = useCallback(() => {
+    if (clickTimerRef.current) {
+      // Second click arrived before timer fired → double-click → toggle sidebar
+      clearTimeout(clickTimerRef.current);
+      clickTimerRef.current = null;
+      setIsCollapsed(prev => !prev);
+    } else {
+      // First click → wait to see if a second click arrives
+      clickTimerRef.current = setTimeout(() => {
+        clickTimerRef.current = null;
+        // Single click → navigate to dashboard
+        navigate('/dashboard');
+      }, 250);
+    }
+  }, [navigate]);
+
   // Accordion States 
   const [isProjectsOpen, setIsProjectsOpen] = useState(location.pathname.startsWith('/projects'));
   const [isTasksOpen, setIsTasksOpen] = useState(location.pathname.startsWith('/taskboard'));
   const [isAdminOpen, setIsAdminOpen] = useState(location.pathname.startsWith('/admin'));
   const [isTeamsOpen, setIsTeamsOpen] = useState(location.pathname.startsWith('/admin/teams'));
   const showAdmin = user?.role && ADMIN_ROLES.includes(user.role);
+  const isSuperuser = !!user?.is_superuser;
   const { data: projectsData } = useQuery({
     queryKey: ['projects'],
     queryFn: () => projectsApi.list(),
@@ -130,9 +149,14 @@ export function Sidebar() {
 
         // Subscribe to chat unread updates
         const unsubscribe = notificationSocket.onChatUnreadUpdate((updateData) => {
-          setChatUnreadCount(updateData.total_unread);
+          const activeRoomId = (window as any).__activeTeamChatRoomId as string | undefined;
+          const roomUnread = updateData.room_unread || 0;
+          const isActiveRoom = activeRoomId && updateData.room_id === activeRoomId;
+          const correctedTotal = isActiveRoom
+            ? Math.max(0, updateData.total_unread - roomUnread)
+            : updateData.total_unread;
+          setChatUnreadCount(correctedTotal);
         });
-
         return () => {
           unsubscribe();
         };
@@ -154,10 +178,10 @@ export function Sidebar() {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* "Z" Toggle Button */}
+      {/* "D" Toggle Button */}
       <div className="flex h-16 items-center px-4 border-b">
         <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
+          onClick={handleLogoClick}
           className={cn(
             "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-all",
             !isCollapsed
@@ -168,7 +192,10 @@ export function Sidebar() {
           <span className="text-xl font-bold">D</span>
         </button>
         {isExpanded && (
-          <span className="ml-3 text-xl font-bold text-primary animate-in fade-in duration-300">
+          <span
+            className="ml-3 text-xl font-bold text-primary animate-in fade-in duration-300 cursor-pointer select-none"
+            onClick={handleLogoClick}
+          >
             DYUKSA
           </span>
         )}
@@ -177,7 +204,7 @@ export function Sidebar() {
       <nav className="flex-1 space-y-2 px-3 py-4 overflow-y-auto overflow-x-hidden">
         {/* Dashboard */}
         <NavLink
-          to="/"
+          to="/dashboard"
           className={({ isActive }) =>
             cn('flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
               isActive ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
@@ -284,8 +311,6 @@ export function Sidebar() {
           { name: 'Documents', href: '/documents', icon: FileText },
           { name: 'Calendar', href: '/calendar', icon: Calendar },
           { name: 'Quick Notes', href: '/quick-notes', icon: NotebookPen },
-          // { name: 'Activity', href: '/notifications', icon: Bell },
-          // { name: 'Test Runs', href: '/test-runs', icon: TestTube2 },
         ].map((item) => (
           <NavLink
             key={item.name}
@@ -304,7 +329,7 @@ export function Sidebar() {
         ))}
 
         {/* Team Management Accordion */}
-        {showAdmin && (
+        {(showAdmin || isSuperuser) && (
           <div className="space-y-1">
             <div
               className={cn('flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors cursor-pointer',
@@ -365,6 +390,16 @@ export function Sidebar() {
                 >
                   <TrendingUp className="h-3.5 w-3.5" /> Performance
                 </NavLink>
+
+                {isSuperuser && (
+                  <NavLink
+                    to="/admin/workspace"
+                    className={({ isActive }) => cn("flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs transition-colors",
+                      isActive ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-primary")}
+                  >
+                    <Building2 className="h-3.5 w-3.5" /> Workspace
+                  </NavLink>
+                )}
               </div>
             )}
           </div>
@@ -393,11 +428,16 @@ export function Sidebar() {
       {/* Profile & Footer */}
       <div className="border-t p-4">
         <div className={cn("flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-accent cursor-pointer", !isExpanded && "justify-center px-0")} onClick={() => navigate('/profile')}>
-          <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-primary-foreground font-bold",
-            !isCollapsed
-              ? "bg-indigo-300 text-white"
-              : "bg-primary text-primary-foreground hover:opacity-90")}>
-            {user?.username?.charAt(0).toUpperCase()}
+          <div className="relative shrink-0 h-9 w-9">
+            <div className={cn("flex h-9 w-9 items-center justify-center rounded-full text-primary-foreground font-bold",
+              !isCollapsed
+                ? "bg-indigo-300 text-white"
+                : "bg-primary text-primary-foreground hover:opacity-90")}>
+              {user?.username?.charAt(0).toUpperCase()}
+            </div>
+            {user?.is_active && (
+              <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-card" />
+            )}
           </div>
           {isExpanded && (
             <div className="min-w-0 flex-1">

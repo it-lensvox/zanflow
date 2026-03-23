@@ -61,6 +61,8 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
     const [projectMembers, setProjectMembers] = useState<{ user: { id: number; username: string; full_name: string } }[]>([]);
     const [isEditingDescription, setIsEditingDescription] = useState(false);
     const [editableDescription, setEditableDescription] = useState(task.description);
+    const [isEditingTitle, setIsEditingTitle] = useState(false);
+    const [editableTitle, setEditableTitle] = useState(task.heading || '');
     const [attachmentPage, setAttachmentPage] = useState(1);
     const [loadingMoreAttachments, setLoadingMoreAttachments] = useState(false);
     const [hasMoreAttachments, setHasMoreAttachments] = useState(true);
@@ -149,6 +151,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
         mutationFn: (updates: any) => taskApi.update(task.id, updates),
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            queryClient.invalidateQueries({ queryKey: ['task', task.id] });
             onTaskUpdated(data);
             setIsEditingStatus(false);
             onClose();
@@ -240,8 +243,9 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
         const originalLinks = getInitialLinks(baselineLinks);
         const linksChanged = JSON.stringify(links) !== JSON.stringify(originalLinks);
 
-        setHasUnsavedChanges(statusChanged || usersChanged || docsChanged || descriptionChanged || datesChanged || linksChanged);
-    }, [selectedStatus, task.status, newUsers.length, newDocuments.length, editableDescription, task.description, startDate, endDate, task.start_date, task.end_date, links, task.links]);
+        const titleChanged = editableTitle !== (task.heading || '');
+        setHasUnsavedChanges(statusChanged || usersChanged || docsChanged || descriptionChanged || datesChanged || linksChanged || titleChanged);
+    }, [selectedStatus, task.status, newUsers.length, newDocuments.length, editableDescription, task.description, startDate, endDate, task.start_date, task.end_date, links, task.links, editableTitle, task.heading]);
 
     const handleAddLink = () => {
         if (linkInput.trim()) {
@@ -260,6 +264,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
     const handleSaveStatus = async () => {
         try {
             const updates: any = {};
+            if (editableTitle !== (task.heading || '')) updates.heading = editableTitle;
             if (selectedStatus !== task.status) updates.status = selectedStatus;
             if (newUsers.length > 0) updates.assigned_to = [...task.assigned_to, ...newUsers];
             if (editableDescription !== task.description) updates.description = editableDescription;
@@ -455,12 +460,33 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
                 {/* Header */}
                 <div className={`${isMaximized ? 'px-4 max-w-4xl mx-auto w-full' : 'px-'} py-5 border-b border-gray-200 dark:border-border bg-white dark:bg-card flex items-center justify-between sticky top-0 z-20`}>
                     <div className="flex items-center gap-4">
-                        <div className="p-2 bg-purple-50 dark:bg-purple-950/30 rounded-lg"><Edit3 className="w-5 h-5 text-purple-600 dark:text-purple-400" /></div>
+                        <div className="p-2 bg-purple-50 rounded-lg"></div>
                         <div className="pr-2 flex flex-col">
-                            <span className="text-sm font-bold text-gray-900 dark:text-foreground line-clamp-1 mb-0.5">
-                                {task.heading || 'No Task'}
-                            </span>
-                            <span className="text-xs font-medium text-gray-600 dark:text-muted-foreground line-clamp-2">
+                            <div className="flex items-center gap-1 mb-0.5">
+                                {isEditingTitle ? (
+                                    <input
+                                        autoFocus
+                                        value={editableTitle}
+                                        onChange={(e) => setEditableTitle(e.target.value)}
+                                        onBlur={() => setIsEditingTitle(false)}
+                                        onKeyDown={(e) => e.key === 'Enter' && setIsEditingTitle(false)}
+                                        className="text-sm font-bold text-gray-900 border-b border-purple-400 outline-none bg-transparent w-full"
+                                    />
+                                ) : (
+                                    <span className="text-sm font-bold text-gray-900 line-clamp-1">
+                                        {editableTitle || 'No Task'}
+                                    </span>
+                                )}
+                                <button
+                                    onClick={() => setIsEditingTitle(true)}
+                                    className="p-0.5 text-gray-400 hover:text-purple-600 rounded transition-colors flex-shrink-0"
+                                    title="Edit title"
+                                >
+                                    <Edit3 className="w-3 h-3" />
+                                </button>
+                            </div>
+                            <span className="text-xs font-medium text-gray-600 line-clamp-2">
+
                                 {task.project_details?.name || task.project_name || 'No Project'}
                             </span>
                         </div>

@@ -1,4 +1,4 @@
- import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { X, Calendar, CheckCircle, AlertCircle, ArrowLeft, Briefcase, User, Flag, Paperclip, Type, Sparkles, Plus, Link, Trash2 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -274,9 +274,9 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                 setSelectedProjects([aiGeneratedTask.project]);
             }
 
-            // Handle description - now works directly with HTML state
+            // Handle description
             if (aiGeneratedTask.description) {
-                setDescription(aiGeneratedTask.description);
+                setDescription(formatAITextToHtml(aiGeneratedTask.description));
             }
 
             navigate(location.pathname, { replace: true, state: {} });
@@ -301,6 +301,14 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
         } finally {
             setIsTitleRefining(false);
         }
+    };
+    const formatAITextToHtml = (text: string) => {
+        return text
+            .replace(/\n{2,}/g, '</p><p>')
+            .replace(/\n/g, '<br/>') 
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/^- (.*)$/gm, '<li>$1</li>')
+            .replace(/(<li>.*<\/li>)/gms, '<ul>$1</ul>');
     };
 
     const handleRefineDescription = async () => {
@@ -330,8 +338,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
             const response = await taskApi.refineText(payload);
 
             if (response.refined_text) {
-                // Set the description with the refined HTML
-                setDescription(response.refined_text);
+                setDescription(formatAITextToHtml(response.refined_text));
             }
         } catch (error) {
             console.error("Failed to refine description", error);
@@ -857,7 +864,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                                     <div>
                                         <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-foreground mb-2">
                                             <User className="w-4 h-4" />
-                                            Assignees <span className="text-red-500">*</span>
+                                            Assignees
                                         </label>
                                         <div className="relative" data-dropdown="assignee">
                                             {/* Main input field - shows selected users + allows typing */}

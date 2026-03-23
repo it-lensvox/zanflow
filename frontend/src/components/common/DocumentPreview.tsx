@@ -50,10 +50,11 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
     const isPDF = extension === 'pdf' || fileType?.includes('pdf');
     const isOfficeDoc = ['doc', 'docx'].includes(extension);
     const isPresentation = ['ppt', 'pptx'].includes(extension);
-    const isSpreadsheet = ['xls', 'xlsx', 'csv'].includes(extension);
-    const isText = ['txt', 'md', 'log'].includes(extension);
+const isSpreadsheet = ['xls', 'xlsx'].includes(extension);
+    const isText = ['txt', 'md', 'log', 'csv'].includes(extension);
     const isCode = ['js', 'jsx', 'ts', 'tsx', 'json', 'html', 'css', 'py', 'java', 'cpp', 'c', 'sh', 'yml', 'yaml', 'xml'].includes(extension);
-
+    const isVideo = ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'].includes(extension) || fileType?.startsWith('video/') || false;
+    const isAudio = ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a'].includes(extension) || fileType?.startsWith('audio/') || false;
     // Handle download - Force download using fetch and blob
     const handleDownload = async () => {
         try {
@@ -131,7 +132,11 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
                     setLoading(false);
                 });
         }
-    }, [url, isText, isCode]);
+        const isKnownType = isImage || isPDF || isOfficeDoc || isPresentation || isSpreadsheet || isText || isCode || isVideo || isAudio;
+        if (!isKnownType) {
+            setLoading(false);
+        }
+    }, [url, isImage, isPDF, isOfficeDoc, isPresentation, isSpreadsheet, isText, isCode, isVideo, isAudio]);
 
     // Zoom controls
     const handleZoomIn = () => setZoom(prev => Math.min(prev + 25, 200));
@@ -158,12 +163,13 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
             );
         }
 
-        // PDF Preview using iframe
+        // PDF Preview
         if (isPDF) {
+            const googleViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
             return (
                 <div className="h-full w-full bg-gray-100">
                     <iframe
-                        src={`${url}#view=FitH`}
+                        src={googleViewerUrl}
                         className="w-full h-full border-0"
                         title={fileName}
                         onLoad={() => setLoading(false)}
@@ -204,6 +210,52 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
                     <pre className="font-mono text-sm whitespace-pre-wrap">
                         <code>{textContent}</code>
                     </pre>
+                </div>
+            );
+        }
+
+        // Video Preview
+        if (isVideo) {
+            return (
+                <div className="flex items-center justify-center h-full bg-gray-900">
+                    <video
+                        src={url}
+                        controls
+                        autoPlay={false}
+                        className="max-w-full max-h-full rounded"
+                        style={{ maxHeight: '100%', maxWidth: '100%' }}
+                        onLoadedData={() => setLoading(false)}
+                        onCanPlay={() => setLoading(false)}
+                        onError={() => {
+                            setError('Failed to load video. Click download to view externally.');
+                            setLoading(false);
+                        }}
+                    >
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+            );
+        }
+
+        // Audio Preview
+        if (isAudio) {
+            return (
+                <div className="flex flex-col items-center justify-center h-full bg-gray-900 gap-6 p-8">
+                    <FileText className="w-20 h-20 text-blue-400" />
+                    <p className="text-white text-lg font-medium truncate max-w-sm text-center">{fileName}</p>
+                    <audio
+                        src={url}
+                        controls
+                        className="w-full max-w-lg"
+                        onLoadedData={() => setLoading(false)}
+                        onCanPlay={() => setLoading(false)}
+                        onError={() => {
+                            setError('Failed to load audio. Click download to view externally.');
+                            setLoading(false);
+                        }}
+                    >
+                        Your browser does not support the audio tag.
+                    </audio>
                 </div>
             );
         }
@@ -427,9 +479,11 @@ export const DocumentThumbnail: React.FC<DocumentThumbnailProps> = ({
     const isPDF = extension === 'pdf' || fileType?.includes('pdf');
     const isOfficeDoc = ['doc', 'docx'].includes(extension);
     const isPresentation = ['ppt', 'pptx'].includes(extension);
-    const isSpreadsheet = ['xls', 'xlsx', 'csv'].includes(extension);
-    const isText = ['txt', 'md', 'log'].includes(extension);
+    const isSpreadsheet = ['xls', 'xlsx'].includes(extension);
+    const isText = ['txt', 'md', 'log', 'csv'].includes(extension);
     const isCode = ['js', 'jsx', 'ts', 'tsx', 'json', 'html', 'css', 'py', 'java', 'cpp', 'c', 'sh', 'yml', 'yaml', 'xml'].includes(extension);
+    const isVideo = ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'].includes(extension) || fileType?.startsWith('video/') || false;
+    const isAudio = ['mp3', 'wav', 'ogg', 'aac', 'flac', 'm4a'].includes(extension) || fileType?.startsWith('audio/') || false;
 
     // Get appropriate icon and color for file type
     const getFileIcon = () => {
@@ -438,6 +492,8 @@ export const DocumentThumbnail: React.FC<DocumentThumbnailProps> = ({
         if (isPresentation) return { icon: <FileText className="w-8 h-8" />, color: 'bg-orange-100 text-orange-600' };
         if (isSpreadsheet) return { icon: <FileText className="w-8 h-8" />, color: 'bg-green-100 text-green-600' };
         if (isText || isCode) return { icon: <FileText className="w-8 h-8" />, color: 'bg-gray-100 text-gray-600' };
+        if (isVideo) return { icon: <FileText className="w-8 h-8" />, color: 'bg-purple-100 text-purple-600' };
+        if (isAudio) return { icon: <FileText className="w-8 h-8" />, color: 'bg-pink-100 text-pink-600' };
         return { icon: <FileText className="w-8 h-8" />, color: 'bg-gray-100 text-gray-500' };
     };
 

@@ -202,6 +202,7 @@ export function Projects() {
             </div>
           </div>
 
+
           {/* Project-type filter pills */}
           <div className="flex items-center gap-2 px-8 pt-4 shrink-0">
             <span className="text-xs text-muted-foreground font-medium mr-1">Filter:</span>

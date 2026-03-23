@@ -6,7 +6,7 @@ import { ThemeProvider } from '@/context/ThemeContext';
 import type { User as AppUser } from '@/types';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
-import { projectsApi, notificationSocket } from '@/services/api';
+import { projectsApi, notificationSocket, gatewaySocket } from '@/services/api';
 
 // Lazy-loaded page components for route-level code splitting
 const Dashboard = lazy(() => import('@/pages/Dashboard').then(m => ({ default: m.Dashboard })));
@@ -29,7 +29,11 @@ const Profile = lazy(() => import('@/pages/Profile').then(m => ({ default: m.Pro
 const ResetPassword = lazy(() => import('@/pages/ResetPassword').then(m => ({ default: m.ResetPassword })));
 const TeamChatModern = lazy(() => import('@/pages/TeamsChat/TeamChatModern').then(m => ({ default: m.TeamChatModern })));
 const Settings = lazy(() => import('@/pages/Settings').then(m => ({ default: m.Settings })));
+const SetupAccount = lazy(() => import('@/pages/TeamManagement/SetupAccount').then(m => ({ default: m.SetupAccount })));
+const WorkSpace = lazy(() => import('@/pages/TeamManagement/Workspace/Workspace').then(m => ({ default: m.WorkSpace })));
 const QuickNotesPage = lazy(() => import('@/pages/QuickNotes/QuickNotesPage').then(m => ({ default: m.QuickNotesPage })));
+const LandingPage = lazy(() => import('@/pages/LandingPage/LandingPage').then(m => ({ default: m.LandingPage })));
+const Signup = lazy(() => import('@/pages/SignUp/SignUp').then(m => ({ default: m.Signup })));
 
 function PageLoader() {
   return (
@@ -120,13 +124,33 @@ function AppRoutes() {
 
   return (
     <Routes>
+      {/* Root: unauthenticated → landing, authenticated → dashboard */}
+      <Route
+        path="/"
+        element={
+          isAuthenticated
+            ? <Navigate to="/dashboard" replace />
+            : <Suspense fallback={<PageLoader />}><LandingPage /></Suspense>
+        }
+      />
+
       <Route
         path="/login"
         element={
           isAuthenticated
-            ? <Navigate to="/users" replace />
+            ? <Navigate to="/dashboard" replace />
             : <Suspense fallback={<PageLoader />}><Login /></Suspense>
         }
+      />
+
+      <Route path="/welcome" element={<Suspense fallback={<PageLoader />}><LandingPage /></Suspense>} />
+      <Route path="/signup" element={<Suspense fallback={<PageLoader />}><Signup /></Suspense>} />
+
+
+      {/* Public — no auth required — invited user has no account yet */}
+      <Route
+        path="/setup-account"
+        element={<Suspense fallback={<PageLoader />}><SetupAccount /></Suspense>}
       />
 
       {/* Routes WITH Sidebar */}
@@ -137,7 +161,7 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route path="/" element={<Dashboard />} />
+        <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/resetPassword" element={<ResetPassword />} />
         <Route path="/projects" element={<Projects />} />
@@ -146,9 +170,9 @@ function AppRoutes() {
         <Route path="/projects/:id/settings" element={<ProjectSettings />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/documents" element={<Documents />} />
-        {/* <Route path="/documents/:id" element={<DocumentDetail />} /> */}
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/team-chat" element={<TeamChatModern />} />
+        <Route path="/team-chat/:projectId/:roomId" element={<TeamChatModern />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/quick-notes" element={<QuickNotesPage />} />
         {/* Task Detail Page (full-page view) */}
@@ -179,6 +203,7 @@ function AppRoutes() {
           <Route path="teams" element={<Teams />} />
           <Route path="user-roles" element={<UserManagement />} />
           <Route path="team-performance" element={<TeamPerformance />} />
+          <Route path="workspace" element={<WorkSpace />} />
           <Route index element={<Navigate to="teams" replace />} />
         </Route>
 
@@ -187,19 +212,20 @@ function AppRoutes() {
   );
 }
 
-// Preload the Dashboard chunk as soon as the user is authenticated so
-// there is no lazy-load delay when they land on "/" after login.
 const preloadDashboard = () => import('@/pages/Dashboard');
 
-// Global WebSocket initializer component
 function WebSocketProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
 
+  // Connect/disconnect when auth state hydrates 
   useEffect(() => {
     if (isAuthenticated) {
       notificationSocket.connect();
+      gatewaySocket.connect();
       preloadDashboard();
       return () => {
+        notificationSocket.disconnect();
+        gatewaySocket.disconnect();
       };
     }
   }, [isAuthenticated]);

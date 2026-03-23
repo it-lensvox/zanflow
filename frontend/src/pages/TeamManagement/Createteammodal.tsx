@@ -268,6 +268,7 @@ export function CreateTeamModal({ isOpen, onClose, onSuccess }: CreateTeamModalP
 
             {/* Modal */}
             <div className="relative bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden dark:bg-card">
+
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b">
                     <h2 className="text-2xl font-bold dark:text-foreground">Create New Team</h2>
@@ -281,7 +282,7 @@ export function CreateTeamModal({ isOpen, onClose, onSuccess }: CreateTeamModalP
                 </div>
 
                 {/* Content */}
-                <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+                <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)] relative">
                     {error && (
                         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
                             <p className="text-sm text-red-600">{error}</p>
@@ -316,7 +317,7 @@ export function CreateTeamModal({ isOpen, onClose, onSuccess }: CreateTeamModalP
                             />
                         </div>
 
-                        {/* Description */}
+                        {/* Description
                         <div>
                             <label className={labelClass}>Description</label>
                             <RichTextEditor
@@ -339,7 +340,7 @@ export function CreateTeamModal({ isOpen, onClose, onSuccess }: CreateTeamModalP
                                     heading: false,
                                 }}
                             />
-                        </div>
+                        </div> */}
 
                         {/* Add Members */}
                         <div>
@@ -426,6 +427,7 @@ export function CreateTeamModal({ isOpen, onClose, onSuccess }: CreateTeamModalP
                                 {/* Dropdown */}
                                 {memberDropdownOpen && !usersLoading && filteredMemberOptions.length > 0 && (
                                     <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto dark:bg-secondary" ref={memberDropdownRef}>
+
                                         {filteredMemberOptions.map((user, index) => (
                                             <div
                                                 key={user.id}

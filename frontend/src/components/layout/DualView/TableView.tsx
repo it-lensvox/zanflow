@@ -49,14 +49,15 @@ export function TableView<T>({
   maxHeight = '70vh',
 }: TableViewProps<T>) {
   return (
-    <div
-      className={`bg-card border border-border rounded-md shadow-sm overflow-auto scrollbar-hide font-sans text-[13px] ${className}`}
-      style={{
-        maxHeight: typeof maxHeight === 'number' ? `${maxHeight}px` : maxHeight,
+    <div 
+      className={`bg-white border border-[#dfe1e6] rounded-md shadow-sm font-sans text-[13px] ${className}`}
+      style={{ 
         display: 'flex',
         flexDirection: 'column',
+        maxHeight: typeof maxHeight === 'number' ? `${maxHeight}px` : maxHeight,
       }}
     >
+
       {/* Sticky Header */}
       <div className="flex-shrink-0 bg-muted/50 border-b border-border sticky top-0 z-20">
         <table className="w-full border-collapse table-fixed">
@@ -100,7 +101,7 @@ export function TableView<T>({
         </table>
       </div>
       {/* Scrollable Body */}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 overflow-auto scrollbar-hide">
         <table className="w-full border-collapse table-fixed">
           <tbody>
             {data.map((item, index) => (

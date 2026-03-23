@@ -1,7 +1,4 @@
-// src/components/common/RichTextEditor.tsx
-// Single-file Rich Text Editor component with Tailwind CSS
-
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState, Suspense, lazy, useCallback } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -36,10 +33,15 @@ import {
   Undo,
   Redo,
   Code2,
+  Paperclip,
+  Send,
+  Smile,
+  Type,
 } from 'lucide-react';
 
 
-// TYPES & INTERFACES
+// TYPES & INTERFACES 
+
 export interface EditorFeatures {
   bold?: boolean;
   italic?: boolean;
@@ -250,7 +252,7 @@ const MenuBar: React.FC<MenuBarProps> = ({ editor, features }) => {
   );
 };
 
-// EXTENSIONS CONFIGURATION
+// EXTENSIONS CONFIGURATION 
 
 const getExtensions = (placeholder: string, features: EditorFeatures) => {
   const defaultFeatures = {
@@ -325,7 +327,7 @@ const getExtensions = (placeholder: string, features: EditorFeatures) => {
   return extensions;
 };
 
-// MAIN RICH TEXT EDITOR COMPONENT
+//  MAIN RICH TEXT EDITOR COMPONENT 
 
 export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   value,
@@ -449,3 +451,454 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     </div>
   );
 };
+
+
+// ─── CHAT MESSAGE INPUT ───────────────────────────────────────────────────────
+// Teams-style chat input using Tiptap. Import & use in TeamChatModern.tsx.
+
+const EmojiPickerLazy = lazy(() => import('emoji-picker-react'));
+
+/** Features enabled for the chat input (lightweight set) */
+const CHAT_FEATURES: EditorFeatures = {
+  bold: true,
+  italic: true,
+  underline: true,
+  strikethrough: true,
+  code: true,
+  codeBlock: false,
+  bulletList: true,
+  orderedList: true,
+  blockquote: true,
+  horizontalRule: false,
+  table: false,
+  image: false,
+  heading: false,
+  textAlign: false,
+  link: false,
+};
+
+export interface ChatMessageInputProps {
+  value: string;
+  onChange: (plainText: string, html: string) => void;
+  onSend: () => void;
+  onAttachmentClick?: () => void;
+  placeholder?: string;
+  disabled?: boolean;
+  isUploading?: boolean;
+  selectedFile?: File | null;
+  filePreviewUrl?: string | null;
+  onRemoveFile?: () => void;
+}
+
+/** Compact inline formatting toolbar that slides in above the editor */
+const InlineFormatBar: React.FC<{ editor: any }> = ({ editor }) => {
+  if (!editor) return null;
+
+  const Btn = ({ onClick, active, title, children }: any) => (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className={`p-1.5 rounded-md transition-all duration-150 ${
+        active
+          ? 'bg-blue-100 text-blue-700 shadow-inner'
+          : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800'
+      }`}
+    >
+      {children}
+    </button>
+  );
+
+  const Sep = () => <div className="w-px h-4 bg-gray-200 mx-0.5 self-center flex-shrink-0" />;
+
+  return (
+    <div className="flex flex-wrap items-center gap-0.5 px-3 py-1.5 border-b border-gray-100 bg-gray-50/80 rounded-t-xl animate-in slide-in-from-top-1 duration-150">
+      <Btn
+        onClick={() => editor.chain().focus().toggleBold().run()}
+        active={editor.isActive('bold')}
+        title="Bold (Ctrl+B)"
+      >
+        <Bold className="w-3.5 h-3.5" />
+      </Btn>
+      <Btn
+        onClick={() => editor.chain().focus().toggleItalic().run()}
+        active={editor.isActive('italic')}
+        title="Italic (Ctrl+I)"
+      >
+        <Italic className="w-3.5 h-3.5" />
+      </Btn>
+      <Btn
+        onClick={() => editor.chain().focus().toggleUnderline().run()}
+        active={editor.isActive('underline')}
+        title="Underline (Ctrl+U)"
+      >
+        <UnderlineIcon className="w-3.5 h-3.5" />
+      </Btn>
+      <Btn
+        onClick={() => editor.chain().focus().toggleStrike().run()}
+        active={editor.isActive('strike')}
+        title="Strikethrough"
+      >
+        <Strikethrough className="w-3.5 h-3.5" />
+      </Btn>
+      <Sep />
+      <Btn
+        onClick={() => editor.chain().focus().toggleCode().run()}
+        active={editor.isActive('code')}
+        title="Inline Code"
+      >
+        <Code className="w-3.5 h-3.5" />
+      </Btn>
+      <Sep />
+      <Btn
+        onClick={() => editor.chain().focus().toggleBulletList().run()}
+        active={editor.isActive('bulletList')}
+        title="Bullet List"
+      >
+        <List className="w-3.5 h-3.5" />
+      </Btn>
+      <Btn
+        onClick={() => editor.chain().focus().toggleOrderedList().run()}
+        active={editor.isActive('orderedList')}
+        title="Numbered List"
+      >
+        <ListOrdered className="w-3.5 h-3.5" />
+      </Btn>
+      <Btn
+        onClick={() => editor.chain().focus().toggleBlockquote().run()}
+        active={editor.isActive('blockquote')}
+        title="Quote"
+      >
+        <Quote className="w-3.5 h-3.5" />
+      </Btn>
+      <Sep />
+      <Btn
+        onClick={() => editor.chain().focus().undo().run()}
+        active={false}
+        title="Undo (Ctrl+Z)"
+      >
+        <Undo className="w-3.5 h-3.5" />
+      </Btn>
+      <Btn
+        onClick={() => editor.chain().focus().redo().run()}
+        active={false}
+        title="Redo (Ctrl+Y)"
+      >
+        <Redo className="w-3.5 h-3.5" />
+      </Btn>
+    </div>
+  );
+};
+
+export const ChatMessageInput: React.FC<ChatMessageInputProps> = ({
+  value,
+  onChange,
+  onSend,
+  onAttachmentClick,
+  placeholder = 'Type a message…',
+  disabled = false,
+  isUploading = false,
+  selectedFile,
+  filePreviewUrl,
+  onRemoveFile,
+}) => {
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showFormatPanel, setShowFormatPanel] = useState(false);
+  const emojiContainerRef = useRef<HTMLDivElement>(null);
+
+  // Close emoji picker on outside click
+  useEffect(() => {
+    if (!showEmojiPicker) return;
+    const handler = (e: MouseEvent) => {
+      if (emojiContainerRef.current && !emojiContainerRef.current.contains(e.target as Node)) {
+        setShowEmojiPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showEmojiPicker]);
+
+  const editor = useEditor({
+    extensions: getExtensions(placeholder, CHAT_FEATURES),
+    content: value || '',
+    editable: !disabled,
+    onUpdate: ({ editor: e }) => {
+      const html = e.getHTML();
+      const text = e.getText();
+      onChange(text, html);
+    },
+  });
+
+  // Sync external clear (value === '') back into the editor
+  useEffect(() => {
+    if (!editor) return;
+    if (value === '' && editor.getText() !== '') {
+      editor.commands.setContent('');
+    }
+  }, [value, editor]);
+
+  // Update editable state when disabled changes
+  useEffect(() => {
+    if (editor) {
+      editor.setEditable(!disabled);
+    }
+  }, [disabled, editor]);
+
+  // Insert emoji at current cursor position
+  const handleEmojiSelect = useCallback(
+    (emojiData: any) => {
+      if (!editor) return;
+      editor.chain().focus().insertContent(emojiData.emoji).run();
+      const html = editor.getHTML();
+      const text = editor.getText();
+      onChange(text, html);
+      setShowEmojiPicker(false);
+    },
+    [editor, onChange]
+  );
+
+  // Send on Enter, new line on Shift+Enter
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      const hasContent = editor ? editor.getText().trim().length > 0 : false;
+      if ((hasContent || selectedFile) && !isUploading) {
+        onSend();
+      }
+    }
+  };
+
+  const canSend =
+    !isUploading &&
+    ((editor ? editor.getText().trim().length > 0 : false) || !!selectedFile);
+
+    return (
+    <div className="px-3 py-2 bg-white border-t border-gray-200">
+
+      {/* Format toolbar — slides in above when toggled */}
+      {showFormatPanel && <InlineFormatBar editor={editor} />}
+
+      {/* File preview — shown above the input row when a file is attached */}
+      {selectedFile && (
+        <div className="mb-1.5 px-1">
+          <div className="inline-flex items-center gap-2 px-2.5 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700 max-w-[300px]">
+            {filePreviewUrl ? (
+              <img src={filePreviewUrl} alt="preview" className="h-7 w-7 rounded object-cover flex-shrink-0" />
+            ) : (
+              <div className="h-7 w-7 rounded bg-blue-100 flex items-center justify-center flex-shrink-0">
+                <Paperclip className="w-3.5 h-3.5 text-blue-500" />
+              </div>
+            )}
+            <span className="truncate font-medium flex-1 min-w-0">{selectedFile.name}</span>
+            <span className="text-blue-400 flex-shrink-0 whitespace-nowrap">
+              {(selectedFile.size / 1024).toFixed(1)} KB
+            </span>
+            {onRemoveFile && (
+              <button
+                type="button"
+                onClick={onRemoveFile}
+                className="flex-shrink-0 text-blue-400 hover:text-blue-700 transition-colors ml-1"
+                title="Remove file"
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+    {/* ── Single-row: editor + buttons + send ── */}
+      <div
+        className={`flex items-end gap-1 rounded-xl border bg-white overflow-visible transition-all duration-200 px-3 ${
+          showFormatPanel
+            ? 'border-blue-400 ring-1 ring-blue-100'
+            : 'border-gray-300 focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-100'
+        }`}
+      >
+        {/* Tiptap editor — grows to fill available width */}
+        <div onKeyDown={handleKeyDown} className="flex-1 min-w-0">
+          <EditorContent
+            editor={editor}
+            className="
+              py-2 text-sm text-gray-900
+              [&_.ProseMirror]:outline-none
+              [&_.ProseMirror]:min-h-[22px]
+              [&_.ProseMirror]:max-h-28
+              [&_.ProseMirror]:overflow-y-auto
+              [&_.ProseMirror_p]:m-0
+              [&_.ProseMirror_p]:leading-snug
+              [&_.ProseMirror_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)]
+              [&_.ProseMirror_p.is-editor-empty:first-child::before]:text-gray-400
+              [&_.ProseMirror_p.is-editor-empty:first-child::before]:absolute
+              [&_.ProseMirror_p.is-editor-empty:first-child::before]:pointer-events-none
+              [&_.ProseMirror_p]:relative
+              [&_.ProseMirror_strong]:font-semibold
+              [&_.ProseMirror_em]:italic
+              [&_.ProseMirror_u]:underline
+              [&_.ProseMirror_s]:line-through
+              [&_.ProseMirror_code]:bg-gray-100
+              [&_.ProseMirror_code]:text-red-600
+              [&_.ProseMirror_code]:px-1
+              [&_.ProseMirror_code]:py-0.5
+              [&_.ProseMirror_code]:rounded
+              [&_.ProseMirror_code]:text-xs
+              [&_.ProseMirror_code]:font-mono
+              [&_.ProseMirror_ul]:list-disc
+              [&_.ProseMirror_ul]:pl-5
+              [&_.ProseMirror_ul]:my-1
+              [&_.ProseMirror_ol]:list-decimal
+              [&_.ProseMirror_ol]:pl-5
+              [&_.ProseMirror_ol]:my-1
+              [&_.ProseMirror_li]:my-0.5
+              [&_.ProseMirror_blockquote]:border-l-4
+              [&_.ProseMirror_blockquote]:border-gray-300
+              [&_.ProseMirror_blockquote]:pl-3
+              [&_.ProseMirror_blockquote]:text-gray-500
+              [&_.ProseMirror_blockquote]:italic
+              [&_.ProseMirror_blockquote]:my-1
+            "
+          />
+        </div>
+
+       {/* ── Right-side buttons — pinned to bottom, never shift on multiline ── */}
+        <div className="flex items-center gap-0.5 flex-shrink-0 self-end pb-1.5">
+
+          {/* Format toggle */}
+          <button
+            type="button"
+            title={showFormatPanel ? 'Hide formatting' : 'Show formatting'}
+            onClick={() => setShowFormatPanel(v => !v)}
+            className={`p-1.5 rounded-lg transition-colors ${
+              showFormatPanel
+                ? 'bg-blue-100 text-blue-600'
+                : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
+            }`}
+          >
+            <Type className="w-4 h-4" />
+          </button>
+
+          {/* Emoji */}
+          <div ref={emojiContainerRef} className="relative">
+            <button
+              type="button"
+              title="Emoji"
+              onClick={() => setShowEmojiPicker(v => !v)}
+              className={`p-1.5 rounded-lg transition-colors ${
+                showEmojiPicker
+                  ? 'bg-blue-100 text-blue-600'
+                  : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
+              }`}
+            >
+              <Smile className="w-4 h-4" />
+            </button>
+            {showEmojiPicker && (
+              <div className="absolute bottom-10 right-0 mb-1 z-[9999] shadow-2xl rounded-xl overflow-hidden">
+                <Suspense
+                  fallback={
+                    <div
+                      style={{ width: 320, height: 400 }}
+                      className="bg-white border border-gray-200 rounded-xl flex items-center justify-center"
+                    >
+                      <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  }
+                >
+                  <EmojiPickerLazy
+                    onEmojiClick={handleEmojiSelect}
+                    width={320}
+                    height={400}
+                    searchPlaceHolder="Search emoji…"
+                    previewConfig={{ showPreview: false }}
+                  />
+                </Suspense>
+              </div>
+            )}
+          </div>
+
+          {/* Attachment */}
+          {onAttachmentClick && (
+            <button
+              type="button"
+              title="Attach file"
+              onClick={onAttachmentClick}
+              className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+            >
+              <Paperclip className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* Send — moved inside the border box, same row */}
+          <button
+            type="button"
+            onClick={onSend}
+            disabled={!canSend}
+            title="Send message (Enter)"
+            className={`p-1.5 rounded-lg transition-all duration-150 ${
+              canSend
+                ? 'text-blue-600 hover:bg-blue-50 active:scale-95'
+                : 'text-gray-300 cursor-not-allowed'
+            }`}
+          >
+            {isUploading ? (
+              <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+ 
+};
+
+// UTILITY
+
+/**
+ * Converts a subset of Markdown (##/###/** bold **) to HTML
+ * so it can be fed directly into Tiptap's readOnly RichTextEditor.
+ */
+export function markdownToHtml(markdown: string): string {
+  if (!markdown) return '';
+  const lines = markdown.split('\n');
+  const htmlLines = lines.map(line => {
+    // ### heading → <h3>, ## heading → <h2>, # heading → <h1>
+    const h3 = line.match(/^###\s+(.*)/);
+    if (h3) return `<h3>${h3[1]}</h3>`;
+    const h2 = line.match(/^##\s+(.*)/);
+    if (h2) return `<h2>${h2[1]}</h2>`;
+    const h1 = line.match(/^#\s+(.*)/);
+    if (h1) return `<h1>${h1[1]}</h1>`;
+
+    // Bullet list items
+    const bullet = line.match(/^[-*]\s+(.*)/);
+    if (bullet) return `<li>${applyInline(bullet[1])}</li>`;
+
+    // Numbered list items
+    const numbered = line.match(/^\d+\.\s+(.*)/);
+    if (numbered) return `<li>${applyInline(numbered[1])}</li>`;
+
+    // Empty line → paragraph break
+    if (line.trim() === '') return '<br>';
+
+    return `<p>${applyInline(line)}</p>`;
+  });
+
+  // Wrap consecutive <li> in <ul>
+  const joined = htmlLines.join('');
+  return joined.replace(/(<li>.*?<\/li>)+/gs, match => `<ul>${match}</ul>`);
+}
+
+function applyInline(text: string): string {
+  // **bold** → <strong>bold</strong>
+  return text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+}
+
+export function htmlToPlainText(html: string): string {
+  if (typeof document === 'undefined') return html;
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  return div.textContent || div.innerText || '';
+}

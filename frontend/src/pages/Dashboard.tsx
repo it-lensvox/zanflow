@@ -456,9 +456,6 @@ export function Dashboard() {
                   <FileText className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
                   <p className="text-sm text-muted-foreground mb-2">No documents yet</p>
                   <Link to="/projects">
-                    {/* <Button variant="outline" size="sm" className="mt-2">
-                      Create Document
-                    </Button> */}
                   </Link>
                 </div>
               ) : (
@@ -476,9 +473,9 @@ export function Dashboard() {
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           <div className="flex-1 min-w-0">
                             <div className="font-medium truncate">{doc.name}</div>
-                            <div className="text-sm text-muted-foreground truncate">
+                            {/* <div className="text-sm text-muted-foreground truncate">
                               {doc.project_name || `Project ${doc.project}`}
-                            </div>
+                            </div> */}
                           </div>
                         </div>
 
@@ -578,7 +575,7 @@ export function Dashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
-              <h2 className="text-xl font-bold">Recent Projects</h2>
+              <h2 className="text-xl font-bold">Favourite Projects</h2>
             </CardTitle>
             <Link to="/projects">
               <Button variant="ghost" size="sm">
@@ -627,19 +624,19 @@ export function Dashboard() {
               <Link to="/documents">
                 <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
                   <FileText className="h-6 w-6" />
-                  <span>Browse Documents</span>
+                  <span>Documents</span>
                 </Button>
               </Link>
               <Link to="/documents?status=in_review">
                 <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
                   <Clock className="h-6 w-6" />
-                  <span>Review Queue</span>
+                  <span>Review Doc</span>
                 </Button>
               </Link>
               <Link to="/documents?status=approved">
                 <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
                   <CheckCircle className="h-6 w-6" />
-                  <span>Approved Docs</span>
+                  <span>Approved Doc</span>
                 </Button>
               </Link>
             </div>
