@@ -16,6 +16,12 @@ import { Button } from '@/components/common/Button';
 import { useNotifications } from '@/hooks/useNotifications';
 import { NotificationsPage } from '../NotificationsPage';
 
+const DATE_FIELD_OPTIONS: { value: 'end_date' | 'start_date' | 'created_at'; label: string }[] = [
+    { value: 'end_date', label: 'Due Date' },
+    { value: 'start_date', label: 'Start Date' },
+    { value: 'created_at', label: 'Created At' },
+];
+
 export const MyTask: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -35,11 +41,14 @@ export const MyTask: React.FC = () => {
         enabled: !!user,
     });
 
-    const { data: tasksData, isLoading: loading } = useQuery({
+    const { data: tasksData, isLoading: loading, isFetching, isPlaceholderData } = useQuery({
         queryKey: ['tasks'],
         queryFn: () => taskApi.list(),
         enabled: !!user,
+        staleTime: 1000 * 60 * 2,
+        placeholderData: (prev) => prev,
     });
+    
 
     const tasks = React.useMemo(() => {
         if (!tasksData || !user) return [];
@@ -102,15 +111,33 @@ export const MyTask: React.FC = () => {
     const handleCloseTaskDetail = useCallback(() => setSelectedTask(null), []);
 
     const handleSelectedTaskUpdate = useCallback((updatedTask: Task) => {
+        queryClient.setQueryData(['tasks'], (old: any) => {
+            if (!old) return old;
+            if (Array.isArray(old)) return old.map(t => t.id === updatedTask.id ? updatedTask : t);
+            if (old.tasks) return { ...old, tasks: old.tasks.map((t: Task) => t.id === updatedTask.id ? updatedTask : t) };
+            if (old.results) return { ...old, results: old.results.map((t: Task) => t.id === updatedTask.id ? updatedTask : t) };
+            return old;
+        });
         queryClient.invalidateQueries({ queryKey: ['tasks'] });
         setSelectedTask(updatedTask);
     }, [queryClient]);
 
-    const handleDeleteTask = useCallback(async (id: number) => {
+   const handleDeleteTask = useCallback(async (id: number) => {
+    queryClient.setQueryData(['tasks'], (old: any) => {
+        if (!old) return old;
+        if (Array.isArray(old)) return old.filter(t => t.id !== id);
+        if (old.tasks) return { ...old, tasks: old.tasks.filter((t: Task) => t.id !== id) };
+        if (old.results) return { ...old, results: old.results.filter((t: Task) => t.id !== id) };
+        return old;
+    });
+    setSelectedTask(null);
+
+    try {
         await taskApi.delete(id);
+    } catch (err) {
         queryClient.invalidateQueries({ queryKey: ['tasks'] });
-        setSelectedTask(null);
-    }, [queryClient]);
+    }
+}, [queryClient]);
 
     const filteredTasks = React.useMemo(() => {
         return hookFilteredTasks.filter((task: Task) => {
@@ -134,13 +161,13 @@ export const MyTask: React.FC = () => {
     }, []);
 
     // Create table columns configuration
-    const tableColumns = createTasksTableColumns({
+ const tableColumns = useMemo(() => createTasksTableColumns({
         onTaskClick: handleTaskClick,
         queryClient,
         user,
         navigate,
         dateField,
-    });
+    }), [handleTaskClick, queryClient, user, navigate, dateField]);
     const { unreadCount } = useNotifications();
 
     const { isActivityOpen, setIsActivityOpen } = useOutletContext<{
@@ -148,11 +175,6 @@ export const MyTask: React.FC = () => {
         setIsActivityOpen: (open: boolean) => void;
     }>();
 
-    const DATE_FIELD_OPTIONS: { value: 'end_date' | 'start_date' | 'created_at'; label: string }[] = [
-        { value: 'end_date', label: 'Due Date' },
-        { value: 'start_date', label: 'Start Date' },
-        { value: 'created_at', label: 'Created At' },
-    ];
     const activeDateLabel = DATE_FIELD_OPTIONS.find(o => o.value === dateField)?.label ?? 'Due Date';
     const dateTriggerRef = useRef<HTMLButtonElement>(null);
     const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
@@ -190,12 +212,13 @@ export const MyTask: React.FC = () => {
     return (
         <div className="w-full p-8 space-y-8">
             {location.pathname.startsWith('/taskboard') && !location.pathname.endsWith('/create') ? (
-                loading ? (
-                    <div className="flex items-center justify-center h-64">
-                        {/* <div className="animate-spin h-8 w-8 border-b-2 border-blue-600" /> */}
-                    </div>
-                ) : (
-                    <>
+                // loading ? (
+                //     <div className="flex items-center justify-center h-64">
+                //         {/* <div className="animate-spin h-8 w-8 border-b-2 border-blue-600" /> */}
+                //     </div>
+                // ) : (
+                //     <>
+                <>
                         <div>
                             <div className="flex flex-col gap-6">
                                 {/* Header Section */}
@@ -384,7 +407,10 @@ export const MyTask: React.FC = () => {
                             </div>
                         </div>
                     </>
-                )
+            //     )
+            // ) : (
+            //     <Outlet />
+            // )}
             ) : (
                 <Outlet />
             )}
