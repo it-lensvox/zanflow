@@ -433,73 +433,83 @@ export function ContentCreation() {
     );
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file || !id) return;
+        const files = e.target.files;
+        if (!files || files.length === 0 || !id) return;
 
         const MAX_FILE_SIZE = 500 * 1024 * 1024;
-        if (file.size > MAX_FILE_SIZE) {
-            setUploadError('File size exceeds the 500 MB limit.');
-            return;
+        
+        for (let i = 0; i < files.length; i++) {
+            if (files[i].size > MAX_FILE_SIZE) {
+                setUploadError(`File ${files[i].name} exceeds the 500 MB limit.`);
+                return;
+            }
         }
 
         try {
             setIsUploading(true);
             setUploadError(null);
-
-            // Step 1: Get Upload URL
             const projectIdNum = Number(id);
+            const newUploadedDocs: any[] = [];
 
-            const uploadUrlResponse = await documentsApi.getUploadUrl(projectIdNum, {
-                file_name: file.name,
-                file_type: file.type || 'application/octet-stream',
-            });
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
 
-            const { url: s3Url, fields: s3Fields, file_key } = uploadUrlResponse;
+                // Step 1: Get Upload URL
+                const uploadUrlResponse = await documentsApi.getUploadUrl(projectIdNum, {
+                    file_name: file.name,
+                    file_type: file.type || 'application/octet-stream',
+                });
 
-            // Step 2: Direct S3 Upload
-            await documentsApi.uploadFileToS3(s3Url, s3Fields, file);
+                const { url: s3Url, fields: s3Fields, file_key } = uploadUrlResponse;
 
-            // Step 3: Confirm Upload
-            const ext = file.name.split('.').pop()?.toLowerCase() || '';
-            const imageTypes = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'];
-            const docTypes = ['doc', 'docx', 'pdf', 'txt', 'rtf'];
-            const spreadsheetTypes = ['xls', 'xlsx', 'csv'];
-            const presentationTypes = ['ppt', 'pptx'];
+                // Step 2: Direct S3 Upload
+                await documentsApi.uploadFileToS3(s3Url, s3Fields, file);
 
-            let mappedType = 'other';
-            if (imageTypes.includes(ext)) mappedType = 'image';
-            else if (ext === 'pdf') mappedType = 'pdf';
-            else if (ext === 'json') mappedType = 'json';
-            else if (docTypes.includes(ext) || spreadsheetTypes.includes(ext) || presentationTypes.includes(ext)) mappedType = 'document';
-            else if (['mp4', 'mov', 'avi', 'webm'].includes(ext)) mappedType = 'video';
-            else if (['mp3', 'wav', 'ogg'].includes(ext)) mappedType = 'audio';
-            else if (ext === 'zip' || ext === 'xml') mappedType = ext;
+                // Step 3: Confirm Upload
+                const ext = file.name.split('.').pop()?.toLowerCase() || '';
+                const imageTypes = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'];
+                const docTypes = ['doc', 'docx', 'pdf', 'txt', 'rtf'];
+                const spreadsheetTypes = ['xls', 'xlsx', 'csv'];
+                const presentationTypes = ['ppt', 'pptx'];
 
-            const confirmResponse = await documentsApi.confirmUpload(projectIdNum, {
-                file_key: file_key,
-                file_name: file.name,
-                file_type: mappedType,
-            });
+                let mappedType = 'other';
+                if (imageTypes.includes(ext)) mappedType = 'image';
+                else if (ext === 'pdf') mappedType = 'pdf';
+                else if (ext === 'json') mappedType = 'json';
+                else if (docTypes.includes(ext) || spreadsheetTypes.includes(ext) || presentationTypes.includes(ext)) mappedType = 'document';
+                else if (['mp4', 'mov', 'avi', 'webm'].includes(ext)) mappedType = 'video';
+                else if (['mp3', 'wav', 'ogg'].includes(ext)) mappedType = 'audio';
+                else if (ext === 'zip' || ext === 'xml') mappedType = ext;
 
-            // Step 4: Call Get Download URL
-            if (confirmResponse.id) {
-                await documentsApi.getDownloadUrl(projectIdNum, { document_id: confirmResponse.id });
+                const confirmResponse = await documentsApi.confirmUpload(projectIdNum, {
+                    file_key: file_key,
+                    file_name: file.name,
+                    file_type: mappedType,
+                });
+
+                // Step 4: Call Get Download URL
+                if (confirmResponse.id) {
+                    await documentsApi.getDownloadUrl(projectIdNum, { document_id: confirmResponse.id });
+                    
+                    if (user) {
+                        newUploadedDocs.push({
+                            id: confirmResponse.id,
+                            created_by: {
+                                id: user.id,
+                                username: user.username,
+                                full_name: `${user.first_name} ${user.last_name}`.trim() || user.username,
+                            },
+                            file_type: mappedType,
+                            project_name: project?.name || 'General',
+                        });
+                    }
+                }
             }
-            if (confirmResponse.id && user) {
-                setAllMediaFiles(prev => [
-                    ...prev,
-                    {
-                        id: confirmResponse.id,
-                        created_by: {
-                            id: user.id,
-                            username: user.username,
-                            full_name: `${user.first_name} ${user.last_name}`.trim() || user.username,
-                        },
-                        file_type: mappedType,
-                        project_name: project?.name || 'General',
-                    },
-                ]);
+
+            if (newUploadedDocs.length > 0) {
+                setAllMediaFiles(prev => [...prev, ...newUploadedDocs]);
             }
+
             // Reset pagination state to show new document immediately
             setMediaPage(1);
             setHasMoreMedia(true);
@@ -981,6 +991,7 @@ export function ContentCreation() {
                                                 onChange={handleFileUpload}
                                                 disabled={isUploading}
                                                 accept="*"
+                                                multiple
                                             />
                                             {isUploading ? (
                                                 <Loader2 className="w-4 h-4 animate-spin" />

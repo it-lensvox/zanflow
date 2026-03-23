@@ -230,16 +230,22 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     const [activeDropdown, setActiveDropdown] = useState(false);
     const statusConfig = getStatusConfig(task.status);
 
-    const handleStatusChange = async (newStatus: string) => {
-      try {
-        await taskApi.update(task.id, { status: newStatus } as any);
-        queryClient.invalidateQueries({ queryKey: ['tasks'] });
-        setActiveDropdown(false);
-      } catch (error) {
-        console.error('Failed to update status:', error);
-      }
-    };
+    const handleStatusChange = (newStatus: string) => {
+      queryClient.setQueryData(['tasks'], (old: any) => {
+        if (!old) return old;
+        const updater = (t: Task) => t.id === task.id ? { ...t, status: newStatus } : t;
+        if (Array.isArray(old)) return old.map(updater);
+        if (old.tasks) return { ...old, tasks: old.tasks.map(updater) };
+        if (old.results) return { ...old, results: old.results.map(updater) };
+        return old;
+      });
+      setActiveDropdown(false);
 
+      taskApi.update(task.id, { status: newStatus } as any).catch((error) => {
+        console.error('Failed to update status:', error);
+        queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      });
+    };
     const trigger = (
       <div
         className={`px-2.5 py-1 rounded text-[11px] font-medium ${statusConfig.bg} ${statusConfig.text} cursor-pointer hover:opacity-80 transition-opacity flex items-center gap-1`}
@@ -290,14 +296,21 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     const [activeDropdown, setActiveDropdown] = useState(false);
     const priorityOption = priorityOptions.find(opt => opt.value === task.priority);
 
-    const handlePriorityChange = async (newPriority: string) => {
-      try {
-        await taskApi.update(task.id, { priority: newPriority } as any);
-        queryClient.invalidateQueries({ queryKey: ['tasks'] });
-        setActiveDropdown(false);
-      } catch (error) {
+    const handlePriorityChange = (newPriority: string) => {
+      queryClient.setQueryData(['tasks'], (old: any) => {
+        if (!old) return old;
+        const updater = (t: Task) => t.id === task.id ? { ...t, priority: newPriority } : t;
+        if (Array.isArray(old)) return old.map(updater);
+        if (old.tasks) return { ...old, tasks: old.tasks.map(updater) };
+        if (old.results) return { ...old, results: old.results.map(updater) };
+        return old;
+      });
+      setActiveDropdown(false);
+
+      taskApi.update(task.id, { priority: newPriority } as any).catch((error) => {
         console.error('Failed to update priority:', error);
-      }
+        queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      });
     };
 
     const trigger = (
@@ -336,18 +349,27 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
 
   // Date Input Component
   const DateInput = ({ task, field }: { task: Task; field: 'start_date' | 'end_date' }) => {
-    const handleDateChange = async (value: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleDateChange = (value: string, e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.type === 'blur') {
         e.stopPropagation();
       }
       if (!value) return;
 
-      try {
-        await taskApi.update(task.id, { [field]: `${value}T12:00:00Z` });
-        queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      } catch (error) {
+      const isoValue = `${value}T12:00:00Z`;
+
+      queryClient.setQueryData(['tasks'], (old: any) => {
+        if (!old) return old;
+        const updater = (t: Task) => t.id === task.id ? { ...t, [field]: isoValue } : t;
+        if (Array.isArray(old)) return old.map(updater);
+        if (old.tasks) return { ...old, tasks: old.tasks.map(updater) };
+        if (old.results) return { ...old, results: old.results.map(updater) };
+        return old;
+      });
+
+      taskApi.update(task.id, { [field]: isoValue }).catch((error) => {
         console.error('Failed to update date:', error);
-      }
+        queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      });
     };
 
     return (
@@ -507,7 +529,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
           ? <span className="text-[13px] text-gray-600 pl-1">{formatDate(task.created_at || '')}</span>
           : <DateInput task={task} field={dateField as 'start_date' | 'end_date'} />,
     },
-     {
+    {
       key: 'updated_at',
       label: <span className="text-[14px] font-bold tracking-wide text-gray-700">Updated</span>,
       width: '8%',

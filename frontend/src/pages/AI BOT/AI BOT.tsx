@@ -39,8 +39,6 @@ function generateId() {
 // Derive page name + optional entity id from the current URL path
 function getPageContext(pathname: string): { page: string; id: string | number | null } {
     const segments = pathname.split('/').filter(Boolean);
-    // e.g. /tasks/42  →  { page: 'tasks', id: 42 }
-    // e.g. /dashboard →  { page: 'dashboard', id: null }
     const page = segments[0] ?? 'dashboard';
     const rawId = segments[1];
     const id = rawId && !isNaN(Number(rawId)) ? Number(rawId) : (rawId ?? null);
@@ -118,7 +116,7 @@ export function AIBot() {
             const msg = aiBotApi.parseMessage(event);
             if (!msg) return;
 
-          if (msg.type === 'ai_chunk' || msg.type === 'ai_response') {
+            if (msg.type === 'ai_chunk' || msg.type === 'ai_response') {
                 streamBufferRef.current += msg.text;
                 const currentText = streamBufferRef.current;
                 const sessionId = activeSessionIdRef.current;
@@ -268,32 +266,28 @@ export function AIBot() {
         }
     }, [sendMessage]);
 
-    // ── Derived ───────────────────────────────────────────────────────────────
+    // ── Derived 
 
     const activeSession = sessions.find(s => s.id === activeSessionId);
     const filteredSessions = sessions.filter(s =>
         s.title.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    // ── COLLAPSED — icon only, matches Thread's collapsed pill style ──────────
-
     if (!isExpanded) {
         return (
-            <div className="fixed bottom-5 right-20 z-50">
+            <div className="fixed bottom-6 right-6 z-50">
                 <button
                     onClick={() => setIsExpanded(true)}
                     title="Open AI Bot"
-                    className="w-14 h-14 bg-white rounded-full shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-200 hover:scale-105 flex items-center justify-center"
+                    className="w-12 h-12 bg-[#1a1a2e] rounded-full shadow-lg border border-[#2d2d4e] hover:shadow-xl hover:bg-[#22223a] transition-all duration-200 hover:scale-105 flex items-center justify-center text-white"
                 >
-                    <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white">
-                        <Bot className="w-5 h-5" />
-                    </div>
+                    <Bot className="w-6 h-6" />
                 </button>
             </div>
         );
     }
 
-    // ── History Panel — exact Thread theme (white/gray-50) ───────────────────
+    // History Panel 
 
     const historyPanelJSX = (
         <div className="flex flex-col h-full">
@@ -360,7 +354,7 @@ export function AIBot() {
         </div>
     );
 
-    // ── Chat Area — exact Thread theme (bg-[#f0ede8], #2d6a5f bubbles) ────────
+    // Chat Area 
 
     const chatAreaJSX = (
         <>
@@ -398,10 +392,10 @@ export function AIBot() {
                                     {message.sender === 'bot' && (
                                         <p className="text-xs font-semibold text-gray-600 mb-1">AI Bot</p>
                                     )}
-                                   {message.sender === 'bot' ? (
+                                    {message.sender === 'bot' ? (
                                         <RichTextEditor
                                             value={markdownToHtml(message.text)}
-                                            onChange={() => {}}
+                                            onChange={() => { }}
                                             readOnly
                                             showToolbar={false}
                                             minHeight="0px"
@@ -435,7 +429,7 @@ export function AIBot() {
                 )}
             </div>
 
-            {/* Input — exact Thread style */}
+            {/* Input */}
             <div className="border-t border-gray-200 p-3 bg-white">
                 {activeSession ? (
                     <div className="flex items-end gap-2">
@@ -468,8 +462,6 @@ export function AIBot() {
             </div>
         </>
     );
-
-    // ── Render
 
     return (
         <>
@@ -536,7 +528,7 @@ export function AIBot() {
                 </div>
             ) : (
                 /* MINI WIDGET */
-                <div className="fixed bottom-20 right-4 z-50">
+                <div className="fixed bottom-[76px] right-6 z-50">
                     <div
                         className="bg-white rounded-lg shadow-2xl border border-gray-200 flex overflow-hidden"
                         style={{

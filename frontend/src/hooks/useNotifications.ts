@@ -43,6 +43,14 @@ export function useNotifications() {
 
       // Force refetch with resetQueries to ensure fresh data
       queryClient.resetQueries({ queryKey: ['notifications-initial'] });
+
+      // Real-time task sync: when a task-related notification arrives,
+      const isTaskNotification =
+        notification.related_object?.type === 'task' ||
+        notification.title?.toLowerCase().includes('task');
+        if (isTaskNotification) {
+          queryClient.refetchQueries({ queryKey: ['tasks'] });
+        }
     });
     
     return () => {

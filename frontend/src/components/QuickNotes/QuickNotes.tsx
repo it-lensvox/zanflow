@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  NotebookPen, Plus, FolderPlus, Maximize2, X, Folder, FileText, MoreVertical,
+  NotebookPen, Plus, FolderPlus, Maximize2, X, Folder, FileText, MoreVertical, Paperclip, Loader2, Trash2,
 } from 'lucide-react';
 import { cn, formatRelativeTime } from '@/lib/utils';
 import { quickNotesApi } from '@/services/api';
 import type { QuickNote, QuickNoteFolder } from '@/types';
 import DeleteModal from '@/components/common/Deletemodal';
+import { DocumentPreview } from '@/components/common/DocumentPreview'; 
 
 // UI State model
 
@@ -74,14 +75,13 @@ export function useQuickNotes() {
     setState((prev) => ({
       ...prev,
       pendingNote: { folderId: targetFolder },
-      selectedNoteId: null, // deselect any existing note
+      selectedNoteId: null, 
     }));
   };
 
   const updateNote = async (id: number | 'pending', content: string): Promise<void> => {
-    // If this is the pending (unsaved) note — POST it now with real content so AI can generate title
     if (id === 'pending') {
-      if (!content.trim()) return; // nothing typed yet, don't create
+      if (!content.trim()) return;
       const currentState = await new Promise<QuickNotesState>((resolve) => {
         setState((prev) => { resolve(prev); return prev; });
       });
@@ -109,7 +109,6 @@ export function useQuickNotes() {
     }));
     try {
       const updated = await quickNotesApi.updateNote(id, { content });
-      // Sync full backend response — title stays as AI-generated, won't overwrite
       setState((prev) => ({
         ...prev,
         notes: prev.notes.map((n) =>
@@ -202,6 +201,28 @@ export function useQuickNotes() {
     setState((prev) => ({ ...prev, selectedNoteId: noteId }));
   };
 
+  const addAttachmentToNote = (noteId: number, attachment: import('@/types').QuickNoteAttachment): void => {
+    setState((prev) => ({
+      ...prev,
+      notes: prev.notes.map((n) =>
+        n.id === noteId
+          ? { ...n, attachments: [...(n.attachments || []), attachment] }
+          : n
+      ),
+    }));
+  };
+
+  const removeAttachmentFromNote = (noteId: number, attachmentId: number): void => {
+    setState((prev) => ({
+      ...prev,
+      notes: prev.notes.map((n) =>
+        n.id === noteId
+          ? { ...n, attachments: n.attachments?.filter(a => a.id !== attachmentId) || [] }
+          : n
+      ),
+    }));
+  };
+
   return {
     state,
     getNotesForFolder,
@@ -215,10 +236,12 @@ export function useQuickNotes() {
     selectNote,
     renameFolder,
     deleteFolder,
+    addAttachmentToNote,
+    removeAttachmentFromNote,
   };
 }
 
-// Shared toolbar icon button (mini window only)
+// Shared toolbar icon button
 
 function ToolbarBtn({
   icon,
@@ -240,7 +263,7 @@ function ToolbarBtn({
   );
 }
 
-// ─── Folder sidebar ───────────────────────────────────────────────────────────
+// Folder sidebar
 
 interface FolderSidebarProps {
   state: QuickNotesState;
@@ -474,7 +497,7 @@ export function FolderSidebar({
   );
 }
 
-// ─── Notes list ───────────────────────────────────────────────────────────────
+// Notes list
 
 interface NotesListProps {
   state: QuickNotesState;
@@ -608,9 +631,6 @@ export function NotesList({
                       <p className="text-[10px] text-muted-foreground mt-0.5">
                         {formatRelativeTime(note.updated_at)}
                       </p>
-                      {/* {preview && !isRenaming && (
-                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2 leading-snug">{preview}</p>
-                      )} */}
                     </div>
 
                     {/* Ellipsis trigger */}
@@ -678,6 +698,8 @@ interface NoteEditorProps {
   isPending?: boolean;
   getNoteTitle: (note: QuickNote) => string;
   onUpdateNote: (id: number | 'pending', content: string) => void;
+  onAddAttachment: (noteId: number, attachment: import('@/types').QuickNoteAttachment) => void;
+  onRemoveAttachment: (noteId: number, attachmentId: number) => void;
   editorRef?: React.RefObject<HTMLTextAreaElement>;
 }
 
@@ -686,10 +708,54 @@ export function NoteEditor({
   isPending = false,
   getNoteTitle,
   onUpdateNote,
+  onAddAttachment,
+  onRemoveAttachment,
   editorRef,
 }: NoteEditorProps) {
   const [localContent, setLocalContent] = useState(selectedNote?.content ?? '');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState<import('@/types').QuickNoteAttachment | null>(null);
+  const [attachmentToDelete, setAttachmentToDelete] = useState<{ id: number; name: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteClick = (e: React.MouseEvent, attachment: import('@/types').QuickNoteAttachment) => {
+    e.stopPropagation();
+    setAttachmentToDelete({ id: attachment.id, name: attachment.filename });
+  };
+
+  const confirmDeleteAttachment = async () => {
+    if (!selectedNote || !attachmentToDelete) return;
+    
+    try {
+      setIsDeleting(true);
+      await quickNotesApi.deleteAttachment(attachmentToDelete.id);
+      onRemoveAttachment(selectedNote.id, attachmentToDelete.id);
+      setAttachmentToDelete(null);
+    } catch (error) {
+      console.error('Failed to delete attachment:', error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedNote || isPending) return;
+
+    try {
+      setIsUploading(true);
+      const newAttachment = await quickNotesApi.uploadAttachment(selectedNote.id, file);
+      onAddAttachment(selectedNote.id, newAttachment);
+      // Optional: Add toast success notification here if your app has a global toast provider
+    } catch (error) {
+      console.error('Failed to upload attachment:', error);
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   // Sync local content when selected note changes
   useEffect(() => {
@@ -728,23 +794,104 @@ export function NoteEditor({
 
   return (
     <div className="flex-1 flex flex-col bg-background overflow-hidden">
-      <div className="px-8 pt-6 pb-2 shrink-0 border-b border-border">
-        <p className="text-lg font-semibold text-foreground truncate">
-          {selectedNote ? getNoteTitle(selectedNote) : 'New Note'}
-        </p>
-        <p className="text-[10px] text-muted-foreground mt-1">
-          {selectedNote ? formatRelativeTime(selectedNote.updated_at) : 'Start typing to save…'}
-        </p>
+      <div className="px-8 pt-6 pb-2 shrink-0 border-b border-border flex items-start justify-between">
+        <div className="flex-1 min-w-0">
+          <p className="text-lg font-semibold text-foreground truncate">
+            {selectedNote ? getNoteTitle(selectedNote) : 'New Note'}
+          </p>
+          <p className="text-[10px] text-muted-foreground mt-1">
+            {selectedNote ? formatRelativeTime(selectedNote.updated_at) : 'Start typing to save…'}
+          </p>
+        </div>
+        {selectedNote && !isPending && (
+          <div className="shrink-0 ml-4 flex items-center">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              className="hidden"
+              accept="*/*"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              title="Upload Document"
+              className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50"
+            >
+              {isUploading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Paperclip className="h-4 w-4" />
+              )}
+            </button>
+          </div>
+        )}
       </div>
-      <textarea
-        ref={editorRef}
-        value={localContent}
-        onChange={handleChange}
-        autoFocus={isPending}
-        className="flex-1 resize-none bg-transparent text-sm text-foreground px-8 py-4 pb-8 placeholder:text-muted-foreground/40 focus:outline-none leading-relaxed selection:bg-primary/20"
-        placeholder="Start writing…"
-        spellCheck
-      />
+      <div className="flex-1 flex overflow-hidden">
+        <textarea
+          ref={editorRef}
+          value={localContent}
+          onChange={handleChange}
+          autoFocus={isPending}
+          className="flex-1 resize-none bg-transparent text-sm text-foreground px-8 py-4 pb-8 placeholder:text-muted-foreground/40 focus:outline-none leading-relaxed selection:bg-primary/20"
+          placeholder="Start writing…"
+          spellCheck
+        />
+
+        {/* Attachments Sidebar */}
+        {selectedNote?.attachments && selectedNote.attachments.length > 0 && (
+          <div className="w-72 shrink-0 border-l border-border bg-muted/5 p-4 overflow-y-auto flex flex-col gap-2">
+            <h4 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">
+              Attachments ({selectedNote.attachments.length})
+            </h4>
+            {selectedNote.attachments.map((attachment) => (
+              <div key={attachment.id} className="relative group">
+                <button
+                  type="button"
+                  onClick={() => setPreviewAttachment(attachment)}
+                  className="w-full flex items-start gap-3 p-3 rounded-lg border border-border bg-background hover:border-primary/50 hover:shadow-sm transition-all text-left pr-10"
+                >
+                  <FileText className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate" title={attachment.filename}>
+                      {attachment.filename}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      {new Date(attachment.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                </button>
+                <button
+                  onClick={(e) => handleDeleteClick(e, attachment)}
+                  title="Delete Attachment"
+                  className="absolute top-2 right-2 p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100 disabled:opacity-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+{previewAttachment && (
+          <DocumentPreview
+            url={previewAttachment.file}
+            fileName={previewAttachment.filename}
+            onClose={() => setPreviewAttachment(null)}
+          />
+        )}
+
+        {/* Delete Confirmation Modal for Attachment */}
+        <DeleteModal
+          isOpen={!!attachmentToDelete}
+          type="confirm"
+          itemType="document"
+          itemName={attachmentToDelete?.name}
+          onConfirm={confirmDeleteAttachment}
+          onCancel={() => setAttachmentToDelete(null)}
+          isDeleting={isDeleting}
+        />
+      </div>
     </div>
   );
 }
@@ -760,6 +907,8 @@ interface QuickNotesContentProps {
   onUpdateNote: (id: number | 'pending', content: string) => void;
   onRenameNote: (noteId: number, newTitle: string) => void;
   onDeleteNote: (noteId: number) => void;
+  onAddAttachment: (noteId: number, attachment: import('@/types').QuickNoteAttachment) => void;
+  onRemoveAttachment: (noteId: number, attachmentId: number) => void;
   state: QuickNotesState;
   getNotesForFolder: (folderId: number | 'all') => QuickNote[];
   getNoteTitle: (note: QuickNote) => string;
@@ -777,6 +926,8 @@ export function QuickNotesContent({
   onUpdateNote,
   onRenameNote,
   onDeleteNote,
+  onAddAttachment,
+  onRemoveAttachment,
   state,
   getNotesForFolder,
   getNoteTitle,
@@ -820,6 +971,8 @@ export function QuickNotesContent({
         isPending={isPending}
         getNoteTitle={getNoteTitle}
         onUpdateNote={onUpdateNote}
+        onAddAttachment={onAddAttachment}
+        onRemoveAttachment={onRemoveAttachment}
         editorRef={editorRef}
       />
     </div>
@@ -963,9 +1116,9 @@ function getInitialFabPos(): { x: number; y: number } {
     const raw = localStorage.getItem(FAB_POS_KEY);
     if (raw) return JSON.parse(raw);
   } catch { }
-  return {
-    x: window.innerWidth - FAB_SIZE * 2 - 24 - 12,
-    y: window.innerHeight - FAB_SIZE - 24,
+return {
+    x: window.innerWidth - FAB_SIZE - 24,
+    y: window.innerHeight - FAB_SIZE * 2 - 32,
   };
 }
 
@@ -1063,7 +1216,7 @@ export function QuickNotes() {
         title="Quick Notes (drag to reposition)"
         style={{ left: fabPos.x, top: fabPos.y }}
         className={cn(
-          'fixed z-[60] flex h-12 w-12 items-center justify-center rounded-full',
+         'fixed z-[60] flex h-12 w-12 items-center justify-center rounded-full',
           'bg-primary text-primary-foreground shadow-lg',
           'hover:opacity-90 transition-opacity duration-200',
           'focus:outline-none cursor-grab active:cursor-grabbing select-none',

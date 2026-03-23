@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { X, Calendar, CheckCircle, AlertCircle, ArrowLeft, Briefcase, User, Flag, Paperclip, Type, Sparkles, Plus, Link, Trash2 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { taskApi, usersApi, projectsApi } from '@/services/api';
-import { ProjectMinimal, AITaskSuggestionResponse, Label } from '@/types';
+import { ProjectMinimal, AITaskSuggestionResponse, Label, Task } from '@/types';
 import { AITask } from './AITask';
 import { RichTextEditor } from '@/components/common/RichTextEditor';
 
@@ -305,7 +305,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
     const formatAITextToHtml = (text: string) => {
         return text
             .replace(/\n{2,}/g, '</p><p>')
-            .replace(/\n/g, '<br/>') 
+            .replace(/\n/g, '<br/>')
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
             .replace(/^- (.*)$/gm, '<li>$1</li>')
             .replace(/(<li>.*<\/li>)/gms, '<ul>$1</ul>');
@@ -368,6 +368,67 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
         }
         const projectId = selectedProjects[0];
 
+        // Build the optimistic task object from current form state
+        // so the UI renders it instantly before the API responds
+        const selectedProject = allProjectOptions.find(p => p.id === projectId);
+        const selectedLabelObjects = projectLabels.filter(l => selectedLabelIds.includes(l.id));
+        const assignedUserDetails = allUserOptions
+            .filter(u => assignedToList.includes(u.id))
+            .map(u => ({
+                id: u.id,
+                username: u.label,
+                email: '',
+                first_name: u.label.split(' ')[0] || '',
+                last_name: u.label.split(' ').slice(1).join(' ') || '',
+                role: 'annotator' as const,
+                is_active: true,
+                date_joined: new Date().toISOString(),
+            }));
+
+        const optimisticTask = {
+            id: Date.now(),
+            heading,
+            description,
+            start_date: startDate ? `${startDate}T09:00:00Z` : '',
+            end_date: endDate ? `${endDate}T18:00:00Z` : '',
+            duration_time: duration,
+            status: status as Task['status'],
+            priority,
+            project: String(projectId),
+            project_details: selectedProject || { id: projectId, name: '' },
+            project_name: selectedProject?.name || null,
+            assigned_to: assignedToList,
+            assigned_to_user_details: assignedUserDetails,
+            assigned_by: 0,
+            labels: selectedLabelObjects,
+            links: links.map((url, idx) => ({ id: idx, url, created_at: new Date().toISOString() })),
+            attachments: [],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+        } satisfies Task;
+
+        // Optimistically insert task into the cache immediately — UI updates now
+        const previousTasksSnapshot = queryClient.getQueryData<Task[] | { tasks?: Task[]; results?: Task[] }>(['tasks']);
+
+        queryClient.setQueryData(['tasks'], (old: any) => {
+            if (!old) return [optimisticTask];
+            if (Array.isArray(old)) return [optimisticTask, ...old];
+            if (old.tasks) return { ...old, tasks: [optimisticTask, ...old.tasks] };
+            if (old.results) return { ...old, results: [optimisticTask, ...old.results] };
+            return old;
+        });
+
+        // Show success and navigate immediately — don't wait for API
+        setShowSuccessView(true);
+        setTimeout(() => {
+            if (isModal && onSuccess) {
+                onSuccess();
+            } else {
+                navigate('/taskboard');
+            }
+        }, 1500);
+
+        // Fire API call in background — rollback cache if it fails
         try {
             const formData = new FormData();
             formData.append('heading', heading);
@@ -391,24 +452,24 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                 formData.append('uploaded_files', file);
             });
 
-            await taskApi.create(formData);
-            queryClient.invalidateQueries({ queryKey: ['tasks'] });
-            setShowSuccessView(true);
+            const createdTask = await taskApi.create(formData);
 
-            setTimeout(() => {
-                if (isModal && onSuccess) {
-                    onSuccess();
-                } else {
-                    navigate('/taskboard');
-                }
-            }, 1500);
+            // Replace the optimistic entry with the real task from the server
+            queryClient.setQueryData(['tasks'], (old: any) => {
+                if (!old) return [createdTask];
+                if (Array.isArray(old)) return old.map(t => t.id === optimisticTask.id ? createdTask : t);
+                if (old.tasks) return { ...old, tasks: old.tasks.map((t: Task) => t.id === optimisticTask.id ? createdTask : t) };
+                if (old.results) return { ...old, results: old.results.map((t: Task) => t.id === optimisticTask.id ? createdTask : t) };
+                return old;
+            });
 
         } catch (err: any) {
+            queryClient.setQueryData(['tasks'], previousTasksSnapshot);
             console.error('❌ [CreateTask] Upload failed:', err);
             console.error('❌ [CreateTask] Error details:', err.response?.data);
-            console.error('Error creating task:', err);
             setError(err.response?.data?.message || 'Failed to create task. Please check your inputs.');
             setLoading(false);
+            setShowSuccessView(false);
         }
     };
 

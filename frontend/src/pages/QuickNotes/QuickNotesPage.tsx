@@ -20,6 +20,8 @@ export function QuickNotesPage() {
     selectNote,
     renameNote,
     deleteNote,
+    addAttachmentToNote,
+    removeAttachmentFromNote,
   } = useQuickNotes();
 
   // When navigating from mini view, auto-select the note that was active there
@@ -81,6 +83,8 @@ export function QuickNotesPage() {
             onUpdateNote={updateNote}
             onRenameNote={renameNote}
             onDeleteNote={deleteNote}
+            onAddAttachment={addAttachmentToNote}
+            onRemoveAttachment={removeAttachmentFromNote}
             triggerFolderCreate={triggerFolderCreate}
             onAcknowledgeFolderCreate={() => setTriggerFolderCreate(false)}
           />

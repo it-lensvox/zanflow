@@ -4,7 +4,8 @@ import type {
   TaskComment, CreateTaskCommentPayload, AITaskSuggestionResponse, AITaskSuggestionPayload, ProjectCreatePayload, Label, DocumentStatus, ChatMessage, ChatRoom, ChatRoomMessagesResponse, CreatePrivateChatPayload,
   GatewaySendMessagePayload, GatewayIncomingMessage, RefineTextPayload, RefineTextResponse, TaskResponse, TeamTypeChoicesResponse,
   CreateTeamPayload, ProjectChatRoom, TeamChatRoom, ChatUnreadResponse, NotificationData, NotificationCallback, Team, ThreadRoom, ThreadSession, ThreadStorage, ThreadUIMessage, CreateThreadRoomPayload, WSJoinRoomCommand, WSSendMessageCommand, WSIncomingThreadMessage, WSUnreadUpdateSignal, ThreadMessagesResponse,
-  InviteUserPayload, InviteUserResponse, InviteVerifyResponse, InviteAcceptPayload, InviteAcceptResponse, AIBotSendPayload, AIBotIncomingMessage, OrganizationSignupPayload, OrganizationSignupResponse
+  InviteUserPayload, InviteUserResponse, InviteVerifyResponse, InviteAcceptPayload, InviteAcceptResponse, AIBotSendPayload, AIBotIncomingMessage, OrganizationSignupPayload, OrganizationSignupResponse,
+   DailyUpdate, DailyUpdatePayload, DailyUpdateListResponse
 } from '@/types';
 
 
@@ -121,8 +122,6 @@ export const authApi = {
     });
     setTokens(response.data);
     api.defaults.headers.common['Authorization'] = `Bearer ${response.data.access}`;
-    notificationSocket.connect();
-    gatewaySocket.connect();
     return response.data;
   },
 
@@ -138,8 +137,6 @@ export const authApi = {
     );
     setTokens(response.data.tokens);
     api.defaults.headers.common['Authorization'] = `Bearer ${response.data.tokens.access}`;
-    notificationSocket.connect();
-    gatewaySocket.connect();
     return response.data;
   },
 
@@ -931,7 +928,6 @@ export class NotificationWebSocketService {
           // Check if this is a notification event
           if (message.type === 'SIGNAL' && message.event === 'NEW_NOTIFICATION') {
             const notificationData: NotificationData = message.data;
-            // Notify all registered callbacks
             this.notificationCallbacks.forEach(callback => {
               try {
                 callback(notificationData);
@@ -940,10 +936,7 @@ export class NotificationWebSocketService {
               }
             });
           }
-          // Check if this is a chat unread update event
           if (message.type === 'SIGNAL' && message.event === 'CHAT_UNREAD_UPDATE') {
-
-            // Notify all registered unread callbacks
             this.chatUnreadCallbacks.forEach(callback => {
               try {
                 callback(message.data);
@@ -1345,6 +1338,68 @@ export const quickNotesApi = {
   deleteNote: async (id: number): Promise<void> => {
     await api.delete(`/quicknotes/notes/${id}/`);
   },
+uploadAttachment: async (noteId: number, file: File): Promise<import('@/types').QuickNoteAttachment> => {
+    const formData = new FormData();
+    formData.append('note', noteId.toString());
+    formData.append('file', file);
+    
+    const response = await api.post('/quicknotes/attachments/', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  deleteAttachment: async (attachmentId: number): Promise<void> => {
+    await api.delete(`/quicknotes/attachments/${attachmentId}/`);
+  },
 };
+
+// Calendar Daily Update API
+export const dailyUpdateApi = {
+  // Get the current user's daily update for a specific date — matched by both date AND userId
+  getMyUpdate: async (date: string, userId: number): Promise<DailyUpdate | null> => {
+    const response = await api.get<DailyUpdateListResponse | DailyUpdate[]>('/daily-updates/', {
+      params: { date },
+    });
+    const all: DailyUpdate[] = Array.isArray(response.data)
+      ? response.data
+      : (response.data as DailyUpdateListResponse).results ?? [];
+    // Match on BOTH date and user — prevents picking up another user's record
+    const match = all.find((u) => u.date === date && u.user === userId);
+    return match ?? null;
+  },
+
+  // POST to create, PATCH to update — avoids UNIQUE constraint error on (user, date)
+  upsert: async (data: DailyUpdatePayload, userId: number): Promise<DailyUpdate> => {
+    const existing = await dailyUpdateApi.getMyUpdate(data.date, userId);
+    if (existing) {
+      const response = await api.patch<DailyUpdate>(`/daily-updates/${existing.id}/`, {
+        content: data.content,
+      });
+      return response.data;
+    }
+    const response = await api.post<DailyUpdate>('/daily-updates/', data);
+    return response.data;
+  },
+
+  // Admin / manager: list all users' updates for a given date (filtered client-side by date)
+  listAll: async (params?: { date?: string; user?: number }): Promise<DailyUpdate[]> => {
+    const response = await api.get<DailyUpdateListResponse | DailyUpdate[]>(
+      '/daily-updates/',
+      { params }
+    );
+    const all: DailyUpdate[] = Array.isArray(response.data)
+      ? response.data
+      : (response.data as DailyUpdateListResponse).results ?? [];
+    // Guard: only show records that exactly match the requested date
+    if (params?.date) {
+      return all.filter((u) => u.date === params.date);
+    }
+    return all;
+  },
+};
+
 
 export default api;

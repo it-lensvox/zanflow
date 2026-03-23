@@ -1175,6 +1175,14 @@ export interface QuickNoteFolder {
   updated_at: string;
 }
 
+export interface QuickNoteAttachment {
+  id: number;
+  note: number;
+  file: string;
+  filename: string;
+  created_at: string;
+}
+
 // Backend note shape 
 export interface QuickNote {
   id: number;
@@ -1183,6 +1191,7 @@ export interface QuickNote {
   content: string;
   created_at: string;
   updated_at: string;
+  attachments?: QuickNoteAttachment[];
 }
 
 // Paginated notes list response
@@ -1214,4 +1223,31 @@ export interface UpdateQuickNotePayload {
   title?: string;
   content?: string;
   folder?: number | null;
+}
+
+// Calendar Daily Update Types
+
+// Single daily update entry (matches backend response)
+export interface DailyUpdate {
+  id: number;
+  user: number;
+  user_name: string;
+  date: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Payload for creating or updating a daily update
+export interface DailyUpdatePayload {
+  date: string; // 'YYYY-MM-DD'
+  content: string;
+}
+
+// Response when listing daily updates (admin / manager)
+export interface DailyUpdateListResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: DailyUpdate[];
 }
