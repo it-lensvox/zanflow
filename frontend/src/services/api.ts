@@ -118,8 +118,6 @@ export const authApi = {
     });
     setTokens(response.data);
     api.defaults.headers.common['Authorization'] = `Bearer ${response.data.access}`;
-    notificationSocket.connect();
-    gatewaySocket.connect();
     return response.data;
   },
 
@@ -135,8 +133,6 @@ export const authApi = {
     );
     setTokens(response.data.tokens);
     api.defaults.headers.common['Authorization'] = `Bearer ${response.data.tokens.access}`;
-    notificationSocket.connect();
-    gatewaySocket.connect();
     return response.data;
   },
 
@@ -928,7 +924,6 @@ export class NotificationWebSocketService {
           // Check if this is a notification event
           if (message.type === 'SIGNAL' && message.event === 'NEW_NOTIFICATION') {
             const notificationData: NotificationData = message.data;
-            // Notify all registered callbacks
             this.notificationCallbacks.forEach(callback => {
               try {
                 callback(notificationData);
@@ -937,10 +932,7 @@ export class NotificationWebSocketService {
               }
             });
           }
-          // Check if this is a chat unread update event
           if (message.type === 'SIGNAL' && message.event === 'CHAT_UNREAD_UPDATE') {
-
-            // Notify all registered unread callbacks
             this.chatUnreadCallbacks.forEach(callback => {
               try {
                 callback(message.data);
@@ -1341,6 +1333,22 @@ export const quickNotesApi = {
 
   deleteNote: async (id: number): Promise<void> => {
     await api.delete(`/quicknotes/notes/${id}/`);
+  },
+uploadAttachment: async (noteId: number, file: File): Promise<import('@/types').QuickNoteAttachment> => {
+    const formData = new FormData();
+    formData.append('note', noteId.toString());
+    formData.append('file', file);
+    
+    const response = await api.post('/quicknotes/attachments/', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  deleteAttachment: async (attachmentId: number): Promise<void> => {
+    await api.delete(`/quicknotes/attachments/${attachmentId}/`);
   },
 };
 

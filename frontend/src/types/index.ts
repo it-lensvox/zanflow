@@ -1175,6 +1175,14 @@ export interface QuickNoteFolder {
   updated_at: string;
 }
 
+export interface QuickNoteAttachment {
+  id: number;
+  note: number;
+  file: string;
+  filename: string;
+  created_at: string;
+}
+
 // Backend note shape 
 export interface QuickNote {
   id: number;
@@ -1183,6 +1191,7 @@ export interface QuickNote {
   content: string;
   created_at: string;
   updated_at: string;
+  attachments?: QuickNoteAttachment[];
 }
 
 // Paginated notes list response
