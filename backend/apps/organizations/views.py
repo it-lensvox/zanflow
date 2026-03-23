@@ -58,7 +58,8 @@ class TenantSignupView(APIView):
     """
 
     permission_classes = [permissions.AllowAny]
-    throttle_classes = [GlobalSignupDailyThrottle]
+    # throttle_scope = "signup"
+    throttle_classes = [GlobalSignupDailyThrottle] #limit on signup
 
     def post(self, request):
         serializer = TenantSignupSerializer(data=request.data)

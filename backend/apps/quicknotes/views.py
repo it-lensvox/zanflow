@@ -1,7 +1,8 @@
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
-from .models import Folder, Note
-from .serializers import FolderSerializer, NoteSerializer
+from rest_framework.parsers import MultiPartParser, FormParser # <-- Import parsers
+from .models import Folder, Note, NoteAttachment
+from .serializers import FolderSerializer, NoteSerializer, NoteAttachmentSerializer
 from .utils import generate_title_from_content
 
 class FolderViewSet(viewsets.ModelViewSet):
@@ -50,3 +51,14 @@ class NoteViewSet(viewsets.ModelViewSet):
              serializer.save(title=title)
         else:
              serializer.save()
+
+class NoteAttachmentViewSet(viewsets.ModelViewSet):
+    serializer_class = NoteAttachmentSerializer
+    permission_classes = [IsAuthenticated]
+    
+    # Crucial: Tells DRF to accept file uploads
+    parser_classes = [MultiPartParser, FormParser] 
+
+    def get_queryset(self):
+        # Security: Only let users see attachments belonging to their own notes
+        return NoteAttachment.objects.filter(note__user=self.request.user)
