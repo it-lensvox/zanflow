@@ -42,7 +42,7 @@ const CustomDropdown: React.FC<{
     return (
         <div ref={dropdownRef} className="relative">
             <div
-                className="w-full p-2 rounded border border-gray-300 hover:border-gray-400 cursor-pointer bg-white flex items-center justify-between transition-all"
+                className="w-full p-2 rounded border border-gray-300 hover:border-gray-400 cursor-pointer bg-white flex items-center justify-between transition-all dark:bg-secondary dark:border-gray-600"
                 onClick={() => setIsOpen(!isOpen)}
             >
                 <div className="flex items-center gap-2">
@@ -255,8 +255,8 @@ export function CreateTeamModal({ isOpen, onClose, onSuccess }: CreateTeamModalP
 
     if (!isOpen) return null;
 
-    const labelClass = 'block text-sm font-semibold text-gray-700 mb-1.5';
-    const inputClass = 'w-full border rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all';
+    const labelClass = 'block text-sm font-semibold text-gray-700 mb-1.5 dark:text-foreground';
+    const inputClass = 'w-full border rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all dark:bg-secondary dark:border-gray-600 dark:text-foreground';
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -267,10 +267,10 @@ export function CreateTeamModal({ isOpen, onClose, onSuccess }: CreateTeamModalP
             />
 
             {/* Modal */}
-            <div className="relative bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
+            <div className="relative bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden dark:bg-card">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b">
-                    <h2 className="text-2xl font-bold">Create New Team</h2>
+                    <h2 className="text-2xl font-bold dark:text-foreground">Create New Team</h2>
                     <button
                         onClick={handleClose}
                         disabled={isSubmitting}
@@ -345,10 +345,10 @@ export function CreateTeamModal({ isOpen, onClose, onSuccess }: CreateTeamModalP
                         <div>
                             <label className={labelClass}>Add Members *</label>
                             <div className="relative" data-dropdown="member">
-                                <div className="w-full p-2 rounded border border-gray-300 hover:border-gray-400 bg-white flex flex-wrap gap-2 min-h-[38px] transition-colors">
+                                <div className="w-full p-2 rounded border border-gray-300 hover:border-gray-400 bg-white flex flex-wrap gap-2 min-h-[38px] transition-colors dark:bg-secondary dark:border-gray-600" onClick={() => setMemberDropdownOpen(true)}>
                                     {usersLoading ? (
                                         <span className="text-gray-400 text-sm flex items-center gap-2">
-                                            <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                                            <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin dark:border-blue-500" />
                                             Loading users...
                                         </span>
                                     ) : (
@@ -416,7 +416,7 @@ export function CreateTeamModal({ isOpen, onClose, onSuccess }: CreateTeamModalP
                                                     }
                                                 }}
                                                 placeholder={selectedMembers.length === 0 ? "Search members..." : ""}
-                                                className="flex-1 min-w-[120px] outline-none text-sm"
+                                                className="flex-1 min-w-[120px] outline-none text-sm dark:bg-secondary dark:text-foreground"
                                                 disabled={isSubmitting}
                                             />
                                         </>
@@ -425,7 +425,7 @@ export function CreateTeamModal({ isOpen, onClose, onSuccess }: CreateTeamModalP
 
                                 {/* Dropdown */}
                                 {memberDropdownOpen && !usersLoading && filteredMemberOptions.length > 0 && (
-                                    <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                                    <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto dark:bg-secondary" ref={memberDropdownRef}>
                                         {filteredMemberOptions.map((user, index) => (
                                             <div
                                                 key={user.id}
@@ -452,7 +452,7 @@ export function CreateTeamModal({ isOpen, onClose, onSuccess }: CreateTeamModalP
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center justify-end gap-3 p-6 border-t bg-gray-50">
+                <div className="flex items-center justify-end gap-3 p-6 border-t bg-gray-50 dark:bg-secondary">
                     <Button
                         variant="outline"
                         onClick={handleClose}

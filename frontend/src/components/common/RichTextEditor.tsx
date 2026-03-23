@@ -112,8 +112,8 @@ const MenuBar: React.FC<MenuBarProps> = ({ editor, features }) => {
       className={`
         p-2 rounded-lg transition-colors
         ${isActive
-          ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+          ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/60'
+          : 'text-gray-600 dark:text-muted-foreground hover:bg-gray-100 dark:hover:bg-secondary hover:text-gray-900 dark:hover:text-foreground'
         }
         ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
         flex items-center justify-center
@@ -123,10 +123,10 @@ const MenuBar: React.FC<MenuBarProps> = ({ editor, features }) => {
     </button>
   );
 
-  const Divider = () => <div className="w-px h-6 bg-gray-300 mx-1" />;
+  const Divider = () => <div className="w-px h-6 bg-gray-300 dark:bg-border mx-1" />;
 
   return (
-    <div className="border-b border-gray-200 bg-gray-50 px-3 py-2 rounded-t-lg flex flex-wrap items-center gap-1">
+    <div className="border-b border-gray-200 dark:border-border bg-gray-50 dark:bg-secondary px-3 py-2 rounded-t-lg flex flex-wrap items-center gap-1">
       {/* Undo/Redo */}
       <MenuButton onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} title="Undo">
         <Undo className="w-4 h-4" />
@@ -364,17 +364,20 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   if (!editor) return null;
 
   return (
-    <div className={`border border-gray-300 rounded-lg bg-white transition-all focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-200 ${readOnly ? 'bg-gray-50' : ''} ${className}`}>
+    <div className={`border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-card transition-all focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-200 dark:focus-within:ring-blue-900/40 ${readOnly ? 'bg-gray-50 dark:bg-muted' : ''} ${className}`}>
       {showToolbar && !readOnly && <MenuBar editor={editor} features={features} />}
       <div style={{ minHeight, ...(maxHeight && { maxHeight, overflowY: 'auto' }) }}>
         <EditorContent
           editor={editor}
-          className="prose prose-sm max-w-none p-4 focus:outline-none
+          className="prose prose-sm dark:prose-invert max-w-none p-4 focus:outline-none
             [&_.ProseMirror]:outline-none
             [&_.ProseMirror]:min-h-[150px]
             [&_.ProseMirror]:relative
+            [&_.ProseMirror]:text-gray-900
+            dark:[&_.ProseMirror]:text-foreground
             [&_.ProseMirror_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)]
             [&_.ProseMirror_p.is-editor-empty:first-child::before]:text-gray-400
+            dark:[&_.ProseMirror_p.is-editor-empty:first-child::before]:text-muted-foreground
             [&_.ProseMirror_p.is-editor-empty:first-child::before]:absolute 
             [&_.ProseMirror_p.is-editor-empty:first-child::before]:left-0
             [&_.ProseMirror_p.is-editor-empty:first-child::before]:top-0 

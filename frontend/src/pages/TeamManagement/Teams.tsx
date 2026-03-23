@@ -32,10 +32,10 @@ function DeleteConfirmationModal({ isOpen, onClose, onConfirm, teamName }: Delet
       />
 
       {/* Modal */}
-      <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4 overflow-hidden">
+      <div className="relative bg-white dark:bg-card rounded-lg shadow-xl w-full max-w-md mx-4 overflow-hidden">
         {/* Icon */}
         <div className="flex justify-center pt-6">
-          <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+          <div className="w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
             <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
@@ -44,11 +44,11 @@ function DeleteConfirmationModal({ isOpen, onClose, onConfirm, teamName }: Delet
 
         {/* Content */}
         <div className="p-6 text-center">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-foreground mb-2">
             Confirm Deletion
           </h3>
-          <p className="text-sm text-gray-600">
-            Are you sure you want to delete <span className="font-medium text-gray-900">"{teamName}"</span>?
+          <p className="text-sm text-gray-600 dark:text-muted-foreground">
+            Are you sure you want to delete <span className="font-medium text-gray-900 dark:text-foreground">"{teamName}"</span>?
           </p>
         </div>
 
@@ -197,7 +197,7 @@ export function Teams() {
     <>
       <div className="w-full h-full flex flex-col">
         {/* Static Header */}
-        <div className="flex-shrink-0 px-8 pt-8 pb-4 bg-white border-b border-gray-200">
+        <div className="flex-shrink-0 px-8 pt-8 pb-4 bg-white dark:bg-card border-b border-gray-200 dark:border-border">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold">Teams</h1>

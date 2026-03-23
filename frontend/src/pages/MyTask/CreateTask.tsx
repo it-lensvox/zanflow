@@ -422,16 +422,16 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
         }>
             {/* Inner card: constrained + scrollable in both modes */}
             <div className={isModal
-                ? "bg-white rounded-lg shadow-xl w-full max-w-4xl flex flex-col max-h-[calc(100vh-64px)]"
+                ? "bg-white dark:bg-card rounded-lg shadow-xl w-full max-w-4xl flex flex-col max-h-[calc(100vh-64px)]"
                 : "w-full max-w-4xl mx-auto flex flex-col max-h-[calc(100vh-64px)]"
             }>
 
                 {/* Header */}
-                <div className="flex-shrink-0 flex items-center justify-between px-8 pt-6 pb-4 border-b border-gray-200 bg-background rounded-t-lg">
+                <div className="flex-shrink-0 flex items-center justify-between px-8 pt-6 pb-4 border-b border-gray-200 dark:border-border bg-background rounded-t-lg">
                     <div className="max-w-4xl w-full mx-auto flex items-center justify-between">
                         <div>
-                            <h1 className="text-2xl font-semibold text-gray-900">Create task</h1>
-                            <p className="text-sm text-gray-500 mt-1">Fill in the details below to create a new task</p>
+                            <h1 className="text-2xl font-semibold text-gray-900 dark:text-foreground">Create task</h1>
+                            <p className="text-sm text-gray-500 dark:text-muted-foreground mt-1">Fill in the details below to create a new task</p>
                         </div>
                         <div className="flex items-center gap-3">
                             <button
@@ -453,7 +453,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                             <button
                                 type="button"
                                 onClick={handleClose}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-foreground bg-white dark:bg-card border border-gray-300 dark:border-border rounded hover:bg-gray-50 dark:hover:bg-muted transition-colors"
                                 disabled={loading}
                             >
                                 Cancel
@@ -466,7 +466,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                 <div className="flex-1 overflow-y-auto scrollbar-hide px-8 py-6">
                     <div className="max-w-4xl mx-auto"></div>
                     <form id="create-task-form" onSubmit={handleSubmit}>
-                        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+                        <div className="bg-white dark:bg-card rounded-lg shadow-sm border border-gray-200 dark:border-border">
                             {/* Alerts */}
                             {error && (
                                 <div className="p-4 bg-red-50 border-b border-red-100 flex items-start gap-3">
@@ -489,12 +489,12 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                             <div className="p-5 space-y-4">
                                 {/* Project Selection */}
                                 <div className="relative" data-dropdown="project">
-                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-foreground mb-2">
                                         <Briefcase className="w-4 h-4" />
                                         Project <span className="text-red-500">*</span>
                                     </label>
                                     <div
-                                        className={`w-full p-2.5 rounded border border-gray-300 bg-white flex flex-wrap gap-2 min-h-[42px] ${fixedProjectId ? 'cursor-not-allowed bg-gray-50' : 'cursor-pointer hover:border-gray-400'
+                                        className={`w-full p-2.5 rounded border border-gray-300 dark:border-border bg-white dark:bg-muted flex flex-wrap gap-2 min-h-[42px] ${fixedProjectId ? 'cursor-not-allowed bg-gray-50 dark:bg-secondary' : 'cursor-pointer hover:border-gray-400'
                                             } transition-colors`}
                                         onClick={() => {
                                             if (!fixedProjectId) {
@@ -519,7 +519,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                                                     onChange={(e) => setProjectSearchInput(e.target.value)}
                                                     onClick={(e) => e.stopPropagation()}
                                                     placeholder="Search project"
-                                                    className="flex-1 min-w-[120px] outline-none text-sm text-gray-400"
+                                                    className="flex-1 min-w-[120px] outline-none text-sm text-gray-400 dark:text-muted-foreground bg-transparent"
                                                 />
                                             )
                                         ) : (
@@ -554,14 +554,14 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                                                         onChange={(e) => setProjectSearchInput(e.target.value)}
                                                         onClick={(e) => e.stopPropagation()}
                                                         placeholder="Search project"
-                                                        className="flex-1 min-w-[120px] outline-none text-sm text-gray-400"
+                                                        className="flex-1 min-w-[120px] outline-none text-sm text-gray-400 dark:text-muted-foreground bg-transparent"
                                                     />
                                                 )}
                                             </>
                                         )}
                                     </div>
                                     {projectDropdownOpen && !fixedProjectId && (
-                                        <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                                        <div className="absolute z-20 mt-1 w-full bg-white dark:bg-card border border-gray-200 dark:border-border rounded-lg shadow-lg max-h-56 overflow-y-auto">
                                             {filteredProjectOptions.length > 0 ? (
                                                 filteredProjectOptions.map((project) => (
                                                     <div
@@ -577,7 +577,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                                                     </div>
                                                 ))
                                             ) : (
-                                                <div className="px-4 py-2.5 text-sm text-gray-500 text-center">
+                                                <div className="px-4 py-2.5 text-sm text-gray-500 dark:text-muted-foreground text-center">
                                                     No projects found
                                                 </div>
                                             )}
@@ -587,7 +587,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
 
                                 {/* Task Title */}
                                 <div>
-                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-foreground mb-2">
                                         <Type className="w-4 h-4" />
                                         Task title <span className="text-red-500">*</span>
                                     </label>
@@ -596,7 +596,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                                             type="text"
                                             value={heading}
                                             onChange={(e) => setHeading(e.target.value)}
-                                            className="w-full p-2.5 pr-10 rounded border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                                            className="w-full p-2.5 pr-10 rounded border border-gray-300 dark:border-border bg-white dark:bg-muted text-gray-900 dark:text-foreground focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
                                             placeholder="Enter a concise task title"
                                             required
                                         />
@@ -618,7 +618,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
 
                                 {/*  Description Section */}
                                 <div>
-                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-foreground mb-2">
                                         Description
                                         <button
                                             type="button"
@@ -662,7 +662,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
 
                                 {/* Link Field */}
                                 <div>
-                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-foreground mb-2">
                                         <Link className="w-4 h-4" />
                                         Links
                                     </label>
@@ -673,7 +673,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                                             onChange={(e) => setLinkInput(e.target.value)}
                                             onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddLink())}
                                             placeholder="Paste URL here..."
-                                            className="flex-1 p-2.5 rounded border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
+                                            className="flex-1 p-2.5 rounded border border-gray-300 dark:border-border bg-white dark:bg-muted text-gray-900 dark:text-foreground focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all"
                                         />
                                         <button
                                             type="button"
@@ -686,7 +686,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                                     {links.length > 0 && (
                                         <div className="mt-3 space-y-2">
                                             {links.map((link, index) => (
-                                                <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-200 group">
+                                                <div key={index} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-muted rounded border border-gray-200 dark:border-border group">
                                                     <div className="flex items-center gap-2 flex-1 min-w-0">
                                                         <Link className="w-3 h-3 text-gray-400 flex-shrink-0" />
                                                         <a
@@ -711,31 +711,31 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                                     )}
                                 </div>
 
-                                <div className="border-t border-gray-200 pt-4">
+                                <div className="border-t border-gray-200 dark:border-border pt-4">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         {/* Status */}
                                         <div>
-                                            <label className="text-sm font-medium text-gray-700 mb-2 block">
+                                            <label className="text-sm font-medium text-gray-700 dark:text-foreground mb-2 block">
                                                 Status
                                             </label>
                                             <div className="relative" data-dropdown="status">
                                                 <div
-                                                    className="w-full p-2.5 rounded border border-gray-300 hover:border-gray-400 cursor-pointer bg-white flex items-center justify-between min-h-[42px] transition-colors"
+                                                    className="w-full p-2.5 rounded border border-gray-300 dark:border-border hover:border-gray-400 cursor-pointer bg-white dark:bg-muted flex items-center justify-between min-h-[42px] transition-colors dark:text-foreground"
                                                     onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
                                                 >
-                                                    <span className="text-sm text-gray-700">
+                                                    <span className="text-sm text-gray-700 dark:text-foreground">
                                                         {statusOptions.find(opt => opt.value === status)?.label || 'Select status'}
                                                     </span>
-                                                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <svg className="w-4 h-4 text-gray-400 dark:text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                                     </svg>
                                                 </div>
                                                 {statusDropdownOpen && (
-                                                    <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                                                    <div className="absolute z-20 mt-1 w-full bg-white dark:bg-card border border-gray-200 dark:border-border rounded-lg shadow-lg max-h-56 overflow-y-auto">
                                                         {statusOptions.map((option) => (
                                                             <div
                                                                 key={option.value}
-                                                                className="px-4 py-2.5 hover:bg-gray-50 cursor-pointer text-sm flex items-center justify-between"
+                                                                className="px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-muted cursor-pointer text-sm dark:text-foreground flex items-center justify-between"
                                                                 onClick={() => {
                                                                     setStatus(option.value);
                                                                     setStatusDropdownOpen(false);
@@ -756,29 +756,29 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
 
                                         {/* Priority */}
                                         <div>
-                                            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                                            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-foreground mb-2">
                                                 <Flag className="w-4 h-4" />
                                                 Priority
                                             </label>
                                             <div className="relative" data-dropdown="priority">
                                                 <div
-                                                    className="w-full p-2.5 rounded border border-gray-300 hover:border-gray-400 cursor-pointer bg-white flex items-center justify-between min-h-[42px] transition-colors"
+                                                    className="w-full p-2.5 rounded border border-gray-300 dark:border-border hover:border-gray-400 cursor-pointer bg-white dark:bg-muted flex items-center justify-between min-h-[42px] transition-colors dark:text-foreground"
                                                     onClick={() => setPriorityDropdownOpen(!priorityDropdownOpen)}
                                                 >
-                                                    <span className="text-sm text-gray-700">
+                                                    <span className="text-sm text-gray-700 dark:text-foreground">
                                                         {priorityOptions.find(opt => opt.value === priority)?.icon}{' '}
                                                         {priorityOptions.find(opt => opt.value === priority)?.label || 'Select priority'}
                                                     </span>
-                                                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <svg className="w-4 h-4 text-gray-400 dark:text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                                     </svg>
                                                 </div>
                                                 {priorityDropdownOpen && (
-                                                    <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                                                    <div className="absolute z-20 mt-1 w-full bg-white dark:bg-card border border-gray-200 dark:border-border rounded-lg shadow-lg max-h-56 overflow-y-auto">
                                                         {priorityOptions.map((option) => (
                                                             <div
                                                                 key={option.value}
-                                                                className="px-4 py-2.5 hover:bg-gray-50 cursor-pointer text-sm flex items-center justify-between"
+                                                                className="px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-muted cursor-pointer text-sm dark:text-foreground flex items-center justify-between"
                                                                 onClick={() => {
                                                                     setPriority(option.value);
                                                                     setPriorityDropdownOpen(false);
@@ -801,10 +801,10 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
 
                                         {/* Combined Date & Duration Section */}
                                         <div className="col-span-1 md:col-span-2">
-                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-50/50 rounded-xl border border-gray-100 shadow-sm">
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-50/50 dark:bg-secondary/50 rounded-xl border border-gray-100 dark:border-border shadow-sm">
                                                 {/* Start Date */}
                                                 <div className="">
-                                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-foreground mb-2">
                                                         <Calendar className="w-4 h-4" />
                                                         Start date
                                                     </label>
@@ -812,13 +812,13 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                                                         type="date"
                                                         value={startDate}
                                                         onChange={(e) => setStartDate(e.target.value)}
-                                                        className="w-full p-2.5 rounded border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                                                        className="w-full p-2.5 rounded border border-gray-300 dark:border-border bg-white dark:bg-muted text-gray-900 dark:text-foreground focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
                                                     />
                                                 </div>
 
                                                 {/* End Date */}
                                                 <div>
-                                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-foreground mb-2">
                                                         <Calendar className="w-4 h-4" />
                                                         Due Date
                                                     </label>
@@ -826,13 +826,13 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                                                         type="date"
                                                         value={endDate}
                                                         onChange={(e) => setEndDate(e.target.value)}
-                                                        className="w-full p-2.5 rounded border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                                                        className="w-full p-2.5 rounded border border-gray-300 dark:border-border bg-white dark:bg-muted text-gray-900 dark:text-foreground focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
                                                     />
                                                 </div>
 
                                                 {/* Duration Time */}
                                                 <div className="space-y-2">
-                                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-foreground mb-2">
                                                         <span className="flex items-center justify-center w-4 h-4 bg-blue-100 text-blue-600 rounded-full text-[10px]">⏱</span>
                                                         Duration
                                                     </label>
@@ -842,7 +842,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                                                             value={duration}
                                                             onChange={handleDurationChange}
                                                             placeholder="HH:MM:SS"
-                                                            className="w-full p-2.5 rounded border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                                                            className="w-full p-2.5 rounded border border-gray-300 dark:border-border bg-white dark:bg-muted text-gray-900 dark:text-foreground focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
                                                         />
                                                     </div>
                                                 </div>
@@ -855,13 +855,13 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {/* Assignees */}
                                     <div>
-                                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-foreground mb-2">
                                             <User className="w-4 h-4" />
                                             Assignees <span className="text-red-500">*</span>
                                         </label>
                                         <div className="relative" data-dropdown="assignee">
                                             {/* Main input field - shows selected users + allows typing */}
-                                            <div className="w-full p-2.5 rounded border border-gray-300 hover:border-gray-400 bg-white flex flex-wrap gap-2 min-h-[42px] transition-colors">
+                                            <div className="w-full p-2.5 rounded border border-gray-300 dark:border-border hover:border-gray-400 bg-white dark:bg-muted flex flex-wrap gap-2 min-h-[42px] transition-colors">
                                                 {usersLoading ? (
                                                     <span className="text-gray-400 text-sm flex items-center gap-2">
                                                         <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -874,7 +874,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                                                             const user = allUserOptions.find(u => u.id === userId);
                                                             if (!user) return null;
                                                             return (
-                                                                <span key={userId} className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-sm font-medium flex items-center gap-1">
+                                                                <span key={userId} className="px-2 py-1 bg-gray-100 dark:bg-secondary text-gray-700 dark:text-foreground rounded text-sm font-medium flex items-center gap-1">
                                                                     {user.label}
                                                                     <button
                                                                         type="button"
@@ -929,7 +929,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                                                                 }
                                                             }}
                                                             placeholder={assignedToList.length === 0 ? "Assign to team members" : ""}
-                                                            className="flex-1 min-w-[120px] outline-none text-sm"
+                                                            className="flex-1 min-w-[120px] outline-none text-sm bg-transparent dark:text-foreground"
                                                         />
                                                     </>
                                                 )}
@@ -937,13 +937,13 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
 
                                             {/* Dropdown with filtered users */}
                                             {dropdownOpen && !usersLoading && filteredUserOptions.length > 0 && (
-                                                <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                                                <div className="absolute z-20 mt-1 w-full bg-white dark:bg-card border border-gray-200 dark:border-border rounded-lg shadow-lg max-h-56 overflow-y-auto">
                                                     {filteredUserOptions.map((user, index) => (
                                                         <div
                                                             key={user.id}
-                                                            className={`px-4 py-2.5 cursor-pointer text-sm ${index === highlightedUserIndex
-                                                                ? 'bg-blue-50 text-blue-700'
-                                                                : 'hover:bg-gray-50'
+                                                            className={`px-4 py-2.5 cursor-pointer text-sm dark:text-foreground ${index === highlightedUserIndex
+                                                                ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                                                                : 'hover:bg-gray-50 dark:hover:bg-muted'
                                                                 }`}
                                                             onClick={() => {
                                                                 setAssignedToList([...assignedToList, user.id]);
@@ -963,13 +963,13 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
 
                                     {/* Right: Labels */}
                                     <div>
-                                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-foreground mb-2">
                                             <Flag className="w-4 h-4 text-gray-400" />
                                             Labels
                                         </label>
                                         <div className="relative" data-dropdown="label">
                                             <div
-                                                className={`w-full p-2.5 rounded border border-gray-300 bg-white flex flex-wrap gap-2 min-h-[42px] transition-colors ${selectedProjects.length === 0 ? 'cursor-not-allowed bg-gray-50' : 'cursor-pointer hover:border-gray-400'}`}
+                                                className={`w-full p-2.5 rounded border border-gray-300 dark:border-border bg-white dark:bg-muted flex flex-wrap gap-2 min-h-[42px] transition-colors ${selectedProjects.length === 0 ? 'cursor-not-allowed bg-gray-50 dark:bg-secondary' : 'cursor-pointer hover:border-gray-400'}`}
                                                 onClick={() => selectedProjects.length > 0 && setLabelDropdownOpen(!labelDropdownOpen)}
                                             >
                                                 {selectedLabelIds.length === 0 ? (
@@ -1003,11 +1003,11 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                                                 )}
                                             </div>
                                             {labelDropdownOpen && projectLabels.length > 0 && (
-                                                <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                                                <div className="absolute z-20 mt-1 w-full bg-white dark:bg-card border border-gray-200 dark:border-border rounded-lg shadow-lg max-h-56 overflow-y-auto">
                                                     {projectLabels.filter(label => !selectedLabelIds.includes(label.id)).map((label) => (
                                                         <div
                                                             key={label.id}
-                                                            className="px-4 py-2.5 hover:bg-gray-50 cursor-pointer text-sm flex items-center justify-between gap-2"
+                                                            className="px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-muted cursor-pointer text-sm dark:text-foreground flex items-center justify-between gap-2"
                                                             onClick={() => {
                                                                 setSelectedLabelIds([...selectedLabelIds, label.id]);
                                                             }}
@@ -1028,9 +1028,9 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                                                         </div>
                                                     ))}
                                                     {projectLabels.filter(label => !selectedLabelIds.includes(label.id)).length === 0 && (
-                                                        <div className="px-4 py-2.5 text-sm text-gray-500 italic">
+                                                        <div className="px-4 py-2.5 text-sm text-gray-500 dark:text-muted-foreground italic">
                                                             No more labels available
-                                                            <div className="sticky bottom-0 bg-white border-t border-gray-200 p-2 mt-1">
+                                                            <div className="sticky bottom-0 bg-white dark:bg-card border-t border-gray-200 dark:border-border p-2 mt-1">
                                                                 <button
                                                                     type="button"
                                                                     onClick={(e) => {
@@ -1047,7 +1047,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                                                 </div>
                                             )}
                                             {labelDropdownOpen && projectLabels.length === 0 && (
-                                                <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm text-gray-500 text-center">
+                                                <div className="absolute z-20 mt-1 w-full bg-white dark:bg-card border border-gray-200 dark:border-border rounded-lg shadow-lg p-3 text-sm text-gray-500 dark:text-muted-foreground text-center">
                                                     No labels found for this project.
                                                 </div>
                                             )}
@@ -1057,12 +1057,12 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
 
                                 {/* Attachments */}
                                 <div>
-                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-foreground mb-2">
                                         <Paperclip className="w-4 h-4" />
                                         Attachments
                                     </label>
                                     <div
-                                        className="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-gray-400 transition-colors cursor-pointer relative bg-gray-50"
+                                        className="border-2 border-dashed border-gray-300 dark:border-border rounded-lg p-4 hover:border-gray-400 transition-colors cursor-pointer relative bg-gray-50 dark:bg-secondary"
                                         onDragOver={(e) => e.preventDefault()}
                                         onDrop={(e) => {
                                             e.preventDefault();
@@ -1081,21 +1081,21 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                                         />
                                         <div className="text-center">
                                             <Paperclip className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                                            <p className="text-sm text-gray-600">
+                                            <p className="text-sm text-gray-600 dark:text-muted-foreground">
                                                 <span className="font-medium text-blue-600">Click to upload</span> or drag and drop
                                             </p>
-                                            <p className="text-xs text-gray-500 mt-1">Videos, images, archives, code, PDFs (Max 500MB)</p>
+                                            <p className="text-xs text-gray-500 dark:text-muted-foreground mt-1">Videos, images, archives, code, PDFs (Max 500MB)</p>
                                         </div>
                                     </div>
 
                                     {attachments.length > 0 && (
                                         <div className="mt-3 space-y-2">
                                             {attachments.map((file, index) => (
-                                                <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-200">
+                                                <div key={index} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-muted rounded border border-gray-200 dark:border-border">
                                                     <div className="flex items-center gap-2 flex-1 min-w-0">
-                                                        <Paperclip className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                                                        <span className="text-sm text-gray-700 truncate">{file.name}</span>
-                                                        <span className="text-xs text-gray-500 flex-shrink-0">
+                                                        <Paperclip className="w-4 h-4 text-gray-400 dark:text-muted-foreground flex-shrink-0" />
+                                                        <span className="text-sm text-gray-700 dark:text-foreground truncate">{file.name}</span>
+                                                        <span className="text-xs text-gray-500 dark:text-muted-foreground flex-shrink-0">
                                                             {(file.size / 1024 / 1024).toFixed(2)} MB
                                                         </span>
                                                     </div>

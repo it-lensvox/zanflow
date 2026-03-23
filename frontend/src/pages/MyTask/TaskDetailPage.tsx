@@ -460,7 +460,7 @@ export function TaskDetailPage() {
                         onClick={handleSaveStatus}
                         disabled={isSaving || !hasUnsavedChanges}
                         className={`flex items-center px-4 py-2 text-sm font-bold rounded-lg transition-all shadow-sm ${isSaving || !hasUnsavedChanges
-                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-700 dark:text-gray-300'
                             : 'bg-green-600 text-white hover:bg-green-500 active:scale-95 shadow-green-100'
                             }`}
                     >
@@ -485,14 +485,14 @@ export function TaskDetailPage() {
             {/* Main Content */}
             <div className="space-y-4">
                 {/* 1. Timeline Div */}
-                <div className="timeline bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+                <div className="timeline bg-white rounded-xl p-4 border border-gray-100 shadow-sm dark:bg-gray-800 dark:border-gray-700 ">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div className="flex-1">
                             <div className="flex flex-wrap items-center gap-6 text-sm font-semibold text-gray-700">
                                 {/* Start Date */}
                                 <span className={`flex items-center group relative ${canEditDates ? 'cursor-pointer' : 'cursor-not-allowed opacity-75'}`}>
                                     <div className="flex flex-col">
-                                        <span className="text-sm font-semibold text-gray-700 block mb-4">Start Date</span>
+                                        <span className="text-sm font-semibold text-gray-700 block mb-4 dark:text-foreground">Start Date</span>
                                         <input
                                             type="date"
                                             value={startDate}
@@ -504,7 +504,7 @@ export function TaskDetailPage() {
                                                     setEndDate('');
                                                 }
                                             }}
-                                            className={`text-xs text-gray-400 ${canEditDates ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                                            className={`text-xs text-gray-400 dark:text-gray-300 ${canEditDates ? 'cursor-pointer' : 'cursor-not-allowed'}`}
                                         />
                                     </div>
                                 </span>
@@ -512,14 +512,14 @@ export function TaskDetailPage() {
                                 {/* End Date */}
                                 <span className={`flex items-center group relative ${canEditDates ? 'cursor-pointer' : 'cursor-not-allowed opacity-75'}`}>
                                     <div className="flex flex-col">
-                                        <span className="text-sm font-semibold text-gray-700 block mb-4">Due Date</span>
+                                        <span className="text-sm font-semibold text-gray-700 block mb-4 dark:text-foreground">Due Date</span>
                                         <input
                                             type="date"
                                             value={endDate}
                                             disabled={!canEditDates}
                                             min={startDate}
                                             onChange={(e) => setEndDate(e.target.value)}
-                                            className={`text-xs text-gray-400 ${canEditDates ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                                            className={`text-xs text-gray-400 dark:text-gray-300 ${canEditDates ? 'cursor-pointer' : 'cursor-not-allowed'}`}
                                         />
                                     </div>
                                 </span>
@@ -530,8 +530,8 @@ export function TaskDetailPage() {
                                         <Clock className="w-3 h-3" />
                                     </div>
                                     <div className="flex flex-col">
-                                        <span className="text-sm font-semibold text-gray-700 block mb-4">Duration</span>
-                                        <span className="text-xs text-gray-400">
+                                        <span className="text-sm font-semibold text-gray-700 block mb-4 dark:text-foreground">Duration</span>
+                                        <span className="text-xs text-gray-400 dark:text-gray-300">
                                             {(task as any).duration_time || 'N/A'}
                                         </span>
                                     </div>
@@ -541,7 +541,7 @@ export function TaskDetailPage() {
 
                         {/* Status logic*/}
                         <div className="flex-shrink-0 border-t sm:border-t-0 sm:border-l border-gray-100 pt-3 sm:pt-0 sm:pl-4">
-                            <label className="text-sm font-semibold text-gray-700 block mb-4">Task Status</label>
+                            <label className="text-sm font-semibold text-gray-700 block mb-4 dark:text-foreground">Task Status</label>
                             <button
                                 onClick={() => setShowStatusDropdown(!showStatusDropdown)}
                                 className={`inline-flex items-center px-4 py-2 rounded-xl border text-xs font-bold transition-all hover:shadow-sm ${getStatusConfig(selectedStatus).bg} ${getStatusConfig(selectedStatus).text}`}
@@ -553,11 +553,11 @@ export function TaskDetailPage() {
                         </div>
                     </div>
                     {showStatusDropdown && (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-3 mt-3 border-t border-gray-50">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-3 mt-3 border-t border-gray-50 dark:border-gray-800 ">
                             {statusOptions.map(opt => (
-                                <div key={opt.status} onClick={() => { setSelectedStatus(opt.status); setHasUnsavedChanges(true); setShowStatusDropdown(false); }} className={`flex items-center p-2.5 rounded-xl border-2 cursor-pointer ${selectedStatus === opt.status ? 'border-black bg-gray-50' : 'border-gray-100 bg-white'}`}>
-                                    {React.createElement(opt.icon, { className: `w-4 h-4 mr-2.5 ${getStatusConfig(opt.status).text}` })}
-                                    <span className="text-xs font-bold text-gray-800">{opt.label}</span>
+                                <div key={opt.status} onClick={() => { setSelectedStatus(opt.status); setHasUnsavedChanges(true); setShowStatusDropdown(false); }} className={`flex items-center p-2.5 rounded-xl border-2 cursor-pointer dark:bg-gray-700 ${selectedStatus === opt.status ? 'border-black bg-gray-50' : 'border-gray-100 bg-white'}`}>
+                                    {React.createElement(opt.icon, { className: `w-4 h-4 mr-2.5 dark:text-foreground  ${getStatusConfig(opt.status).text}` })}
+                                    <span className="text-xs font-bold text-gray-800 dark:text-foreground">{opt.label}</span>
                                 </div>
                             ))}
                         </div>
@@ -565,9 +565,9 @@ export function TaskDetailPage() {
                 </div>
 
                 {/* 2. Description Div */}
-                <div className="description bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+                <div className="description bg-white rounded-xl p-4 border border-gray-100 shadow-sm dark:bg-gray-800 dark:border-gray-700">
                     <div className="flex justify-between items-center mb-2">
-                        <label className="text-sm font-semibold text-gray-700 block mb-4">Description</label>
+                        <label className="text-sm font-semibold text-gray-700 block mb-4 dark:text-foreground">Description</label>
                         {!isEditingDescription && (
                             <button
                                 onClick={() => setIsEditingDescription(true)}
@@ -613,11 +613,11 @@ export function TaskDetailPage() {
                 </div>
 
                 {/* 3. Project Assignees*/}
-                <div className="project-assignees bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+                <div className="project-assignees bg-white rounded-xl p-4 border border-gray-100 shadow-sm dark:bg-gray-800 dark:border-gray-700">
                     <div className="flex items-center justify-between mb-3 cursor-pointer" onClick={() => setAssignedMembersOpen(!assignedMembersOpen)}>
-                        <label className="text-sm font-semibold text-gray-700 block mb-4">Assignees</label>
+                        <label className="text-sm font-semibold text-gray-700 block mb-4 dark:text-foreground">Assignees</label>
                         {task.assigned_by_user_details && (
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-gray-500 dark:text-foreground">
                                 Created by {task.assigned_by_user_details.first_name && task.assigned_by_user_details.last_name
                                     ? `${task.assigned_by_user_details.first_name} ${task.assigned_by_user_details.last_name}`.trim()
                                     : task.assigned_by_user_details.username}
@@ -632,12 +632,12 @@ export function TaskDetailPage() {
                                 {task.assigned_to_user_details?.map(u => (
                                     <div key={u.id} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg transition-colors border border-transparent hover:border-gray-100">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-7 h-7 rounded-full bg-purple-100 border border-purple-200 flex items-center justify-center text-xs font-bold text-purple-700">
+                                            <div className="w-7 h-7 rounded-full bg-purple-100 border border-purple-200 flex items-center justify-center text-xs font-bold text-purple-700 ">
                                                 {u.first_name[0]}{u.last_name[0]}
                                             </div>
                                             <div className="flex flex-col">
-                                                <span className="text-xs font-bold text-gray-900">{u.first_name} {u.last_name}</span>
-                                                <span className="text-[10px] text-gray-500">{u.role || 'Member'}</span>
+                                                <span className="text-xs font-bold text-gray-900 dark:text-foreground">{u.first_name} {u.last_name}</span>
+                                                <span className="text-[10px] text-gray-500 dark:text-foreground">{u.role || 'Member'}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -647,7 +647,7 @@ export function TaskDetailPage() {
                                 {newUsers.map(userId => {
                                     const u = availableUsers.find(au => au.id === userId);
                                     return u && (
-                                        <div key={userId} className="flex items-center justify-between p-2 bg-green-50/50 rounded-lg border border-green-100">
+                                        <div key={userId} className="flex items-center justify-between p-2 bg-green-50/50 rounded-lg border border-green-100 bg">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-7 h-7 rounded-full bg-green-100 flex items-center justify-center text-xs font-bold text-green-700">{u.first_name[0]}</div>
                                                 <span className="text-xs font-bold text-green-800">{u.first_name} (Adding...)</span>
@@ -687,7 +687,7 @@ export function TaskDetailPage() {
                                     return availableUnassignedUsers.length > 0 && (
                                         <div className="relative">
                                             <div
-                                                className="w-full p-2 rounded border border-gray-300 hover:border-gray-400 cursor-pointer bg-white flex items-center justify-between min-h-[38px] transition-colors"
+                                                className="w-full p-2 rounded border border-gray-300 hover:border-gray-400 dark:hover:border-gray-600 dark:hover:bg-gray-600 cursor-pointer bg-white flex items-center justify-between min-h-[38px] transition-colors dark:bg-gray-700 dark:border-gray-600"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     setShowAddUsersDropdown(!showAddUsersDropdown);
@@ -695,7 +695,7 @@ export function TaskDetailPage() {
                                             >
                                                 <div className="flex items-center gap-2">
                                                     <Plus className="w-3.5 h-3.5 text-gray-500" />
-                                                    <span className="text-sm text-gray-700 font-medium">Add Assignee</span>
+                                                    <span className="text-sm text-gray-700 font-medium dark:text-foreground">Add Assignee</span>
                                                 </div>
                                                 <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -704,7 +704,7 @@ export function TaskDetailPage() {
 
                                             {/* Dropdown List */}
                                             {showAddUsersDropdown && (
-                                                <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                                                <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto dark:bg-gray-700 dark:border-gray-600">
                                                     {(() => {
                                                         // Filter users based on project membership
                                                         let filteredUsers = availableUsers;
@@ -768,8 +768,8 @@ export function TaskDetailPage() {
                 </div>
 
                 {/* Links Section */}
-                <div className="links bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
-                    <label className="text-sm font-semibold text-gray-700 block mb-3">Links</label>
+                <div className="links bg-white rounded-xl p-4 border border-gray-100 shadow-sm dark:bg-gray-800 dark:border-gray-700">
+                    <label className="text-sm font-semibold text-gray-700 block mb-3 dark:text-foreground">Links</label>
 
                     {/* List Existing Links */}
                     {links.length > 0 && (
@@ -810,12 +810,12 @@ export function TaskDetailPage() {
                             onChange={(e) => setLinkInput(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleAddLink()}
                             placeholder="Paste URL to add..."
-                            className="flex-1 px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                            className="flex-1 px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300 dark:focus:ring-blue-500 dark:focus:border-blue-500" 
                         />
                         <button
                             onClick={handleAddLink}
                             disabled={!linkInput.trim()}
-                            className="px-3 py-2 bg-blue-50 text-blue-600 rounded-lg border border-blue-200 hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            className="px-3 py-2 bg-blue-50 text-blue-600 rounded-lg border border-blue-200 hover:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors dark:bg-blue-900 dark:text-blue-400 dark:border-blue-700 dark:hover:bg-blue-800"
                         >
                             <Plus className="w-5 h-5" />
                         </button>
@@ -823,11 +823,11 @@ export function TaskDetailPage() {
                 </div>
 
                 {/* 4. Documents */}
-                <div className="documents bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-                    <label className="text-sm font-semibold text-gray-700 block mb-4">Attachment</label>
+                <div className="documents bg-white rounded-xl p-6 border border-gray-200 shadow-sm dark:bg-gray-800 dark:border-gray-700">
+                    <label className="text-sm font-semibold text-gray-700 block mb-4 dark:text-foreground">Attachment</label>
 
                     {/* Dropzone with auto-trigger */}
-                    <div className={`relative border-2 border-dashed rounded-lg p-8 flex flex-col items-center justify-center transition-all ${uploadingDocs ? 'bg-blue-50/30 border-blue-200' : 'bg-gray-50/30 border-gray-200 hover:bg-gray-50 hover:border-gray-300'} group`}>
+                    <div className={`relative border-2 border-dashed rounded-lg p-8 flex flex-col items-center justify-center transition-all ${uploadingDocs ? 'bg-blue-50/30 border-blue-200' : 'bg-gray-50/30 border-gray-200 hover:bg-gray-50 hover:border-gray-300 dark:hover:bg-gray-700 dark:border-gray-600 dark:hover:bg-gray-600'} group`}>
                         <input
                             type="file"
                             multiple
@@ -843,7 +843,7 @@ export function TaskDetailPage() {
                                     <Plus className="w-5 h-5 text-gray-500" />
                                 )}
                             </div>
-                            <p className="text-lg text-gray-500 font-small">
+                            <p className="text-lg text-gray-500 font-small dark:text-gray-300">
                                 {uploadingDocs ? 'Uploading documents...' : (
                                     <>Drop files to attach or <span className="text-blue-500 hover:underline font-semibold">Browse</span></>
                                 )}
@@ -885,7 +885,7 @@ export function TaskDetailPage() {
                                         </div>
                                         {/* File Info Below Thumbnail */}
                                         <div className="p-3">
-                                            <p className="text-xs font-bold text-gray-900 truncate" title={doc.file_name}>{doc.file_name}</p>
+                                            <p className="text-xs font-bold text-gray-900 truncate dark:text-gray-300" title={doc.file_name}>{doc.file_name}</p>
                                             <p className="text-[10px] text-gray-500 mt-1 font-medium italic">
                                                 {new Date(doc.uploaded_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toLowerCase()}
                                             </p>
@@ -905,7 +905,7 @@ export function TaskDetailPage() {
                             {/* No More Attachments Indicator */}
                             {!hasNextPage && displayAttachments.length > 20 && (
                                 <div className="flex justify-center py-4">
-                                    <span className="text-xs text-gray-500">All attachments loaded</span>
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">All attachments loaded</span>
                                 </div>
                             )}
                         </div>
@@ -913,20 +913,20 @@ export function TaskDetailPage() {
                 </div>
 
                 {/* 5. Discussion */}
-                <div className="discussion bg-white rounded-xl p-4 border border-gray-100 shadow-sm space-y-3">
-                    <label className="text-sm font-semibold text-gray-700 block mb-4">Discussion ({comments.length})</label>
+                <div className="discussion bg-white rounded-xl p-4 border border-gray-100 shadow-sm space-y-3 dark:bg-gray-800 dark:border-gray-700">
+                    <label className="text-sm font-semibold text-gray-700 block mb-4 dark:text-foreground">Discussion ({comments.length})</label>
                     <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
                         {comments.map((comment: any) => (
                             <div key={comment.id} className="flex gap-2.5">
                                 <div className="w-7 h-7 rounded-full bg-gray-100 flex-shrink-0 flex items-center justify-center text-[10px] font-bold">
                                     {comment.user_details?.first_name?.[0] || comment.user_details?.username?.[0] || '?'}
                                 </div>
-                                <div className="bg-gray-50 rounded-2xl rounded-tl-none p-2.5 flex-1">
+                                <div className="bg-gray-50 rounded-2xl rounded-tl-none p-2.5 flex-1 ">
                                     <div className="flex justify-between mb-1">
                                         <span className="text-xs font-bold text-gray-900">{comment.user_details?.first_name || comment.user_details?.username}</span>
                                         <span className="text-[9px] font-bold text-gray-400 uppercase">{new Date(comment.created_at).toLocaleDateString()}</span>
                                     </div>
-                                    <p className="text-xs text-gray-600">{comment.content}</p>
+                                    <p className="text-xs text-gray-600 dark:text-gray-300">{comment.content}</p>
                                 </div>
                             </div>
                         ))}
@@ -934,11 +934,11 @@ export function TaskDetailPage() {
                     <div className="flex gap-2 pt-1">
                         <input
                             type="text" value={newComment} onChange={(e) => setNewComment(e.target.value)}
-                            placeholder="Add a comment..." className="flex-1 px-3 py-2 bg-gray-50 border-none rounded-full text-xs focus:ring-2 focus:ring-black"
+                            placeholder="Add a comment..." className="flex-1 px-3 py-2 bg-gray-50 border-none rounded-full text-xs focus:ring-2 focus:ring-black dark:bg-gray-700 dark:text-gray-300"
                         />
                         <button
                             onClick={() => { if (newComment.trim()) addCommentMutation.mutate(newComment.trim()); }}
-                            disabled={!newComment.trim()} className="p-2 bg-black text-white rounded-full disabled:bg-gray-200"
+                            disabled={!newComment.trim()} className="p-2 bg-black text-white rounded-full disabled:bg-gray-200 dark:disabled:bg-gray-600 disabled:text-gray-400 transition-colors"
                         >
                             <Send className="w-4 h-4" />
                         </button>

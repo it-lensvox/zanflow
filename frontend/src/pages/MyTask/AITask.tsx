@@ -113,10 +113,10 @@ export const AITask: React.FC<AITaskProps> = ({ onClose, onGenerate, fixedProjec
     if (isDataLoading) {
         return (
             <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50">
-                <div className="bg-white rounded-lg p-6 shadow-xl">
+                <div className="bg-white dark:bg-card rounded-lg p-6 shadow-xl">
                     <div className="flex items-center gap-3">
                         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
-                        <p className="text-gray-600">Loading...</p>
+                        <p className="text-gray-600 dark:text-muted-foreground">Loading...</p>
                     </div>
                 </div>
             </div>
@@ -128,23 +128,23 @@ export const AITask: React.FC<AITaskProps> = ({ onClose, onGenerate, fixedProjec
             className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
             onClick={handleBackdropClick}
         >
-            <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-white dark:bg-card rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-border">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-purple-100 rounded-lg">
-                            <Sparkles className="w-5 h-5 text-purple-600" />
+                        <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                            <Sparkles className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                         </div>
                         <div>
-                            <h2 className="text-xl font-semibold text-gray-900">Generate Task by AI</h2>
-                            <p className="text-sm text-gray-500 mt-0.5">Let AI help you create comprehensive tasks</p>
+                            <h2 className="text-xl font-semibold text-gray-900 dark:text-foreground">Generate Task by AI</h2>
+                            <p className="text-sm text-gray-500 dark:text-muted-foreground mt-0.5">Let AI help you create comprehensive tasks</p>
                         </div>
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-2 rounded hover:bg-gray-100 transition-colors"
+                        className="p-2 rounded hover:bg-gray-100 dark:hover:bg-secondary transition-colors"
                     >
-                        <X className="w-5 h-5 text-gray-600" />
+                        <X className="w-5 h-5 text-gray-600 dark:text-muted-foreground" />
                     </button>
                 </div>
 
@@ -152,7 +152,7 @@ export const AITask: React.FC<AITaskProps> = ({ onClose, onGenerate, fixedProjec
                     <div className="p-6 space-y-5">
                         {/* Error Alert */}
                         {error && (
-                            <div className="p-4 bg-red-50 border border-red-100 rounded-lg flex items-start gap-3">
+                            <div className="p-4 bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/50 rounded-lg flex items-start gap-3">
                                 <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
                                 <div className="flex-1">
                                     <p className="text-sm font-medium text-red-800">Error</p>
@@ -163,13 +163,13 @@ export const AITask: React.FC<AITaskProps> = ({ onClose, onGenerate, fixedProjec
 
                         {/* Project Selection */}
                         <div>
-                            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-foreground mb-2">
                                 <Briefcase className="w-4 h-4" />
                                 Project <span className="text-red-500">*</span>
                             </label>
                             <div className="relative" data-dropdown="project">
                                 <div
-                                    className={`w-full p-2.5 rounded border border-gray-300 bg-white flex flex-wrap gap-2 min-h-[42px] ${fixedProjectId ? 'cursor-not-allowed bg-gray-50' : 'cursor-pointer hover:border-gray-400'
+                                    className={`w-full p-2.5 rounded border border-gray-300 dark:border-border bg-white dark:bg-muted flex flex-wrap gap-2 min-h-[42px] ${fixedProjectId ? 'cursor-not-allowed bg-gray-50 dark:bg-secondary' : 'cursor-pointer hover:border-gray-400 dark:hover:border-muted-foreground'
                                         } transition-colors`}
                                     onClick={() => {
                                         if (!fixedProjectId) {
@@ -180,7 +180,7 @@ export const AITask: React.FC<AITaskProps> = ({ onClose, onGenerate, fixedProjec
                                 >
                                     {selectedProjects.length === 0 ? (
                                         !projectDropdownOpen ? (
-                                            <span className="text-gray-400 text-sm">Search project</span>
+                                            <span className="text-gray-400 dark:text-muted-foreground text-sm">Search project</span>
                                         ) : (
                                             <input
                                                 ref={projectSearchInputRef}
@@ -231,12 +231,12 @@ export const AITask: React.FC<AITaskProps> = ({ onClose, onGenerate, fixedProjec
                                     )}
                                 </div>
                                 {projectDropdownOpen && !fixedProjectId && (
-                                    <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                                    <div className="absolute z-20 mt-1 w-full bg-white dark:bg-card border border-gray-200 dark:border-border rounded-lg shadow-lg max-h-56 overflow-y-auto">
                                         {filteredProjectOptions.length > 0 ? (
                                             filteredProjectOptions.map((project) => (
                                                 <div
                                                     key={project.id}
-                                                    className="px-4 py-2.5 hover:bg-gray-50 cursor-pointer text-sm"
+                                                    className="px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-muted cursor-pointer text-sm dark:text-foreground"
                                                     onClick={() => {
                                                         setSelectedProjects([project.id]);
                                                         setProjectDropdownOpen(false);
@@ -247,7 +247,7 @@ export const AITask: React.FC<AITaskProps> = ({ onClose, onGenerate, fixedProjec
                                                 </div>
                                             ))
                                         ) : (
-                                            <div className="px-4 py-2.5 text-sm text-gray-500 text-center">
+                                            <div className="px-4 py-2.5 text-sm text-gray-500 dark:text-muted-foreground text-center">
                                                 No projects found
                                             </div>
                                         )}
@@ -258,7 +258,7 @@ export const AITask: React.FC<AITaskProps> = ({ onClose, onGenerate, fixedProjec
 
                         {/* Description Section */}
                         <div>
-                            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-foreground mb-2">
                                 Description <span className="text-red-500">*</span>
                             </label>
                             <RichTextEditor
@@ -289,11 +289,11 @@ export const AITask: React.FC<AITaskProps> = ({ onClose, onGenerate, fixedProjec
                     </div>
 
                     {/* Footer */}
-                    <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
+                    <div className="px-6 py-4 bg-gray-50 dark:bg-secondary border-t border-gray-200 dark:border-border flex justify-end gap-3">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-foreground bg-white dark:bg-card border border-gray-300 dark:border-border rounded hover:bg-gray-50 dark:hover:bg-muted transition-colors"
                             disabled={loading}
                         >
                             Cancel

@@ -127,11 +127,11 @@ export function NotificationsPage({
       onClick={handleClose}>
 
       {/* The Popup Card */}
-      <div className="w-full max-w-md border border-white/10 rounded-[2rem] shadow-2xl flex flex-col max-h-[85vh] bg-white"
+      <div className="w-full max-w-md border border-white/10 rounded-[2rem] shadow-2xl flex flex-col max-h-[85vh] bg-white dark:bg-card"
         onClick={(e) => e.stopPropagation()}>
 
         {/* Header Section */}
-        <div className="px-6 py-5 border-b border-white/5 bg-white/10">
+        <div className="px-6 py-5 border-b border-gray-100 dark:border-border bg-white dark:bg-card">
           <div className="flex items-center justify-between mb-4">
             {/* Left: Title (Hide when searching on small screens if needed) */}
             <div className='mx-3'>
@@ -151,7 +151,7 @@ export function NotificationsPage({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     autoFocus
-                    className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#97bd30]/30"
+                    className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-border bg-white dark:bg-muted dark:text-foreground focus:outline-none focus:ring-2 focus:ring-[#97bd30]/30"
                   />
                   <X
                     className="h-4 w-4 opacity-60 hover:opacity-100 cursor-pointer flex-shrink-0"
@@ -177,7 +177,7 @@ export function NotificationsPage({
           </div>
 
           {/* Filter Toggle inside the header */}
-          <div className="inline-flex p-1 bg-gray-100 rounded-xl">
+          <div className="inline-flex p-1 bg-gray-100 dark:bg-secondary rounded-xl">
             {(['all', 'unread'] as const).map((key) => (
               <button
                 key={key}
@@ -186,7 +186,7 @@ export function NotificationsPage({
                   "px-5 py-1.5 text-xs font-semibold rounded-lg transition-all",
                   filter === key
                     ? "bg-[#97bd30] text-white shadow-lg shadow-[#97bd30]/20"
-                    : "text-gray-500 hover:text-gray-700 bg-transparent"
+                    : "text-gray-500 dark:text-muted-foreground hover:text-gray-700 dark:hover:text-foreground bg-transparent"
                 )}
               >
                 {key === 'all' ? 'All' : 'Unread'}
@@ -212,8 +212,8 @@ export function NotificationsPage({
                     className={cn(
                       "group relative p-4 rounded-2xl mb-3 border transition-all cursor-pointer",
                       !isRead
-                        ? "bg-blue-50/50 border-blue-100 shadow-sm"
-                        : "bg-white border-gray-100 hover:bg-gray-50"
+                        ? "bg-blue-50/50 dark:bg-blue-950/30 border-blue-100 dark:border-blue-900/50 shadow-sm"
+                        : "bg-white dark:bg-card border-gray-100 dark:border-border hover:bg-gray-50 dark:hover:bg-muted"
                     )}
                   >
                     {/* Unread Accent */}
@@ -230,7 +230,7 @@ export function NotificationsPage({
                         e.stopPropagation();
                         deleteNotificationMutation.mutate(n.id);
                       }}
-                      className="absolute top-3 right-3 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-50 text-gray-400 hover:text-red-500 transition-all"
+                      className="absolute top-3 right-3 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-50 dark:hover:bg-red-950/30 text-gray-400 dark:text-muted-foreground hover:text-red-500 transition-all"
                       title="Delete notification"
                     >
                       <Trash2 className="h-3.5 w-3.5" />

@@ -34,7 +34,7 @@ export const createUserTableColumns = ({ onRoleClick, onDeleteClick }: UserTable
             {user.first_name?.charAt(0) || user.username.charAt(0).toUpperCase()}
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="font-medium text-[#172b4d] truncate">
+            <span className="font-medium text-[#172b4d] truncate dark:text-gray-200">
               {user.first_name} {user.last_name}
             </span>
             <span className="text-[11px] text-gray-400 truncate">{user.email}</span>
@@ -62,7 +62,7 @@ export const createUserTableColumns = ({ onRoleClick, onDeleteClick }: UserTable
       key: 'date_joined',
       label: 'Joined Date',
       render: (user: AppUser) => (
-        <span className="text-[12px] text-gray-700">
+        <span className="text-[12px] text-gray-700 dark:text-gray-300">
           {formatDate(user.date_joined)}
         </span>
       ),

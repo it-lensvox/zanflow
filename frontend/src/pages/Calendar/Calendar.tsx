@@ -96,22 +96,22 @@ const DayCell: React.FC<DayCellProps> = ({ day, onTaskClick, onDateClick }) => {
     return (
         <div
             className={`
-                relative flex flex-col min-h-[120px] p-2 border-b border-r border-gray-200 transition-colors hover:bg-gray-50 cursor-pointer
-                ${!day.isCurrentMonth ? 'bg-gray-50/50' : 'bg-white'}
+                relative flex flex-col min-h-[120px] p-2 border-b border-r border-gray-200 dark:border-border transition-colors hover:bg-gray-50 dark:hover:bg-muted cursor-pointer
+                ${!day.isCurrentMonth ? 'bg-gray-50/50 dark:bg-muted/50' : 'bg-white dark:bg-card'}
             `}
             onClick={() => onDateClick(day.date)}
         >
             <div className="flex items-center justify-between mb-2">
                 <span className={`
                     text-sm font-medium w-7 h-7 flex items-center justify-center rounded-full
-                    ${day.isToday 
-                        ? 'bg-blue-600 text-white shadow-sm' 
-                        : !day.isCurrentMonth ? 'text-gray-400' : 'text-gray-700'}
+                    ${day.isToday
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : !day.isCurrentMonth ? 'text-gray-400 dark:text-muted-foreground' : 'text-gray-700 dark:text-foreground'}
                 `}>
                     {day.date.getDate()}
                 </span>
                 {day.tasks.length > 0 && (
-                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-full">
                         {day.tasks.length}
                     </span>
                 )}
@@ -127,7 +127,7 @@ const DayCell: React.FC<DayCellProps> = ({ day, onTaskClick, onDateClick }) => {
                     />
                 ))}
                 {remainingCount > 0 && (
-                    <div className="text-[10px] font-medium text-gray-500 text-center hover:text-blue-600 p-1">
+                    <div className="text-[10px] font-medium text-gray-500 dark:text-muted-foreground text-center hover:text-blue-600 p-1">
                         +{remainingCount} more
                     </div>
                 )}
@@ -172,31 +172,31 @@ const WeekView: React.FC<WeekViewProps> = ({ currentDate, tasks, onTaskClick }) 
     };
 
     return (
-        <div className="flex flex-col h-full bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-            <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
+        <div className="flex flex-col h-full bg-white dark:bg-card rounded-lg border border-gray-200 dark:border-border shadow-sm overflow-hidden">
+            <div className="grid grid-cols-7 border-b border-gray-200 dark:border-border bg-gray-50 dark:bg-secondary">
                 {weekDays.map((day, index) => {
                     const isToday = day.toDateString() === today.toDateString();
                     return (
-                        <div key={index} className={`flex flex-col items-center justify-center py-3 px-2 border-r border-gray-200 last:border-r-0 ${isToday ? 'bg-blue-50/50' : ''}`}>
-                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{DAYS_OF_WEEK[index]}</span>
-                            <span className={`text-lg font-bold ${isToday ? 'text-blue-600 bg-blue-100 w-8 h-8 flex items-center justify-center rounded-full' : 'text-gray-900'}`}>
+                        <div key={index} className={`flex flex-col items-center justify-center py-3 px-2 border-r border-gray-200 dark:border-border last:border-r-0 ${isToday ? 'bg-blue-50/50 dark:bg-blue-950/20' : ''}`}>
+                            <span className="text-xs font-semibold text-gray-500 dark:text-muted-foreground uppercase tracking-wider mb-1">{DAYS_OF_WEEK[index]}</span>
+                            <span className={`text-lg font-bold ${isToday ? 'text-blue-600 bg-blue-100 dark:bg-blue-950/40 w-8 h-8 flex items-center justify-center rounded-full' : 'text-gray-900 dark:text-foreground'}`}>
                                 {day.getDate()}
                             </span>
                         </div>
                     );
                 })}
             </div>
-            <div className="grid grid-cols-7 flex-1 min-h-[500px] divide-x divide-gray-200">
+            <div className="grid grid-cols-7 flex-1 min-h-[500px] divide-x divide-gray-200 dark:divide-border">
                 {weekDays.map((day, index) => {
                     const dayTasks = getTasksForDate(day);
                     const isToday = day.toDateString() === today.toDateString();
                     return (
-                        <div key={index} className={`p-2 flex flex-col gap-2 ${isToday ? 'bg-blue-50/10' : ''}`}>
+                        <div key={index} className={`p-2 flex flex-col gap-2 ${isToday ? 'bg-blue-50/10 dark:bg-blue-950/10' : ''}`}>
                             {dayTasks.map((task) => (
                                 <TaskEvent key={task.id} task={task} onClick={onTaskClick} />
                             ))}
                             {dayTasks.length === 0 && (
-                                <div className="text-center py-8 text-xs text-gray-400 italic">No tasks</div>
+                                <div className="text-center py-8 text-xs text-gray-400 dark:text-muted-foreground italic">No tasks</div>
                             )}
                         </div>
                     );
@@ -231,12 +231,12 @@ const TaskListSidebar: React.FC<TaskListSidebarProps> = ({
     };
 
     return (
-        <div className="w-80 flex-shrink-0 bg-white border border-gray-200 rounded-xl shadow-lg flex flex-col overflow-hidden animate-in slide-in-from-right-4 duration-200">
-            <div className="flex items-center justify-between p-4 bg-gray-50 border-b border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-900">{formatDateLong(selectedDate)}</h3>
-                <button 
+        <div className="w-80 flex-shrink-0 bg-white dark:bg-card border border-gray-200 dark:border-border rounded-xl shadow-lg flex flex-col overflow-hidden animate-in slide-in-from-right-4 duration-200">
+            <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-secondary border-b border-gray-200 dark:border-border">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-foreground">{formatDateLong(selectedDate)}</h3>
+                <button
                     onClick={onClose}
-                    className="p-1 rounded-md text-gray-500 hover:bg-gray-200 hover:text-gray-700 transition-colors"
+                    className="p-1 rounded-md text-gray-500 dark:text-muted-foreground hover:bg-gray-200 dark:hover:bg-muted hover:text-gray-700 dark:hover:text-foreground transition-colors"
                 >
                     <span className="text-lg leading-none">&times;</span>
                 </button>
@@ -255,15 +255,15 @@ const TaskListSidebar: React.FC<TaskListSidebarProps> = ({
                             return (
                                 <div
                                     key={task.id}
-                                    className="group flex gap-3 p-3 rounded-lg border border-transparent bg-gray-50 hover:bg-white hover:border-gray-200 hover:shadow-sm cursor-pointer transition-all"
+                                    className="group flex gap-3 p-3 rounded-lg border border-transparent bg-gray-50 dark:bg-muted hover:bg-white dark:hover:bg-card hover:border-gray-200 dark:hover:border-border hover:shadow-sm cursor-pointer transition-all"
                                     onClick={() => onTaskClick(task)}
                                 >
                                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-white shadow-sm`} style={{ backgroundColor: statusConfig.color }}>
                                         <StatusIcon size={14} />
                                     </div>
                                     <div className="min-w-0 flex-1">
-                                        <h4 className="text-sm font-medium text-gray-900 truncate mb-1">{task.heading}</h4>
-                                        <div className="flex items-center gap-3 text-xs text-gray-500">
+                                        <h4 className="text-sm font-medium text-gray-900 dark:text-foreground truncate mb-1">{task.heading}</h4>
+                                        <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-muted-foreground">
                                             <span 
                                                 className="font-medium capitalize" 
                                                 style={{ color: getPriorityColor(task.priority) }}
@@ -430,7 +430,7 @@ export const Calendar: React.FC = () => {
 
     if (isLoading) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[400px] gap-4 text-gray-500">
+            <div className="flex flex-col items-center justify-center min-h-[400px] gap-4 text-gray-500 dark:text-muted-foreground">
                 <div className="w-10 h-10 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin" />
                 <p>Loading calendar...</p>
             </div>
@@ -442,30 +442,30 @@ export const Calendar: React.FC = () => {
             {/* Header Area */}
             <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+                    <h1 className="text-3xl font-bold text-gray-900 dark:text-foreground flex items-center gap-3">
                         <CalendarIcon className="w-8 h-8 text-blue-600" />
                         Calendar
                     </h1>
-                    <p className="text-lg text-gray-600 mt-1">View and manage your task schedules</p>
+                    <p className="text-lg text-gray-600 dark:text-muted-foreground mt-1">View and manage your task schedules</p>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full xl:w-auto">
                     {[
-                        { label: 'Total', value: taskStats.total, color: 'text-gray-900' },
+                        { label: 'Total', value: taskStats.total, color: 'text-gray-900 dark:text-foreground' },
                         { label: 'Done', value: taskStats.completed, color: 'text-green-600' },
                         { label: 'Active', value: taskStats.inProgress, color: 'text-blue-600' },
                         { label: 'Pending', value: taskStats.pending, color: 'text-yellow-600' },
                     ].map((stat) => (
-                        <div key={stat.label} className="flex flex-col items-center justify-center px-6 py-3 bg-white rounded-xl border border-gray-200 shadow-sm min-w-[100px]">
+                        <div key={stat.label} className="flex flex-col items-center justify-center px-6 py-3 bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border shadow-sm min-w-[100px]">
                             <span className={`text-2xl font-bold ${stat.color}`}>{stat.value}</span>
-                            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{stat.label}</span>
+                            <span className="text-xs font-semibold text-gray-400 dark:text-muted-foreground uppercase tracking-wider">{stat.label}</span>
                         </div>
                     ))}
                 </div>
             </div>
 
             {/* Controls Bar */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white dark:bg-card p-4 rounded-xl border border-gray-200 dark:border-border shadow-sm">
                 <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
                     <button 
                         onClick={goToToday}
@@ -474,40 +474,40 @@ export const Calendar: React.FC = () => {
                         Today
                     </button>
                     
-                    <div className="flex items-center gap-1 bg-gray-50 rounded-lg border border-gray-200 p-1">
-                        <button 
+                    <div className="flex items-center gap-1 bg-gray-50 dark:bg-secondary rounded-lg border border-gray-200 dark:border-border p-1">
+                        <button
                             onClick={() => navigateMonth('prev')}
-                            className="p-1.5 hover:bg-white hover:shadow-sm rounded-md transition-all text-gray-600"
+                            className="p-1.5 hover:bg-white dark:hover:bg-card hover:shadow-sm rounded-md transition-all text-gray-600 dark:text-muted-foreground"
                         >
                             <ChevronLeft size={20} />
                         </button>
-                        <button 
+                        <button
                             onClick={() => navigateMonth('next')}
-                            className="p-1.5 hover:bg-white hover:shadow-sm rounded-md transition-all text-gray-600"
+                            className="p-1.5 hover:bg-white dark:hover:bg-card hover:shadow-sm rounded-md transition-all text-gray-600 dark:text-muted-foreground"
                         >
                             <ChevronRight size={20} />
                         </button>
                     </div>
                     
-                    <h2 className="text-xl font-bold text-gray-900 ml-2 hidden sm:block">
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-foreground ml-2 hidden sm:block">
                         {getHeaderTitle()}
                     </h2>
                 </div>
                 
-                <h2 className="text-lg font-bold text-gray-900 sm:hidden w-full text-center">
+                <h2 className="text-lg font-bold text-gray-900 dark:text-foreground sm:hidden w-full text-center">
                     {getHeaderTitle()}
                 </h2>
 
-                <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200 w-full sm:w-auto">
+                <div className="flex bg-gray-100 dark:bg-secondary p-1 rounded-lg border border-gray-200 dark:border-border w-full sm:w-auto">
                     {(['month', 'week'] as ViewMode[]).map((mode) => (
                         <button
                             key={mode}
                             onClick={() => setViewMode(mode)}
                             className={`
                                 flex items-center justify-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all flex-1 sm:flex-none
-                                ${viewMode === mode 
-                                    ? 'bg-white text-blue-600 shadow-sm' 
-                                    : 'text-gray-500 hover:text-gray-900'}
+                                ${viewMode === mode
+                                    ? 'bg-white dark:bg-card text-blue-600 shadow-sm'
+                                    : 'text-gray-500 dark:text-muted-foreground hover:text-gray-900 dark:hover:text-foreground'}
                             `}
                         >
                             {mode === 'month' ? <Grid3X3 size={16} /> : <List size={16} />}
@@ -519,13 +519,13 @@ export const Calendar: React.FC = () => {
 
             {/* Calendar Content Area */}
             <div className="flex gap-6 min-h-[600px]">
-                <div className={`flex-1 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col ${selectedDate ? 'hidden md:flex' : 'flex'}`}>
+                <div className={`flex-1 bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border shadow-sm overflow-hidden flex flex-col ${selectedDate ? 'hidden md:flex' : 'flex'}`}>
                     {viewMode === 'month' ? (
                         <>
                             {/* Month Header */}
-                            <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
+                            <div className="grid grid-cols-7 border-b border-gray-200 dark:border-border bg-gray-50 dark:bg-secondary">
                                 {DAYS_OF_WEEK.map((day) => (
-                                    <div key={day} className="py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                    <div key={day} className="py-3 text-center text-xs font-semibold text-gray-500 dark:text-muted-foreground uppercase tracking-wider">
                                         {day}
                                     </div>
                                 ))}
@@ -563,8 +563,8 @@ export const Calendar: React.FC = () => {
             </div>
 
             {/* Status Legend Footer */}
-            <div className="flex flex-wrap items-center gap-4 px-6 py-4 bg-white rounded-xl border border-gray-200 shadow-sm">
-                <span className="text-sm font-semibold text-gray-500">Status:</span>
+            <div className="flex flex-wrap items-center gap-4 px-6 py-4 bg-white dark:bg-card rounded-xl border border-gray-200 dark:border-border shadow-sm">
+                <span className="text-sm font-semibold text-gray-500 dark:text-muted-foreground">Status:</span>
                 <div className="flex flex-wrap gap-4">
                     {[
                         { status: 'pending', label: 'Pending' },
@@ -578,7 +578,7 @@ export const Calendar: React.FC = () => {
                         return (
                             <div key={status} className="flex items-center gap-2">
                                 <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: config.color }} />
-                                <span className="text-xs font-medium text-gray-600">{label}</span>
+                                <span className="text-xs font-medium text-gray-600 dark:text-muted-foreground">{label}</span>
                             </div>
                         );
                     })}

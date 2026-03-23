@@ -1244,7 +1244,7 @@ export function TeamChatModern() {
 }
 
   return (
-    <div className="flex h-screen bg-[#f3f2f1] overflow-hidden border-2 border-gray-200">
+    <div className="flex h-screen bg-[#f3f2f1] dark:bg-background overflow-hidden border-2 border-gray-200 dark:border-border">
       {/* Toast Notifications Container */}
       <div className="fixed top-4 right-4 z-50 space-y-2">
         {toastNotifications.map(toast => (
@@ -1252,70 +1252,70 @@ export function TeamChatModern() {
         ))}
       </div>
       {/* Left Sidebar */}
-      <div className="w-80 bg-[#f3f2f1] border-r border-gray-200 flex flex-col h-full overflow-hidden">
+      <div className="w-80 bg-[#f3f2f1] dark:bg-card border-r border-gray-200 dark:border-border flex flex-col h-full overflow-hidden">
         {/* Sidebar Header */}
-        <div className="h-14 px-4 flex items-center justify-between bg-white border-b border-gray-200">
-          <h2 className="font-semibold text-base text-gray-900">Chat</h2>
+        <div className="h-14 px-4 flex items-center justify-between bg-white dark:bg-card border-b border-gray-200 dark:border-border">
+          <h2 className="font-semibold text-base text-gray-900 dark:text-foreground">Chat</h2>
           <div className="flex items-center gap-1">
             <button
               onClick={() => setIsCreateTeamModalOpen(true)}
-              className="p-2 hover:bg-gray-100 rounded transition-colors"
+              className="p-2 hover:bg-gray-100 dark:hover:bg-secondary rounded transition-colors"
               title="Create Team"
             >
-              <Plus className="h-4 w-4 text-gray-600" />
+              <Plus className="h-4 w-4 text-gray-600 dark:text-muted-foreground" />
             </button>
           </div>
         </div>
 
         {/* Search Bar */}
-        <div className="px-3 py-3 bg-white border-b border-gray-200">
+        <div className="px-3 py-3 bg-white dark:bg-card border-b border-gray-200 dark:border-border">
           <div className="relative">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400 dark:text-muted-foreground" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search"
-              className="w-full pl-9 pr-3 py-2 text-sm bg-[#f3f2f1] rounded border-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-9 pr-3 py-2 text-sm bg-[#f3f2f1] dark:bg-secondary dark:text-foreground rounded border-none focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
         </div>
 
         {/* Tab Navigation */}
        <Tabs.Root value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-          <Tabs.List className="flex items-center gap-1 px-3 py-2 bg-white border-b border-gray-200">
+          <Tabs.List className="flex items-center gap-1 px-3 py-2 bg-white dark:bg-card border-b border-gray-200 dark:border-border">
             <Tabs.Trigger
               value="chats"
-              className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+              className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 dark:data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-gray-100 dark:data-[state=inactive]:hover:bg-secondary"
             >
               Chats
             </Tabs.Trigger>
             <Tabs.Trigger
               value="projects"
-              className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+              className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 dark:data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-gray-100 dark:data-[state=inactive]:hover:bg-secondary"
             >
               Projects
             </Tabs.Trigger>
             <Tabs.Trigger
               value="teams"
-              className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+              className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 dark:data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-gray-100 dark:data-[state=inactive]:hover:bg-secondary"
             >
               Teams
             </Tabs.Trigger>
             <Tabs.Trigger
               value="unread"
-              className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+              className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 dark:data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-gray-100 dark:data-[state=inactive]:hover:bg-secondary"
             >
               Unread
             </Tabs.Trigger>
           </Tabs.List>
 
           {/* Scrollable Lists */}
-          <div className="flex-1 overflow-y-auto scrollbar-hide min-h-0 bg-white">
+          <div className="flex-1 overflow-y-auto scrollbar-hide min-h-0 bg-white dark:bg-card">
             <Tabs.Content value="chats">
               {/* Chats Section */}
-              <div className="bg-white">
-                <div className="border-t border-gray-100">
+              <div className="bg-white dark:bg-card">
+                <div className="border-t border-gray-100 dark:border-border">
                   {isLoadingUsers ? (
                     <div className="p-4 text-center">
                       <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
@@ -1338,7 +1338,7 @@ export function TeamChatModern() {
                           key={user.id}
                           onClick={() => handleUserSelect(user.id)}
                           className={cn(
-                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
+                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-secondary transition-colors border-l-2",
                             isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
                           )}
                         >
@@ -1351,10 +1351,10 @@ export function TeamChatModern() {
                             </div>
                           </div>
                           <div className="flex-1 min-w-0 text-left">
-                            <div className="flex items-center justify-between mb-0.5">
+                            <div className="flex items-center justify-between mb-0.5 dark:text-foreground">
                               <p className={cn(
                                 "text-sm truncate flex-1",
-                                hasUnreadMessages ? "font-bold text-gray-900" : "font-medium text-gray-900"
+                                hasUnreadMessages ? "font-bold text-gray-900 dark:text-foreground" : "font-medium text-gray-900 dark:text-foreground"
                               )}>
                                 {user?.first_name} {user?.last_name}
                               </p>
@@ -1397,8 +1397,8 @@ export function TeamChatModern() {
             <Tabs.Content value="projects">
 
               {/* Projects Section */}
-              <div className="bg-white">
-                <div className="border-t border-gray-100">
+              <div className="bg-white dark:bg-card">
+                <div className="border-t border-gray-100 dark:border-border">
                   {isLoadingProjects ? (
                     <div className="p-4 text-center">
                       <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
@@ -1419,7 +1419,7 @@ export function TeamChatModern() {
                           key={project.id}
                           onClick={() => handleProjectClick(project)}
                           className={cn(
-                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
+                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-secondary transition-colors border-l-2",
                             isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
                           )}
                         >
@@ -1427,7 +1427,7 @@ export function TeamChatModern() {
                             {project.name.charAt(0).toUpperCase()}
                           </div>
                           <div className="flex-1 min-w-0 text-left">
-                            <p className="text-sm font-medium text-gray-900 truncate">{project.name}</p>
+                            <p className="text-sm font-medium text-gray-900 truncate dark:text-foreground">{project.name}</p>
                             <p className="text-xs text-gray-600 truncate">
                               {project.last_message?.content_preview || 'No messages yet'}
                             </p>
@@ -1453,8 +1453,8 @@ export function TeamChatModern() {
             <Tabs.Content value="teams">
 
               {/* Teams Section */}
-              <div className="bg-white">
-                <div className="border-t border-gray-100">
+              <div className="bg-white dark:bg-card">
+                <div className="border-t border-gray-100 dark:border-border">
                   {isLoadingTeams ? (
                     <div className="p-4 text-center">
                       <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
@@ -1475,7 +1475,7 @@ export function TeamChatModern() {
                           key={team.id}
                           onClick={() => handleTeamClick(team)}
                           className={cn(
-                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
+                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-secondary transition-colors border-l-2",
                             isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
                           )}
                         >
@@ -1483,7 +1483,7 @@ export function TeamChatModern() {
                             {team.name.charAt(0).toUpperCase()}
                           </div>
                           <div className="flex-1 min-w-0 text-left">
-                            <p className="text-sm font-medium text-gray-900 truncate">{team.name}</p>
+                            <p className="text-sm font-medium text-gray-900 truncate dark:text-foreground">{team.name}</p>
                             <p className="text-xs text-gray-600 truncate">Team Chat</p>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
@@ -1506,8 +1506,8 @@ export function TeamChatModern() {
 
             <Tabs.Content value="unread">
               {/* Unread Section */}
-              <div className="bg-white">
-                <div className="border-t border-gray-100">
+              <div className="bg-white dark:bg-card">
+                <div className="border-t border-gray-100 dark:border-border">
                   {unreadUsers.length === 0 ? (
                     <div className="p-4 text-center text-sm text-gray-500">No unread messages</div>
                   ) : (
@@ -1520,7 +1520,7 @@ export function TeamChatModern() {
                           key={user.id}
                           onClick={() => handleUserSelect(user.id)}
                           className={cn(
-                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
+                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-secondary transition-colors border-l-2",
                             isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
                           )}
                         >
@@ -1533,8 +1533,8 @@ export function TeamChatModern() {
                             </div>
                           </div>
                           <div className="flex-1 min-w-0 text-left">
-                            <div className="flex items-center justify-between mb-0.5">
-                              <p className="text-sm font-bold text-gray-900 truncate">
+                            <div className="flex items-center justify-between mb-0.5 ">
+                              <p className="text-sm font-bold text-gray-900 truncate dark:text-foreground">
                                 {user.first_name || user.username}
                               </p>
                               {user.lastMessageTime && (
@@ -1566,11 +1566,11 @@ export function TeamChatModern() {
       </div>
 
       {/* Right Panel - Chat View */}
-      <div className="flex-1 flex flex-col bg-white h-full overflow-hidden">
+      <div className="flex-1 flex flex-col bg-white dark:bg-background h-full overflow-hidden">
         {(activeRoom || selectedProjectRoom || selectedTeamRoom) ? (
           <>
             {/* Chat Header */}
-            <div className="h-14 px-6 flex items-center justify-between bg-white border-b border-gray-200">
+            <div className="h-14 px-6 flex items-center justify-between bg-white dark:bg-card border-b border-gray-200 dark:border-border">
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-3">
                   <div className="relative">
@@ -1591,7 +1591,7 @@ export function TeamChatModern() {
                     ) : null}
                   </div>
                   <div>
-                    <h3 className="font-semibold text-sm text-gray-900">
+                    <h3 className="font-semibold text-sm text-gray-900 dark:text-foreground">
                       {selectedProjectRoom?.name || selectedTeamRoom?.name || (selectedUser ? `${selectedUser.first_name || selectedUser.username}` : '')}
                     </h3>
                     {selectedProjectRoom && (
@@ -1631,13 +1631,13 @@ export function TeamChatModern() {
                 <div className="relative" ref={headerMenuRef}>
                   <button
                     onClick={() => setShowHeaderMenu(!showHeaderMenu)}
-                    className="p-2 hover:bg-gray-100 rounded transition-colors"
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-secondary rounded transition-colors"
                   >
-                    <MoreVertical className="h-4 w-4 text-gray-600" />
+                    <MoreVertical className="h-4 w-4 text-gray-600 dark:text-muted-foreground" />
                   </button>
 
                   {showHeaderMenu && (
-                    <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                    <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-card rounded-lg shadow-lg border border-gray-200 dark:border-border py-1 z-50">
                       <button
                         onClick={() => {
                           const roomId = selectedProjectRoom?.id || selectedTeamRoom?.id || activeRoom?.id;
@@ -1650,7 +1650,7 @@ export function TeamChatModern() {
                             console.error('❌ No room ID available for favourite toggle');
                           }
                         }}
-                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-foreground hover:bg-gray-50 dark:hover:bg-muted flex items-center gap-2"
                       >
                         {(() => {
                           const roomId = selectedProjectRoom?.id || selectedTeamRoom?.id || activeRoom?.id;
@@ -1670,7 +1670,7 @@ export function TeamChatModern() {
                         <>
                           <button
                             onClick={() => setShowMemberList(!showMemberList)}
-                            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                            className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-foreground hover:bg-gray-50 dark:hover:bg-muted flex items-center gap-2"
                           >
                             <UsersIcon className="h-4 w-4" />
                             Member list
@@ -1699,7 +1699,7 @@ export function TeamChatModern() {
               <>
                 {/* Messages Area */}
                 <div
-                  className="flex-1 overflow-y-auto bg-[#efeae2] scrollbar-hide p-6"
+                  className="flex-1 overflow-y-auto bg-[#efeae2] dark:bg-card scrollbar-hide p-6"
                   onDragEnter={handleDragEnter}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
@@ -1803,7 +1803,7 @@ export function TeamChatModern() {
                                     "px-3 py-2 rounded-lg text-sm break-words shadow-sm max-w-full",
                                     isOwn
                                       ? "bg-[#005c4b] text-white rounded-br-none"
-                                      : "bg-white text-gray-900 border border-gray-100 rounded-bl-none"
+                                      : "bg-white dark:bg-card text-gray-900 dark:text-foreground border border-gray-100 dark:border-border rounded-bl-none"
                                   )}
                                   style={{
                                     minWidth: '60px',
@@ -1833,39 +1833,39 @@ export function TeamChatModern() {
                                 {(isHovered || menuOpen) && (
                                   <div
                                     className={cn(
-                                      "absolute top-0 flex items-center gap-0.5 bg-white border border-gray-200 rounded-lg shadow-sm px-1 py-0.5",
+                                      "absolute top-0 flex items-center gap-0.5 bg-white dark:bg-card border border-gray-200 dark:border-border rounded-lg shadow-sm px-1 py-0.5",
                                       isOwn ? "right-full mr-2" : "left-full ml-2"
                                     )}
                                   >
                                     {/* Quick Emoji Reactions */}
                                     <button
                                       onClick={() => handleQuickReaction(message.id, '👍')}
-                                      className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                      className="p-1 hover:bg-gray-100 dark:hover:bg-secondary rounded transition-colors"
                                       title="Like"
                                     >
                                       <span className="text-xs">👍</span>
                                     </button>
                                     <button
                                       onClick={() => handleQuickReaction(message.id, '❤️')}
-                                      className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                      className="p-1 hover:bg-gray-100 dark:hover:bg-secondary rounded transition-colors"
                                       title="Love"
                                     >
                                       <span className="text-xs">❤️</span>
                                     </button>
                                     <button
                                       onClick={() => handleQuickReaction(message.id, '😊')}
-                                      className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                      className="p-1 hover:bg-gray-100 dark:hover:bg-secondary rounded transition-colors"
                                       title="Smile"
                                     >
                                       <span className="text-xs">😊</span>
                                     </button>
 
-                                    <div className="h-4 w-px bg-gray-200 mx-0.5" />
+                                    <div className="h-4 w-px bg-gray-200 dark:bg-border mx-0.5" />
 
                                     {/* More Reactions Button */}
                                     <button
                                       onClick={() => setShowReactionPicker(showReactionPicker === message.id ? null : message.id)}
-                                      className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                      className="p-1 hover:bg-gray-100 dark:hover:bg-secondary rounded transition-colors"
                                       title="More reactions"
                                     >
                                       <Smile className="h-3.5 w-3.5 text-gray-600" />
@@ -1874,7 +1874,7 @@ export function TeamChatModern() {
                                     {/* More Options Menu */}
                                     <button
                                       onClick={() => setOpenMenuMessageId(menuOpen ? null : message.id)}
-                                      className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                      className="p-1 hover:bg-gray-100 dark:hover:bg-secondary rounded transition-colors"
                                       title="More options"
                                     >
                                       <MoreVertical className="h-3.5 w-3.5 text-gray-600" />
@@ -1905,53 +1905,53 @@ export function TeamChatModern() {
                                       <div
                                         ref={menuRef}
                                         className={cn(
-                                          "absolute top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-48 z-50",
+                                          "absolute top-full mt-1 bg-white dark:bg-card border border-gray-200 dark:border-border rounded-lg shadow-lg py-1 w-48 z-50",
                                           isOwn ? "right-0" : "left-0"
                                         )}
                                       >
                                         <button
                                           onClick={() => handleReplyWithQuote(message)}
-                                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-muted flex items-center gap-2 text-gray-700 dark:text-foreground"
                                         >
                                           <Reply className="h-4 w-4" />
                                           Reply
                                         </button>
                                         <button
                                           onClick={() => handleForward(message)}
-                                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-muted flex items-center gap-2 text-gray-700 dark:text-foreground"
                                         >
                                           <Forward className="h-4 w-4" />
                                           Forward
                                         </button>
                                         <button
                                           onClick={() => handleCopyLink(message)}
-                                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-muted flex items-center gap-2 text-gray-700 dark:text-foreground"
                                         >
                                           <Link2 className="h-4 w-4" />
                                           Copy link
                                         </button>
                                         <button
                                           onClick={() => handlePinMessage(message)}
-                                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-muted flex items-center gap-2 text-gray-700 dark:text-foreground"
                                         >
                                           <Pin className="h-4 w-4" />
                                           Pin message
                                         </button>
                                         <button
                                           onClick={() => handleSaveMessage(message)}
-                                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-muted flex items-center gap-2 text-gray-700 dark:text-foreground"
                                         >
                                           <Bookmark className="h-4 w-4" />
                                           Save
                                         </button>
                                         <button
                                           onClick={() => handleMarkAsUnread(message)}
-                                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                          className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-muted flex items-center gap-2 text-gray-700 dark:text-foreground"
                                         >
                                           <MailOpen className="h-4 w-4" />
                                           Mark as unread
                                         </button>
-                                        <div className="h-px bg-gray-200 my-1" />
+                                        <div className="h-px bg-gray-200 dark:bg-border my-1" />
                                         {isOwn && (
                                           <button
                                             onClick={() => handleDeleteMessage(message.id)}
@@ -1975,7 +1975,7 @@ export function TeamChatModern() {
                                     {Array.from(reactions.entries()).map(([emoji, count]) => (
                                       <span
                                         key={emoji}
-                                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-white border border-gray-200 rounded-full text-xs"
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-white dark:bg-card border border-gray-200 dark:border-border rounded-full text-xs"
                                       >
                                         <span>{emoji}</span>
                                         <span className="text-gray-600">{count}</span>
@@ -1995,7 +1995,7 @@ export function TeamChatModern() {
                 </div>
 
                 {/* Message Input */}
-                <div className="p-4 bg-white border-t border-gray-200"
+                <div className="p-4 bg-white dark:bg-card border-t border-gray-200 dark:border-border"
                   onDragEnter={handleDragEnter}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
@@ -2013,9 +2013,9 @@ export function TeamChatModern() {
                       />
                       <button
                         onClick={handleAttachmentClick}
-                        className="p-2 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
+                        className="p-2 hover:bg-gray-100 dark:hover:bg-secondary rounded transition-colors flex-shrink-0"
                       >
-                        <Paperclip className="h-5 w-5 text-gray-600" />
+                        <Paperclip className="h-5 w-5 text-gray-600 dark:text-muted-foreground" />
                       </button>
                     </>
 
@@ -2024,7 +2024,7 @@ export function TeamChatModern() {
 
                       {/* File Preview */}
                       {selectedFile && (
-                        <div className="absolute bottom-full left-0 mb-2 bg-white border border-gray-300 rounded-lg shadow-lg overflow-hidden max-w-[300px]">
+                        <div className="absolute bottom-full left-0 mb-2 bg-white dark:bg-card border border-gray-300 dark:border-border rounded-lg shadow-lg overflow-hidden max-w-[300px]">
                           {filePreviewUrl ? (
                             // Image Preview
                             <div className="relative">
@@ -2044,11 +2044,11 @@ export function TeamChatModern() {
                               >
                                 <X className="h-4 w-4" />
                               </button>
-                              <div className="px-3 py-2 bg-gray-50 border-t border-gray-200">
-                                <p className="text-xs text-gray-700 truncate font-medium">
+                              <div className="px-3 py-2 bg-gray-50 dark:bg-secondary border-t border-gray-200 dark:border-border">
+                                <p className="text-xs text-gray-700 dark:text-foreground truncate font-medium">
                                   {selectedFile.name}
                                 </p>
-                                <p className="text-[10px] text-gray-500">
+                                <p className="text-[10px] text-gray-500 dark:text-muted-foreground">
                                   {(selectedFile.size / 1024).toFixed(1)} KB
                                 </p>
                               </div>
@@ -2060,10 +2060,10 @@ export function TeamChatModern() {
                                 <Paperclip className="h-5 w-5 text-blue-600" />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-xs text-gray-900 font-medium truncate">
+                                <p className="text-xs text-gray-900 dark:text-foreground font-medium truncate">
                                   {selectedFile.name}
                                 </p>
-                                <p className="text-[10px] text-gray-500">
+                                <p className="text-[10px] text-gray-500 dark:text-muted-foreground">
                                   {(selectedFile.size / 1024).toFixed(1)} KB
                                 </p>
                               </div>
@@ -2087,7 +2087,7 @@ export function TeamChatModern() {
                         onKeyPress={handleKeyPress}
                         placeholder="Type a message"
                         rows={1}
-                        className="w-full px-3 py-2 pr-24 text-sm border border-gray-300 rounded resize-none focus:outline-none focus:border-blue-500 max-h-32"
+                        className="w-full px-3 py-2 pr-24 text-sm border border-gray-300 dark:border-border bg-white dark:bg-muted text-gray-900 dark:text-foreground rounded resize-none focus:outline-none focus:border-blue-500 max-h-32"
                         style={{ fieldSizing: 'content' } as any}
                       />
 
@@ -2097,7 +2097,7 @@ export function TeamChatModern() {
                           onClick={toggleEmojiPicker}
                           className={cn(
                             "p-1.5 rounded transition-colors",
-                            showEmojiPicker ? "bg-blue-100" : "hover:bg-gray-100"
+                            showEmojiPicker ? "bg-blue-100 dark:bg-blue-900/40" : "hover:bg-gray-100 dark:hover:bg-secondary"
                           )}
                         >
                           <Smile className={cn(
@@ -2131,7 +2131,7 @@ export function TeamChatModern() {
                         'p-2.5 rounded transition-colors flex-shrink-0',
                         (messageInput.trim() || selectedFile) && !isUploadingFile
                           ? 'bg-blue-600 text-white hover:bg-blue-700'
-                          : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                          : 'bg-gray-200 dark:bg-secondary text-gray-400 dark:text-muted-foreground cursor-not-allowed'
                       )}
                     >
                       {isUploadingFile ? (
@@ -2145,9 +2145,9 @@ export function TeamChatModern() {
               </>
             ) : (
               /* Shared Documents Panel */
-              <div className="flex-1 overflow-y-auto bg-[#f3f2f1] p-6">
+              <div className="flex-1 overflow-y-auto bg-[#f3f2f1] dark:bg-background p-6">
                 <div className="max-w-4xl mx-auto">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Shared Documents</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-foreground mb-4">Shared Documents</h3>
                   {sharedDocuments.length === 0 ? (
                     <div className="flex items-center justify-center h-64">
                       <div className="text-center">
@@ -2170,10 +2170,10 @@ export function TeamChatModern() {
                             <Paperclip className="h-6 w-6 text-blue-600" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate group-hover:text-blue-600">
+                            <p className="text-sm font-medium text-gray-900 truncate group-hover:text-blue-600 dark:text-foreground">
                               {doc.name}
                             </p>
-                            <p className="text-xs text-gray-500 mt-1">
+                            <p className="text-xs text-gray-500 mt-1 dark:text-muted-foreground">
                               Shared by {doc.sender.full_name || doc.sender.username} • {new Date(doc.created_at).toLocaleDateString()}
                             </p>
                           </div>
@@ -2187,16 +2187,16 @@ export function TeamChatModern() {
           </>
         ) : (
           /* Empty State */
-          <div className="flex-1 flex items-center justify-center bg-[#f3f2f1]">
+          <div className="flex-1 flex items-center justify-center bg-[#f3f2f1] dark:bg-background">
             <div className="text-center max-w-sm">
               <div className="h-20 w-20 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-4">
                 <MessageSquare className="h-10 w-10 text-blue-600" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Welcome to Chat</h3>
-              <p className="text-gray-600 text-sm">
+              <h3 className="text-xl font-semibold text-gray-900 mb-2 dark:text-foreground">Welcome to Chat</h3>
+              <p className="text-gray-600 text-sm dark:text-muted-foreground">
                 Select a user from the list to start messaging
               </p>
-              <p className="text-xs text-gray-400 mt-4">
+              <p className="text-xs text-gray-400 mt-4 dark:text-muted-foreground">
                 {users.length} {users.length === 1 ? 'user' : 'users'} available
               </p>
             </div>
