@@ -420,13 +420,13 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
 
         // Show success and navigate immediately — don't wait for API
         setShowSuccessView(true);
-        setTimeout(() => {
-            if (isModal && onSuccess) {
-                onSuccess();
-            } else {
-                navigate('/taskboard');
-            }
-        }, 1500);
+        // Navigate instantly — task is already in cache optimistically
+        console.log('[CreateTask] ✅ Optimistic task inserted into cache, navigating immediately.');
+        if (isModal && onSuccess) {
+            onSuccess();
+        } else {
+            navigate('/taskboard');
+        }
 
         // Fire API call in background — rollback cache if it fails
         try {
@@ -451,15 +451,13 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
             attachments.forEach((file) => {
                 formData.append('uploaded_files', file);
             });
-
-            const createdTask = await taskApi.create(formData);
-
-            // Replace the optimistic entry with the real task from the server
+            const apiResponse = await taskApi.create(formData);
+            const createdTask: Task = apiResponse?.task || apiResponse;
             queryClient.setQueryData(['tasks'], (old: any) => {
                 if (!old) return [createdTask];
-                if (Array.isArray(old)) return old.map(t => t.id === optimisticTask.id ? createdTask : t);
-                if (old.tasks) return { ...old, tasks: old.tasks.map((t: Task) => t.id === optimisticTask.id ? createdTask : t) };
-                if (old.results) return { ...old, results: old.results.map((t: Task) => t.id === optimisticTask.id ? createdTask : t) };
+                if (Array.isArray(old)) return [createdTask, ...old.filter((t: Task) => t.id !== optimisticTask.id)];
+                if (old.tasks) return { ...old, tasks: [createdTask, ...old.tasks.filter((t: Task) => t.id !== optimisticTask.id)] };
+                if (old.results) return { ...old, results: [createdTask, ...old.results.filter((t: Task) => t.id !== optimisticTask.id)] };
                 return old;
             });
 

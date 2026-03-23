@@ -364,7 +364,7 @@ export function TeamChatModern() {
                 const prevMsg = newLastMessages.get(user.id);
                 if (!prevMsg?.isUnread) {
                   newLastMessages.set(user.id, {
-                    content: prevMsg?.content || 'Unread messages',
+                    content: (prevMsg?.content || 'Unread messages').replace(/<[^>]*>/g, '').trim() || 'Unread messages',
                     timestamp: prevMsg?.timestamp || new Date().toISOString(),
                     isUnread: true
                   });
@@ -615,7 +615,7 @@ export function TeamChatModern() {
       }
 
       // Handle chat unread updates from WebSocket SIGNAL
-     if (data.type === 'SIGNAL' && (data as any).event === 'CHAT_UNREAD_UPDATE') {
+      if (data.type === 'SIGNAL' && (data as any).event === 'CHAT_UNREAD_UPDATE') {
         const unreadData = (data as any).data;
         const roomId = unreadData.room_id;
         const roomUnread = unreadData.room_unread || 0;
@@ -669,7 +669,7 @@ export function TeamChatModern() {
 
     gateway.onMessage(handler);
 
-   //  only this handler, do NOT disconnect the shared singleton
+    //  only this handler, do NOT disconnect the shared singleton
     return () => {
       gateway.offMessage(handler);
       isGatewayInitialized.current = false;
@@ -681,7 +681,7 @@ export function TeamChatModern() {
   // 3. Mutation: Create or Get Private Room
   const createRoomMutation = useMutation({
     mutationFn: (userId: number) => chatApi.createPrivateRoom(userId),
-onSuccess: (roomData, userId) => {
+    onSuccess: (roomData, userId) => {
       setActiveRoom(roomData);
       activeRoomRef.current = roomData;
       (window as any).__activeTeamChatRoomId = roomData.id;

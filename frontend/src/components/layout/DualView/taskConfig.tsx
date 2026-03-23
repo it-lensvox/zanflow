@@ -232,17 +232,34 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
 
     const handleStatusChange = (newStatus: string) => {
       queryClient.setQueryData(['tasks'], (old: any) => {
-        if (!old) return old;
-        const updater = (t: Task) => t.id === task.id ? { ...t, status: newStatus } : t;
-        if (Array.isArray(old)) return old.map(updater);
-        if (old.tasks) return { ...old, tasks: old.tasks.map(updater) };
-        if (old.results) return { ...old, results: old.results.map(updater) };
+        if (!old) {
+          console.warn('[StatusChange] Cache is empty — cannot reorder.');
+          return old;
+        }
+        const updatedTask = { ...task, status: newStatus, updated_at: new Date().toISOString() };
+
+        if (Array.isArray(old)) {
+          const prevIndex = old.findIndex((t: Task) => t.id === task.id);
+          const newList = [updatedTask, ...old.filter((t: Task) => t.id !== task.id)];
+          return newList;
+        }
+        if (old.tasks) {
+          const prevIndex = old.tasks.findIndex((t: Task) => t.id === task.id);
+          const newTasks = [updatedTask, ...old.tasks.filter((t: Task) => t.id !== task.id)];
+          return { ...old, tasks: newTasks };
+        }
+        if (old.results) {
+          const prevIndex = old.results.findIndex((t: Task) => t.id === task.id);
+          const newResults = [updatedTask, ...old.results.filter((t: Task) => t.id !== task.id)];
+          return { ...old, results: newResults };
+        }
+        console.warn('[StatusChange] ⚠️ Unknown cache shape — task not reordered:', old);
         return old;
       });
       setActiveDropdown(false);
 
       taskApi.update(task.id, { status: newStatus } as any).catch((error) => {
-        console.error('Failed to update status:', error);
+        console.error('[StatusChange] ❌ API update failed:', error);
         queryClient.invalidateQueries({ queryKey: ['tasks'] });
       });
     };
@@ -298,17 +315,34 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
 
     const handlePriorityChange = (newPriority: string) => {
       queryClient.setQueryData(['tasks'], (old: any) => {
-        if (!old) return old;
-        const updater = (t: Task) => t.id === task.id ? { ...t, priority: newPriority } : t;
-        if (Array.isArray(old)) return old.map(updater);
-        if (old.tasks) return { ...old, tasks: old.tasks.map(updater) };
-        if (old.results) return { ...old, results: old.results.map(updater) };
+        if (!old) {
+          console.warn('[PriorityChange] Cache is empty — cannot reorder.');
+          return old;
+        }
+        const updatedTask = { ...task, priority: newPriority, updated_at: new Date().toISOString() };
+
+        if (Array.isArray(old)) {
+          const prevIndex = old.findIndex((t: Task) => t.id === task.id);
+          const newList = [updatedTask, ...old.filter((t: Task) => t.id !== task.id)];
+          return newList;
+        }
+        if (old.tasks) {
+          const prevIndex = old.tasks.findIndex((t: Task) => t.id === task.id);
+          const newTasks = [updatedTask, ...old.tasks.filter((t: Task) => t.id !== task.id)];
+          return { ...old, tasks: newTasks };
+        }
+        if (old.results) {
+          const prevIndex = old.results.findIndex((t: Task) => t.id === task.id);
+          const newResults = [updatedTask, ...old.results.filter((t: Task) => t.id !== task.id)];
+          return { ...old, results: newResults };
+        }
+        console.warn('[PriorityChange] ⚠️ Unknown cache shape — task not reordered:', old);
         return old;
       });
       setActiveDropdown(false);
 
       taskApi.update(task.id, { priority: newPriority } as any).catch((error) => {
-        console.error('Failed to update priority:', error);
+        console.error('[PriorityChange] ❌ API update failed:', error);
         queryClient.invalidateQueries({ queryKey: ['tasks'] });
       });
     };
@@ -358,11 +392,28 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
       const isoValue = `${value}T12:00:00Z`;
 
       queryClient.setQueryData(['tasks'], (old: any) => {
-        if (!old) return old;
-        const updater = (t: Task) => t.id === task.id ? { ...t, [field]: isoValue } : t;
-        if (Array.isArray(old)) return old.map(updater);
-        if (old.tasks) return { ...old, tasks: old.tasks.map(updater) };
-        if (old.results) return { ...old, results: old.results.map(updater) };
+        if (!old) {
+          console.warn('[DateChange] Cache is empty — cannot reorder.');
+          return old;
+        }
+        const updatedTask = { ...task, [field]: isoValue, updated_at: new Date().toISOString() };
+
+        if (Array.isArray(old)) {
+          const prevIndex = old.findIndex((t: Task) => t.id === task.id);
+          const newList = [updatedTask, ...old.filter((t: Task) => t.id !== task.id)];
+          return newList;
+        }
+        if (old.tasks) {
+          const prevIndex = old.tasks.findIndex((t: Task) => t.id === task.id);
+          const newTasks = [updatedTask, ...old.tasks.filter((t: Task) => t.id !== task.id)];
+          return { ...old, tasks: newTasks };
+        }
+        if (old.results) {
+          const prevIndex = old.results.findIndex((t: Task) => t.id === task.id);
+          const newResults = [updatedTask, ...old.results.filter((t: Task) => t.id !== task.id)];
+          return { ...old, results: newResults };
+        }
+        console.warn('[DateChange] ⚠️ Unknown cache shape — task not reordered:', old);
         return old;
       });
 
