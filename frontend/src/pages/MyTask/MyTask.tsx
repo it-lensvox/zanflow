@@ -140,16 +140,20 @@ export const MyTask: React.FC = () => {
 }, [queryClient]);
 
     const filteredTasks = React.useMemo(() => {
-        return hookFilteredTasks.filter((task: Task) => {
-            const matchesFilter = activeFilter === 'ALL' || task.status.toUpperCase() === activeFilter;
-            const matchesSearch = searchQuery.trim() === '' ||
-                task.heading.toLowerCase().includes(searchQuery.toLowerCase());
-            const assigneeFilterValue = columnFilters['assigned_to'];
-            const matchesAssignee = !assigneeFilterValue ||
-                task.assigned_to.map(String).includes(String(assigneeFilterValue));
-            return matchesFilter && matchesSearch && matchesAssignee;
-        });
-    }, [hookFilteredTasks, activeFilter, searchQuery, columnFilters]);
+    return hookFilteredTasks.filter((task: Task) => {
+        if (!task || !task.status) {
+            console.warn('[filteredTasks] Skipping task with missing status:', task);
+            return false;
+        }
+        const matchesFilter = activeFilter === 'ALL' || task.status.toUpperCase() === activeFilter;
+        const matchesSearch = searchQuery.trim() === '' ||
+            (task.heading || '').toLowerCase().includes(searchQuery.toLowerCase());
+        const assigneeFilterValue = columnFilters['assigned_to'];
+        const matchesAssignee = !assigneeFilterValue ||
+            (task.assigned_to || []).map(String).includes(String(assigneeFilterValue));
+        return matchesFilter && matchesSearch && matchesAssignee;
+    });
+}, [hookFilteredTasks, activeFilter, searchQuery, columnFilters]);
     const handleFilter = useCallback((key: string) => {
         console.log('[handleFilter] called with key:', key, '| dateField:', dateField, '| will reset showDateFieldDropdown');
         setShowDateFieldDropdown(false);
