@@ -54,6 +54,7 @@ LOCAL_APPS = [
     "apps.teams",
     "apps.organizations",
     "apps.quicknotes",
+    "apps.daily_updates",
     # "apps.ai_ops",
     
 ]
