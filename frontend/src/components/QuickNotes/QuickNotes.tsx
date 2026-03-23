@@ -1116,9 +1116,9 @@ function getInitialFabPos(): { x: number; y: number } {
     const raw = localStorage.getItem(FAB_POS_KEY);
     if (raw) return JSON.parse(raw);
   } catch { }
-  return {
-    x: window.innerWidth - FAB_SIZE * 2 - 24 - 12,
-    y: window.innerHeight - FAB_SIZE - 24,
+return {
+    x: window.innerWidth - FAB_SIZE - 24,
+    y: window.innerHeight - FAB_SIZE * 2 - 32,
   };
 }
 
@@ -1216,7 +1216,7 @@ export function QuickNotes() {
         title="Quick Notes (drag to reposition)"
         style={{ left: fabPos.x, top: fabPos.y }}
         className={cn(
-          'fixed z-[60] flex h-12 w-12 items-center justify-center rounded-full',
+         'fixed z-[60] flex h-12 w-12 items-center justify-center rounded-full',
           'bg-primary text-primary-foreground shadow-lg',
           'hover:opacity-90 transition-opacity duration-200',
           'focus:outline-none cursor-grab active:cursor-grabbing select-none',
