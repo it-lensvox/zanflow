@@ -291,10 +291,11 @@ export const MyTask: React.FC = () => {
     ), [showDateFieldDropdown, dateField, activeDateLabel]);
 
     return (
-        <div className="w-full p-8 space-y-8">
+        <div className="w-full flex flex-col h-screen overflow-hidden">
             {location.pathname.startsWith('/taskboard') && !location.pathname.endsWith('/create') ? (
                 <>
-                    <div>
+                    {/* ── Sticky header — never scrolls ── */}
+                    <div className="flex-shrink-0 px-8 pt-8 pb-0 bg-white z-10">
                         <div className="flex flex-col gap-6">
                             {/* Header Section */}
                             <div className="flex items-center justify-between">
@@ -364,16 +365,19 @@ export const MyTask: React.FC = () => {
                                 </div>
                             </div>
                         </div>
+                    </div>
 
+                    {/* ── Scrollable content area ── */}
+                    <div className="flex-1 min-h-0 overflow-y-auto px-8 pb-8">
                         {/* Content Section*/}
-                        <div className="space-y-0 mt-6 flex-1 flex flex-col">
+                        <div className="space-y-0 mt-6 flex flex-col">
                             <DualView
                                 viewMode={viewMode}
                                 isLoading={loading}
                                 gridProps={{
                                     data: filteredTasks,
                                     renderCard: (task: Task) => <TaskGridCard task={task} onTaskClick={handleTaskClick} />,
-                                    gridClassName: "grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
+                                    gridClassName: "grid gap-4 grid-cols-4",
                                 }}
                                 tableProps={{
                                     data: filteredTasks,
