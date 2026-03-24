@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import TaskListCreateView, TaskRetrieveUpdateView, AllUsersListView, UserPerformanceView, TaskCommentListCreateView, TaskAttachmentDeleteView
+from .views import TaskListCreateView, TaskRetrieveUpdateView, AllUsersListView, UserPerformanceView, TaskCommentListCreateView, TaskAttachmentDeleteView, TaskPinToggleView
 
 urlpatterns = [
     path('', TaskListCreateView.as_view(), name='task_list_create'),
@@ -9,4 +9,5 @@ urlpatterns = [
     # --- New Performance Endpoint ---
     path('performance/<int:user_id>/', UserPerformanceView.as_view(), name='user_performance'),
     path('attachments/<uuid:pk>/', TaskAttachmentDeleteView.as_view(), name='delete_task_attachment'),
+    path('<int:task_id>/pin/', TaskPinToggleView.as_view(), name='task_pin_toggle'),
 ]

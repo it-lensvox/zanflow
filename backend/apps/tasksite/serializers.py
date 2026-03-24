@@ -96,6 +96,7 @@ class TaskSerializer(serializers.ModelSerializer):
     project_details = ProjectSimpleSerializer(source='project', read_only=True)
     label_details = LabelSimpleSerializer(source='labels', many=True, read_only=True)
     comments = TaskCommentSerializer(many=True, read_only=True)
+    is_pinned = serializers.SerializerMethodField()
     # WRITE ONLY: This allows uploading multiple files during creation
     uploaded_files = serializers.ListField(
         child=serializers.FileField(),
@@ -131,10 +132,18 @@ class TaskSerializer(serializers.ModelSerializer):
             'uploaded_links',
             'created_at',
             'updated_at',
-            'comments'
+            'comments',
+            'is_pinned'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'assigned_by', 'assigned_by_user_details']
-        
+
+    def get_is_pinned(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            # Returns True if the current user is in the pinned_by list
+            return obj.pinned_by.filter(id=request.user.id).exists()
+        return False   
+    
     def validate_uploaded_links(self, value):
         """
         Automatically adds 'https://' if the user (or Postman) 
