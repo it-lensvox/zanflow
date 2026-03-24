@@ -5,7 +5,7 @@ import type {
   GatewaySendMessagePayload, GatewayIncomingMessage, RefineTextPayload, RefineTextResponse, TaskResponse, TeamTypeChoicesResponse,
   CreateTeamPayload, ProjectChatRoom, TeamChatRoom, ChatUnreadResponse, NotificationData, NotificationCallback, Team, ThreadRoom, ThreadSession, ThreadStorage, ThreadUIMessage, CreateThreadRoomPayload, WSJoinRoomCommand, WSSendMessageCommand, WSIncomingThreadMessage, WSUnreadUpdateSignal, ThreadMessagesResponse,
   InviteUserPayload, InviteUserResponse, InviteVerifyResponse, InviteAcceptPayload, InviteAcceptResponse, AIBotSendPayload, AIBotIncomingMessage, OrganizationSignupPayload, OrganizationSignupResponse,
-   DailyUpdate, DailyUpdatePayload, DailyUpdateListResponse
+   DailyUpdate, DailyUpdatePayload, DailyUpdateListResponse,
 } from '@/types';
 
 export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.164:8000/api/v1';
@@ -345,7 +345,7 @@ export const documentsApi = {
 
 // Add New Task API
 export const taskApi = {
-  list: async () => {
+ list: async () => {
     const response = await api.get('/tasksite/');
     const data = response.data;
     if (data.tasks && Array.isArray(data.tasks)) {
@@ -364,6 +364,24 @@ export const taskApi = {
     }
 
     return data;
+  },
+
+  // Paginated fetch — used by the Task Board infinite scroll
+  listPaginated: async (page: number = 1): Promise<import('@/types').TaskPaginatedResponse> => {
+    const response = await api.get('/tasksite/', { params: { page } });
+    const data = response.data;
+    const rawResults: any[] = data.results ?? data.tasks ?? [];
+    const results = rawResults.map((task: any) => ({
+      ...task,
+      attachments: task.attachments || [],
+      labels: task.label_details || task.labels || [],
+    }));
+    return {
+      count: data.count ?? results.length,
+      next: data.next ?? null,
+      previous: data.previous ?? null,
+      results,
+    };
   },
 
   get: async (taskId: number) => {

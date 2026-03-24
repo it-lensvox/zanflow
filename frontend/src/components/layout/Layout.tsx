@@ -5,6 +5,7 @@ import { NotificationsPage } from '@/pages/NotificationsPage';
 import { QuickNotes } from '@/components/QuickNotes';
 import { AIBot } from '@/pages/AI BOT/AI BOT';
 import { useNotifications } from '@/hooks/useNotifications';
+import { TaskDraftBar } from '@/pages/MyTask/Taskdrafts';
 
 function PageSkeleton() {
   return (
@@ -105,8 +106,9 @@ export function Layout() {
       {isActivityOpen && (
         <NotificationsPage onClose={() => setIsActivityOpen(false)} />
       )}
-      {!isProjectDetailPage && <AIBot />}
+     {!isProjectDetailPage && <AIBot />}
       <QuickNotes />
+      <TaskDraftBar />
     </div>
   );
 }

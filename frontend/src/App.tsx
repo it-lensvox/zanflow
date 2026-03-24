@@ -6,6 +6,7 @@ import type { User as AppUser } from '@/types';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { projectsApi, notificationSocket, gatewaySocket } from '@/services/api';
+import { TaskDraftsProvider } from '@/pages/MyTask/Taskdrafts';
 
 // Lazy-loaded page components for route-level code splitting
 const Dashboard = lazy(() => import('@/pages/Dashboard').then(m => ({ default: m.Dashboard })));
@@ -235,9 +236,11 @@ function WebSocketProvider({ children }: { children: React.ReactNode }) {
 function App() {
   return (
     <AuthProvider>
-      <WebSocketProvider>
-        <AppRoutes />
-      </WebSocketProvider>
+      <TaskDraftsProvider>
+        <WebSocketProvider>
+          <AppRoutes />
+        </WebSocketProvider>
+      </TaskDraftsProvider>
     </AuthProvider>
   );
 }

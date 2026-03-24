@@ -195,6 +195,14 @@ export interface TaskResponse {
   task: Task;
 }
 
+// Paginated task list response (DRF standard envelope)
+export interface TaskPaginatedResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: Task[];
+}
+
 // In taskdetailmodal comment section 
 export interface TaskComment {
   id: number;
