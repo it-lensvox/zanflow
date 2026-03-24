@@ -881,7 +881,6 @@ export function TeamChatModern() {
   };
 
   // Unread users filter
-  // Unread users filter (chat tab only — used for badge counts)
   const unreadUsers = useMemo(() => {
     return filteredUsers.filter(user => {
       const unreadCount = getUserUnreadCount(user.id);

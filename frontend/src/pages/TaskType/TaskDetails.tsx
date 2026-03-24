@@ -138,15 +138,41 @@ export function TaskDetails() {
         }
     };
 
-    const handleTaskCreated = () => {
+    const handleTaskCreated = useCallback((newTask?: Task) => {
         setIsCreateTaskModalOpen(false);
-        queryClient.invalidateQueries({ queryKey: ['tasks'] });
-    };
+        if (newTask) {
+            // 1. Update the infinite-query 
+            queryClient.setQueryData(['tasks'], (old: any) => {
+                if (!old?.pages) return old;
+                return {
+                    ...old,
+                    pages: [
+                        { ...old.pages[0], results: [newTask, ...(old.pages[0]?.results ?? [])] },
+                        ...old.pages.slice(1),
+                    ],
+                };
+            });
+
+            // 2. Update THIS component's
+            queryClient.setQueryData(['tasks-list', id], (old: any) => {
+                if (!old) return old;
+                const list: Task[] = old.tasks ?? old.results ?? old ?? [];
+                const withoutDupe = list.filter((t: Task) => t.id !== newTask.id);
+                const merged = [newTask, ...withoutDupe];
+                if (old.tasks) return { ...old, tasks: merged };
+                if (old.results) return { ...old, results: merged };
+                return merged;
+            });
+        } else {
+            queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            queryClient.invalidateQueries({ queryKey: ['tasks-list', id] });
+        }
+    }, [queryClient, id]);
 
 
     // 6. ADD this new useQuery for tasks
     const { data: tasksData, isLoading: isLoadingTasks } = useQuery({
-        queryKey: ['tasks'],
+        queryKey: ['tasks-list', id],
         queryFn: () => taskApi.list(),
         staleTime: 0,
         select: (data) => {
@@ -238,11 +264,9 @@ export function TaskDetails() {
     // Filter documents based on selected filter
     const filteredDocuments = React.useMemo(() => {
         if (documentFilter === 'project') {
-            // Only project-level docs (source === 'Project')
             return allDocuments.filter((doc: FilteredDocument) => doc.source === 'Project');
         } else if (documentFilter === 'task') {
             if (selectedTaskId) {
-                // Specific task selected — show only that task's attachments
                 const taskData = selectedTaskData?.task || selectedTaskData;
                 const attachments: TaskAttachment[] = taskData?.attachments || [];
                 return attachments.map((att: TaskAttachment) => ({
@@ -377,7 +401,7 @@ export function TaskDetails() {
         if (!files || files.length === 0 || !id) return;
 
         const MAX_FILE_SIZE = 500 * 1024 * 1024;
-        
+
         for (let i = 0; i < files.length; i++) {
             if (files[i].size > MAX_FILE_SIZE) {
                 setUploadError(`File ${files[i].name} exceeds the 500 MB limit.`);
@@ -423,7 +447,7 @@ export function TaskDetails() {
 
                 if (confirmResponse.id) {
                     await documentsApi.getDownloadUrl(projectIdNum, { document_id: confirmResponse.id });
-                    
+
                     // Optimistically inject created_by from current user for the newly uploaded doc
                     // so "Uploaded By" renders immediately without waiting for allMediaFiles refetch
                     if (user) {
@@ -501,15 +525,34 @@ export function TaskDetails() {
         }
     };
 
-    const handleDeleteTask = async (taskId: number) => {
+    const handleDeleteTask = useCallback(async (taskId: number) => {
+        // Optimistically remove from cache immediately 
+        queryClient.setQueryData(['tasks'], (old: any) => {
+            if (!old) return old;
+            if (old?.pages) {
+                return {
+                    ...old,
+                    pages: old.pages.map((page: any) => ({
+                        ...page,
+                        results: page.results.filter((t: Task) => t.id !== taskId),
+                    })),
+                };
+            }
+            const list: Task[] = old.tasks ?? old.results ?? old ?? [];
+            const filtered = list.filter((t: Task) => t.id !== taskId);
+            if (old.tasks) return { ...old, tasks: filtered };
+            if (old.results) return { ...old, results: filtered };
+            return filtered;
+        });
+        setSelectedTask(null);
+
         try {
             await taskApi.delete(taskId);
-            queryClient.invalidateQueries({ queryKey: ['tasks'] });
-            setSelectedTask(null);
         } catch (error) {
             console.error("Failed to delete task:", error);
+            queryClient.invalidateQueries({ queryKey: ['tasks'] });
         }
-    };
+    }, [queryClient]);
 
     // Handle document preview 
     const handleDocumentClick = (doc: FilteredDocument) => {
@@ -1001,14 +1044,10 @@ export function TaskDetails() {
                 isCreateTaskModalOpen && (
                     <CreateTask
                         onClose={() => setIsCreateTaskModalOpen(false)}
-                        onSuccess={() => {
-                            setIsCreateTaskModalOpen(false);
-                            queryClient.invalidateQueries({ queryKey: ['tasks'] });
-                        }}
+                        onSuccess={(newTask?: Task) => handleTaskCreated(newTask)}
                         isModal={true}
                         fixedProjectId={id ? Number(id) : undefined}
                     />
-
                 )
             }
 

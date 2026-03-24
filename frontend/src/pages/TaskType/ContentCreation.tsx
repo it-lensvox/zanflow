@@ -166,7 +166,7 @@ export function ContentCreation() {
     const [showTaskDropdown, setShowTaskDropdown] = useState(false);
     const taskDropdownRef = useRef<HTMLDivElement>(null);
     const { data: tasksData, isLoading: isTasksLoading } = useQuery({
-        queryKey: ['tasks'],
+        queryKey: ['tasks-list', id],
         queryFn: () => taskApi.list(),
         select: (data) => {
             const allTasks = data.tasks || data.results || [];
@@ -437,7 +437,7 @@ export function ContentCreation() {
         if (!files || files.length === 0 || !id) return;
 
         const MAX_FILE_SIZE = 500 * 1024 * 1024;
-        
+
         for (let i = 0; i < files.length; i++) {
             if (files[i].size > MAX_FILE_SIZE) {
                 setUploadError(`File ${files[i].name} exceeds the 500 MB limit.`);
@@ -490,7 +490,7 @@ export function ContentCreation() {
                 // Step 4: Call Get Download URL
                 if (confirmResponse.id) {
                     await documentsApi.getDownloadUrl(projectIdNum, { document_id: confirmResponse.id });
-                    
+
                     if (user) {
                         newUploadedDocs.push({
                             id: confirmResponse.id,
@@ -565,11 +565,36 @@ export function ContentCreation() {
         }
     };
 
-    const handleTaskCreated = () => {
+    const handleTaskCreated = useCallback((newTask?: Task) => {
         setIsCreateTaskModalOpen(false);
-        // This triggers the global refetch same as Taskboard
-        queryClient.invalidateQueries({ queryKey: ['tasks'] });
-    };
+        if (newTask) {
+            // 1. Update the infinite-query
+            queryClient.setQueryData(['tasks'], (old: any) => {
+                if (!old?.pages) return old;
+                return {
+                    ...old,
+                    pages: [
+                        { ...old.pages[0], results: [newTask, ...(old.pages[0]?.results ?? [])] },
+                        ...old.pages.slice(1),
+                    ],
+                };
+            });
+
+            // 2. Update THIS component's 
+            queryClient.setQueryData(['tasks-list', id], (old: any) => {
+                if (!old) return old;
+                const list: Task[] = old.tasks ?? old.results ?? old ?? [];
+                const withoutDupe = list.filter((t: Task) => t.id !== newTask.id);
+                const merged = [newTask, ...withoutDupe];
+                if (old.tasks) return { ...old, tasks: merged };
+                if (old.results) return { ...old, results: merged };
+                return merged;
+            });
+        } else {
+            queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            queryClient.invalidateQueries({ queryKey: ['tasks-list', id] });
+        }
+    }, [queryClient, id]);
 
     const handleDocumentPreview = (doc: FilteredDocument) => {
         if (!doc.file_url) {
@@ -703,7 +728,7 @@ export function ContentCreation() {
                             Create Task
                         </button>
 
-                       <button
+                        <button
                             onClick={() => {
                                 const projectRoom = projectRoomsData?.find(room => room.project === Number(id));
                                 if (projectRoom) {
@@ -1085,7 +1110,7 @@ export function ContentCreation() {
             {isCreateTaskModalOpen && (
                 <CreateTask
                     onClose={() => setIsCreateTaskModalOpen(false)}
-                    onSuccess={handleTaskCreated}
+                    onSuccess={(newTask?: Task) => handleTaskCreated(newTask)}
                     isModal={true}
                     fixedProjectId={Number(id)}
                 />
@@ -1111,7 +1136,7 @@ export function ContentCreation() {
             {project && (
                 <Threads projectId={project.id} projectName={project.name} />
             )}
-           <DeleteModal
+            <DeleteModal
                 isOpen={!!deleteConfirm}
                 type="confirm"
                 itemType="document"

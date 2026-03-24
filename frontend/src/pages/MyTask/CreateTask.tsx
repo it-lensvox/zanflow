@@ -16,7 +16,7 @@ interface UserOption {
 
 interface CreateTaskProps {
     onClose?: () => void;
-    onSuccess?: () => void;
+    onSuccess?: (task?: Task) => void;
     isModal?: boolean;
     fixedProjectId?: number;
     draftId?: string;
@@ -470,13 +470,12 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
             if (Array.isArray(old)) return { pages: [{ count: old.length + 1, next: null, previous: null, results: [optimisticTask, ...old] }], pageParams: [1] };
             return old;
         });
-        setShowSuccessView(true);
-        console.log('[CreateTask] ✅ Optimistic task inserted into cache, navigating immediately.');
-        if (isModal && onSuccess) {
-            onSuccess();
-        } else {
-            navigate('/taskboard');
-        }
+       setShowSuccessView(true);
+if (isModal && onSuccess) {
+    onSuccess(optimisticTask); 
+} else {
+    navigate('/taskboard');
+}
 
         // Fire API call in background
         try {

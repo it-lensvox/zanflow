@@ -75,17 +75,18 @@ export const MyTask: React.FC = () => {
     } = useInfiniteQuery({
         queryKey: ['tasks'],
         queryFn: ({ pageParam = 1 }) => taskApi.listPaginated(pageParam as number),
-        getNextPageParam: (lastPage) => {
-            if (!lastPage || typeof lastPage !== 'object') return undefined;
-            if (!('next' in lastPage) || !lastPage.next) return undefined;
-            try {
-                const url = new URL(lastPage.next);
-                const p = url.searchParams.get('page');
-                return p ? Number(p) : undefined;
-            } catch {
-                return undefined;
-            }
-        },
+       getNextPageParam: (lastPage) => {
+    if (!lastPage || typeof lastPage !== 'object' || Array.isArray(lastPage)) return undefined;
+    if (!('next' in lastPage) || !lastPage.next) return undefined;
+    if (!Array.isArray((lastPage as any).results)) return undefined;
+    try {
+        const url = new URL(lastPage.next);
+        const p = url.searchParams.get('page');
+        return p ? Number(p) : undefined;
+    } catch {
+        return undefined;
+    }
+},
         initialPageParam: 1,
         enabled: !!user,
         staleTime: 1000 * 60 * 2,
