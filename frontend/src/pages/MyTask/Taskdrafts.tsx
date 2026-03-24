@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, ChevronUp, ClipboardList, Minus } from 'lucide-react';
+import { X, ChevronUp, ClipboardList } from 'lucide-react';
 import { TaskDraftsContext, useTaskDrafts, useTaskDraftsContext } from '@/hooks/useTaskDrafts';
 
 // Provider
@@ -29,7 +29,7 @@ export function TaskDraftBar() {
 
     return (
         <div
-            className="fixed bottom-0 right-4 z-[200] flex flex-col-reverse gap-1 pb-1"
+            className="fixed bottom-0 right-20 z-[200] flex flex-row-reverse items-end gap-1"
             aria-label="Task drafts"
         >
             {minimizedDrafts.map((draft) => (

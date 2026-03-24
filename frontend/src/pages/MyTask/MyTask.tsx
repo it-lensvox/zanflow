@@ -307,15 +307,14 @@ export const MyTask: React.FC = () => {
                                         <>
                                             <button
                                                 onClick={() => navigate('/taskboard/create')}
-                                                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
+                                                className="flex items-center px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800 transition-colors shadow-sm"
                                             >
-                                                <Plus className="w-4 h-4 mr-2" />
                                                 Create Task
                                             </button>
 
                                             <button
                                                 onClick={() => setShowAITaskModal(true)}
-                                                className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-md text-sm font-medium hover:bg-purple-700 transition-colors shadow-sm"
+                                                className="flex items-center px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800 transition-colors shadow-sm"
                                             >
                                                 Generate Task by AI
                                             </button>

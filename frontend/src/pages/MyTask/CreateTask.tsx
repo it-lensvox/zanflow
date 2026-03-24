@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { X, Calendar, CheckCircle, AlertCircle, ArrowLeft, Briefcase, User, Flag, Paperclip, Type, Sparkles, Plus, Link, Trash2, Minus, Square } from 'lucide-react';
+import { X, Calendar, CheckCircle, AlertCircle, Briefcase, User, Flag, Paperclip, Type, Sparkles, Plus, Link, Trash2, Minus, Square } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { taskApi, usersApi, projectsApi } from '@/services/api';
 import { ProjectMinimal, AITaskSuggestionResponse, Label, Task } from '@/types';
@@ -38,7 +38,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
     const resolvedDraftId = propDraftId ?? (location.state?.draftId as string | undefined);
     const draftIdRef = useRef<string>(resolvedDraftId ?? '');
 
-    // Create the draft exactly once, outside of render, using a layout effect
+    // Create the draft exactly once, outside of render
     const { drafts } = useTaskDraftsContext();
     useEffect(() => {
         if (!draftIdRef.current) {
@@ -567,7 +567,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                             <button
                                 type="submit"
                                 form="create-task-form"
-                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                               className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 disabled={loading}
                             >
                                 {loading ? 'Creating...' : 'Create task'}
@@ -575,7 +575,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                             <button
                                 type="button"
                                 onClick={() => setShowAIModal(true)}
-                                className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded hover:bg-purple-700 transition-colors flex items-center gap-2"
+                                className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded hover:bg-gray-800 transition-colors flex items-center gap-2"
                             >
                                 <Sparkles className="w-4 h-4" />
                                 Generate Task By AI
