@@ -84,8 +84,8 @@ urlpatterns = [
     
     # DELETE /notifications/delete-read/ - Delete all read notifications
     path(
-        'delete-read/',
-        views.NotificationDeleteAllReadView.as_view(),
+        'delete-all/',
+        views.NotificationDeleteAllView.as_view(),
         name='notification_delete_read'
     ),
     

@@ -70,7 +70,7 @@ class TaskListCreateView(APIView):
         paginator = PageNumberPagination()
         paginated_tasks = paginator.paginate_queryset(tasks, request, view=self)
 
-        serializer = TaskSerializer(paginated_tasks, many=True)
+        serializer = TaskSerializer(paginated_tasks, many=True, context={'request': request})
         
         # YOU MUST RETURN THIS, NOT your custom Response dictionary
         return paginator.get_paginated_response(serializer.data)
@@ -121,7 +121,7 @@ class TaskRetrieveUpdateView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        serializer = TaskSerializer(task)
+        serializer = TaskSerializer(task, context={'request': request})
         return Response({
             "message": "Task retrieved successfully",
             "task": serializer.data
