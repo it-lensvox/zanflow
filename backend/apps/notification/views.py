@@ -23,7 +23,26 @@ from .serializers import (
     NotificationCountSerializer,
 )
 from .services import get_or_create_preferences, mark_all_as_read, get_unread_count
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.response import Response
 
+class NotificationPagination(PageNumberPagination):
+    page_size = 50 # Default number of items per page
+    page_size_query_param = 'limit' # Allows frontend to request a specific size (e.g., ?page=1&limit=20)
+    max_page_size = 100 # Safety cap
+    
+    def get_paginated_response(self, data, unread_count=0):
+        """Custom response format to maintain your existing metadata structure."""
+        return Response({
+            'message': 'Notifications retrieved successfully',
+            'total': self.page.paginator.count,
+            'unread_count': unread_count,
+            'total_pages': self.page.paginator.num_pages,
+            'current_page': self.page.number,
+            'next': self.get_next_link(),
+            'previous': self.get_previous_link(),
+            'notifications': data
+        })
 
 class NotificationListView(APIView):
     """
@@ -31,10 +50,10 @@ class NotificationListView(APIView):
     
     Query Parameters:
         - is_read: Filter by read status (true/false)
-        - notification_type: Filter by type (e.g., task_assigned, task_status_updated)
-        - priority: Filter by priority (low, medium, high, urgent)
-        - limit: Limit number of results (default: 50)
-        - offset: Offset for pagination (default: 0)
+        - notification_type: Filter by type
+        - priority: Filter by priority
+        - page: Page number (default: 1)
+        - limit: Items per page (default: 50)
     """
     authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
     permission_classes = [IsAuthenticated]
@@ -43,39 +62,35 @@ class NotificationListView(APIView):
         user = request.user
         queryset = Notification.objects.filter(recipient=user).select_related('actor')
         
-        # Filter by read status
+        # 1. Filters (Keep your existing filter logic)
         is_read = request.query_params.get('is_read')
         if is_read is not None:
             is_read_bool = is_read.lower() in ('true', '1', 'yes')
             queryset = queryset.filter(is_read=is_read_bool)
         
-        # Filter by notification type
         notification_type = request.query_params.get('notification_type')
         if notification_type:
             queryset = queryset.filter(notification_type=notification_type)
         
-        # Filter by priority
         priority = request.query_params.get('priority')
         if priority:
             queryset = queryset.filter(priority=priority)
+            
+        # Calculate unread count before paginating
+        unread_count = queryset.filter(is_read=False).count()
         
-        # Pagination
-        limit = int(request.query_params.get('limit', 50))
-        offset = int(request.query_params.get('offset', 0))
+        # 2. Apply DRF Pagination
+        paginator = NotificationPagination()
+        paginated_queryset = paginator.paginate_queryset(queryset, request, view=self)
         
-        total_count = queryset.count()
-        notifications = queryset[offset:offset + limit]
-        
-        serializer = NotificationListSerializer(notifications, many=True)
-        
-        return Response({
-            'message': 'Notifications retrieved successfully',
-            'total': total_count,
-            'unread_count': queryset.filter(is_read=False).count(),
-            'limit': limit,
-            'offset': offset,
-            'notifications': serializer.data
-        }, status=status.HTTP_200_OK)
+        # 3. Serialize and Return
+        if paginated_queryset is not None:
+            serializer = NotificationListSerializer(paginated_queryset, many=True)
+            return paginator.get_paginated_response(serializer.data, unread_count=unread_count)
+
+        # Fallback (safety catch)
+        serializer = NotificationListSerializer(queryset, many=True)
+        return Response({'notifications': serializer.data})
 
 
 class NotificationDetailView(APIView):
@@ -239,21 +254,21 @@ class NotificationCountView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
-class NotificationDeleteAllReadView(APIView):
+class NotificationDeleteAllView(APIView):
     """
-    DELETE: Delete all read notifications for the user.
+    DELETE: Delete all notifications (both read and unread) for the user.
     """
     authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
     permission_classes = [IsAuthenticated]
     
     def delete(self, request):
+        # We removed `is_read=True` so it grabs ALL notifications for this user
         deleted_count, _ = Notification.objects.filter(
-            recipient=request.user,
-            is_read=True
+            recipient=request.user
         ).delete()
         
         return Response({
-            'message': f'{deleted_count} read notification(s) deleted',
+            'message': f'{deleted_count} notification(s) deleted',
             'deleted_count': deleted_count
         }, status=status.HTTP_200_OK)
 

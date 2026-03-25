@@ -59,7 +59,7 @@ class Task(TenantModel):
         null=True, 
         related_name='created_tasks'
     )
-    
+    pinned_by = models.ManyToManyField(User, related_name='pinned_tasks', blank=True)
     status = models.CharField(
         max_length=20, 
         choices=STATUS_CHOICES, 

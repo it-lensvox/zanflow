@@ -7,7 +7,9 @@ from apps.groundtruth.models import Document
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.shortcuts import get_object_or_404
 from django.db.models import Count, Q
+from django.db.models import Count, Q, Case, When, Value, BooleanField
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.pagination import PageNumberPagination
 from rest_framework import serializers
 from apps.users.auth import StaticTokenAuthentication
 # Ensure this import matches your project structure
@@ -42,33 +44,50 @@ class AllUsersListView(APIView):
         }, status=status.HTTP_200_OK)
 
 class TaskListCreateView(APIView):
-    authentication_classes = [StaticTokenAuthentication,JWTAuthentication]
+    authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
     permission_classes = [IsAuthenticated]
     parser_classes = (MultiPartParser, FormParser)
+
     def get(self, request):
         user = self.request.user
-        # 1. Base Queryset
         queryset = Task.objects.all()
 
-        # 2. Privacy Logic: 
-        # Show tasks only if the user is assigned TO it OR if they created it (assigned_by)
         tasks = queryset.filter(
             Q(assigned_to=user) | Q(assigned_by=user)
         ).distinct()
         
-        # 3. Existing Project Filtering
+        # 1. Filters by project_id
         project_id = request.query_params.get('project_id')
         if project_id:
             tasks = tasks.filter(project__id=project_id)
+            
+        tasks = tasks.annotate(
+            user_has_pinned=Case(
+                When(pinned_by=user, then=Value(True)),
+                default=Value(False),
+                output_field=BooleanField()
+            )
+        ).order_by('-user_has_pinned', '-updated_at')
 
-        serializer = TaskSerializer(tasks, many=True)
-        return Response({
-            "message": "Tasks retrieved successfully",
-            "tasks": serializer.data
-        }, status=status.HTTP_200_OK)
+        # 2. Checks for disable_pagination=true
+        disable_pagination = request.query_params.get('disable_pagination', 'false').lower() == 'true'
+
+        if disable_pagination:
+            # RETURN ALL TASKS IN ONE GO
+            serializer = TaskSerializer(tasks, many=True, context={'request': request})
+            return Response({
+                "count": tasks.count(),
+                "results": serializer.data
+            }, status=status.HTTP_200_OK)
+
+        # 3. IF disable_pagination is NOT true, do normal pagination
+        paginator = PageNumberPagination()
+        paginated_tasks = paginator.paginate_queryset(tasks, request, view=self)
+        serializer = TaskSerializer(paginated_tasks, many=True, context={'request': request})
+        
+        return paginator.get_paginated_response(serializer.data)
 
     def post(self, request):
-        # --- UPDATE THIS CONDITION ---
         # Allow Admin to create tasks too
         if not (request.user.is_manager or request.user.is_superuser):
             return Response(
@@ -80,11 +99,9 @@ class TaskListCreateView(APIView):
         if serializer.is_valid():
             task = serializer.save(assigned_by=request.user)
             
-            # ================================================================
             # TRIGGER NOTIFICATION: Task Created
-            # ================================================================
             notify_task_created(task=task, actor=request.user)
-            # ================================================================
+            
             return Response({
                 "message": "Task created successfully",
                 "task": serializer.data
@@ -113,7 +130,7 @@ class TaskRetrieveUpdateView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        serializer = TaskSerializer(task)
+        serializer = TaskSerializer(task, context={'request': request})
         return Response({
             "message": "Task retrieved successfully",
             "task": serializer.data
@@ -303,4 +320,42 @@ class TaskAttachmentDeleteView(APIView):
             {"message": "Attachment deleted successfully"}, 
             status=status.HTTP_204_NO_CONTENT
         )
-    
+
+class TaskPinToggleView(APIView):
+    """
+    POST: Toggles the pin status of a task for the requesting user.
+    """
+    authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, task_id):
+        task = get_object_or_404(Task, id=task_id)
+
+        # Ensure the user has access to this task
+        is_authorized = (
+            request.user.is_manager or 
+            request.user.is_superuser or 
+            task.assigned_to.filter(id=request.user.id).exists() or
+            task.assigned_by == request.user
+        )
+
+        if not is_authorized:
+            return Response(
+                {"detail": "You do not have permission to pin this task."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Toggle Logic
+        if task.pinned_by.filter(id=request.user.id).exists():
+            task.pinned_by.remove(request.user)
+            is_pinned = False
+            message = "Task unpinned successfully"
+        else:
+            task.pinned_by.add(request.user)
+            is_pinned = True
+            message = "Task pinned successfully"
+
+        return Response({
+            "message": message,
+            "is_pinned": is_pinned
+        }, status=status.HTTP_200_OK)
