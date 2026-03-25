@@ -345,22 +345,41 @@ export const documentsApi = {
 
 // Add New Task API
 export const taskApi = {
- list: async () => {
-    const response = await api.get('/tasksite/');
+  list: async (params?: { project_id?: number; disable_pagination?: boolean }) => {
+    const response = await api.get('/tasksite/', { params });
     const data = response.data;
-    if (data.tasks && Array.isArray(data.tasks)) {
-      data.tasks = data.tasks.map((task: any) => ({
+    const taskArray = data.results || data.tasks;
+    
+    if (taskArray && Array.isArray(taskArray)) {
+      const mappedTasks = taskArray.map((task: any) => ({
         ...task,
         attachments: task.attachments || [],
-        labels: task.label_details || []
+        labels: task.label_details || task.labels || []
       }));
 
       // Sort tasks by created_at and updated_at in descending order 
-      data.tasks.sort((a: any, b: any) => {
+      mappedTasks.sort((a: any, b: any) => {
         const dateA = new Date(a.updated_at || a.created_at).getTime();
         const dateB = new Date(b.updated_at || b.created_at).getTime();
         return dateB - dateA;
       });
+
+      // Retain the structure but inject the mapped tasks
+      if (data.results) data.results = mappedTasks;
+      if (data.tasks) data.tasks = mappedTasks;
+    } else if (Array.isArray(data)) {
+      const mappedTasks = data.map((task: any) => ({
+        ...task,
+        attachments: task.attachments || [],
+        labels: task.label_details || task.labels || []
+      }));
+      
+      mappedTasks.sort((a: any, b: any) => {
+        const dateA = new Date(a.updated_at || a.created_at).getTime();
+        const dateB = new Date(b.updated_at || b.created_at).getTime();
+        return dateB - dateA;
+      });
+      return mappedTasks;
     }
 
     return data;

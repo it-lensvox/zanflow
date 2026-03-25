@@ -8,7 +8,6 @@ import { useViewMode } from '@/components/layout/DualView/useViewMode';
 import { useTableFilters, ColumnFilterConfig } from '@/hooks/useTableFilters';
 import { statusOptions, priorityOptions } from '@/components/layout/DualView/taskConfig';
 import type { Task, TaskOption, FilteredDocument, AllDocumentsResponse, TaskAttachment } from '@/types';
-import React from 'react';
 
 export type TabType = 'tasks' | 'add_documents';
 export type ProjectMode = 'media' | 'documents';
@@ -33,67 +32,17 @@ export function useProjectDetails() {
         storageKey: 'project-documents-view-mode',
     });
 
-    // Modal State 
+    // ─── Modal State ─────────────────────────────────────────────────────────────
     const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
-    const setSelectedTaskSafe = React.useCallback((taskArg: Task | null) => {
-        if (!taskArg) { setSelectedTask(null); return; }
-
-        const raw = taskArg.id;
-        const num = Number(raw);
-        const isSafeId = Number.isFinite(num) && num > 0 && num < 1_000_000_000_000;
-
-        if (isSafeId) {
-            setSelectedTask({ ...taskArg, id: num });
-            return;
-        }
-
-        // id is bad — try to recover from the tasks-list cache using heading match
-        console.warn('[TaskModal] ⚠️ Bad task.id received:', raw, '— attempting cache recovery');
-        const cacheKeys = queryClient.getQueryCache().findAll({ queryKey: ['tasks-list'], exact: false });
-        for (const cacheEntry of cacheKeys) {
-            const cached: any = queryClient.getQueryData(cacheEntry.queryKey);
-            const list: Task[] = cached?.tasks ?? cached?.results ?? (Array.isArray(cached) ? cached : []);
-            const match = list.find((t: Task) =>
-                t.heading === taskArg.heading &&
-                Number.isFinite(Number(t.id)) &&
-                Number(t.id) > 0 &&
-                Number(t.id) < 1_000_000_000_000
-            );
-            if (match) {
-                setSelectedTask({ ...taskArg, ...match, id: Number(match.id) });
-                return;
-            }
-        }
-
-        // Final fallback: also check ['tasks'] infinite cache
-        const globalCache: any = queryClient.getQueryData(['tasks']);
-        const globalPages = globalCache?.pages ?? [];
-        for (const page of globalPages) {
-            const list: Task[] = page.results ?? [];
-            const match = list.find((t: Task) =>
-                t.heading === taskArg.heading &&
-                Number.isFinite(Number(t.id)) &&
-                Number(t.id) > 0
-            );
-            if (match) {
-                setSelectedTask({ ...taskArg, ...match, id: Number(match.id) });
-                return;
-            }
-        }
-
-        console.error('[TaskModal] ❌ Could not recover valid task id. Raw value:', raw, '| Task:', taskArg);
-        setSelectedTask({ ...taskArg, id: raw });
-    }, [queryClient]);
-
-    // ─── Upload State 
+    // ─── Upload State ─────────────────────────────────────────────────────────────
     const [isUploading, setIsUploading] = useState(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
     const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // ─── Preview / Delete State 
+    // ─── Preview / Delete State ──────────────────────────────────────────────────
     const [previewDocument, setPreviewDocument] = useState<{
         url: string;
         fileName: string;
@@ -102,25 +51,25 @@ export function useProjectDetails() {
     const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    // Document Filter State
+    // ─── Document Filter State ───────────────────────────────────────────────────
     const [documentFilter, setDocumentFilter] = useState<'project' | 'task'>('project');
     const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
     const [taskSearchQuery, setTaskSearchQuery] = useState('');
     const [showTaskDropdown, setShowTaskDropdown] = useState(false);
     const taskDropdownRef = useRef<HTMLDivElement>(null);
 
-    // Date Filter State 
+    // ─── Date Filter State ───────────────────────────────────────────────────────
     const [dateField, setDateField] = useState<'end_date' | 'start_date' | 'created_at'>('end_date');
     const [showDateFieldDropdown, setShowDateFieldDropdown] = useState(false);
     const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
     const dateTriggerRef = useRef<HTMLButtonElement>(null);
 
-    // Media Pagination State
+    // ─── Media Pagination State ──────────────────────────────────────────────────
     const [mediaPage, setMediaPage] = useState(1);
     const [allMediaFiles, setAllMediaFiles] = useState<any[]>([]);
     const [hasMoreMedia, setHasMoreMedia] = useState(true);
 
-    // Queries 
+    // ─── Queries ─────────────────────────────────────────────────────────────────
     const { data: project, isLoading: isProjectLoading } = useQuery({
         queryKey: ['project', id],
         queryFn: () => projectsApi.get(Number(id)),
@@ -143,11 +92,11 @@ export function useProjectDetails() {
 
     const { data: tasksData, isLoading: isLoadingTasks } = useQuery({
         queryKey: ['tasks-list', id],
-        queryFn: () => taskApi.list(),
+        queryFn: () => taskApi.list({ project_id: Number(id), disable_pagination: true }),
         staleTime: 0,
         select: (data) => {
-            const allTasks = data.tasks || data.results || [];
-            return allTasks.filter((t: any) => String(t.project) === id);
+            if (Array.isArray(data)) return data;
+            return data?.results || data?.tasks || [];
         },
     });
     const tasks = (tasksData || []) as Task[];
@@ -186,17 +135,17 @@ export function useProjectDetails() {
 
     const { data: allTasksData, isLoading: isAllTasksLoading } = useQuery({
         queryKey: ['all-tasks-attachments', id],
-        queryFn: () => taskApi.list(),
+        queryFn: () => taskApi.list({ project_id: Number(id), disable_pagination: true }),
         enabled: activeTab === 'add_documents' && documentFilter === 'task' && !selectedTaskId,
         staleTime: 0,
         refetchOnMount: true,
         select: (data) => {
-            const allTasks = data.tasks || data.results || [];
-            return allTasks.filter((t: any) => String(t.project) === id);
+            if (Array.isArray(data)) return data;
+            return data?.results || data?.tasks || [];
         },
     });
 
-    // Derived Data 
+    // ─── Derived Data ─────────────────────────────────────────────────────────────
     const allDocuments: FilteredDocument[] = allDocumentsData?.documents || [];
 
     const taskOptions: TaskOption[] = useMemo(() => {
@@ -252,7 +201,7 @@ export function useProjectDetails() {
     const activeDateLabel =
         DATE_FIELD_OPTIONS.find((o) => o.value === dateField)?.label ?? 'Due Date';
 
-    // Table Filters 
+    // ─── Table Filters ────────────────────────────────────────────────────────────
     const filterConfig: ColumnFilterConfig[] = [
         { key: 'project', type: 'search', searchFields: ['project_details', 'name'] },
         { key: 'heading', type: 'search' },
@@ -296,7 +245,7 @@ export function useProjectDetails() {
         );
     }, [filteredTasksFromHook, columnFilters]);
 
-    //  Effects
+    // ─── Effects ──────────────────────────────────────────────────────────────────
     useEffect(() => {
         if (!documentsData) return;
         const allResults = documentsData?.results || documentsData || [];
@@ -325,7 +274,7 @@ export function useProjectDetails() {
         return () => document.removeEventListener('mousedown', handler);
     }, [showDateFieldDropdown]);
 
-    //  Handlers 
+    // ─── Handlers ─────────────────────────────────────────────────────────────────
     const handleMediaScroll = useCallback(
         (e: React.UIEvent<HTMLDivElement>) => {
             const target = e.currentTarget;
@@ -376,8 +325,8 @@ export function useProjectDetails() {
                     return {
                         ...old,
                         pages: [
-                            { ...old.pages?.[0], results: [newTask, ...(old.pages?.[0]?.results ?? [])] },
-                            ...(old.pages?.slice(1) ?? []),
+                            { ...old.pages[0], results: [newTask, ...(old.pages[0]?.results ?? [])] },
+                            ...old.pages.slice(1),
                         ],
                     };
                 });
@@ -416,8 +365,8 @@ export function useProjectDetails() {
                 return {
                     ...old,
                     pages: [
-                        { ...pages?.[0], results: [updatedTask, ...(pages?.[0]?.results ?? [])] },
-                        ...(pages?.slice(1) ??[]),
+                        { ...pages[0], results: [updatedTask, ...(pages[0]?.results ?? [])] },
+                        ...pages.slice(1),
                     ],
                 };
             });
@@ -694,7 +643,7 @@ export function useProjectDetails() {
         isCreateTaskModalOpen,
         setIsCreateTaskModalOpen,
         selectedTask,
-        setSelectedTask: setSelectedTaskSafe,
+        setSelectedTask,
         previewDocument,
         setPreviewDocument,
         deleteConfirm,

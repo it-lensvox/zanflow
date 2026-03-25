@@ -8,6 +8,26 @@ import { aiBotApi } from '@/services/api';
 import { RichTextEditor, markdownToHtml } from '@/components/common/RichTextEditor';
 import type { AIBotUIMessage, AIBotSession } from '@/types';
 
+// ── Draggable FAB helpers
+
+const AIBOT_FAB_SIZE = 48;
+const AIBOT_POS_KEY = 'zanflow_aibot_fab_pos';
+
+function clampAI(val: number, min: number, max: number) {
+  return Math.min(Math.max(val, min), max);
+}
+
+function getInitialAIBotPos(): { x: number; y: number } {
+  try {
+    const raw = localStorage.getItem(AIBOT_POS_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { }
+  return {
+    x: window.innerWidth - AIBOT_FAB_SIZE - 24,
+    y: window.innerHeight - AIBOT_FAB_SIZE - 80,
+  };
+}
+
 // Storage helpers
 
 const STORAGE_KEY = 'aibot_sessions';
@@ -123,7 +143,6 @@ export function AIBot() {
                 if (!sessionId) return;
 
                 if (!streamMsgIdRef.current) {
-                    // First chunk — create the bubble with a stable id
                     const bubbleId = generateId();
                     streamMsgIdRef.current = bubbleId;
                     const botMsg: AIBotUIMessage = {
@@ -273,17 +292,65 @@ export function AIBot() {
         s.title.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
+// Drag state for the collapsed FAB
+    const [aiBotPos, setAIBotPos] = useState<{ x: number; y: number }>(getInitialAIBotPos);
+    const aiBotDragging = useRef(false);
+    const aiBotDidDrag = useRef(false);
+    const aiBotDragStart = useRef<{ mx: number; my: number; fx: number; fy: number } | null>(null);
+
+    useEffect(() => {
+        localStorage.setItem(AIBOT_POS_KEY, JSON.stringify(aiBotPos));
+    }, [aiBotPos]);
+
+    useEffect(() => {
+        const onResize = () => {
+            setAIBotPos((prev) => ({
+                x: clampAI(prev.x, 0, window.innerWidth - AIBOT_FAB_SIZE),
+                y: clampAI(prev.y, 0, window.innerHeight - AIBOT_FAB_SIZE),
+            }));
+        };
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
+    }, []);
+
+    const onAIBotMouseMove = useCallback((e: MouseEvent) => {
+        if (!aiBotDragging.current || !aiBotDragStart.current) return;
+        const dx = e.clientX - aiBotDragStart.current.mx;
+        const dy = e.clientY - aiBotDragStart.current.my;
+        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) aiBotDidDrag.current = true;
+        setAIBotPos({
+            x: clampAI(aiBotDragStart.current.fx + dx, 0, window.innerWidth - AIBOT_FAB_SIZE),
+            y: clampAI(aiBotDragStart.current.fy + dy, 0, window.innerHeight - AIBOT_FAB_SIZE),
+        });
+    }, []);
+
+    const onAIBotMouseUp = useCallback(() => {
+        aiBotDragging.current = false;
+        aiBotDragStart.current = null;
+        window.removeEventListener('mousemove', onAIBotMouseMove);
+        window.removeEventListener('mouseup', onAIBotMouseUp);
+    }, [onAIBotMouseMove]);
+
+    const handleAIBotMouseDown = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        aiBotDidDrag.current = false;
+        aiBotDragging.current = true;
+        aiBotDragStart.current = { mx: e.clientX, my: e.clientY, fx: aiBotPos.x, fy: aiBotPos.y };
+        window.addEventListener('mousemove', onAIBotMouseMove);
+        window.addEventListener('mouseup', onAIBotMouseUp);
+    }, [aiBotPos, onAIBotMouseMove, onAIBotMouseUp]);
+
     if (!isExpanded) {
         return (
-            <div className="fixed bottom-6 right-6 z-50">
-                <button
-                    onClick={() => setIsExpanded(true)}
-                    title="Open AI Bot"
-                    className="w-12 h-12 bg-[#1a1a2e] rounded-full shadow-lg border border-[#2d2d4e] hover:shadow-xl hover:bg-[#22223a] transition-all duration-200 hover:scale-105 flex items-center justify-center text-white"
-                >
-                    <Bot className="w-6 h-6" />
-                </button>
-            </div>
+            <button
+                onMouseDown={handleAIBotMouseDown}
+                onClick={() => { if (!aiBotDidDrag.current) setIsExpanded(true); }}
+                title="Open AI Bot (drag to reposition)"
+                style={{ left: aiBotPos.x, top: aiBotPos.y }}
+                className="fixed z-50 w-12 h-12 bg-[#1a1a2e] rounded-full shadow-lg border border-[#2d2d4e] hover:shadow-xl hover:bg-[#22223a] transition-all duration-200 hover:scale-105 flex items-center justify-center text-white cursor-grab active:cursor-grabbing select-none"
+            >
+                <Bot className="w-6 h-6 pointer-events-none" />
+            </button>
         );
     }
 
@@ -526,9 +593,15 @@ export function AIBot() {
                         </div>
                     </div>
                 </div>
-            ) : (
+           ) : (
                 /* MINI WIDGET */
-                <div className="fixed bottom-[76px] right-6 z-50">
+                <div
+                    className="fixed z-50"
+                    style={{
+                        left: clampAI(aiBotPos.x + AIBOT_FAB_SIZE / 2 - (isHistoryPanelOpen ? 340 : 200), 8, window.innerWidth - (isHistoryPanelOpen ? 680 : 400) - 8),
+                        top: clampAI(aiBotPos.y - 612, 8, window.innerHeight - 620),
+                    }}
+                >
                     <div
                         className="bg-white rounded-lg shadow-2xl border border-gray-200 flex overflow-hidden"
                         style={{

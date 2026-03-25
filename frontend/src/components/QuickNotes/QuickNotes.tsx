@@ -1110,7 +1110,7 @@ function MiniWindow({
 const FAB_SIZE = 48;
 const MINI_W = 340;
 const MINI_H = 260;
-const FAB_POS_KEY = 'zanflow_fab_pos';
+const FAB_POS_KEY = 'zanflow_quicknotes_fab_pos';
 
 function clamp(val: number, min: number, max: number) {
   return Math.min(Math.max(val, min), max);
@@ -1121,9 +1121,9 @@ function getInitialFabPos(): { x: number; y: number } {
     const raw = localStorage.getItem(FAB_POS_KEY);
     if (raw) return JSON.parse(raw);
   } catch { }
-return {
+  return {
     x: window.innerWidth - FAB_SIZE - 24,
-    y: window.innerHeight - FAB_SIZE * 2 - 32,
+    y: window.innerHeight - FAB_SIZE - 132,
   };
 }
 

@@ -22,25 +22,46 @@ const DATE_FIELD_OPTIONS: { value: 'end_date' | 'start_date' | 'created_at'; lab
     { value: 'created_at', label: 'Created At' },
 ];
 
-// ── Module-level flag: sanitise the tasks cache exactly once per page load ──
-let _taskCacheSanitised = false;
-
+// ── Sanitise the tasks cache on every mount to prevent InfiniteQuery crashes ──
 function sanitiseTaskCache(queryClient: import('@tanstack/react-query').QueryClient) {
-    if (_taskCacheSanitised) return;
-    _taskCacheSanitised = true;
     const existing = queryClient.getQueryData(['tasks']);
+
+    // undefined / null = no cached data yet → perfectly fine, let RQ start fresh
+    if (!existing) {
+        console.log('%c[Cache:tasks] ✅ No existing cache — clean start', 'color:#22c55e;font-weight:bold');
+        return;
+    }
+
+    const shape = typeof existing;
+    const hasPages = Array.isArray((existing as any).pages);
+    const pageCount = hasPages ? (existing as any).pages.length : 'N/A';
+
     const isValidInfiniteShape =
-        existing &&
-        typeof existing === 'object' &&
-        Array.isArray((existing as any).pages) &&
+        shape === 'object' &&
+        hasPages &&
         (existing as any).pages.every(
             (p: any) => p && typeof p === 'object' && Array.isArray(p.results)
         );
-    if (!isValidInfiniteShape) {
-        console.log('[MyTask] 🧹 One-time cache sanitise. shape was:', existing ? typeof existing : 'null');
-        queryClient.removeQueries({ queryKey: ['tasks'] });
+
+    if (isValidInfiniteShape) {
+        console.log(
+            '%c[Cache:tasks] ✅ Valid InfiniteQuery shape',
+            'color:#22c55e;font-weight:bold',
+            `| pages: ${pageCount}`,
+            `| total tasks: ${(existing as any).pages.reduce((acc: number, p: any) => acc + (p.results?.length ?? 0), 0)}`
+        );
     } else {
-        console.log('[MyTask] ✅ Cache already valid. Keeping', (existing as any).pages.length, 'pages.');
+        console.warn(
+            '%c[Cache:tasks] ⚠️ CORRUPT / FLAT cache detected — clearing now',
+            'color:#f97316;font-weight:bold',
+            '\nShape:', shape,
+            '| hasPages:', hasPages,
+            '| keys:', Object.keys(existing as object).join(', ')
+        );
+        // removeQueries fully removes the entry so useInfiniteQuery starts with state.data = undefined
+        // NOTE: setQueryData(undefined) is a NO-OP in React Query v5 — it must NOT be used here
+        queryClient.removeQueries({ queryKey: ['tasks'], exact: true });
+        console.log('%c[Cache:tasks] 🧹 Cache cleared — useInfiniteQuery will start fresh', 'color:#f97316;font-weight:bold');
     }
 }
 
@@ -65,7 +86,7 @@ export const MyTask: React.FC = () => {
         enabled: !!user,
     });
 
-    // Infinite-scroll paginated query 
+    // Infinite-scroll paginated query
     const {
         data: infiniteData,
         isLoading: loading,
@@ -74,30 +95,60 @@ export const MyTask: React.FC = () => {
         hasNextPage,
     } = useInfiniteQuery({
         queryKey: ['tasks'],
-        queryFn: ({ pageParam = 1 }) => taskApi.listPaginated(pageParam as number),
-       getNextPageParam: (lastPage) => {
-    if (!lastPage || typeof lastPage !== 'object' || Array.isArray(lastPage)) return undefined;
-    if (!('next' in lastPage) || !lastPage.next) return undefined;
-    if (!Array.isArray((lastPage as any).results)) return undefined;
-    try {
-        const url = new URL(lastPage.next);
-        const p = url.searchParams.get('page');
-        return p ? Number(p) : undefined;
-    } catch {
-        return undefined;
-    }
-},
+        queryFn: async ({ pageParam = 1 }) => {
+            console.log('%c[InfiniteQuery:tasks] 📦 Fetching page', 'color:#6366f1;font-weight:bold', pageParam);
+            const result = await taskApi.listPaginated(pageParam as number);
+            console.log(
+                '%c[InfiniteQuery:tasks] ✅ Page fetched',
+                'color:#22c55e;font-weight:bold',
+                `| page: ${pageParam}`,
+                `| count: ${result?.results?.length ?? 0}`,
+                `| hasNext: ${!!result?.next}`
+            );
+            return result;
+        },
+        getNextPageParam: (lastPage) => {
+            if (!lastPage || typeof lastPage !== 'object' || Array.isArray(lastPage)) {
+                console.log('%c[InfiniteQuery:tasks] getNextPageParam → undefined (invalid lastPage)', 'color:#94a3b8');
+                return undefined;
+            }
+            if (!('next' in lastPage) || !lastPage.next) {
+                console.log('%c[InfiniteQuery:tasks] getNextPageParam → undefined (no next URL)', 'color:#94a3b8');
+                return undefined;
+            }
+            if (!Array.isArray((lastPage as any).results)) {
+                console.log('%c[InfiniteQuery:tasks] getNextPageParam → undefined (results not array)', 'color:#94a3b8');
+                return undefined;
+            }
+            try {
+                const url = new URL(lastPage.next);
+                const p = url.searchParams.get('page');
+                const nextPage = p ? Number(p) : undefined;
+                console.log('%c[InfiniteQuery:tasks] getNextPageParam →', 'color:#6366f1', nextPage);
+                return nextPage;
+            } catch {
+                console.log('%c[InfiniteQuery:tasks] getNextPageParam → undefined (URL parse error)', 'color:#f87171');
+                return undefined;
+            }
+        },
         initialPageParam: 1,
         enabled: !!user,
         staleTime: 1000 * 60 * 2,
         placeholderData: (prev: any) => prev,
     });
 
-    // Flatten all pages into a single ordered task array 
+    // Flatten all pages into a single ordered task array
     const tasks = React.useMemo(() => {
         const allTasks: Task[] = infiniteData?.pages?.flatMap(p =>
             (p && Array.isArray((p as any).results)) ? (p as any).results : []
         ) ?? [];
+        console.log(
+            '%c[InfiniteQuery:tasks] 📋 Tasks flattened',
+            'color:#6366f1;font-weight:bold',
+            `| pages loaded: ${infiniteData?.pages?.length ?? 0}`,
+            `| total tasks: ${allTasks.length}`,
+            `| hasNextPage: ${hasNextPage}`
+        );
         let filtered = allTasks;
         if (user?.role === 'manager') {
             filtered = allTasks.filter((task: Task) =>
@@ -214,6 +265,7 @@ export const MyTask: React.FC = () => {
         }
     }, [queryClient]);
 
+
     const filteredTasks = React.useMemo(() => {
         if (!hookFilteredTasks) return [];
         return hookFilteredTasks.filter((task: Task) => {
@@ -313,7 +365,6 @@ export const MyTask: React.FC = () => {
                                             >
                                                 Create Task
                                             </button>
-
                                             <button
                                                 onClick={() => setShowAITaskModal(true)}
                                                 className="flex items-center px-4 py-2 bg-gray-900 text-white rounded-md text-sm font-medium hover:bg-gray-800 transition-colors shadow-sm"
@@ -345,10 +396,10 @@ export const MyTask: React.FC = () => {
                                         placeholder="Search tasks..."
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-full pl-9 pr-4 py-2 text-sm rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                                        className="w-full pl-9 pr-4 py-2 text-sm rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-card text-gray-900 dark:text-foreground"
                                     />
                                 </div>
-                                <div className="flex items-center border border-gray-200 rounded-md bg-white p-1 gap-1">
+                                <div className="flex items-center border border-gray-200 rounded-md bg-white dark:bg-card p-1 gap-1">
                                     <button
                                         onClick={() => setViewMode('table')}
                                         className={`p-1.5 rounded transition-colors ${viewMode === 'table' ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:bg-gray-50'}`}

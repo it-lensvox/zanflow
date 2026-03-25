@@ -580,8 +580,14 @@ export const Calendar: React.FC = () => {
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const { data: tasksData, isLoading } = useQuery({
-        queryKey: ['tasks'],
-        queryFn: () => taskApi.list(),
+        queryKey: ['tasks-calendar'],
+        queryFn: async () => {
+            console.log('%c[Calendar:tasks-calendar] 📦 Fetching tasks (flat list — own key, safe from InfiniteQuery)', 'color:#8b5cf6;font-weight:bold');
+            const result = await taskApi.list();
+            const count = Array.isArray(result) ? result.length : result?.results?.length ?? result?.tasks?.length ?? '?';
+            console.log('%c[Calendar:tasks-calendar] ✅ Tasks loaded', 'color:#22c55e;font-weight:bold', `| count: ${count}`, '| key: tasks-calendar (isolated ✓)');
+            return result;
+        },
         enabled: !!user,
     });
 
