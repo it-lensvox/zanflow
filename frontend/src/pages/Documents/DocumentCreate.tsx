@@ -1,29 +1,24 @@
 import { useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Upload, File, X } from 'lucide-react';
-import {
-  Button,
-  Input,
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-} from '@/components/common';
+import { Button, Input, Card, CardHeader, CardTitle, CardContent, } from '@/components/common';
 import { documentsApi, projectsApi } from '@/services/api';
 
 const FILE_TYPES = [
-    { value: 'json', label: 'JSON' },
-    { value: 'pdf', label: 'PDF' },
-    { value: 'image', label: 'Image' },
-    { value: 'text', label: 'Text' },
-    { value: 'other', label: 'Other' },
+  { value: 'json', label: 'JSON' },
+  { value: 'pdf', label: 'PDF' },
+  { value: 'image', label: 'Image' },
+  { value: 'video', label: 'Video' },
+  { value: 'text', label: 'Text' },
+  { value: 'other', label: 'Other' },
 ];
 
 export function DocumentCreate() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  
+  const queryClient = useQueryClient();
+
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -38,49 +33,93 @@ export function DocumentCreate() {
     queryFn: () => projectsApi.get(Number(projectId)),
     enabled: !!projectId,
   });
-
+  const projectIdNum = Number(projectId);
+  // UPDATED MUTATION 
   const createMutation = useMutation({
-    mutationFn: async (data: FormData) => {
-      return documentsApi.create(data);
+    mutationFn: async ({ name, description, file_key, initial_gt_data, file_type, original_file_name }: {
+      name: string;
+      description: string;
+      file_key: string;
+      initial_gt_data?: Record<string, unknown>;
+      file_type: string;
+      original_file_name: string;
+    }) => {
+      return documentsApi.create({
+        project: projectIdNum,
+        name,
+        description,
+        file_key,
+        initial_gt_data,
+        file_type,
+        original_file_name,
+      });
     },
-    onSuccess: () => {
-      navigate(`/projects/${projectId}`);
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['documents', { project: projectId }] });
+      navigate(`/documents/${data.id}`);
     },
     onError: (err: any) => {
-      setError(err.response?.data?.detail || 'Failed to create document');
+      setError(err.response?.data?.detail || 'Failed to create document record after file upload.');
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+
+  // UPDATED SUBMIT HANDLER
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (!formData.name.trim()) {
-      setError('Document name is required');
+    if (!formData.name.trim() || !file) {
+      setError('Document name and a source file are required.');
       return;
     }
 
-    const data = new FormData();
-    data.append('project', projectId || '');
-    data.append('name', formData.name);
-    data.append('description', formData.description);
-    data.append('file_type', formData.file_type);
-    
-    if (file) {
-      data.append('source_file', file);
-    }
-
+    let gtData: Record<string, unknown> | undefined = undefined;
     if (initialGT.trim()) {
       try {
-        const gtData = JSON.parse(initialGT);
-        data.append('initial_gt_data', JSON.stringify(gtData));
+        gtData = JSON.parse(initialGT);
       } catch {
         setError('Invalid JSON format for ground truth data');
         return;
       }
     }
 
-    createMutation.mutate(data);
+    try {
+      // Step 1: Get Upload URL from backend API
+      const uploadUrlResponse = await documentsApi.getUploadUrl(projectIdNum, {
+        file_name: file.name,
+        file_type: file.type || 'application/octet-stream',
+      });
+
+      const { url: s3Url, fields: s3Fields, file_key } = uploadUrlResponse;
+
+      // Step 2: Upload File directly to S3 using the pre-signed URL/fields
+      await documentsApi.uploadFileToS3(s3Url, s3Fields, file);
+      // Step 3: CONFIRM UPLOAD original_file_name
+      const fileNameWithoutPath = file_key.split('/').pop() || file.name;
+      console.log(`[DocumentCreate] Step 3: Confirming upload with file_key: ${file_key}, file_name: ${fileNameWithoutPath}`);
+      const confirmResponse = await documentsApi.confirmUpload(projectIdNum, {
+        file_key: file_key,
+        file_name: file.name,
+        file_type: formData.file_type,
+      });
+
+      console.log('[DocumentCreate] Step 3 Success: Confirm upload complete.', confirmResponse);
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+
+      // Navigate to the document detail page
+      if (confirmResponse.id) {
+        navigate(`/documents/${confirmResponse.id}`);
+      } else {
+        navigate(`/projects/${projectId}`);
+      }
+
+    } catch (e: any) {
+      console.error('Document creation failed:', e);
+      const detailedError = e.response?.data?.detail || e.message || 'An unknown error occurred during file upload or confirmation.';
+      setError(`Process Failed: ${detailedError}`);
+    }
   };
 
   const handleChange = (
@@ -96,24 +135,15 @@ export function DocumentCreate() {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
       setFile(selectedFile);
-      // Auto-fill name if empty
-      if (!formData.name) {
-        setFormData((prev) => ({
-          ...prev,
-          name: selectedFile.name.replace(/\.[^/.]+$/, ''),
-        }));
-      }
-      // Auto-detect file type
       const ext = selectedFile.name.split('.').pop()?.toLowerCase();
-      if (ext === 'pdf') {
-        setFormData((prev) => ({ ...prev, file_type: 'pdf' }));
-      } else if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext || '')) {
-        setFormData((prev) => ({ ...prev, file_type: 'image' }));
-      } else if (ext === 'json') {
-        setFormData((prev) => ({ ...prev, file_type: 'json' }));
-      } else if (ext === 'txt') {
-        setFormData((prev) => ({ ...prev, file_type: 'text' }));
-      }
+      let detectedType = 'other';
+      if (ext === 'pdf') detectedType = 'pdf';
+      else if (['png', 'jpg', 'jpeg'].includes(ext!)) detectedType = 'image';
+      else if (['mp4', 'mov'].includes(ext!)) detectedType = 'video';
+      else if (ext === 'json') detectedType = 'json';
+      else if (ext === 'txt') detectedType = 'text';
+
+      setFormData((prev) => ({ ...prev, file_type: detectedType }));
     }
   };
 
@@ -167,14 +197,14 @@ export function DocumentCreate() {
                     <span className="font-semibold">Click to upload</span> or drag and drop
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    PDF, PNG, JPG, JSON, TXT (MAX. 50MB)
+                    PDF, PNG, JPG, JSON, TXT, **MP4, MOV** (MAX. **500MB**)
                   </p>
                 </div>
                 <input
                   type="file"
                   className="hidden"
                   onChange={handleFileChange}
-                  accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.json,.txt"
+                  accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.json,.txt,**video/*,.mp4,.mov,.avi,.webm**" // UPDATED ACCEPT
                 />
               </label>
             ) : (
@@ -284,7 +314,7 @@ export function DocumentCreate() {
 
         {/* Actions */}
         <div className="flex gap-3">
-          <Button type="submit" disabled={createMutation.isPending}>
+          <Button type="submit" disabled={createMutation.isPending || !file}>
             {createMutation.isPending ? 'Creating...' : 'Create Document'}
           </Button>
           <Link to={`/projects/${projectId}`}>
