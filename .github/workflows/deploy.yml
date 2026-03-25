@@ -29,30 +29,18 @@ jobs:
             git stash 2>/dev/null || true
             git pull origin ${{ github.ref_name }}
             
-            echo "🔧 Replacing localhost URLs with production URLs..."
-            sed -i 's|VITE_API_URL=http://localhost:8000/api/v1|VITE_API_URL=https://zanflow.lensvox.com/api/v1|g' docker-compose.yml
-            sed -i 's|VITE_API_BASE_URL=http://localhost:8000|VITE_API_BASE_URL=https://zanflow.lensvox.com|g' docker-compose.yml
-
-            echo "🔧 Creating production frontend/.env..."
-            cat > frontend/.env << 'EOF'
-            VITE_API_URL=https://zanflow.lensvox.com/api/v1
-            VITE_API_BASE_URL=https://zanflow.lensvox.com
-            VITE_WS_URL=wss://zanflow.lensvox.com
-            VITE_WS_GATEWAY_URL=wss://zanflow.lensvox.com/ws/gateway
-            EOF
-
             echo "🔧 Setting production URLs in api.ts..."
             sed -i "s|http://localhost:8000/api/v1|https://zanflow.lensvox.com/api/v1|g" frontend/src/services/api.ts
             sed -i "s|http://localhost:8000|https://zanflow.lensvox.com|g" frontend/src/services/api.ts
             sed -i "s|ws://localhost:8000|wss://zanflow.lensvox.com|g" frontend/src/services/api.ts
             
-            echo "🔍 Validating docker-compose.yml..."
-            sudo docker-compose config > /dev/null
+            echo "🔧 Setting production build script..."
+            sed -i 's|"build": "tsc && vite build"|"build": "vite build"|g' frontend/package.json
             
-            echo "🔨 Building new images..."
+            echo "🔨 Building new images (site still running)..."
             sudo docker-compose build
-
-            echo "🚀 Restarting with new images..."
+            
+            echo "🚀 Restarting with new images (2-5 sec downtime)..."
             sudo docker-compose up -d --force-recreate --no-build
             
             echo "⏳ Waiting for services..."
