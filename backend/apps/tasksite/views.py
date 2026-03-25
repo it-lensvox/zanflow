@@ -44,7 +44,7 @@ class AllUsersListView(APIView):
         }, status=status.HTTP_200_OK)
 
 class TaskListCreateView(APIView):
-    authentication_classes = [StaticTokenAuthentication,JWTAuthentication]
+    authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
     permission_classes = [IsAuthenticated]
     parser_classes = (MultiPartParser, FormParser)
 
@@ -56,9 +56,11 @@ class TaskListCreateView(APIView):
             Q(assigned_to=user) | Q(assigned_by=user)
         ).distinct()
         
+        # 1. Filters by project_id
         project_id = request.query_params.get('project_id')
         if project_id:
             tasks = tasks.filter(project__id=project_id)
+            
         tasks = tasks.annotate(
             user_has_pinned=Case(
                 When(pinned_by=user, then=Value(True)),
@@ -66,17 +68,26 @@ class TaskListCreateView(APIView):
                 output_field=BooleanField()
             )
         ).order_by('-user_has_pinned', '-updated_at')
-        # --- PAGINATION LOGIC ---
+
+        # 2. Checks for disable_pagination=true
+        disable_pagination = request.query_params.get('disable_pagination', 'false').lower() == 'true'
+
+        if disable_pagination:
+            # RETURN ALL TASKS IN ONE GO
+            serializer = TaskSerializer(tasks, many=True, context={'request': request})
+            return Response({
+                "count": tasks.count(),
+                "results": serializer.data
+            }, status=status.HTTP_200_OK)
+
+        # 3. IF disable_pagination is NOT true, do normal pagination
         paginator = PageNumberPagination()
         paginated_tasks = paginator.paginate_queryset(tasks, request, view=self)
-
         serializer = TaskSerializer(paginated_tasks, many=True, context={'request': request})
         
-        # YOU MUST RETURN THIS, NOT your custom Response dictionary
         return paginator.get_paginated_response(serializer.data)
 
     def post(self, request):
-        # --- UPDATE THIS CONDITION ---
         # Allow Admin to create tasks too
         if not (request.user.is_manager or request.user.is_superuser):
             return Response(
@@ -88,11 +99,9 @@ class TaskListCreateView(APIView):
         if serializer.is_valid():
             task = serializer.save(assigned_by=request.user)
             
-            # ================================================================
             # TRIGGER NOTIFICATION: Task Created
-            # ================================================================
             notify_task_created(task=task, actor=request.user)
-            # ================================================================
+            
             return Response({
                 "message": "Task created successfully",
                 "task": serializer.data
