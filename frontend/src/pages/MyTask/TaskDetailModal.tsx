@@ -115,12 +115,14 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
             }
         },
         getNextPageParam: (lastPage) => {
-            if (lastPage.next) {
+            if (!lastPage || !lastPage.next) return undefined;
+            try {
                 const url = new URL(lastPage.next);
                 const pageParam = url.searchParams.get('page');
                 return pageParam ? parseInt(pageParam) : undefined;
+            } catch {
+                return undefined;
             }
-            return undefined;
         },
         enabled: !!task.id,
         initialPageParam: 1,
@@ -129,7 +131,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
     // Flatten paginated documents
     const taskDocuments = React.useMemo(() => {
         if (!taskDocumentsData?.pages) return [];
-        return taskDocumentsData.pages.flatMap(page => page.results);
+        return taskDocumentsData.pages.flatMap(page => page?.results ?? []);
     }, [taskDocumentsData]);
 
     // Sync links when full details arrive

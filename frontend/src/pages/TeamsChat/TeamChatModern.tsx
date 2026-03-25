@@ -1975,7 +1975,7 @@ export function TeamChatModern() {
       </div>
 
       {/* Right Panel - Chat View */}
-      <div className="flex-1 flex flex-col bg-white dark:bg-background h-full overflow-hidden">
+      <div className="flex-1 flex flex-col bg-white dark:bg-card h-full overflow-hidden">
         {(activeRoom || selectedProjectRoom || selectedTeamRoom) ? (
           <>
             {/* Chat Header */}
@@ -2110,7 +2110,7 @@ export function TeamChatModern() {
                 {/* Messages Area */}
                 <div
                   ref={scrollContainerRef}
-                  className="flex-1 overflow-y-auto bg-[#efeae2] scrollbar-hide p-6"
+                  className="flex-1 overflow-y-auto bg-[#efeae2] scrollbar-hide p-6 dark:bg-secondary relative"
                   onScroll={handleScroll}
                   onDragEnter={handleDragEnter}
                   onDragOver={handleDragOver}
@@ -2457,7 +2457,7 @@ export function TeamChatModern() {
                 </div>
 
                 {/* Message Input */}
-                <div className=" bg-white dark:bg-card border-t border-gray-200 dark:border-border"
+                <div className=" bg-white dark:bg-card border-t border-gray-200 dark:border-border dark:bg-secondary p-4"
                   onDragEnter={handleDragEnter}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
@@ -2495,7 +2495,7 @@ export function TeamChatModern() {
                         )}
                         
                         {/* Horizontal File Preview Cards */}
-                        <div className="px-4 py-3 flex items-center gap-3 overflow-x-auto scrollbar-hide">
+                        <div className="px-4 py-3 flex items-center gap-3 overflow-x-auto scrollbar-hide dark:bg-secondary">
                           {selectedFiles.map((file, index) => (
                             <div key={`${file.name}-${index}`} className="flex items-center gap-2.5 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 shrink-0 w-64 max-w-full">
                               {filePreviewUrls[index] ? (

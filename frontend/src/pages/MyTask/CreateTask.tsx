@@ -461,8 +461,8 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                 return {
                     ...old,
                     pages: [
-                        { ...old.pages[0], results: [optimisticTask, ...(old.pages[0]?.results ?? [])] },
-                        ...old.pages.slice(1),
+                        { ...old.pages?.[0], results: [optimisticTask, ...(old.pages?.[0]?.results ?? [])] },
+                        ...(old.pages?.slice(1) ?? []),
                     ],
                 };
             }
@@ -508,13 +508,13 @@ if (isModal && onSuccess) {
                         ...old,
                         pages: [
                             {
-                                ...old.pages[0],
+                                ...old.pages?.[0],
                                 results: [
                                     createdTask,
-                                    ...(old.pages[0]?.results ?? []).filter((t: Task) => t.id !== optimisticTask.id),
+                                    ...(old.pages?.[0]?.results ?? []).filter((t: Task) => t.id !== optimisticTask.id),
                                 ],
                             },
-                            ...old.pages.slice(1),
+                            ...(old.pages?.slice(1) ?? []),
                         ],
                     };
                 }
@@ -566,7 +566,7 @@ if (isModal && onSuccess) {
                             <button
                                 type="submit"
                                 form="create-task-form"
-                               className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                               className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-700 dark:hover:bg-gray-600"
                                 disabled={loading}
                             >
                                 {loading ? 'Creating...' : 'Create task'}
@@ -574,7 +574,7 @@ if (isModal && onSuccess) {
                             <button
                                 type="button"
                                 onClick={() => setShowAIModal(true)}
-                                className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded hover:bg-gray-800 transition-colors flex items-center gap-2"
+                                className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded hover:bg-gray-800 transition-colors flex items-center gap-2 dark:bg-gray-700 dark:hover:bg-gray-600"
                             >
                                 <Sparkles className="w-4 h-4" />
                                 Generate Task By AI

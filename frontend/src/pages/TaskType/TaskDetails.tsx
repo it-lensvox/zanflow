@@ -227,7 +227,7 @@ export function TaskDetails() {
   return (
     <>
       {/* ── Outer layout wrapper ── */}
-      <div className="flex min-h-screen bg-[#f8fafc] text-black">
+      <div className="flex min-h-screen bg-[#f8fafc] text-black dark:bg-[#11181c] dark:text-white">
         <div className="flex-1 w-full p-8">
 
           {/* ── Header ── */}

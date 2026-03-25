@@ -442,7 +442,7 @@ const TaskListSidebar: React.FC<TaskListSidebarProps> = ({
                                 {loadingMyUpdate ? 'Loading…' : myUpdate ? 'Edit Daily Update' : 'Add Daily Update'}
                             </button>
                         ) : (
-                            <div className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-gray-50 text-gray-400 text-sm rounded-lg border border-gray-200 cursor-not-allowed select-none">
+                            <div className=" w-full flex items-center justify-center gap-2 py-2 px-4 bg-gray-50 text-gray-400 text-sm font-medium rounded-lg border border-gray-200 dark:bg-muted dark:border-border">
                                 <ClipboardList size={16} />
                                 Daily updates for today only
                             </div>

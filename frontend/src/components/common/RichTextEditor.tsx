@@ -674,7 +674,7 @@ export const ChatMessageInput: React.FC<ChatMessageInputProps> = ({
     ((editor ? editor.getText().trim().length > 0 : false) || !!selectedFile || hasAttachments);
 
     return (
-    <div className="px-3 py-2 bg-white border-t border-gray-200">
+    <div className="px-3 py-2 bg-white border-t border-gray-200 dark:bg-secondary dark:border-border rounded-b-lg">
 
       {/* Format toolbar — slides in above when toggled */}
       {showFormatPanel && <InlineFormatBar editor={editor} />}
@@ -712,14 +712,14 @@ export const ChatMessageInput: React.FC<ChatMessageInputProps> = ({
 
     {/* ── Single-row: editor + buttons + send ── */}
       <div
-        className={`flex items-end gap-1 rounded-xl border bg-white overflow-visible transition-all duration-200 px-3 ${
+        className={`flex items-end gap-1 rounded-xl border bg-white overflow-visible transition-all duration-200 px-3 dark:bg-secondary ${
           showFormatPanel
             ? 'border-blue-400 ring-1 ring-blue-100'
             : 'border-gray-300 focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-100'
         }`}
       >
         {/* Tiptap editor — grows to fill available width */}
-        <div onKeyDown={handleKeyDown} className="flex-1 min-w-0">
+        <div onKeyDown={handleKeyDown} className="flex-1 min-w-0 dark:text-foreground">
           <EditorContent
             editor={editor}
             className="
