@@ -1,4 +1,5 @@
-import { useEffect, lazy, Suspense } from 'react';
+import { useEffect, lazy, Suspense, Component } from 'react';
+import type { ReactNode, ErrorInfo } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { Layout } from '@/components/layout';
@@ -6,6 +7,7 @@ import type { User as AppUser } from '@/types';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { projectsApi, notificationSocket, gatewaySocket } from '@/services/api';
+import { TaskDraftsProvider } from '@/pages/MyTask/Taskdrafts';
 
 // Lazy-loaded page components for route-level code splitting
 const Dashboard = lazy(() => import('@/pages/Dashboard').then(m => ({ default: m.Dashboard })));
@@ -20,7 +22,6 @@ const TaskDetailPage = lazy(() => import('@/pages/MyTask/TaskDetailPage').then(m
 const Teams = lazy(() => import('@/pages/TeamManagement/Teams').then(m => ({ default: m.Teams })));
 const UserManagement = lazy(() => import('@/pages/TeamManagement/UserManagement').then(m => ({ default: m.UserManagement })));
 const TeamPerformance = lazy(() => import('@/pages/TeamManagement/TeamPerformance').then(m => ({ default: m.TeamPerformance })));
-const ContentCreation = lazy(() => import('@/pages/TaskType/ContentCreation').then(m => ({ default: m.ContentCreation })));
 const TaskDetails = lazy(() => import('@/pages/TaskType/TaskDetails').then(m => ({ default: m.TaskDetails })));
 const Calendar = lazy(() => import('@/pages/Calendar/Calendar').then(m => ({ default: m.Calendar })));
 const NotificationsPage = lazy(() => import('@/pages/NotificationsPage').then(m => ({ default: m.NotificationsPage })));
@@ -33,6 +34,48 @@ const WorkSpace = lazy(() => import('@/pages/TeamManagement/Workspace/Workspace'
 const QuickNotesPage = lazy(() => import('@/pages/QuickNotes/QuickNotesPage').then(m => ({ default: m.QuickNotesPage })));
 const LandingPage = lazy(() => import('@/pages/LandingPage/LandingPage').then(m => ({ default: m.LandingPage })));
 const Signup = lazy(() => import('@/pages/SignUp/SignUp').then(m => ({ default: m.Signup })));
+
+// ── Error Boundary
+class ErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+ 
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+ 
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('[ErrorBoundary] Uncaught render error:', error, info.componentStack);
+  }
+ 
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-8 text-center">
+          <h2 className="text-xl font-semibold text-foreground">Something went wrong</h2>
+          <p className="text-sm text-muted-foreground max-w-md">
+            An unexpected error occurred while loading this page. Please try reloading.
+          </p>
+          <button
+            className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
+            onClick={() => {
+              this.setState({ hasError: false, error: null });
+              window.location.reload();
+            }}
+          >
+            Reload page
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function PageLoader() {
   return (
@@ -97,14 +140,9 @@ function ProjectDetailWrapper() {
 
   if (!project) return null;
 
-  // 1. Content Creation specific UI
-  if (project.task_type === 'content_creation' || project.task_type === 'content-creation') {
-    return <ContentCreation />;
-  }
-
-  // 2. Extraction & OCR
-  const taskDetailsTypes = ['client', 'internal', 'Content Creation', 'ideas'];
-  if (taskDetailsTypes.includes(project.task_type)) {
+// All project types now use the unified TaskDetails component
+  const supportedTypes = ['client', 'internal', 'Content Creation', 'ideas', 'content_creation', 'content-creation'];
+  if (supportedTypes.includes(project.task_type)) {
     return <TaskDetails />;
   }
 }
@@ -235,9 +273,13 @@ function WebSocketProvider({ children }: { children: React.ReactNode }) {
 function App() {
   return (
     <AuthProvider>
-      <WebSocketProvider>
-        <AppRoutes />
-      </WebSocketProvider>
+      <TaskDraftsProvider>
+        <WebSocketProvider>
+          <ErrorBoundary>
+          <AppRoutes />
+          </ErrorBoundary>
+        </WebSocketProvider>
+      </TaskDraftsProvider>
     </AuthProvider>
   );
 }

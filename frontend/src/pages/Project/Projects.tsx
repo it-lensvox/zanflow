@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { FolderKanban, Bell } from 'lucide-react';
 import { Button, Card, CardContent } from '@/components/common';
 import { projectsApi } from '@/services/api';

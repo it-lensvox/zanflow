@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     X, Trash2, Save, Edit3, Loader2, ChevronDown, FileText, Download, Send, Maximize2, Minimize2,
     Clock, ListTodo, PlayCircle, CheckCircle, CheckSquare, Pause, Calendar, Plus, Link, ExternalLink,
@@ -82,10 +82,29 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
             return typeof link === 'object' && link.url ? link.url : String(link);
         });
     };
-    const { data: fullTaskDetails, refetch: refetchTaskDetails } = useQuery({
-        queryKey: ['task-detail', task.id],
-        queryFn: () => taskApi.get(task.id),
-        enabled: !!task.id,
+    // Resolve to a clean numeric task ID before any hooks that depend on it.
+    const resolvedTaskId = useMemo(() => {
+        const num = Number(task.id);
+        const isSafe = Number.isFinite(num) && num > 0 && num < 1_000_000_000_000;
+        if (!isSafe) {
+            console.error(
+                '[TaskDetailModal] ❌ Invalid task.id received:',
+                task.id,
+                '(raw type:', typeof task.id, ')',
+                '| task.heading:', task.heading,
+                '| This will block the API call until a valid id is available.'
+            );
+            return 0;
+        }
+        return num;
+    }, [task.id, task.heading]);
+
+    const { data: fullTaskDetails, refetch: refetchTaskDetails } = useQuery<any>({
+        queryKey: ['task-detail', resolvedTaskId],
+        queryFn: () => {
+            return taskApi.get(resolvedTaskId);
+        },
+        enabled: resolvedTaskId > 0,
     });
 
     // Query to fetch documents associated with this task with pagination
@@ -114,22 +133,24 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
                 return { results: [], count: 0, next: null, previous: null };
             }
         },
-        getNextPageParam: (lastPage) => {
-            if (lastPage.next) {
+       getNextPageParam: (lastPage) => {
+            if (!lastPage || !lastPage.next) return undefined;
+            try {
                 const url = new URL(lastPage.next);
                 const pageParam = url.searchParams.get('page');
                 return pageParam ? parseInt(pageParam) : undefined;
+            } catch {
+                return undefined;
             }
-            return undefined;
         },
         enabled: !!task.id,
         initialPageParam: 1,
     });
-
+ 
     // Flatten paginated documents
     const taskDocuments = React.useMemo(() => {
         if (!taskDocumentsData?.pages) return [];
-        return taskDocumentsData.pages.flatMap(page => page.results);
+        return taskDocumentsData.pages.flatMap(page => page?.results ?? []);
     }, [taskDocumentsData]);
 
     // Sync links when full details arrive
@@ -148,17 +169,74 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
     const queryClient = useQueryClient();
 
     const updateTaskMutation = useMutation({
-        mutationFn: (updates: any) => taskApi.update(task.id, updates),
-        onSuccess: (data) => {
-            queryClient.invalidateQueries({ queryKey: ['tasks'] });
-            queryClient.invalidateQueries({ queryKey: ['task', task.id] });
-            onTaskUpdated(data);
-            setIsEditingStatus(false);
-            onClose();
+        mutationFn: (updates: any) => {
+            if (!resolvedTaskId || resolvedTaskId <= 0) {
+                const errMsg = `[TaskDetailModal] ❌ Blocked API call — resolvedTaskId is invalid: ${resolvedTaskId}`;
+                console.error(errMsg);
+                return Promise.reject(new Error(errMsg));
+            }
+            return taskApi.update(resolvedTaskId, updates);
         },
-        onError: (error) => {
-            console.error('Failed to update task status:', error);
-            alert('Failed to update task status. Check console for details.');
+        onSuccess: (data) => {
+            // Normalize: API returns either Task directly or { task: Task }
+            const updatedTask: Task = (data as any)?.task ?? data;
+
+            // Update all relevant caches immediately (same pattern as taskConfig)
+            queryClient.setQueryData(['tasks'], (old: any) => {
+                if (!old) return old;
+                if (old.pages) {
+                    const pagesWithout = old.pages.map((page: any) => ({
+                        ...page,
+                        results: page.results.filter((t: Task) => t.id !== updatedTask.id),
+                    }));
+                    return {
+                        ...old,
+                        pages: [
+                            { ...pagesWithout[0], results: [updatedTask, ...(pagesWithout[0]?.results ?? [])] },
+                            ...pagesWithout.slice(1),
+                        ],
+                    };
+                }
+                if (Array.isArray(old)) return [updatedTask, ...old.filter((t: Task) => t.id !== updatedTask.id)];
+                if (old.tasks) return { ...old, tasks: [updatedTask, ...old.tasks.filter((t: Task) => t.id !== updatedTask.id)] };
+                if (old.results) return { ...old, results: [updatedTask, ...old.results.filter((t: Task) => t.id !== updatedTask.id)] };
+                return old;
+            });
+
+            // Update all project-specific ['tasks-list', projectId] caches
+            const allTaskListQueries = queryClient.getQueryCache().findAll({ queryKey: ['tasks-list'], exact: false });
+            allTaskListQueries.forEach((query) => {
+                queryClient.setQueryData(query.queryKey, (old: any) => {
+                    if (!old) return old;
+                    if (Array.isArray(old)) return [updatedTask, ...old.filter((t: Task) => t.id !== updatedTask.id)];
+                    if (old.tasks) return { ...old, tasks: [updatedTask, ...old.tasks.filter((t: Task) => t.id !== updatedTask.id)] };
+                    if (old.results) return { ...old, results: [updatedTask, ...old.results.filter((t: Task) => t.id !== updatedTask.id)] };
+                    return old;
+                });
+            });
+
+            queryClient.invalidateQueries({ queryKey: ['task-detail', resolvedTaskId] });
+
+            onTaskUpdated(updatedTask);
+            setIsEditingStatus(false);
+            setNewUsers([]);
+            setHasUnsavedChanges(false);
+        },
+        onError: (error: any) => {
+            const status = error?.response?.status;
+            console.error(
+                '[TaskDetailModal] ❌ Update failed:',
+                '| resolvedTaskId:', resolvedTaskId,
+                '| HTTP status:', status,
+                '| error:', error?.message ?? error
+            );
+            if (error?.message?.includes('invalid')) {
+                alert(`Cannot save: task ID is invalid (got "${task.id}"). Please close and reopen the task.`);
+            } else if (status === 404) {
+                alert(`Task not found on server (404). Task ID: ${resolvedTaskId}. Please close and reopen the task.`);
+            } else {
+                alert('Failed to save changes. Please try again.');
+            }
         },
     });
 
@@ -261,12 +339,20 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
         if (e.target === e.currentTarget && !updateTaskMutation.isPending) onClose();
     };
 
-    const handleSaveStatus = async () => {
+ const handleSaveStatus = async () => {
+        if (!resolvedTaskId || resolvedTaskId <= 0) {
+            console.error('[TaskDetailModal] ❌ Save blocked — resolvedTaskId is 0 or invalid. task.id was:', task.id);
+            alert(`Cannot save: task ID is invalid (got "${task.id}"). Please close and reopen the task.`);
+            return;
+        }
         try {
             const updates: any = {};
             if (editableTitle !== (task.heading || '')) updates.heading = editableTitle;
             if (selectedStatus !== task.status) updates.status = selectedStatus;
-            if (newUsers.length > 0) updates.assigned_to = [...task.assigned_to, ...newUsers];
+            if (newUsers.length > 0) {
+                const existing = (task.assigned_to || []).map(Number);
+                updates.assigned_to = [...new Set([...existing, ...newUsers])];
+            }
             if (editableDescription !== task.description) updates.description = editableDescription;
             const originalStart = task.start_date?.split('T')[0] || '';
             const originalEnd = task.end_date?.split('T')[0] || '';
@@ -516,10 +602,8 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
                         <button
                             onClick={() => {
                                 if (user?.id === task.assigned_by) {
-                                    console.log('→ User is task creator — opening delete confirm popup');
                                     setShowDeleteConfirm(true);
                                 } else {
-                                    console.log('→ User is NOT task creator — opening permission denied popup');
                                     setShowNotAdminPopup(true);
                                 }
                             }}

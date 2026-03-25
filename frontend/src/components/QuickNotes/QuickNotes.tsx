@@ -741,16 +741,21 @@ export function NoteEditor({
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !selectedNote || isPending) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0 || !selectedNote || isPending) return;
 
     try {
       setIsUploading(true);
-      const newAttachment = await quickNotesApi.uploadAttachment(selectedNote.id, file);
-      onAddAttachment(selectedNote.id, newAttachment);
-      // Optional: Add toast success notification here if your app has a global toast provider
+      const uploadPromises = files.map(file => 
+        quickNotesApi.uploadAttachment(selectedNote.id, file)
+      );
+      const newAttachments = await Promise.all(uploadPromises);
+      newAttachments.forEach(attachment => {
+        onAddAttachment(selectedNote.id, attachment);
+      });
+
     } catch (error) {
-      console.error('Failed to upload attachment:', error);
+      console.error('Failed to upload attachment(s):', error);
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -811,6 +816,7 @@ export function NoteEditor({
               onChange={handleFileSelect}
               className="hidden"
               accept="*/*"
+              multiple
             />
             <button
               onClick={() => fileInputRef.current?.click()}
@@ -989,7 +995,6 @@ interface MiniWindowProps {
   onNewNote: () => void;
   onNewFolder: () => void;
   onUpdateNote: (id: number | 'pending', content: string) => void;
-  // Callback so parent can flush pending content before navigating away
   onFlushAndMaximize: (pendingContent: string) => void;
 }
 
@@ -1105,7 +1110,7 @@ function MiniWindow({
 const FAB_SIZE = 48;
 const MINI_W = 340;
 const MINI_H = 260;
-const FAB_POS_KEY = 'zanflow_fab_pos';
+const FAB_POS_KEY = 'zanflow_quicknotes_fab_pos';
 
 function clamp(val: number, min: number, max: number) {
   return Math.min(Math.max(val, min), max);
@@ -1116,9 +1121,9 @@ function getInitialFabPos(): { x: number; y: number } {
     const raw = localStorage.getItem(FAB_POS_KEY);
     if (raw) return JSON.parse(raw);
   } catch { }
-return {
+  return {
     x: window.innerWidth - FAB_SIZE - 24,
-    y: window.innerHeight - FAB_SIZE * 2 - 32,
+    y: window.innerHeight - FAB_SIZE - 132,
   };
 }
 

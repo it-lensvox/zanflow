@@ -186,13 +186,28 @@ export interface Task {
   attachments?: TaskAttachment[];
   created_at?: string;
   updated_at?: string;
+  is_pinned?: boolean;
   comments?: TaskComment[];
+}
+
+// Pin task API response
+export interface PinTaskResponse {
+  message: string;
+  is_pinned: boolean;
 }
 
 // Update TaskResponse to use the interface
 export interface TaskResponse {
   message: string;
   task: Task;
+}
+
+// Paginated task list response (DRF standard envelope)
+export interface TaskPaginatedResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: Task[];
 }
 
 // In taskdetailmodal comment section 
@@ -738,13 +753,13 @@ export interface GatewaySendMessagePayload {
 }
 
 export interface GatewayIncomingMessage {
- type: 'CHAT_MESSAGE' | 'SIGNAL' | 'GATEWAY_CONNECTED' | 'PRESENCE' | 'PRESENCE_SYNC' | 'room_created';
+  type: 'CHAT_MESSAGE' | 'SIGNAL' | 'GATEWAY_CONNECTED' | 'PRESENCE' | 'PRESENCE_SYNC' | 'room_created';
   event?: 'NEW_NOTIFICATION' | 'CHAT_UNREAD_UPDATE';
   message?: ChatMessage;
   data?: ChatMessage | NotificationData | any;
   room_id?: string;
   user_id?: number;
-  online_users?: number[]; 
+  online_users?: number[];
   status?: 'online' | 'offline';
   username?: string;
   room?: any;
@@ -795,6 +810,12 @@ export interface NotificationListResponse {
   limit: number;
   offset: number;
   notifications: NotificationData[];
+}
+
+// Response type for delete-read notifications API
+export interface DeleteReadNotificationsResponse {
+  message: string;
+  deleted_count: number;
 }
 
 // WebSocket notification event wrapper

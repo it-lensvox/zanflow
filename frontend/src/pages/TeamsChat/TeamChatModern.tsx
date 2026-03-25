@@ -94,8 +94,8 @@ export function TeamChatModern() {
   const [messageInput, setMessageInput] = useState('');
   const [richHtmlContent, setRichHtmlContent] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [filePreviewUrls, setFilePreviewUrls] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [hoveredMessageId, setHoveredMessageId] = useState<string | number | null>(null);
   const [openMenuMessageId, setOpenMenuMessageId] = useState<string | number | null>(null);
@@ -104,6 +104,7 @@ export function TeamChatModern() {
   const menuRef = useRef<HTMLDivElement>(null);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
   const dragCounter = useRef(0);
   const [optimisticMessages, setOptimisticMessages] = useState<OptimisticChatMessage[]>([]);
   const [previewDoc, setPreviewDoc] = useState<{ url: string; fileName: string; fileType?: string } | null>(null);
@@ -118,6 +119,8 @@ export function TeamChatModern() {
   const [lastMessages, setLastMessages] = useState<Map<number, { content: string; timestamp: string; isUnread: boolean }>>(new Map());
   const [chatListVersion, setChatListVersion] = useState(0);
   const [userLastActivity, setUserLastActivity] = useState<Map<number, number>>(new Map());
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const isPaginatingRef = useRef(false);
 
   // Sidebar section states
   const [isCreateTeamModalOpen, setIsCreateTeamModalOpen] = useState(false);
@@ -752,7 +755,8 @@ export function TeamChatModern() {
       return messages;
     },
     enabled: !!(activeRoom || selectedProjectRoom || selectedTeamRoom),
-    staleTime: 0,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
     refetchOnMount: true,
   });
 
@@ -783,6 +787,80 @@ export function TeamChatModern() {
       new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     );
   }, [messagesData?.messages, optimisticMessages, activeRoom?.id, selectedProjectRoom?.id, selectedTeamRoom?.id]);
+
+  // Handle loading older messages for pagination
+  const handleLoadMore = async () => {
+    const roomId = activeRoom?.id || selectedProjectRoom?.id || selectedTeamRoom?.id;
+    if (!roomId || !messagesData?.has_more || isFetchingMore || !messagesData.messages.length) return;
+
+    // Find the oldest message ID using the sorted array to be safe
+    const sortedMessages = [...messagesData.messages].sort((a, b) => 
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+    const oldestMessage = sortedMessages[0];
+    
+    setIsFetchingMore(true);
+    isPaginatingRef.current = true;
+    
+    // Capture EXACT scroll state before the API call
+    const container = scrollContainerRef.current;
+    const previousScrollHeight = container?.scrollHeight || 0;
+    const previousScrollTop = container?.scrollTop || 0;
+    
+    try {
+      const olderMessagesData = await chatApi.getRoomMessages(roomId, { 
+        before: oldestMessage.id.toString(), 
+        limit: 50 
+      });
+
+      // Update cache and REMOVE DUPLICATES to fix the React key warning
+      queryClient.setQueryData(['chat-messages', roomId], (oldData: ChatRoomMessagesResponse | undefined) => {
+        if (!oldData) return olderMessagesData;
+        
+        const existingIds = new Set(oldData.messages.map(m => String(m.id)));
+        const uniqueOlderMessages = olderMessagesData.messages.filter(m => !existingIds.has(String(m.id)));
+
+        return {
+          ...oldData,
+          messages: [...uniqueOlderMessages, ...oldData.messages],
+          has_more: olderMessagesData.has_more,
+          count: oldData.messages.length + uniqueOlderMessages.length
+        };
+      });
+
+      // Allow React to paint the new DOM elements, then restore the scroll position
+      setTimeout(() => {
+        if (scrollContainerRef.current) {
+          const newScrollHeight = scrollContainerRef.current.scrollHeight;
+          // Maintain the exact visual position seamlessly
+          scrollContainerRef.current.scrollTop = (newScrollHeight - previousScrollHeight) + previousScrollTop;
+        }
+      }, 50);
+
+    } catch (error) {
+      console.error('Failed to load older messages:', error);
+    } finally {
+      setIsFetchingMore(false);
+      // Wait slightly longer than the scroll timeout to re-enable auto-scrolling safely
+      setTimeout(() => {
+        isPaginatingRef.current = false;
+      }, 150);
+    }
+  };
+
+  // Handle auto-loading when scrolling to the top
+  const handleScroll = () => {
+    if (!scrollContainerRef.current) return;
+    
+    // Trigger load more when user scrolls within 5 pixels of the top
+    if (scrollContainerRef.current.scrollTop <= 5) {
+      if (messagesData?.has_more && !isFetchingMore && !isPaginatingRef.current) {
+        handleLoadMore();
+      }
+    }
+  };
+
+  // Auto-scroll to bottom when messages change
 
   // Log when messages array changes
   useEffect(() => {
@@ -881,7 +959,6 @@ export function TeamChatModern() {
   };
 
   // Unread users filter
-  // Unread users filter (chat tab only — used for badge counts)
   const unreadUsers = useMemo(() => {
     return filteredUsers.filter(user => {
       const unreadCount = getUserUnreadCount(user.id);
@@ -1129,22 +1206,26 @@ export function TeamChatModern() {
 
   // Handle file selection
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      processFile(file);
+    const files = Array.from(event.target.files || []);
+    if (files.length > 0) {
+      processFiles(files);
     }
   };
 
   // Process file (used by both file picker and drag-drop)
-  const processFile = (file: File) => {
-    setSelectedFile(file);
+  const processFiles = (files: File[]) => {
+    setSelectedFiles(prev => [...prev, ...files]);
 
     // Generate preview URL for images
-    if (file.type.startsWith('image/')) {
-      const previewUrl = URL.createObjectURL(file);
-      setFilePreviewUrl(previewUrl);
-    } else {
-      setFilePreviewUrl(null);
+    const newUrls = files.map(file => {
+      if (file.type.startsWith('image/')) {
+        return URL.createObjectURL(file);
+      }
+      return null;
+    }).filter(Boolean) as string[];
+    
+    if (newUrls.length > 0) {
+      setFilePreviewUrls(prev => [...prev, ...newUrls]);
     }
   };
 
@@ -1185,26 +1266,30 @@ export function TeamChatModern() {
 
     const files = e.dataTransfer.files;
     if (files && files.length > 0) {
-      const file = files[0];
-      processFile(file);
+      processFiles(Array.from(files));
     }
   };
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
+    // If we are paginating, do NOT auto-scroll down.
+    // The handleLoadMore function will safely reset this flag when it's done.
+    if (isPaginatingRef.current) {
+      return; 
+    }
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
 
-  // Cleanup preview URL on unmount
+  // Cleanup preview URLs on unmount
   useEffect(() => {
     return () => {
-      if (filePreviewUrl) {
-        URL.revokeObjectURL(filePreviewUrl);
-      }
+      filePreviewUrls.forEach(url => {
+        if (url) URL.revokeObjectURL(url);
+      });
     };
-  }, [filePreviewUrl]);
+  }, [filePreviewUrls]);
 
   // Send Message
   const buildOptimisticMessage = (
@@ -1285,50 +1370,72 @@ export function TeamChatModern() {
 
     // Use rich HTML if available (Tiptap), fall back to plain text
     const content = richHtmlContent && richHtmlContent !== '<p></p>' ? richHtmlContent : messageInput.trim();
-    const hasFile = selectedFile !== null;
+    const hasFiles = selectedFiles.length > 0;
 
-    if (!content && !hasFile) {
+    if (!content && !hasFiles) {
       return;
     }
 
     const roomId = selectedProjectRoom?.id || selectedTeamRoom?.id || activeRoom?.id;
 
     // If there's a file attachment, use HTTP POST
-    if (hasFile && roomId) {
-      const tempId = `optimistic-${Date.now()}-${Math.random()}`;
-      const optimisticMsg = buildOptimisticMessage(roomId, content, tempId, selectedFile);
+    if (hasFiles && roomId) {
+      const tempIds: string[] = [];
+      const optimisticMsgs: OptimisticChatMessage[] = [];
 
-      // 1. Immediately render optimistic message
-      setOptimisticMessages(prev => [...prev, optimisticMsg]);
+      selectedFiles.forEach((file, index) => {
+        const tempId = `optimistic-${Date.now()}-${Math.random()}`;
+        tempIds.push(tempId);
+        // Only attach text content to the first message, subsequent ones are just the file
+        const msgContent = index === 0 ? content : '';
+        optimisticMsgs.push(buildOptimisticMessage(roomId, msgContent, tempId, file));
+      });
+
+      // 1. Immediately render optimistic messages
+      setOptimisticMessages(prev => [...prev, ...optimisticMsgs]);
 
       // 2. Clear input right away
       setMessageInput('');
       setRichHtmlContent('');
-      const capturedFile = selectedFile!;
-      setSelectedFile(null);
-      if (filePreviewUrl) {
-        URL.revokeObjectURL(filePreviewUrl);
-        setFilePreviewUrl(null);
-      }
+      const capturedFiles = [...selectedFiles];
+      setSelectedFiles([]);
+      filePreviewUrls.forEach(url => {
+        if (url) URL.revokeObjectURL(url);
+      });
+      setFilePreviewUrls([]);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
 
       try {
         setIsUploadingFile(true);
-        const response = await chatApi.sendMessageWithAttachment(roomId, {
-          content: content,
-          attachment: capturedFile,
+        
+        // Upload all files concurrently
+        const uploadPromises = capturedFiles.map((file, index) => {
+          const msgContent = index === 0 ? content : '';
+          return chatApi.sendMessageWithAttachment(roomId, {
+            content: msgContent,
+            attachment: file,
+          });
         });
+
+        const responses = await Promise.all(uploadPromises);
 
         // 3. Confirmed: replace optimistic with real message in cache
         queryClient.setQueryData(
           ['chat-messages', roomId],
           (oldData: ChatRoomMessagesResponse | undefined) => {
             const existingMessages = oldData?.messages || [];
-            const isDuplicate = existingMessages.some(m => m.id === response.id);
-            if (isDuplicate) return oldData;
-            const updatedMessages = [...existingMessages, response].sort(
+            let updatedMessages = [...existingMessages];
+            
+            responses.forEach(response => {
+              const isDuplicate = updatedMessages.some(m => m.id === response.id);
+              if (!isDuplicate) {
+                updatedMessages.push(response);
+              }
+            });
+            
+            updatedMessages.sort(
               (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
             );
             return {
@@ -1339,15 +1446,15 @@ export function TeamChatModern() {
             };
           }
         );
-        // 4. Remove the optimistic entry and force re-render in one state batch
-        setOptimisticMessages(prev => prev.filter(m => m.optimisticId !== tempId));
+        // 4. Remove the optimistic entries and force re-render in one state batch
+        setOptimisticMessages(prev => prev.filter(m => !tempIds.includes(m.optimisticId!)));
 
         // 5. Force React Query to notify subscribers of the cache change
         queryClient.invalidateQueries({ queryKey: ['chat-messages', roomId], refetchType: 'active' });
       } catch (error) {
         console.error('❌ [SEND ERROR] Failed to send message with attachment:', error);
         setOptimisticMessages(prev =>
-          prev.map(m => m.optimisticId === tempId ? { ...m, optimisticStatus: 'error' } : m)
+          prev.map(m => tempIds.includes(m.optimisticId!) ? { ...m, optimisticStatus: 'error' } : m)
         );
       } finally {
         setIsUploadingFile(false);
@@ -2002,7 +2109,9 @@ export function TeamChatModern() {
               <>
                 {/* Messages Area */}
                 <div
+                  ref={scrollContainerRef}
                   className="flex-1 overflow-y-auto bg-[#efeae2] scrollbar-hide p-6"
+                  onScroll={handleScroll}
                   onDragEnter={handleDragEnter}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
@@ -2033,6 +2142,15 @@ export function TeamChatModern() {
                     </div>
                   ) : (
                     <div className="space-y-3">
+                      {/* Show loading spinner at the top when fetching */}
+                      {isFetchingMore && (
+                        <div className="flex justify-center py-4">
+                          <div className="flex items-center gap-2 text-xs font-medium text-blue-600 bg-white border border-blue-200 px-4 py-1.5 rounded-full shadow-sm">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Loading older messages...
+                          </div>
+                        </div>
+                      )}
                       {messages.filter(m => m.sender != null).map((message, index, visibleMessages) => {
                         const isOwn = message.is_own_message;
                         const showAvatar = index === 0 || visibleMessages[index - 1].sender.id !== message.sender.id;
@@ -2353,8 +2471,70 @@ export function TeamChatModern() {
                       onChange={handleFileSelect}
                       className="hidden"
                       accept="*"
+                      multiple
                     />
 
+                    {selectedFiles.length > 0 && (
+                      <div className="flex flex-col bg-white border-b border-gray-100">
+                        {/* Summary Header */}
+                        {selectedFiles.length > 1 && (
+                          <div className="px-4 py-2 bg-blue-50/50 border-b border-blue-100 flex items-center justify-between text-sm text-blue-700">
+                            <span className="flex items-center gap-2 font-medium">
+                              <Paperclip className="h-4 w-4" />
+                              {selectedFiles.length} files selected
+                            </span>
+                            <button onClick={() => {
+                              setSelectedFiles([]);
+                              filePreviewUrls.forEach(url => { if (url) URL.revokeObjectURL(url); });
+                              setFilePreviewUrls([]);
+                              if (fileInputRef.current) fileInputRef.current.value = '';
+                            }} className="hover:text-blue-900 p-1">
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        )}
+                        
+                        {/* Horizontal File Preview Cards */}
+                        <div className="px-4 py-3 flex items-center gap-3 overflow-x-auto scrollbar-hide">
+                          {selectedFiles.map((file, index) => (
+                            <div key={`${file.name}-${index}`} className="flex items-center gap-2.5 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 shrink-0 w-64 max-w-full">
+                              {filePreviewUrls[index] ? (
+                                <img src={filePreviewUrls[index]} alt={file.name} className="h-9 w-9 object-cover rounded border border-blue-200" />
+                              ) : (
+                                <div className="h-9 w-9 rounded bg-blue-100 flex items-center justify-center shrink-0">
+                                  <Paperclip className="h-4 w-4 text-blue-600" />
+                                </div>
+                              )}
+                              <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                <p className="text-sm font-medium text-blue-900 truncate" title={file.name}>{file.name}</p>
+                                <p className="text-xs text-blue-500">{(file.size / 1024).toFixed(1)} KB</p>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  // Remove single file
+                                  const newFiles = [...selectedFiles];
+                                  newFiles.splice(index, 1);
+                                  setSelectedFiles(newFiles);
+                                  
+                                  const newUrls = [...filePreviewUrls];
+                                  const removedUrl = newUrls.splice(index, 1)[0];
+                                  if (removedUrl) URL.revokeObjectURL(removedUrl);
+                                  setFilePreviewUrls(newUrls);
+                                  
+                                  if (newFiles.length === 0 && fileInputRef.current) {
+                                      fileInputRef.current.value = '';
+                                  }
+                                }}
+                                className="p-1 hover:bg-blue-100 rounded text-blue-400 hover:text-blue-600 transition-colors shrink-0"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
                     <ChatMessageInput
                       value={messageInput}
                       onChange={(plainText, html) => {
@@ -2366,14 +2546,10 @@ export function TeamChatModern() {
                       placeholder="Type a message…"
                       disabled={false}
                       isUploading={isUploadingFile}
-                      selectedFile={selectedFile}
-                      filePreviewUrl={filePreviewUrl}
-                      onRemoveFile={() => {
-                        setSelectedFile(null);
-                        setFilePreviewUrl(null);
-                        if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
-                        if (fileInputRef.current) fileInputRef.current.value = '';
-                      }}
+                      selectedFile={null} 
+                      filePreviewUrl={null} 
+                      onRemoveFile={() => {}}
+                      hasAttachments={selectedFiles.length > 0}
                     />
                   </>
                 </div>

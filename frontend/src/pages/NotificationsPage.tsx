@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { BellOff, Search, X, Trash2 } from 'lucide-react';
-import { fetchNotifications, api } from '@/services/api';
+import { fetchNotifications, deleteReadNotifications, api } from '@/services/api';
 import { cn } from '@/lib/utils';
 import type { NotificationData } from '@/types';
 import { useNotifications } from '@/hooks/useNotifications';
@@ -19,34 +19,101 @@ export function NotificationsPage({
   const [filter, setFilter] = useState<'all' | 'unread'>(defaultFilter);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
   // Get unread count from useNotifications hook
   const { setNotifications: setGlobalNotifications } = useNotifications();
 
   const handleClose = () => (onClose ? onClose() : navigate(-1));
 
-  // Step A: Fetch notifications from REST API
-  const { data: notificationData, isLoading: isFetchingInitial } = useQuery({
+// Step A: Fetch notifications from REST API with pagination
+  const {
+    data: infiniteData,
+    isLoading: isFetchingInitial,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+  } = useInfiniteQuery({
     queryKey: ['notifications-initial'],
     queryFn: fetchNotifications,
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      if (!lastPage || !lastPage.notifications) return undefined;
+      const currentPage = lastPage.current_page ?? 1;
+      const totalPages = lastPage.total_pages ?? 1;
+      return currentPage < totalPages ? currentPage + 1 : undefined;
+    },
     staleTime: 0,
     refetchOnWindowFocus: true,
     refetchOnMount: true,
   });
 
-  const notifications = notificationData?.notifications || [];
-
-  // Update global notifications when data changes
-  useEffect(() => {
-    if (notificationData?.notifications) {
-      setGlobalNotifications(notificationData.notifications);
+  const notifications = React.useMemo(() => {
+    if (!infiniteData?.pages) return [];
+    const seen = new Set<number>();
+    const merged: NotificationData[] = [];
+    for (const page of infiniteData.pages) {
+      for (const n of page?.notifications ?? []) {
+        if (!seen.has(n.id)) {
+          seen.add(n.id);
+          merged.push(n);
+        }
+      }
     }
-  }, [notificationData, setGlobalNotifications]);
+    return merged;
+  }, [infiniteData]);
+
+ // Update global notifications when data changes
+  useEffect(() => {
+    if (notifications.length > 0) {
+      setGlobalNotifications(notifications);
+    }
+  }, [notifications, setGlobalNotifications]);
+
+  // Infinite scroll: fetch next page when user scrolls near bottom
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      if (scrollHeight - scrollTop - clientHeight < 150 && hasNextPage && !isFetchingNextPage) {
+        fetchNextPage();
+      }
+    };
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   // Reset to default filter when panel opens
   useEffect(() => {
     setFilter(defaultFilter);
   }, [defaultFilter]);
+
+  // Mutation for clearing all notifications
+  const clearAllReadMutation = useMutation({
+    mutationFn: deleteReadNotifications,
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['notifications-initial'] });
+      const previous = queryClient.getQueryData(['notifications-initial']);
+      // Optimistic update: wipe all pages
+      queryClient.setQueryData(['notifications-initial'], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages?.map((page: any) => ({ ...page, notifications: [] })) ?? [],
+        };
+      });
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['notifications-initial'], context.previous);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications-initial'] });
+    },
+  });
 
   // Mutation for deleting notifications
   const deleteNotificationMutation = useMutation({
@@ -163,6 +230,14 @@ export function NotificationsPage({
                 </div>
               ) : (
                 <>
+                <button
+                    onClick={() => clearAllReadMutation.mutate()}
+                    disabled={clearAllReadMutation.isPending || notifications.length === 0}
+                    className="text-[10px] font-semibold text-gray-400 hover:text-red-500 transition-colors disabled:opacity-40 whitespace-nowrap"
+                    title="Clear all notifications"
+                  >
+                    Clear All
+                  </button>
                   <Search
                     className="h-4 w-4 opacity-60 hover:opacity-100 cursor-pointer"
                     onClick={() => setIsSearchOpen(true)}
@@ -196,7 +271,7 @@ export function NotificationsPage({
         </div>
 
         {/* Scrollable List with Padding */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar px-4 mb-10">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto custom-scrollbar px-4 mb-10">
           {isFetchingInitial ? (
             <div className="py-20 text-center text-sm opacity-50 italic">
               Loading activity...
@@ -259,6 +334,12 @@ export function NotificationsPage({
                   </div>
                 );
               })}
+            {/* Load more indicator */}
+            {isFetchingNextPage && (
+              <div className="py-4 text-center text-xs text-muted-foreground opacity-50 italic">
+                Loading more...
+              </div>
+            )}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground">

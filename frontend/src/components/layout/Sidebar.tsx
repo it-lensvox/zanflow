@@ -421,7 +421,7 @@ export function Sidebar() {
               </span>
             )}
           </div>
-          {isExpanded && <span>Team Chat</span>}
+          {isExpanded && <span>Chats</span>}
         </NavLink>
       </nav>
 
