@@ -50,7 +50,7 @@ export function TableView<T>({
 }: TableViewProps<T>) {
   return (
     <div 
-      className={`bg-white border border-[#dfe1e6] rounded-md shadow-sm font-sans text-[13px] ${className}`}
+      className={`bg-white dark:bg-card border border-[#dfe1e6] dark:border-border rounded-md shadow-sm font-sans text-[13px] text-foreground ${className}`}
       style={{ 
         display: 'flex',
         flexDirection: 'column',

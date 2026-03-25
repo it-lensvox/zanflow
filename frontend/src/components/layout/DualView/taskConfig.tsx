@@ -384,17 +384,17 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     // },
     {
       key: 'project',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Project</span>,
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700 dark:text-foreground">Project</span>,
       width: '10%',
       render: (task: Task) => (
-        <span className="text-[12px] text-gray-700 font-medium">
+        <span className="text-[12px] text-gray-700 dark:text-muted-foreground font-medium">
           {task.project_details?.name || task.project_name || 'No Project'}
         </span>
       ),
     },
     {
       key: 'heading',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Task Title</span>,
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700 dark:text-foreground">Task Title</span>,
       width: '20%',
       render: (task: Task) => (
         <span className="font-medium text-[#172b4d] truncate block max-w-[300px]" title={task.heading}>
@@ -404,13 +404,13 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     },
     {
       key: 'status',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Status</span>,
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700 dark:text-foreground">Status</span>,
       width: '8%',
       render: (task: Task) => <StatusDropdown task={task} />,
     },
     {
       key: 'assigned_to',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Assignee</span>,
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700 dark:text-foreground">Assignee</span>,
       width: '8%',
       render: (task: Task) => {
         const trigger = (
@@ -443,9 +443,9 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
 
         return (
           <TablePopover trigger={trigger}>
-            <div className="p-2 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-lg">
-              <span className="text-xs font-semibold text-gray-700">Assignees</span>
-              <span className="text-[10px] bg-gray-200 px-1.5 py-0.5 rounded text-gray-600">
+            <div className="p-2 border-b border-gray-100 dark:border-border flex justify-between items-center bg-gray-50 dark:bg-muted rounded-t-lg">
+              <span className="text-xs font-semibold text-gray-700 dark:text-foreground">Assignees</span>
+              <span className="text-[10px] bg-gray-200 dark:bg-muted-foreground px-1.5 py-0.5 rounded text-gray-600 dark:text-foreground">
                 {task.assigned_to_user_details.length}
               </span>
             </div>
@@ -472,13 +472,13 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     },
     {
       key: 'priority',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Priority</span>,
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700 dark:text-foreground">Priority</span>,
       width: '8%',
       render: (task: Task) => <PriorityDropdown task={task} />,
     },
     {
       key: 'labels',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Labels</span>,
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700 dark:text-foreground">Labels</span>,
       width: '8%',
       render: (task: Task) => (
         <div className="flex flex-wrap gap-1.5 items-center h-full min-h-[24px]" onClick={(e) => e.stopPropagation()}>
@@ -500,26 +500,26 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     },
     {
       key: dateField,
-      label: <span className="text-[14px] font-bold tracking-wide text-gray-700">{dateField === 'end_date' ? 'Due Date' : dateField === 'start_date' ? 'Start Date' : 'Created At'}</span>,
+      label: <span className="text-[14px] font-bold tracking-wide text-gray-700 dark:text-foreground">{dateField === 'end_date' ? 'Due Date' : dateField === 'start_date' ? 'Start Date' : 'Created At'}</span>,
       width: '8%',
       render: (task: Task) =>
         dateField === 'created_at'
-          ? <span className="text-[13px] text-gray-600 pl-1">{formatDate(task.created_at || '')}</span>
+          ? <span className="text-[13px] text-gray-600 dark:text-muted-foreground pl-1">{formatDate(task.created_at || '')}</span>
           : <DateInput task={task} field={dateField as 'start_date' | 'end_date'} />,
     },
      {
       key: 'updated_at',
-      label: <span className="text-[14px] font-bold tracking-wide text-gray-700">Updated</span>,
+      label: <span className="text-[14px] font-bold tracking-wide text-gray-700 dark:text-foreground">Updated</span>,
       width: '8%',
       render: (task: Task) => (
-        <span className="text-[13px] text-gray-600 pl-1" title={formatDate(task.updated_at || '')}>
+        <span className="text-[13px] text-gray-600 dark:text-muted-foreground pl-1" title={formatDate(task.updated_at || '')}>
           {task.updated_at ? formatRelativeTime(task.updated_at) : '—'}
         </span>
       ),
     },
     {
       key: 'duration',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Duration</span>,
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700 dark:text-foreground">Duration</span>,
       width: '8%',
       render: (task: Task) => (
         <input

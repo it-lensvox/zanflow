@@ -34,21 +34,21 @@ const TeamMembersList = ({ team }: { team: Team }) => {
 
     return (
         <TablePopover trigger={trigger}>
-            <div className="p-2 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-lg">
-                <span className="text-xs font-semibold text-gray-700">Team Members</span>
-                <span className="text-[10px] bg-gray-200 px-1.5 py-0.5 rounded text-gray-600">
+            <div className="p-2 border-b border-gray-100 dark:border-border flex justify-between items-center bg-gray-50 dark:bg-secondary rounded-t-lg">
+                <span className="text-xs font-semibold text-gray-700 dark:text-foreground">Team Members</span>
+                <span className="text-[10px] bg-gray-200 dark:bg-muted px-1.5 py-0.5 rounded text-gray-600 dark:text-muted-foreground">
                     {team.members?.length || 0}
                 </span>
             </div>
             <div className="max-h-48 overflow-y-auto p-1">
                 {team.members?.map((member) => (
-                    <div key={member.id} className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded">
-                        <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-700 shrink-0">
+                    <div key={member.id} className="flex items-center gap-2 p-1.5 hover:bg-gray-50 dark:hover:bg-muted rounded">
+                        <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-950/40 flex items-center justify-center text-[10px] font-bold text-blue-700 dark:text-blue-400 shrink-0">
                             {member.user.full_name?.charAt(0) || 'U'}
                         </div>
                         <div className="min-w-0">
-                            <p className="text-[11px] font-medium text-gray-700 truncate">{member.user.full_name}</p>
-                            <p className="text-[10px] text-gray-400 truncate capitalize">{member.role.replace('_', ' ')}</p>
+                            <p className="text-[11px] font-medium text-gray-700 dark:text-foreground truncate">{member.user.full_name}</p>
+                            <p className="text-[10px] text-gray-400 dark:text-muted-foreground truncate capitalize">{member.role.replace('_', ' ')}</p>
                         </div>
                     </div>
                 ))}
@@ -160,20 +160,20 @@ const AddMembersDropdown: React.FC<AddMembersDropdownProps> = ({ team, onMemberA
             {isOpen && dropdownPosition && (
                 <div
                     ref={dropdownRef}
-                    className="fixed z-[999] w-64 bg-white border border-gray-200 rounded-lg shadow-xl"
+                    className="fixed z-[999] w-64 bg-white dark:bg-card border border-gray-200 dark:border-border rounded-lg shadow-xl"
                     style={{
                         top: `${dropdownPosition.top}px`,
                         left: `${dropdownPosition.left}px`,
                     }}
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <div className="p-2 border-b border-gray-100">
+                    <div className="p-2 border-b border-gray-100 dark:border-border">
                         <input
                             type="text"
                             placeholder="Search users..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full px-2 py-1 text-xs border border-gray-300 rounded outline-none focus:ring-1 focus:ring-blue-500"
+                            className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-border dark:bg-muted dark:text-foreground dark:placeholder:text-muted-foreground rounded outline-none focus:ring-1 focus:ring-blue-500"
                             onClick={(e) => e.stopPropagation()}
                         />
                     </div>
@@ -181,14 +181,14 @@ const AddMembersDropdown: React.FC<AddMembersDropdownProps> = ({ team, onMemberA
                         {isLoading ? (
                             <div className="p-3 text-center text-xs text-gray-500">Loading users...</div>
                         ) : filteredUsers.length === 0 ? (
-                            <div className="p-3 text-center text-xs text-gray-500">
+                            <div className="p-3 text-center text-xs text-gray-500 dark:text-muted-foreground">
                                 {searchTerm ? 'No users found' : 'No available users'}
                             </div>
                         ) : (
                             filteredUsers.map((user) => (
                                 <div
                                     key={user.id}
-                                    className="flex items-center gap-2 p-2 hover:bg-gray-50 cursor-pointer"
+                                    className="flex items-center gap-2 p-2 hover:bg-gray-50 dark:hover:bg-muted cursor-pointer"
                                     onClick={(e) => {
                                         e.preventDefault();
                                         e.stopPropagation();
@@ -199,12 +199,12 @@ const AddMembersDropdown: React.FC<AddMembersDropdownProps> = ({ team, onMemberA
                                         {user.first_name?.charAt(0) || user.username?.charAt(0) || 'U'}
                                     </div>
                                     <div className="min-w-0 flex-1">
-                                        <p className="text-[11px] font-medium text-gray-700 truncate">
+                                        <p className="text-[11px] font-medium text-gray-700 dark:text-foreground truncate">
                                             {user.first_name && user.last_name
                                                 ? `${user.first_name} ${user.last_name}`
                                                 : user.username}
                                         </p>
-                                        <p className="text-[10px] text-gray-400 truncate">{user.email}</p>
+                                        <p className="text-[10px] text-gray-400 dark:text-muted-foreground truncate">{user.email}</p>
                                     </div>
                                 </div>
                             ))
@@ -228,7 +228,7 @@ export const getTeamsTableColumns = (
             render: (team: Team) => (
                 <div className="flex items-center justify-between gap-2 w-full group/teamname">
                     <div className="flex items-center gap-2">
-                        <span className="font-semibold text-[13px] text-[#172b4d]">{team.name}</span>
+                        <span className="font-semibold text-[13px] text-[#172b4d] dark:text-foreground">{team.name}</span>
                     </div>
                     <button
                         onClick={(e) => {
@@ -300,11 +300,11 @@ interface TeamGridCardProps {
 
 export function TeamGridCard({ team, onToggleFavorite, onMemberAdded }: TeamGridCardProps) {
     return (
-        <div className="bg-white rounded-xl p-4 transition-all duration-300 cursor-pointer text-gray-800 hover:shadow-lg hover:-translate-y-0.5 border border-[#d0d5dd] relative hover:z-50 h-full group">
+        <div className="bg-white dark:bg-card rounded-xl p-4 transition-all duration-300 cursor-pointer text-gray-800 dark:text-foreground hover:shadow-lg hover:-translate-y-0.5 border border-[#d0d5dd] dark:border-border relative hover:z-50 h-full group">
             {/* Header: Team Name & Favorite */}
             <div className="flex justify-between items-start gap-2 mb-3">
                 <div className="flex flex-col">
-                    <span className="text-sm font-bold text-gray-900 line-clamp-1">{team.name}</span>
+                    <span className="text-sm font-bold text-gray-900 dark:text-foreground line-clamp-1">{team.name}</span>
                     <Badge variant="secondary" className="text-[10px] capitalize mt-1">
                         {team.team_type_display || team.team_type}
                     </Badge>
@@ -313,7 +313,7 @@ export function TeamGridCard({ team, onToggleFavorite, onMemberAdded }: TeamGrid
                 <button
                     type="button"
                     onClick={(e) => onToggleFavorite(e, team)}
-                    className="text-gray-300 hover:text-yellow-500 transition-colors focus:outline-none"
+                    className="text-gray-300 dark:text-muted-foreground hover:text-yellow-500 transition-colors focus:outline-none"
                 >
                     <span className={`text-lg ${team.is_favourite ? 'text-yellow-500' : ''}`}>
                         {team.is_favourite ? '★' : '☆'}
@@ -322,7 +322,7 @@ export function TeamGridCard({ team, onToggleFavorite, onMemberAdded }: TeamGrid
             </div>
 
             {/* Details: Members & Add */}
-            <div className="space-y-2 text-xs text-gray-500 mb-2">
+            <div className="space-y-2 text-xs text-gray-500 dark:text-muted-foreground mb-2">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <TeamMembersList team={team} />

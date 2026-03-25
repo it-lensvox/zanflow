@@ -264,10 +264,10 @@ export const MyTask: React.FC = () => {
                                             placeholder="Search tasks..."
                                             value={searchQuery}
                                             onChange={(e) => setSearchQuery(e.target.value)}
-                                            className="w-full pl-9 pr-4 py-2 text-sm rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                                            className="w-full pl-9 pr-4 py-2 text-sm rounded-md border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-card text-gray-900 dark:text-foreground"
                                         />
                                     </div>
-                                    <div className="flex items-center border border-gray-200 rounded-md bg-white p-1 gap-1">
+                                    <div className="flex items-center border border-gray-200 rounded-md bg-white dark:bg-card p-1 gap-1">
                                         <button
                                             onClick={() => setViewMode('table')}
                                             className={`p-1.5 rounded transition-colors ${viewMode === 'table' ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:bg-gray-50'}`}
@@ -390,10 +390,10 @@ export const MyTask: React.FC = () => {
                                 />
                                 {viewMode === 'table' && (
                                     <div
-                                        className="p-3 border-t border-[#dfe1e6] bg-white cursor-pointer hover:bg-gray-50 transition-colors rounded-b-md -mt-px"
+                                        className="p-3 border-t border-[#dfe1e6] bg-white cursor-pointer hover:bg-gray-50 transition-colors rounded-b-md -mt-px dark:bg-card"
                                         onClick={() => navigate('/taskboard/create')}
                                     >
-                                        <div className="flex items-center gap-2 text-gray-500 text-[13px] font-medium pl-1">
+                                        <div className="flex items-center gap-2 text-gray-500 text-[13px] font-medium pl-1 dark:text-gray-400 hover:text-blue-600 dark:bg-card">
                                             <Plus className="w-4 h-4 text-gray-400 group-hover:text-blue-600 transition-colors" />
                                             <span className="hover:text-blue-600 transition-colors">Create</span>
                                         </div>

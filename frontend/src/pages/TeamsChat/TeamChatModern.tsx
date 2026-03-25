@@ -42,8 +42,8 @@ function MemberListContent({ roomId, roomType }: { roomId: string; roomType: 'te
   if (members.length === 0) {
     return (
       <div className="text-center py-8">
-        <UsersIcon className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-        <p className="text-sm text-gray-500">No members found</p>
+        <UsersIcon className="h-12 w-12 text-gray-300 dark:text-muted-foreground mx-auto mb-3" />
+        <p className="text-sm text-gray-500 dark:text-muted-foreground">No members found</p>
       </div>
     );
   }
@@ -53,7 +53,7 @@ function MemberListContent({ roomId, roomType }: { roomId: string; roomType: 'te
       {members.map((member) => (
         <div
           key={member.user.id}
-          className="flex items-center gap-2 p-2 rounded hover:bg-gray-50 transition-colors"
+          className="flex items-center gap-2 p-2 rounded hover:bg-gray-50 dark:hover:bg-muted transition-colors"
         >
           <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center font-semibold text-white text-xs flex-shrink-0">
             {member.user.full_name
@@ -61,10 +61,10 @@ function MemberListContent({ roomId, roomType }: { roomId: string; roomType: 'te
               : member.user.username.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-gray-900 truncate">
+            <p className="text-xs font-medium text-gray-900 dark:text-foreground truncate">
               {member.user.full_name || member.user.username}
             </p>
-            <p className="text-[10px] text-gray-500 truncate">
+            <p className="text-[10px] text-gray-500 dark:text-muted-foreground truncate">
               {member.user.email}
             </p>
           </div>
@@ -1472,17 +1472,17 @@ onSuccess: (roomData, userId) => {
     };
 
     return (
-      <div className="flex items-start gap-3 p-4 bg-white rounded-lg shadow-lg border border-gray-200 min-w-[300px] max-w-[400px] animate-slide-in">
-        <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center font-semibold text-blue-700 text-sm flex-shrink-0">
+      <div className="flex items-start gap-3 p-4 bg-white dark:bg-card rounded-lg shadow-lg border border-gray-200 dark:border-border min-w-[300px] max-w-[400px] animate-slide-in">
+        <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-950/40 flex items-center justify-center font-semibold text-blue-700 dark:text-blue-400 text-sm flex-shrink-0">
           {toast.sender_name.charAt(0).toUpperCase()}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-sm text-gray-900">{toast.sender_name}</p>
-          <p className="text-xs text-gray-600 mt-0.5 truncate">{toast.message_preview}</p>
+          <p className="font-semibold text-sm text-gray-900 dark:text-foreground">{toast.sender_name}</p>
+          <p className="text-xs text-gray-600 dark:text-muted-foreground mt-0.5 truncate">{toast.message_preview}</p>
         </div>
         <button
           onClick={() => setToastNotifications(prev => prev.filter(t => t.id !== toast.id))}
-          className="text-gray-400 hover:text-gray-600 flex-shrink-0 transition-colors"
+          className="text-gray-400 dark:text-muted-foreground hover:text-gray-600 dark:hover:text-foreground flex-shrink-0 transition-colors"
         >
           <X className="h-4 w-4" />
         </button>
@@ -1517,7 +1517,7 @@ onSuccess: (roomData, userId) => {
   };
 
   return (
-    <div className="flex h-screen bg-[#f3f2f1] overflow-hidden border-2 border-gray-200">
+    <div className="flex h-screen bg-[#f3f2f1] dark:bg-background overflow-hidden border-2 border-gray-200 dark:border-border">
       {previewDoc && (
         <div className="fixed inset-0 z-[200]">
           <DocumentPreview
@@ -1536,42 +1536,42 @@ onSuccess: (roomData, userId) => {
         ))}
       </div>
       {/* Left Sidebar */}
-      <div className="w-80 bg-[#f3f2f1] border-r border-gray-200 flex flex-col h-full overflow-hidden">
+      <div className="w-80 bg-[#f3f2f1] dark:bg-card border-r border-gray-200 dark:border-border flex flex-col h-full overflow-hidden">
         {/* Sidebar Header */}
-        <div className="h-14 px-4 flex items-center justify-between bg-white border-b border-gray-200">
-          <h2 className="font-semibold text-base text-gray-900">Chat</h2>
+        <div className="h-14 px-4 flex items-center justify-between bg-white dark:bg-card border-b border-gray-200 dark:border-border">
+          <h2 className="font-semibold text-base text-gray-900 dark:text-foreground">Chat</h2>
           <div className="flex items-center gap-1">
             <button
               onClick={() => setIsCreateTeamModalOpen(true)}
-              className="p-2 hover:bg-gray-100 rounded transition-colors"
+              className="p-2 hover:bg-gray-100 dark:hover:bg-secondary rounded transition-colors"
               title="Create Team"
             >
-              <Plus className="h-4 w-4 text-gray-600" />
+              <Plus className="h-4 w-4 text-gray-600 dark:text-muted-foreground" />
             </button>
           </div>
         </div>
 
         {/* Search Bar */}
-        <div className="px-3 py-3 bg-white border-b border-gray-200">
+        <div className="px-3 py-3 bg-white dark:bg-card border-b border-gray-200 dark:border-border">
           <div className="relative">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400 dark:text-muted-foreground" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search"
-              className="w-full pl-9 pr-3 py-2 text-sm bg-[#f3f2f1] rounded border-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-9 pr-3 py-2 text-sm bg-[#f3f2f1] dark:bg-secondary dark:text-foreground dark:placeholder:text-muted-foreground rounded border-none focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
         </div>
 
         {/* Tab Navigation */}
         <Tabs.Root value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-          <Tabs.List className="flex items-center gap-1 px-3 py-2 bg-white border-b border-gray-200">
+          <Tabs.List className="flex items-center gap-1 px-3 py-2 bg-white dark:bg-card border-b border-gray-200 dark:border-border">
             <div className="relative inline-flex">
               <Tabs.Trigger
                 value="chats"
-                className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+                className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:dark:text-muted-foreground data-[state=inactive]:hover:bg-gray-100 data-[state=inactive]:dark:hover:bg-secondary"
               >
                 Chats
               </Tabs.Trigger>
@@ -1584,7 +1584,7 @@ onSuccess: (roomData, userId) => {
             <div className="relative inline-flex">
               <Tabs.Trigger
                 value="projects"
-                className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+                className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:dark:text-muted-foreground data-[state=inactive]:hover:bg-gray-100 data-[state=inactive]:dark:hover:bg-secondary"
               >
                 Projects
               </Tabs.Trigger>
@@ -1597,7 +1597,7 @@ onSuccess: (roomData, userId) => {
             <div className="relative inline-flex">
               <Tabs.Trigger
                 value="teams"
-                className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+                className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:dark:text-muted-foreground data-[state=inactive]:hover:bg-gray-100 data-[state=inactive]:dark:hover:bg-secondary"
               >
                 Teams
               </Tabs.Trigger>
@@ -1610,7 +1610,7 @@ onSuccess: (roomData, userId) => {
             <div className="relative inline-flex">
               <Tabs.Trigger
                 value="unread"
-                className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+                className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:dark:text-muted-foreground data-[state=inactive]:hover:bg-gray-100 data-[state=inactive]:dark:hover:bg-secondary"
               >
                 Unread
               </Tabs.Trigger>
@@ -1623,17 +1623,17 @@ onSuccess: (roomData, userId) => {
           </Tabs.List>
 
           {/* Scrollable Lists */}
-          <div className="flex-1 overflow-y-auto scrollbar-hide min-h-0 bg-white">
+          <div className="flex-1 overflow-y-auto scrollbar-hide min-h-0 bg-white dark:bg-card">
             <Tabs.Content value="chats">
               {/* Chats Section */}
-              <div className="bg-white">
-                <div className="border-t border-gray-100">
+              <div className="bg-white dark:bg-card">
+                <div className="border-t border-gray-100 dark:border-border">
                   {isLoadingUsers ? (
                     <div className="p-4 text-center">
                       <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
                     </div>
                   ) : filteredUsers.length === 0 ? (
-                    <div className="p-4 text-center text-sm text-gray-500">No users found</div>
+                    <div className="p-4 text-center text-sm text-gray-500 dark:text-muted-foreground">No users found</div>
                   ) : (
                     filteredUsers.map(user => {
                       const isSelected = selectedUserId === user.id;
@@ -1650,8 +1650,8 @@ onSuccess: (roomData, userId) => {
                           key={user.id}
                           onClick={() => handleUserSelect(user.id)}
                           className={cn(
-                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
-                            isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
+                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-secondary transition-colors border-l-2",
+                            isSelected ? "bg-blue-50 dark:bg-blue-950/30 border-blue-600" : "border-transparent"
                           )}
                         >
                           <div className="relative flex-shrink-0">
@@ -1667,7 +1667,7 @@ onSuccess: (roomData, userId) => {
                             <div className="flex items-center justify-between mb-0.5">
                               <p className={cn(
                                 "text-sm truncate flex-1",
-                                hasUnreadMessages ? "font-bold text-gray-900" : "font-medium text-gray-900"
+                                hasUnreadMessages ? "font-bold text-gray-900 dark:text-foreground" : "font-medium text-gray-900 dark:text-foreground"
                               )}>
                                 {user?.first_name} {user?.last_name}
                               </p>
@@ -1680,7 +1680,7 @@ onSuccess: (roomData, userId) => {
                             <div className="flex items-center justify-between">
                               <p className={cn(
                                 "text-xs truncate",
-                                hasUnreadMessages ? "font-semibold text-gray-900" : "text-gray-600"
+                                hasUnreadMessages ? "font-semibold text-gray-900 dark:text-foreground" : "text-gray-600 dark:text-muted-foreground"
                               )}>
                                 {user.lastMessageContent
                                   ? user.lastMessageContent.replace(/<[^>]*>/g, '').trim() || 'Sent a message'
@@ -1704,14 +1704,14 @@ onSuccess: (roomData, userId) => {
             <Tabs.Content value="projects">
 
               {/* Projects Section */}
-              <div className="bg-white">
-                <div className="border-t border-gray-100">
+              <div className="bg-white dark:bg-card">
+                <div className="border-t border-gray-100 dark:border-border">
                   {isLoadingProjects ? (
                     <div className="p-4 text-center">
                       <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
                     </div>
                   ) : projectRooms.length === 0 ? (
-                    <div className="p-4 text-center text-sm text-gray-500">No projects</div>
+                    <div className="p-4 text-center text-sm text-gray-500 dark:text-muted-foreground">No projects</div>
                   ) : (
                     projectRooms.map(project => {
                       const isSelected = selectedProjectRoom?.id === project.id;
@@ -1726,16 +1726,16 @@ onSuccess: (roomData, userId) => {
                           key={project.id}
                           onClick={() => handleProjectClick(project)}
                           className={cn(
-                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
-                            isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
+                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-secondary transition-colors border-l-2",
+                            isSelected ? "bg-blue-50 dark:bg-blue-950/30 border-blue-600" : "border-transparent"
                           )}
                         >
                           <div className="h-10 w-10 rounded bg-purple-100 flex items-center justify-center font-semibold text-purple-700 text-sm flex-shrink-0">
                             {project.name.charAt(0).toUpperCase()}
                           </div>
                           <div className="flex-1 min-w-0 text-left">
-                            <p className="text-sm font-medium text-gray-900 truncate">{project.name}</p>
-                            <p className="text-xs text-gray-600 truncate">
+                            <p className="text-sm font-medium text-gray-900 dark:text-foreground truncate">{project.name}</p>
+                            <p className="text-xs text-gray-600 dark:text-muted-foreground truncate">
                               {project.last_message?.content_preview
                                 ? project.last_message.content_preview.replace(/<[^>]*>/g, '').trim() || 'Sent a message'
                                 : 'No messages yet'}
@@ -1762,14 +1762,14 @@ onSuccess: (roomData, userId) => {
             <Tabs.Content value="teams">
 
               {/* Teams Section */}
-              <div className="bg-white">
-                <div className="border-t border-gray-100">
+              <div className="bg-white dark:bg-card">
+                <div className="border-t border-gray-100 dark:border-border">
                   {isLoadingTeams ? (
                     <div className="p-4 text-center">
                       <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
                     </div>
                   ) : teamRooms.length === 0 ? (
-                    <div className="p-4 text-center text-sm text-gray-500">No teams</div>
+                    <div className="p-4 text-center text-sm text-gray-500 dark:text-muted-foreground">No teams</div>
                   ) : (
                     teamRooms.map(team => {
                       const isSelected = selectedTeamRoom?.id === team.id;
@@ -1784,16 +1784,16 @@ onSuccess: (roomData, userId) => {
                           key={team.id}
                           onClick={() => handleTeamClick(team)}
                           className={cn(
-                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
-                            isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
+                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-secondary transition-colors border-l-2",
+                            isSelected ? "bg-blue-50 dark:bg-blue-950/30 border-blue-600" : "border-transparent"
                           )}
                         >
                           <div className="h-10 w-10 rounded bg-green-100 flex items-center justify-center font-semibold text-green-700 text-sm flex-shrink-0">
                             {team.name.charAt(0).toUpperCase()}
                           </div>
                           <div className="flex-1 min-w-0 text-left">
-                            <p className="text-sm font-medium text-gray-900 truncate">{team.name}</p>
-                            <p className="text-xs text-gray-600 truncate">
+                            <p className="text-sm font-medium text-gray-900 dark:text-foreground truncate">{team.name}</p>
+                            <p className="text-xs text-gray-600 dark:text-muted-foreground truncate">
                               {(() => {
                                 const lastMsg = (team.last_message as any);
                                 if (!lastMsg) return 'No messages yet';
@@ -1822,10 +1822,10 @@ onSuccess: (roomData, userId) => {
 
             <Tabs.Content value="unread">
               {/* Unread Section — aggregates Chat + Project + Team */}
-              <div className="bg-white">
-                <div className="border-t border-gray-100">
+              <div className="bg-white dark:bg-card">
+                <div className="border-t border-gray-100 dark:border-border">
                   {allUnreadItems.length === 0 ? (
-                    <div className="p-4 text-center text-sm text-gray-500">No unread messages</div>
+                    <div className="p-4 text-center text-sm text-gray-500 dark:text-muted-foreground">No unread messages</div>
                   ) : (
                     allUnreadItems.map(item => (
                       <button
@@ -1846,10 +1846,10 @@ onSuccess: (roomData, userId) => {
                         </div>
                         <div className="flex-1 min-w-0 text-left">
                           <div className="flex items-center justify-between mb-0.5">
-                            <p className="text-sm font-bold text-gray-900 truncate">{item.name}</p>
+                            <p className="text-sm font-bold text-gray-900 dark:text-foreground truncate">{item.name}</p>
                           </div>
                           <div className="flex items-center justify-between">
-                            <p className="text-xs font-semibold text-gray-900 truncate">{item.preview}</p>
+                            <p className="text-xs font-semibold text-gray-900 dark:text-muted-foreground truncate">{item.preview}</p>
                             {item.unreadCount > 0 && (
                               <span className="ml-2 flex-shrink-0 h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
                                 {item.unreadCount}
@@ -1868,11 +1868,11 @@ onSuccess: (roomData, userId) => {
       </div>
 
       {/* Right Panel - Chat View */}
-      <div className="flex-1 flex flex-col bg-white h-full overflow-hidden">
+      <div className="flex-1 flex flex-col bg-white dark:bg-background h-full overflow-hidden">
         {(activeRoom || selectedProjectRoom || selectedTeamRoom) ? (
           <>
             {/* Chat Header */}
-            <div className="h-14 px-6 flex items-center justify-between bg-white border-b border-gray-200">
+            <div className="h-14 px-6 flex items-center justify-between bg-white dark:bg-card border-b border-gray-200 dark:border-border">
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-3">
                   <div className="relative">
@@ -1894,14 +1894,14 @@ onSuccess: (roomData, userId) => {
                     ) : null}
                   </div>
                   <div>
-                    <h3 className="font-semibold text-sm text-gray-900">
+                    <h3 className="font-semibold text-sm text-gray-900 dark:text-foreground">
                       {selectedProjectRoom?.name || selectedTeamRoom?.name || (selectedUser ? `${selectedUser.first_name || selectedUser.username}` : '')}
                     </h3>
                     {selectedProjectRoom && (
-                      <p className="text-xs text-gray-500"></p>
+                      <p className="text-xs text-gray-500 dark:text-muted-foreground"></p>
                     )}
                     {selectedTeamRoom && (
-                      <p className="text-xs text-gray-500"></p>
+                      <p className="text-xs text-gray-500 dark:text-muted-foreground"></p>
                     )}
                   </div>
                 </div>
@@ -1911,13 +1911,13 @@ onSuccess: (roomData, userId) => {
                   <Tabs.List className="flex items-center gap-1 border-b-2 border-transparent">
                     <Tabs.Trigger
                       value="chat"
-                      className="px-3 py-1 text-sm font-medium transition-all border-b-2 -mb-[2px] data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=inactive]:border-transparent data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:text-gray-900"
+                      className="px-3 py-1 text-sm font-medium transition-all border-b-2 -mb-[2px] data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=inactive]:border-transparent data-[state=inactive]:text-gray-600 data-[state=inactive]:dark:text-muted-foreground data-[state=inactive]:hover:text-gray-900 data-[state=inactive]:dark:hover:text-foreground"
                     >
                       Chat
                     </Tabs.Trigger>
                     <Tabs.Trigger
                       value="shared"
-                      className="px-3 py-1 text-sm font-medium transition-all border-b-2 -mb-[2px] data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=inactive]:border-transparent data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:text-gray-900"
+                      className="px-3 py-1 text-sm font-medium transition-all border-b-2 -mb-[2px] data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=inactive]:border-transparent data-[state=inactive]:text-gray-600 data-[state=inactive]:dark:text-muted-foreground data-[state=inactive]:hover:text-gray-900 data-[state=inactive]:dark:hover:text-foreground"
                     >
                       Shared
                     </Tabs.Trigger>
@@ -1934,13 +1934,13 @@ onSuccess: (roomData, userId) => {
                 <div className="relative" ref={headerMenuRef}>
                   <button
                     onClick={() => setShowHeaderMenu(!showHeaderMenu)}
-                    className="p-2 hover:bg-gray-100 rounded transition-colors"
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-secondary rounded transition-colors"
                   >
-                    <MoreVertical className="h-4 w-4 text-gray-600" />
+                    <MoreVertical className="h-4 w-4 text-gray-600 dark:text-muted-foreground" />
                   </button>
 
                   {showHeaderMenu && (
-                    <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                    <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-card rounded-lg shadow-lg border border-gray-200 dark:border-border py-1 z-50">
                       <button
                         onClick={() => {
                           const roomId = selectedProjectRoom?.id || selectedTeamRoom?.id || activeRoom?.id;
@@ -1953,7 +1953,7 @@ onSuccess: (roomData, userId) => {
                             console.error('❌ No room ID available for favourite toggle');
                           }
                         }}
-                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                        className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-foreground hover:bg-gray-50 dark:hover:bg-muted flex items-center gap-2"
                       >
                         {(() => {
                           const roomId = selectedProjectRoom?.id || selectedTeamRoom?.id || activeRoom?.id;
@@ -1973,14 +1973,14 @@ onSuccess: (roomData, userId) => {
                         <>
                           <button
                             onClick={() => setShowMemberList(!showMemberList)}
-                            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                            className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-foreground hover:bg-gray-50 dark:hover:bg-muted flex items-center gap-2"
                           >
                             <UsersIcon className="h-4 w-4" />
                             Member list
                           </button>
 
                           {showMemberList && (
-                            <div className="border-t border-gray-200 mt-1 pt-2 px-2 max-h-64 overflow-y-auto">
+                            <div className="border-t border-gray-200 dark:border-border mt-1 pt-2 px-2 max-h-64 overflow-y-auto">
                               {selectedTeamRoom && (
                                 <MemberListContent roomId={selectedTeamRoom.id} roomType="team" />
                               )}
@@ -2026,9 +2026,9 @@ onSuccess: (roomData, userId) => {
                   ) : messages.length === 0 ? (
                     <div className="flex items-center justify-center h-full">
                       <div className="text-center">
-                        <MessageSquare className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                        <p className="text-sm text-gray-500">No messages yet</p>
-                        <p className="text-xs text-gray-400 mt-1">Start the conversation!</p>
+                        <MessageSquare className="h-12 w-12 text-gray-300 dark:text-muted-foreground mx-auto mb-3" />
+                        <p className="text-sm text-gray-500 dark:text-muted-foreground">No messages yet</p>
+                        <p className="text-xs text-gray-400 dark:text-muted-foreground mt-1">Start the conversation!</p>
                       </div>
                     </div>
                   ) : (
@@ -2060,11 +2060,11 @@ onSuccess: (roomData, userId) => {
                             {/* Date separator */}
                             {showDateSeparator && (
                               <div className="flex items-center gap-3 my-4 px-2">
-                                <div className="flex-1 h-px bg-gray-400" />
-                                <span className="text-[11px] font-medium text-gray-700 bg-[#efeae2] px-3 py-1 rounded-full whitespace-nowrap select-none">
+                                <div className="flex-1 h-px bg-gray-400 dark:bg-border" />
+                                <span className="text-[11px] font-medium text-gray-700 dark:text-muted-foreground bg-[#efeae2] dark:bg-secondary px-3 py-1 rounded-full whitespace-nowrap select-none">
                                   {getDateLabel(msgDate)}
                                 </span>
-                                <div className="flex-1 h-px bg-gray-400" />
+                                <div className="flex-1 h-px bg-gray-400 dark:bg-border" />
                               </div>
                             )}
 
@@ -2092,11 +2092,11 @@ onSuccess: (roomData, userId) => {
                                   <div className={cn("flex items-baseline gap-2 mb-1", isOwn ? "flex-row-reverse" : "")}>
                                     <span className={cn(
                                       "text-xs font-medium",
-                                      isOwn ? "text-gray-700" : "text-gray-900"
+                                      isOwn ? "text-gray-700 dark:text-muted-foreground" : "text-gray-900 dark:text-foreground"
                                     )}>
                                       {message.sender.full_name || message.sender.username}
                                     </span>
-                                    <span className="text-[11px] text-gray-400 font-normal">
+                                    <span className="text-[11px] text-gray-400 dark:text-muted-foreground font-normal">
                                       {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </span>
                                   </div>
@@ -2122,7 +2122,7 @@ onSuccess: (roomData, userId) => {
                                               "px-3 py-2 rounded-lg shadow-sm",
                                               isOwn
                                                 ? "bg-[#7699a3] text-white rounded-br-none"
-                                                : "bg-white text-gray-900 border border-gray-100 rounded-bl-none"
+                                                : "bg-white dark:bg-card text-gray-900 dark:text-foreground border border-gray-100 dark:border-border rounded-bl-none"
                                             )
                                         )}
                                         style={{
@@ -2139,7 +2139,7 @@ onSuccess: (roomData, userId) => {
                                                 ? "[&_p]:m-0 [&_p]:text-4xl [&_p]:leading-none"
                                                 : isOwn
                                                   ? "prose-invert [&_*]:text-white [&_a]:text-blue-200 [&_code]:bg-green-800 [&_code]:text-green-100 [&_blockquote]:border-green-400"
-                                                  : "[&_a]:text-blue-600 [&_code]:bg-gray-100 [&_code]:text-red-600"
+                                                  : "[&_a]:text-blue-600 [&_code]:bg-gray-100 dark:[&_code]:bg-secondary [&_code]:text-red-600"
                                             )}
                                             dangerouslySetInnerHTML={{ __html: message.content }}
                                           />
@@ -2172,7 +2172,7 @@ onSuccess: (roomData, userId) => {
                                   {/* Optimistic status indicator */}
                                   {isOwn && (message as OptimisticChatMessage).optimisticStatus === 'sending' && (
                                     <div className="flex justify-end mt-1">
-                                      <span className="flex items-center gap-1 text-[10px] text-gray-400">
+                                      <span className="flex items-center gap-1 text-[10px] text-gray-400 dark:text-muted-foreground">
                                         <Loader2 className="h-3 w-3 animate-spin" />
                                         Sending…
                                       </span>
@@ -2197,51 +2197,51 @@ onSuccess: (roomData, userId) => {
                                   {(isHovered || menuOpen) && (
                                     <div
                                       className={cn(
-                                        "absolute top-0 flex items-center gap-0.5 bg-white border border-gray-200 rounded-lg shadow-sm px-1 py-0.5",
+                                        "absolute top-0 flex items-center gap-0.5 bg-white dark:bg-card border border-gray-200 dark:border-border rounded-lg shadow-sm px-1 py-0.5",
                                         isOwn ? "right-full mr-2" : "left-full ml-2"
                                       )}
                                     >
                                       {/* Quick Emoji Reactions */}
                                       <button
                                         onClick={() => handleQuickReaction(message.id, '👍')}
-                                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                        className="p-1 hover:bg-gray-100 dark:hover:bg-secondary rounded transition-colors"
                                         title="Like"
                                       >
                                         <span className="text-xs">👍</span>
                                       </button>
                                       <button
                                         onClick={() => handleQuickReaction(message.id, '❤️')}
-                                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                        className="p-1 hover:bg-gray-100 dark:hover:bg-secondary rounded transition-colors"
                                         title="Love"
                                       >
                                         <span className="text-xs">❤️</span>
                                       </button>
                                       <button
                                         onClick={() => handleQuickReaction(message.id, '😊')}
-                                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                        className="p-1 hover:bg-gray-100 dark:hover:bg-secondary rounded transition-colors"
                                         title="Smile"
                                       >
                                         <span className="text-xs">😊</span>
                                       </button>
 
-                                      <div className="h-4 w-px bg-gray-200 mx-0.5" />
+                                      <div className="h-4 w-px bg-gray-200 dark:bg-border mx-0.5" />
 
                                       {/* More Reactions Button */}
                                       <button
                                         onClick={() => setShowReactionPicker(showReactionPicker === message.id ? null : message.id)}
-                                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                        className="p-1 hover:bg-gray-100 dark:hover:bg-secondary rounded transition-colors"
                                         title="More reactions"
                                       >
-                                        <Smile className="h-3.5 w-3.5 text-gray-600" />
+                                        <Smile className="h-3.5 w-3.5 text-gray-600 dark:text-muted-foreground" />
                                       </button>
 
                                       {/* More Options Menu */}
                                       <button
                                         onClick={() => setOpenMenuMessageId(menuOpen ? null : message.id)}
-                                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                        className="p-1 hover:bg-gray-100 dark:hover:bg-secondary rounded transition-colors"
                                         title="More options"
                                       >
-                                        <MoreVertical className="h-3.5 w-3.5 text-gray-600" />
+                                        <MoreVertical className="h-3.5 w-3.5 text-gray-600 dark:text-muted-foreground" />
                                       </button>
 
                                       {/* Dropdown Menu */}
@@ -2249,53 +2249,53 @@ onSuccess: (roomData, userId) => {
                                         <div
                                           ref={menuRef}
                                           className={cn(
-                                            "absolute top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-48 z-50",
+                                            "absolute top-full mt-1 bg-white dark:bg-card border border-gray-200 dark:border-border rounded-lg shadow-lg py-1 w-48 z-50",
                                             isOwn ? "right-0" : "left-0"
                                           )}
                                         >
                                           <button
                                             onClick={() => handleReplyWithQuote(message)}
-                                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-muted flex items-center gap-2 text-gray-700 dark:text-foreground"
                                           >
                                             <Reply className="h-4 w-4" />
                                             Reply
                                           </button>
                                           <button
                                             onClick={() => handleForward(message)}
-                                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-muted flex items-center gap-2 text-gray-700 dark:text-foreground"
                                           >
                                             <Forward className="h-4 w-4" />
                                             Forward
                                           </button>
                                           <button
                                             onClick={() => handleCopyLink(message)}
-                                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-muted flex items-center gap-2 text-gray-700 dark:text-foreground"
                                           >
                                             <Link2 className="h-4 w-4" />
                                             Copy link
                                           </button>
                                           <button
                                             onClick={() => handlePinMessage(message)}
-                                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-muted flex items-center gap-2 text-gray-700 dark:text-foreground"
                                           >
                                             <Pin className="h-4 w-4" />
                                             Pin message
                                           </button>
                                           <button
                                             onClick={() => handleSaveMessage(message)}
-                                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-muted flex items-center gap-2 text-gray-700 dark:text-foreground"
                                           >
                                             <Bookmark className="h-4 w-4" />
                                             Save
                                           </button>
                                           <button
                                             onClick={() => handleMarkAsUnread(message)}
-                                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-muted flex items-center gap-2 text-gray-700 dark:text-foreground"
                                           >
                                             <MailOpen className="h-4 w-4" />
                                             Mark as unread
                                           </button>
-                                          <div className="h-px bg-gray-200 my-1" />
+                                          <div className="h-px bg-gray-200 dark:bg-border my-1" />
                                           {isOwn && (
                                             <button
                                               onClick={() => handleDeleteMessage(message.id)}
@@ -2319,10 +2319,10 @@ onSuccess: (roomData, userId) => {
                                       {Array.from(reactions.entries()).map(([emoji, count]) => (
                                         <span
                                           key={emoji}
-                                          className="inline-flex items-center gap-1 px-2 py-0.5 bg-white border border-gray-200 rounded-full text-xs"
+                                          className="inline-flex items-center gap-1 px-2 py-0.5 bg-white dark:bg-card border border-gray-200 dark:border-border rounded-full text-xs"
                                         >
                                           <span>{emoji}</span>
-                                          <span className="text-gray-600">{count}</span>
+                                          <span className="text-gray-600 dark:text-muted-foreground">{count}</span>
                                         </span>
                                       ))}
                                     </div>
@@ -2339,7 +2339,7 @@ onSuccess: (roomData, userId) => {
                 </div>
 
                 {/* Message Input */}
-                <div className=" bg-white border-t border-gray-200"
+                <div className=" bg-white dark:bg-card border-t border-gray-200 dark:border-border"
                   onDragEnter={handleDragEnter}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
@@ -2380,15 +2380,15 @@ onSuccess: (roomData, userId) => {
               </>
             ) : (
               /* Shared Documents Panel */
-              <div className="flex-1 overflow-y-auto bg-[#f3f2f1] p-6">
+              <div className="flex-1 overflow-y-auto bg-[#f3f2f1] dark:bg-background p-6">
                 <div className="max-w-4xl mx-auto">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Shared Documents</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-foreground mb-4">Shared Documents</h3>
                   {sharedDocuments.length === 0 ? (
                     <div className="flex items-center justify-center h-64">
                       <div className="text-center">
-                        <Paperclip className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                        <p className="text-sm text-gray-500">No shared documents</p>
-                        <p className="text-xs text-gray-400 mt-1">Documents shared in this chat will appear here</p>
+                        <Paperclip className="h-12 w-12 text-gray-300 dark:text-muted-foreground mx-auto mb-3" />
+                        <p className="text-sm text-gray-500 dark:text-muted-foreground">No shared documents</p>
+                        <p className="text-xs text-gray-400 dark:text-muted-foreground mt-1">Documents shared in this chat will appear here</p>
                       </div>
                     </div>
                   ) : (
@@ -2397,16 +2397,16 @@ onSuccess: (roomData, userId) => {
                         <button
                           key={doc.id}
                           onClick={() => setPreviewDoc({ url: doc.url, fileName: doc.name })}
-                          className="w-full flex items-center gap-4 p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all group text-left"
+                          className="w-full flex items-center gap-4 p-4 bg-white dark:bg-card rounded-lg border border-gray-200 dark:border-border hover:border-blue-300 dark:hover:border-blue-900 hover:bg-blue-50 dark:hover:bg-blue-950/20 transition-all group text-left"
                         >
                           <div className="h-12 w-12 rounded bg-blue-100 flex items-center justify-center flex-shrink-0">
                             <Paperclip className="h-6 w-6 text-blue-600" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate group-hover:text-blue-600">
+                            <p className="text-sm font-medium text-gray-900 dark:text-foreground truncate group-hover:text-blue-600 dark:group-hover:text-blue-400">
                               {doc.name}
                             </p>
-                            <p className="text-xs text-gray-500 mt-1">
+                            <p className="text-xs text-gray-500 dark:text-muted-foreground mt-1">
                               Shared by {doc.sender.full_name || doc.sender.username} • {new Date(doc.created_at).toLocaleDateString()}
                             </p>
                           </div>
@@ -2420,16 +2420,16 @@ onSuccess: (roomData, userId) => {
           </>
         ) : (
           /* Empty State */
-          <div className="flex-1 flex items-center justify-center bg-[#f3f2f1]">
+          <div className="flex-1 flex items-center justify-center bg-[#f3f2f1] dark:bg-background">
             <div className="text-center max-w-sm">
-              <div className="h-20 w-20 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-4">
-                <MessageSquare className="h-10 w-10 text-blue-600" />
+              <div className="h-20 w-20 rounded-full bg-blue-100 dark:bg-blue-950/40 flex items-center justify-center mx-auto mb-4">
+                <MessageSquare className="h-10 w-10 text-blue-600 dark:text-blue-400" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Welcome to Chat</h3>
-              <p className="text-gray-600 text-sm">
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-foreground mb-2">Welcome to Chat</h3>
+              <p className="text-gray-600 dark:text-muted-foreground text-sm">
                 Select a user from the list to start messaging
               </p>
-              <p className="text-xs text-gray-400 mt-4">
+              <p className="text-xs text-gray-400 dark:text-muted-foreground mt-4">
                 {users.length} {users.length === 1 ? 'user' : 'users'} available
               </p>
             </div>

@@ -21,7 +21,7 @@ export const SearchFilter: React.FC<SearchFilterProps> = ({
     return (
         <input
             autoFocus
-            className="w-full bg-white text-[11px] font-normal border border-blue-400 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full bg-white dark:bg-muted text-[11px] font-normal border border-blue-400 dark:border-border dark:text-foreground dark:placeholder:text-muted-foreground rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-blue-500"
             placeholder={placeholder}
             value={value}
             onChange={(e) => onChange(e.target.value)}
@@ -61,13 +61,13 @@ export const ListFilter: React.FC<ListFilterProps> = ({
     return (
         <div
             ref={containerRef}
-            className="absolute top-full left-0 mt-2 bg-white border border-[#dfe1e6] shadow-xl rounded-lg py-1 min-w-[160px] z-[110]"
+            className="absolute top-full left-0 mt-2 bg-white dark:bg-card border border-[#dfe1e6] dark:border-border shadow-xl rounded-lg py-1 min-w-[160px] z-[110]"
         >
             <div className="flex flex-col">
                 {options.map((option) => (
                     <div
                         key={option.value}
-                        className={`px-3 py-2 hover:bg-gray-50 cursor-pointer text-[12px] flex items-center gap-2 ${option.className || ''
+                        className={`px-3 py-2 hover:bg-gray-50 dark:hover:bg-muted cursor-pointer text-[12px] dark:text-foreground flex items-center gap-2 ${option.className || ''
                             }`}
                         onClick={() => {
                             onSelect(option.value);
@@ -81,7 +81,7 @@ export const ListFilter: React.FC<ListFilterProps> = ({
                 ))}
             </div>
             <button
-                className="mt-1 px-3 py-1 text-[10px] text-red-500 hover:bg-red-50 w-full text-left border-t border-gray-100"
+                className="mt-1 px-3 py-1 text-[10px] text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 w-full text-left border-t border-gray-100 dark:border-border"
                 onClick={onClear}
             >
                 Clear Filter
@@ -112,15 +112,15 @@ export const DateFilter: React.FC<DateFilterProps> = ({
     return (
         <div
             ref={containerRef}
-            className="absolute top-full left-0 mt-2 bg-white border border-[#dfe1e6] shadow-xl rounded-lg py-1 min-w-[160px] z-[110]"
+            className="absolute top-full left-0 mt-2 bg-white dark:bg-card border border-[#dfe1e6] dark:border-border shadow-xl rounded-lg py-1 min-w-[160px] z-[110]"
         >
             <div className="p-2">
                 <input
                     type="date"
                     autoFocus
                     value={value}
-                    className="w-full text-[12px] border-none p-0 outline-none cursor-pointer"
-                    style={{ colorScheme: 'light' }}
+                    className="w-full text-[12px] border-none p-0 outline-none cursor-pointer dark:text-foreground"
+                    style={{ colorScheme: 'light dark' }}
                     onClick={(e) => {
                         e.stopPropagation();
                         e.currentTarget.showPicker?.();
@@ -133,7 +133,7 @@ export const DateFilter: React.FC<DateFilterProps> = ({
 
             {/* Clear Button */}
             <button
-                className="mt-1 px-3 py-1 text-[10px] text-red-500 hover:bg-red-50 w-full text-left border-t border-gray-100"
+                className="mt-1 px-3 py-1 text-[10px] text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 w-full text-left border-t border-gray-100 dark:border-border"
                 onClick={onClear}
             >
                 Clear Filter
@@ -164,7 +164,7 @@ export const FilterHeaderWrapper: React.FC<FilterHeaderWrapperProps> = ({
                     {children}
                 </div>
             )}
-            <span className="truncate text-[14px] font-bold tracking-wide text-gray-700">
+            <span className="truncate text-[14px] font-bold tracking-wide text-gray-700 dark:text-foreground">
                 {columnLabel}
             </span>
             {(filterType === 'list' || filterType === 'date') && isActive && filterContent}
