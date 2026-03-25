@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Calendar, Users, CheckSquare, Clock, PlayCircle, Pause,
-  Eye, AlertCircle, CheckCircle, ListTodo
+  Eye, AlertCircle, CheckCircle, ListTodo, Pin
 } from 'lucide-react';
 import type { Task } from '@/types';
 import type { TableColumn } from '@/components/layout/DualView/TableView';
@@ -141,6 +141,8 @@ interface TaskGridCardProps {
 
 export function TaskGridCard({ task, onTaskClick }: TaskGridCardProps) {
   const statusConfig = getStatusConfig(task.status);
+  const queryClient = useQueryClient();
+  const { isPinned, isPending, handlePin } = usePinTask(task, queryClient);
 
   return (
     <div
@@ -149,7 +151,7 @@ export function TaskGridCard({ task, onTaskClick }: TaskGridCardProps) {
     >
       {/* Header */}
       <div className="flex justify-between items-start gap-2 mb-3">
-        <div className="pr-2 flex flex-col">
+        <div className="pr-2 flex flex-col min-w-0 flex-1">
           {/* Project Name */}
           <span className="text-sm font-bold text-gray-700 line-clamp-1 mb-0.5" title={task.project_details?.name || task.project_name || undefined}>
             {task.project_details?.name || task.project_name || 'No Project'}
@@ -159,11 +161,19 @@ export function TaskGridCard({ task, onTaskClick }: TaskGridCardProps) {
             {task.heading || 'No Task'}
           </span>
         </div>
-        {task.updated_at && (
-          <div className="text-[10px] text-gray-400 whitespace-nowrap flex-shrink-0 mt-0.5">
-            {formatRelativeTime(task.updated_at)}
-          </div>
-        )}
+        <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
+          <PinButton
+            isPinned={isPinned}
+            isPending={isPending}
+            handlePin={handlePin}
+            groupHoverClass="group-hover:opacity-100"
+          />
+          {task.updated_at && (
+            <div className="text-[10px] text-gray-400 whitespace-nowrap">
+              {formatRelativeTime(task.updated_at)}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Details Section */}
@@ -215,6 +225,131 @@ export function TaskGridCard({ task, onTaskClick }: TaskGridCardProps) {
   );
 }
 
+// ─── Shared pin logic — used by both table cell and grid card ────────────────
+function usePinTask(task: Task, queryClient: ReturnType<typeof useQueryClient>) {
+  const [isPinned, setIsPinned] = useState<boolean>(!!task.is_pinned);
+  const [isPending, setIsPending] = useState(false);
+
+  const applyReorder = useCallback((next: boolean) => {
+    queryClient.setQueryData(['tasks'], (old: any) => {
+      if (!old) return old;
+
+      const reorder = (tasks: Task[]): Task[] => {
+        const updated = tasks.map((t) =>
+          t.id === task.id ? { ...t, is_pinned: next } : t
+        );
+        return [
+          ...updated.filter((t) => t.is_pinned),
+          ...updated.filter((t) => !t.is_pinned),
+        ];
+      };
+
+      if (old.pages) {
+        const pageSizes = old.pages.map((p: any) => p.results.length);
+        const allTasks = reorder(old.pages.flatMap((p: any) => p.results));
+        let cursor = 0;
+        const newPages = old.pages.map((p: any, i: number) => {
+          const slice = allTasks.slice(cursor, cursor + pageSizes[i]);
+          cursor += pageSizes[i];
+          return { ...p, results: slice };
+        });
+        return { ...old, pages: newPages };
+      }
+
+      if (Array.isArray(old)) return reorder(old);
+      if (old.results) return { ...old, results: reorder(old.results) };
+      return old;
+    });
+  }, [task.id, queryClient]);
+
+  const handlePin = useCallback(
+    async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (isPending) return;
+
+      const next = !isPinned;
+      setIsPinned(next);
+      setIsPending(true);
+      applyReorder(next);
+
+      try {
+        const res = await taskApi.pinTask(task.id);
+        setIsPinned(res.is_pinned);
+      } catch {
+        setIsPinned(!next);
+        queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      } finally {
+        setIsPending(false);
+      }
+    },
+    [isPinned, isPending, task.id, queryClient, applyReorder]
+  );
+
+  return { isPinned, isPending, handlePin };
+}
+
+// ─── Shared pin button — rendered identically in table and grid ──────────────
+function PinButton({
+  isPinned,
+  isPending,
+  handlePin,
+  groupHoverClass,
+}: {
+  isPinned: boolean;
+  isPending: boolean;
+  handlePin: (e: React.MouseEvent) => void;
+  groupHoverClass: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={isPinned ? 'Unpin task' : 'Pin task'}
+      onClick={handlePin}
+      className={`flex-shrink-0 p-0.5 rounded transition-all duration-150
+        ${isPinned
+          ? 'opacity-100 text-amber-500 hover:text-amber-600'
+          : `opacity-0 ${groupHoverClass} text-gray-300 hover:text-gray-500`
+        }
+        ${isPending ? 'cursor-wait' : 'cursor-pointer'}
+      `}
+    >
+      <Pin
+        className="w-3.5 h-3.5"
+        fill={isPinned ? 'currentColor' : 'none'}
+        strokeWidth={isPinned ? 1.5 : 2}
+      />
+    </button>
+  );
+}
+
+// ─── Pin cell used in the Task Title table column ────────────────────────────
+function TaskTitleCell({
+  task,
+  queryClient,
+}: {
+  task: Task;
+  queryClient: ReturnType<typeof useQueryClient>;
+}) {
+  const { isPinned, isPending, handlePin } = usePinTask(task, queryClient);
+
+  return (
+    <div className="flex items-center justify-between gap-1 group/title w-full min-w-0">
+      <span
+        className="font-medium text-[#172b4d] truncate block"
+        title={task.heading}
+      >
+        {task.heading}
+      </span>
+      <PinButton
+        isPinned={isPinned}
+        isPending={isPending}
+        handlePin={handlePin}
+        groupHoverClass="group-hover/title:opacity-100"
+      />
+    </div>
+  );
+}
+
 // Table Columns Configuration
 interface TaskTableColumnsProps {
   onTaskClick: (task: Task) => void;
@@ -225,21 +360,86 @@ interface TaskTableColumnsProps {
 
 export const createTasksTableColumns = ({ onTaskClick, queryClient, user, navigate, dateField = 'end_date' }: TaskTableColumnsProps & { dateField?: 'end_date' | 'start_date' | 'created_at' }): TableColumn<Task>[] => {
 
+  // Helper: update ALL ['tasks-list', *] caches that exist in the cache
+  // This ensures project pages update instantly, not just the TaskBoard
+  const updateAllTaskListCaches = (updatedTask: Task) => {
+    const allTaskListQueries = queryClient.getQueryCache().findAll({ queryKey: ['tasks-list'], exact: false });
+    console.log('[taskConfig] updateAllTaskListCaches — found caches:', allTaskListQueries.map(q => q.queryKey));
+    allTaskListQueries.forEach((query) => {
+      queryClient.setQueryData(query.queryKey, (old: any) => {
+        if (!old) return old;
+        const list: Task[] = old.tasks ?? old.results ?? (Array.isArray(old) ? old : []);
+        // Only update if this task exists in this project's list
+        const exists = list.some((t: Task) => t.id === updatedTask.id);
+        if (!exists) return old;
+        const withoutTask = list.filter((t: Task) => t.id !== updatedTask.id);
+        const merged = [updatedTask, ...withoutTask];
+        console.log('[taskConfig] updateAllTaskListCaches — updated cache key:', query.queryKey);
+        if (old.tasks) return { ...old, tasks: merged };
+        if (old.results) return { ...old, results: merged };
+        if (Array.isArray(old)) return merged;
+        return merged;
+      });
+    });
+  };
   // Status Dropdown Component
   const StatusDropdown = ({ task }: { task: Task }) => {
     const [activeDropdown, setActiveDropdown] = useState(false);
     const statusConfig = getStatusConfig(task.status);
 
-    const handleStatusChange = async (newStatus: string) => {
-      try {
-        await taskApi.update(task.id, { status: newStatus } as any);
-        queryClient.invalidateQueries({ queryKey: ['tasks'] });
-        setActiveDropdown(false);
-      } catch (error) {
-        console.error('Failed to update status:', error);
-      }
-    };
+    const handleStatusChange = (newStatus: string) => {
+      console.log('[StatusChange] 🔍 Writing to cache key: ["tasks"]');
+      console.log('[StatusChange] 🔍 Task ID:', task.id, '| New status:', newStatus);
+      const taskListKeys = queryClient.getQueryCache().findAll({ queryKey: ['tasks-list'] });
+      console.log('[StatusChange] 🔍 Other task caches that exist (tasks-list):', taskListKeys.map(q => q.queryKey));
+      queryClient.setQueryData(['tasks'], (old: any) => {
+        if (!old) {
+          console.warn('[StatusChange] Cache is empty — cannot reorder.');
+          return old;
+        }
+        const updatedTask = { ...task, status: newStatus, updated_at: new Date().toISOString() };
 
+        // useInfiniteQuery shape
+        if (old.pages) {
+          const pagesWithoutTask = old.pages.map((page: any) => ({
+            ...page,
+            results: page.results.filter((t: Task) => t.id !== task.id),
+          }));
+          return {
+            ...old,
+            pages: [
+              { ...pagesWithoutTask[0], results: [updatedTask, ...(pagesWithoutTask[0]?.results ?? [])] },
+              ...pagesWithoutTask.slice(1),
+            ],
+          };
+        }
+        if (Array.isArray(old)) {
+          const newList = [updatedTask, ...old.filter((t: Task) => t.id !== task.id)];
+          return newList;
+        }
+        if (old.tasks) {
+          const newTasks = [updatedTask, ...old.tasks.filter((t: Task) => t.id !== task.id)];
+          return { ...old, tasks: newTasks };
+        }
+        if (old.results) {
+          const newResults = [updatedTask, ...old.results.filter((t: Task) => t.id !== task.id)];
+          return { ...old, results: newResults };
+        }
+        console.warn('[StatusChange] ⚠️ Unknown cache shape — task not reordered:', old);
+        return old;
+      });
+
+      // Also update all project-specific caches
+      const updatedTaskForProjects = { ...task, status: newStatus, updated_at: new Date().toISOString() };
+      updateAllTaskListCaches(updatedTaskForProjects);
+
+      setActiveDropdown(false);
+
+      taskApi.update(task.id, { status: newStatus } as any).catch((error) => {
+        console.error('[StatusChange] ❌ API update failed:', error);
+        queryClient?.invalidateQueries({ queryKey: ['tasks'] });
+      });
+    };
     const trigger = (
       <div
         className={`px-2.5 py-1 rounded text-[11px] font-medium ${statusConfig.bg} ${statusConfig.text} cursor-pointer hover:opacity-80 transition-opacity flex items-center gap-1`}
@@ -290,14 +490,58 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     const [activeDropdown, setActiveDropdown] = useState(false);
     const priorityOption = priorityOptions.find(opt => opt.value === task.priority);
 
-    const handlePriorityChange = async (newPriority: string) => {
-      try {
-        await taskApi.update(task.id, { priority: newPriority } as any);
+    const handlePriorityChange = (newPriority: string) => {
+      console.log('[PriorityChange] 🔍 Writing to cache key: ["tasks"]');
+      console.log('[PriorityChange] 🔍 Task ID:', task.id, '| New priority:', newPriority);
+      const taskListKeys = queryClient.getQueryCache().findAll({ queryKey: ['tasks-list'] });
+      console.log('[PriorityChange] 🔍 Other task caches (tasks-list):', taskListKeys.map(q => q.queryKey));
+      queryClient.setQueryData(['tasks'], (old: any) => {
+        if (!old) {
+          console.warn('[PriorityChange] Cache is empty — cannot reorder.');
+          return old;
+        }
+        const updatedTask = { ...task, priority: newPriority, updated_at: new Date().toISOString() };
+
+        // useInfiniteQuery shape
+        if (old.pages) {
+          const pagesWithoutTask = old.pages.map((page: any) => ({
+            ...page,
+            results: page.results.filter((t: Task) => t.id !== task.id),
+          }));
+          return {
+            ...old,
+            pages: [
+              { ...pagesWithoutTask[0], results: [updatedTask, ...(pagesWithoutTask[0]?.results ?? [])] },
+              ...pagesWithoutTask.slice(1),
+            ],
+          };
+        }
+        if (Array.isArray(old)) {
+          const newList = [updatedTask, ...old.filter((t: Task) => t.id !== task.id)];
+          return newList;
+        }
+        if (old.tasks) {
+          const newTasks = [updatedTask, ...old.tasks.filter((t: Task) => t.id !== task.id)];
+          return { ...old, tasks: newTasks };
+        }
+        if (old.results) {
+          const newResults = [updatedTask, ...old.results.filter((t: Task) => t.id !== task.id)];
+          return { ...old, results: newResults };
+        }
+        console.warn('[PriorityChange] ⚠️ Unknown cache shape — task not reordered:', old);
+        return old;
+      });
+
+      // Also update all project-specific caches
+      const updatedTaskForProjects = { ...task, priority: newPriority, updated_at: new Date().toISOString() };
+      updateAllTaskListCaches(updatedTaskForProjects);
+
+      setActiveDropdown(false);
+
+      taskApi.update(task.id, { priority: newPriority } as any).catch((error) => {
+        console.error('[PriorityChange] ❌ API update failed:', error);
         queryClient.invalidateQueries({ queryKey: ['tasks'] });
-        setActiveDropdown(false);
-      } catch (error) {
-        console.error('Failed to update priority:', error);
-      }
+      });
     };
 
     const trigger = (
@@ -336,18 +580,59 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
 
   // Date Input Component
   const DateInput = ({ task, field }: { task: Task; field: 'start_date' | 'end_date' }) => {
-    const handleDateChange = async (value: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleDateChange = (value: string, e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.type === 'blur') {
         e.stopPropagation();
       }
       if (!value) return;
 
-      try {
-        await taskApi.update(task.id, { [field]: `${value}T12:00:00Z` });
-        queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      } catch (error) {
+      const isoValue = `${value}T12:00:00Z`;
+
+      queryClient.setQueryData(['tasks'], (old: any) => {
+        if (!old) {
+          console.warn('[DateChange] Cache is empty — cannot reorder.');
+          return old;
+        }
+        const updatedTask = { ...task, [field]: isoValue, updated_at: new Date().toISOString() };
+
+        // useInfiniteQuery shape
+        if (old.pages) {
+          const pagesWithoutTask = old.pages.map((page: any) => ({
+            ...page,
+            results: page.results.filter((t: Task) => t.id !== task.id),
+          }));
+          return {
+            ...old,
+            pages: [
+              { ...pagesWithoutTask[0], results: [updatedTask, ...(pagesWithoutTask[0]?.results ?? [])] },
+              ...pagesWithoutTask.slice(1),
+            ],
+          };
+        }
+        if (Array.isArray(old)) {
+          const newList = [updatedTask, ...old.filter((t: Task) => t.id !== task.id)];
+          return newList;
+        }
+        if (old.tasks) {
+          const newTasks = [updatedTask, ...old.tasks.filter((t: Task) => t.id !== task.id)];
+          return { ...old, tasks: newTasks };
+        }
+        if (old.results) {
+          const newResults = [updatedTask, ...old.results.filter((t: Task) => t.id !== task.id)];
+          return { ...old, results: newResults };
+        }
+        console.warn('[DateChange] ⚠️ Unknown cache shape — task not reordered:', old);
+        return old;
+      });
+
+      // Also update all project-specific caches
+      const updatedTaskForProjects = { ...task, [field]: isoValue, updated_at: new Date().toISOString() };
+      updateAllTaskListCaches(updatedTaskForProjects);
+
+      taskApi.update(task.id, { [field]: isoValue }).catch((error) => {
         console.error('Failed to update date:', error);
-      }
+        queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      });
     };
 
     return (
@@ -372,16 +657,6 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
   };
 
   return [
-    // {
-    //   key: 'type',
-    //   label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Type</span>,
-    //   width: '8%',
-    //   render: (task: Task) => (
-    //     <div className="flex items-center gap-1.5">
-    //       <CheckSquare className="w-4 h-4 text-blue-600" />
-    //     </div>
-    //   ),
-    // },
     {
       key: 'project',
       label: <span className="text-[14px] font-bold  tracking-wide text-gray-700 dark:text-foreground">Project</span>,
@@ -396,11 +671,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
       key: 'heading',
       label: <span className="text-[14px] font-bold  tracking-wide text-gray-700 dark:text-foreground">Task Title</span>,
       width: '20%',
-      render: (task: Task) => (
-        <span className="font-medium text-[#172b4d] truncate block max-w-[300px]" title={task.heading}>
-          {task.heading}
-        </span>
-      ),
+      render: (task: Task) => <TaskTitleCell task={task} queryClient={queryClient} />,
     },
     {
       key: 'status',
@@ -507,15 +778,18 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
           ? <span className="text-[13px] text-gray-600 dark:text-muted-foreground pl-1">{formatDate(task.created_at || '')}</span>
           : <DateInput task={task} field={dateField as 'start_date' | 'end_date'} />,
     },
-     {
+    {
       key: 'updated_at',
       label: <span className="text-[14px] font-bold tracking-wide text-gray-700 dark:text-foreground">Updated</span>,
       width: '8%',
-      render: (task: Task) => (
-        <span className="text-[13px] text-gray-600 dark:text-muted-foreground pl-1" title={formatDate(task.updated_at || '')}>
-          {task.updated_at ? formatRelativeTime(task.updated_at) : '—'}
-        </span>
-      ),
+      render: (task: Task) => {
+        if (!task) return <span className="text-[13px] text-gray-600 dark:text-muted-foreground pl-1">—</span>;
+        return (
+          <span className="text-[13px] text-gray-600 dark:text-muted-foreground pl-1" title={formatDate(task.updated_at || '')}>
+            {task.updated_at ? formatRelativeTime(task.updated_at) : '—'}
+          </span>
+        );
+      },
     },
     {
       key: 'duration',

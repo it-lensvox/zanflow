@@ -1003,6 +1003,198 @@ $transition-normal: 200ms ease;
     }
 }
 
+// Daily Update Section
+.daily-update-section {
+    padding: 12px 16px 16px;
+    border-top: 1px solid $border-color;
+
+    .daily-update-toggle-btn {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 8px 16px;
+        background: rgba($primary-color, 0.06);
+        color: $primary-color;
+        border: 1px solid rgba($primary-color, 0.2);
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background $transition-fast, border-color $transition-fast;
+
+        &:hover {
+            background: rgba($primary-color, 0.12);
+            border-color: rgba($primary-color, 0.4);
+        }
+    }
+
+    .daily-update-form {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+
+        .form-title-row {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+
+            .form-title {
+                font-size: 12px;
+                font-weight: 700;
+                color: $text-primary;
+                margin: 0;
+            }
+
+            .form-date {
+                font-size: 11px;
+                color: $primary-color;
+                font-weight: 500;
+            }
+
+            .form-close-btn {
+                background: none;
+                border: none;
+                color: $text-muted;
+                font-size: 18px;
+                cursor: pointer;
+                line-height: 1;
+                padding: 0;
+                transition: color $transition-fast;
+
+                &:hover {
+                    color: $text-secondary;
+                }
+            }
+        }
+
+        .update-field {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+
+            label {
+                font-size: 11px;
+                font-weight: 600;
+                color: $text-secondary;
+            }
+
+            textarea {
+                width: 100%;
+                padding: 8px 10px;
+                font-size: 12px;
+                color: $text-primary;
+                background: $bg-muted;
+                border: 1px solid $border-color;
+                border-radius: 6px;
+                resize: none;
+                transition: border-color $transition-fast, box-shadow $transition-fast;
+                font-family: inherit;
+
+                &::placeholder {
+                    color: $text-muted;
+                }
+
+                &:focus {
+                    outline: none;
+                    border-color: $primary-color;
+                    box-shadow: 0 0 0 3px rgba($primary-color, 0.12);
+                }
+            }
+        }
+
+        .submit-update-btn {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 9px 16px;
+            background: $primary-color;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background $transition-fast;
+            box-shadow: $shadow-sm;
+
+            &:hover:not(:disabled) {
+                background: $primary-dark;
+            }
+
+            &:disabled {
+                opacity: 0.6;
+                cursor: not-allowed;
+            }
+        }
+    }
+
+    .team-updates-section {
+        margin-top: 8px;
+
+        .team-updates-title {
+            font-size: 10px;
+            font-weight: 700;
+            color: $text-muted;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            margin-bottom: 8px;
+        }
+
+        .update-card {
+            background: $bg-muted;
+            border: 1px solid $border-color;
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+
+            &:last-child {
+                margin-bottom: 0;
+            }
+
+            .update-user {
+                font-size: 11px;
+                font-weight: 700;
+                color: $primary-color;
+                margin-bottom: 6px;
+            }
+
+            .update-field-view {
+                margin-bottom: 6px;
+
+                &:last-child {
+                    margin-bottom: 0;
+                }
+
+                .field-label {
+                    font-size: 10px;
+                    font-weight: 600;
+                    color: $text-muted;
+                    margin-bottom: 2px;
+                }
+
+                .field-value {
+                    font-size: 11px;
+                    color: $text-primary;
+                    white-space: pre-wrap;
+                    word-break: break-word;
+                }
+            }
+        }
+
+        .no-updates-text {
+            font-size: 12px;
+            color: $text-muted;
+            font-style: italic;
+            text-align: center;
+            padding: 8px 0;
+        }
+    }
+}
+
 // Responsive Design
 @media (max-width: 1200px) {
     .calendar-header {

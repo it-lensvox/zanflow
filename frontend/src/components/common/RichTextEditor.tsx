@@ -488,6 +488,7 @@ export interface ChatMessageInputProps {
   selectedFile?: File | null;
   filePreviewUrl?: string | null;
   onRemoveFile?: () => void;
+  hasAttachments?: boolean;
 }
 
 /** Compact inline formatting toolbar that slides in above the editor */
@@ -601,6 +602,7 @@ export const ChatMessageInput: React.FC<ChatMessageInputProps> = ({
   selectedFile,
   filePreviewUrl,
   onRemoveFile,
+  hasAttachments = false,
 }) => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showFormatPanel, setShowFormatPanel] = useState(false);
@@ -657,12 +659,11 @@ export const ChatMessageInput: React.FC<ChatMessageInputProps> = ({
     [editor, onChange]
   );
 
-  // Send on Enter, new line on Shift+Enter
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       const hasContent = editor ? editor.getText().trim().length > 0 : false;
-      if ((hasContent || selectedFile) && !isUploading) {
+      if ((hasContent || selectedFile || hasAttachments) && !isUploading) {
         onSend();
       }
     }
@@ -670,7 +671,7 @@ export const ChatMessageInput: React.FC<ChatMessageInputProps> = ({
 
   const canSend =
     !isUploading &&
-    ((editor ? editor.getText().trim().length > 0 : false) || !!selectedFile);
+    ((editor ? editor.getText().trim().length > 0 : false) || !!selectedFile || hasAttachments);
 
     return (
     <div className="px-3 py-2 bg-white border-t border-gray-200">

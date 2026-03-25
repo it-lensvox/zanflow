@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { X, Calendar, CheckCircle, AlertCircle, ArrowLeft, Briefcase, User, Flag, Paperclip, Type, Sparkles, Plus, Link, Trash2 } from 'lucide-react';
+import { X, Calendar, CheckCircle, AlertCircle, Briefcase, User, Flag, Paperclip, Type, Sparkles, Plus, Link, Trash2, Minus, Square } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { taskApi, usersApi, projectsApi } from '@/services/api';
-import { ProjectMinimal, AITaskSuggestionResponse, Label } from '@/types';
+import { ProjectMinimal, AITaskSuggestionResponse, Label, Task } from '@/types';
 import { AITask } from './AITask';
 import { RichTextEditor } from '@/components/common/RichTextEditor';
+import { useTaskDraftsContext } from '@/hooks/useTaskDrafts';
 
 interface UserOption {
     value: string;
@@ -15,50 +16,74 @@ interface UserOption {
 
 interface CreateTaskProps {
     onClose?: () => void;
-    onSuccess?: () => void;
+    onSuccess?: (task?: Task) => void;
     isModal?: boolean;
     fixedProjectId?: number;
+    draftId?: string;
 }
 
 export const CreateTask: React.FC<CreateTaskProps> = ({
     onClose,
     onSuccess,
     isModal = false,
-    fixedProjectId
+    fixedProjectId,
+    draftId: propDraftId,
 }) => {
     const navigate = useNavigate();
     const location = useLocation();
     const queryClient = useQueryClient();
-    const [heading, setHeading] = useState('');
-    const [description, setDescription] = useState('');
-    const [startDate, setStartDate] = useState('');
-    const [endDate, setEndDate] = useState('');
-    const [assignedToList, setAssignedToList] = useState<number[]>([]);
+
+    // ── Draft system
+    const { createDraft, getDraft, autosaveDraft, minimizeDraft, discardDraft } = useTaskDraftsContext();
+    const resolvedDraftId = propDraftId ?? (location.state?.draftId as string | undefined);
+    const draftIdRef = useRef<string>(resolvedDraftId ?? '');
+
+    // Create the draft exactly once, outside of render
+    const { drafts } = useTaskDraftsContext();
+    useEffect(() => {
+        if (!draftIdRef.current) {
+            const initialProjectId = fixedProjectId ?? (location.state?.projectId ? Number(location.state.projectId) : undefined);
+            const id = createDraft(fixedProjectId, initialProjectId);
+            draftIdRef.current = id;
+        }
+    }, []);
+
+    const draftId = draftIdRef.current;
+    const savedDraft = getDraft(draftId);
+
+    // ── Local form state
+    const [heading, setHeading] = useState(savedDraft?.heading ?? '');
+    const [description, setDescription] = useState(savedDraft?.description ?? '');
+    const [startDate, setStartDate] = useState(savedDraft?.startDate ?? '');
+    const [endDate, setEndDate] = useState(savedDraft?.endDate ?? '');
+    const [assignedToList, setAssignedToList] = useState<number[]>(savedDraft?.assignedToList ?? []);
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
     const [priorityDropdownOpen, setPriorityDropdownOpen] = useState(false);
     const [selectedProjects, setSelectedProjects] = useState<number[]>(
-        fixedProjectId
-            ? [fixedProjectId]
-            : location.state?.projectId
-                ? [Number(location.state.projectId)]
-                : []
+        savedDraft?.selectedProjects.length
+            ? savedDraft.selectedProjects
+            : fixedProjectId
+                ? [fixedProjectId]
+                : location.state?.projectId
+                    ? [Number(location.state.projectId)]
+                    : []
     );
     const [projectDropdownOpen, setProjectDropdownOpen] = useState(false);
-    const [status, setStatus] = useState('pending');
-    const [priority, setPriority] = useState('medium');
+    const [status, setStatus] = useState(savedDraft?.status ?? 'pending');
+    const [priority, setPriority] = useState(savedDraft?.priority ?? 'medium');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
     const [attachments, setAttachments] = useState<File[]>([]);
-    const [labels, setLabels] = useState('');
+    const [labels, setLabels] = useState(savedDraft?.labels ?? '');
     const [linkInput, setLinkInput] = useState('');
-    const [links, setLinks] = useState<string[]>([]);
+    const [links, setLinks] = useState<string[]>(savedDraft?.links ?? []);
     const [showAIModal, setShowAIModal] = useState(false);
     const [showSuccessView, setShowSuccessView] = useState(false);
-    const [duration, setDuration] = useState('');
+    const [duration, setDuration] = useState(savedDraft?.duration ?? '');
     const [projectLabels, setProjectLabels] = useState<Label[]>([]);
-    const [selectedLabelIds, setSelectedLabelIds] = useState<number[]>([]);
+    const [selectedLabelIds, setSelectedLabelIds] = useState<number[]>(savedDraft?.selectedLabelIds ?? []);
     const [labelDropdownOpen, setLabelDropdownOpen] = useState(false);
     const [assigneeSearchInput, setAssigneeSearchInput] = useState('');
     const [projectSearchInput, setProjectSearchInput] = useState('');
@@ -67,6 +92,27 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
     const [isDescRefining, setIsDescRefining] = useState(false);
     const projectSearchInputRef = useRef<HTMLInputElement>(null);
     const [projectMembers, setProjectMembers] = useState<{ user: { id: number; username: string; full_name: string } }[]>([]);
+
+    // ── Autosave:
+    useEffect(() => {
+        if (!draftId) return;
+        autosaveDraft(draftId, {
+            heading, description, startDate, endDate,
+            assignedToList, selectedProjects, status, priority,
+            labels, selectedLabelIds, links, duration,
+        });
+    }, [heading, description, startDate, endDate, assignedToList, selectedProjects,
+        status, priority, labels, selectedLabelIds, links, duration]);
+
+    // ── Minimize handler
+    const handleMinimize = useCallback(() => {
+        minimizeDraft(draftId);
+        if (isModal && onClose) {
+            onClose();
+        } else {
+            navigate(-1);
+        }
+    }, [draftId, minimizeDraft, isModal, onClose, navigate]);
 
     const handleDurationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         let val = e.target.value;
@@ -305,7 +351,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
     const formatAITextToHtml = (text: string) => {
         return text
             .replace(/\n{2,}/g, '</p><p>')
-            .replace(/\n/g, '<br/>') 
+            .replace(/\n/g, '<br/>')
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
             .replace(/^- (.*)$/gm, '<li>$1</li>')
             .replace(/(<li>.*<\/li>)/gms, '<ul>$1</ul>');
@@ -348,6 +394,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
     };
 
     const handleClose = () => {
+        discardDraft(draftId);
         if (isModal && onClose) {
             onClose();
         } else {
@@ -368,6 +415,69 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
         }
         const projectId = selectedProjects[0];
 
+        // Build the optimistic task object from current form state
+        const selectedProject = allProjectOptions.find(p => p.id === projectId);
+        const selectedLabelObjects = projectLabels.filter(l => selectedLabelIds.includes(l.id));
+        const assignedUserDetails = allUserOptions
+            .filter(u => assignedToList.includes(u.id))
+            .map(u => ({
+                id: u.id,
+                username: u.label,
+                email: '',
+                first_name: u.label.split(' ')[0] || '',
+                last_name: u.label.split(' ').slice(1).join(' ') || '',
+                role: 'annotator' as const,
+                is_active: true,
+                date_joined: new Date().toISOString(),
+            }));
+
+        const optimisticTask = {
+            id: Date.now(),
+            heading,
+            description,
+            start_date: startDate ? `${startDate}T09:00:00Z` : '',
+            end_date: endDate ? `${endDate}T18:00:00Z` : '',
+            duration_time: duration,
+            status: status as Task['status'],
+            priority,
+            project: String(projectId),
+            project_details: selectedProject || { id: projectId, name: '' },
+            project_name: selectedProject?.name || null,
+            assigned_to: assignedToList,
+            assigned_to_user_details: assignedUserDetails,
+            assigned_by: 0,
+            labels: selectedLabelObjects,
+            links: links.map((url, idx) => ({ id: idx, url, created_at: new Date().toISOString() })),
+            attachments: [],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+        } satisfies Task;
+
+        // Optimistically insert task into the cache immediately — UI updates now
+        const previousTasksSnapshot = queryClient.getQueryData(['tasks']);
+
+        queryClient.setQueryData(['tasks'], (old: any) => {
+            if (old?.pages) {
+                return {
+                    ...old,
+                    pages: [
+                        { ...old.pages[0], results: [optimisticTask, ...(old.pages[0]?.results ?? [])] },
+                        ...old.pages.slice(1),
+                    ],
+                };
+            }
+            if (!old) return { pages: [{ count: 1, next: null, previous: null, results: [optimisticTask] }], pageParams: [1] };
+            if (Array.isArray(old)) return { pages: [{ count: old.length + 1, next: null, previous: null, results: [optimisticTask, ...old] }], pageParams: [1] };
+            return old;
+        });
+       setShowSuccessView(true);
+if (isModal && onSuccess) {
+    onSuccess(optimisticTask); 
+} else {
+    navigate('/taskboard');
+}
+
+        // Fire API call in background
         try {
             const formData = new FormData();
             formData.append('heading', heading);
@@ -390,25 +500,37 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
             attachments.forEach((file) => {
                 formData.append('uploaded_files', file);
             });
-
-            await taskApi.create(formData);
-            queryClient.invalidateQueries({ queryKey: ['tasks'] });
-            setShowSuccessView(true);
-
-            setTimeout(() => {
-                if (isModal && onSuccess) {
-                    onSuccess();
-                } else {
-                    navigate('/taskboard');
+            const apiResponse = await taskApi.create(formData);
+            const createdTask: Task = apiResponse?.task || apiResponse;
+            queryClient.setQueryData(['tasks'], (old: any) => {
+                if (old?.pages) {
+                    return {
+                        ...old,
+                        pages: [
+                            {
+                                ...old.pages[0],
+                                results: [
+                                    createdTask,
+                                    ...(old.pages[0]?.results ?? []).filter((t: Task) => t.id !== optimisticTask.id),
+                                ],
+                            },
+                            ...old.pages.slice(1),
+                        ],
+                    };
                 }
-            }, 1500);
-
+                return old;
+            });
         } catch (err: any) {
+            if (previousTasksSnapshot !== undefined) {
+                queryClient.setQueryData(['tasks'], previousTasksSnapshot);
+            } else {
+                queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            }
             console.error('❌ [CreateTask] Upload failed:', err);
             console.error('❌ [CreateTask] Error details:', err.response?.data);
-            console.error('Error creating task:', err);
             setError(err.response?.data?.message || 'Failed to create task. Please check your inputs.');
             setLoading(false);
+            setShowSuccessView(false);
         }
     };
 
@@ -444,7 +566,7 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                             <button
                                 type="submit"
                                 form="create-task-form"
-                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                               className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 disabled={loading}
                             >
                                 {loading ? 'Creating...' : 'Create task'}
@@ -452,18 +574,30 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                             <button
                                 type="button"
                                 onClick={() => setShowAIModal(true)}
-                                className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded hover:bg-purple-700 transition-colors flex items-center gap-2"
+                                className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded hover:bg-gray-800 transition-colors flex items-center gap-2"
                             >
                                 <Sparkles className="w-4 h-4" />
                                 Generate Task By AI
                             </button>
+                            {/* Minimize — collapses to bottom-right draft card */}
+                            <button
+                                type="button"
+                                onClick={handleMinimize}
+                                className="p-2 text-gray-500 hover:bg-gray-100 rounded transition-colors"
+                                title="Minimize"
+                                aria-label="Minimize form"
+                            >
+                                <Minus className="w-4 h-4" />
+                            </button>
                             <button
                                 type="button"
                                 onClick={handleClose}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-foreground bg-white dark:bg-card border border-gray-300 dark:border-border rounded hover:bg-gray-50 dark:hover:bg-muted transition-colors"
+                                className="p-2 text-gray-500 hover:bg-gray-100 rounded transition-colors"
+                                title="Discard & close"
+                                aria-label="Close form"
                                 disabled={loading}
                             >
-                                Cancel
+                                <X className="w-4 h-4" />
                             </button>
                         </div>
                     </div>

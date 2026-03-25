@@ -6,22 +6,22 @@ import App from './App';
 import './index.css';
 // Disable automatic refetch on window focus globally
 focusManager.setEventListener(() => {
-  return () => {};
+  return () => { };
 });
 
 // Disable online/offline tracking to prevent reconnect refetches
 onlineManager.setEventListener(() => {
-  return () => {};
+  return () => { };
 });
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: Infinity,
-      gcTime: Infinity,              
-      refetchOnWindowFocus: false,   
-      refetchOnMount: false, 
-      refetchOnReconnect: false,     
+      staleTime: 1000 * 30,
+      gcTime: 1000 * 60 * 5,
+      refetchOnWindowFocus: false,
+      refetchOnMount: true,
+      refetchOnReconnect: true,
       retry: 1,
     },
   },

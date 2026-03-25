@@ -2,9 +2,10 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import type {
   AuthTokens, User as AppUser, PaginatedResponse, PaginatedProjectsResponse, GetUploadUrlPayload, GetUploadUrlResponse, ConfirmUploadResponse, GetDownloadUrlPayload, ConfirmUploadPayload, GetDownloadUrlResponse, AllDocumentsResponse,
   TaskComment, CreateTaskCommentPayload, AITaskSuggestionResponse, AITaskSuggestionPayload, ProjectCreatePayload, Label, DocumentStatus, ChatMessage, ChatRoom, ChatRoomMessagesResponse, CreatePrivateChatPayload,
-  GatewaySendMessagePayload, GatewayIncomingMessage, RefineTextPayload, RefineTextResponse, TaskResponse, TeamTypeChoicesResponse,
+  GatewaySendMessagePayload, GatewayIncomingMessage, RefineTextPayload, RefineTextResponse, TaskResponse, TeamTypeChoicesResponse, PinTaskResponse,
   CreateTeamPayload, ProjectChatRoom, TeamChatRoom, ChatUnreadResponse, NotificationData, NotificationCallback, Team, ThreadRoom, ThreadSession, ThreadStorage, ThreadUIMessage, CreateThreadRoomPayload, WSJoinRoomCommand, WSSendMessageCommand, WSIncomingThreadMessage, WSUnreadUpdateSignal, ThreadMessagesResponse,
-  InviteUserPayload, InviteUserResponse, InviteVerifyResponse, InviteAcceptPayload, InviteAcceptResponse, AIBotSendPayload, AIBotIncomingMessage, OrganizationSignupPayload, OrganizationSignupResponse
+  InviteUserPayload, InviteUserResponse, InviteVerifyResponse, InviteAcceptPayload, InviteAcceptResponse, AIBotSendPayload, AIBotIncomingMessage, OrganizationSignupPayload, OrganizationSignupResponse,
+   DailyUpdate, DailyUpdatePayload, DailyUpdateListResponse,
 } from '@/types';
 
 export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.164:8000/api/v1';
@@ -344,7 +345,7 @@ export const documentsApi = {
 
 // Add New Task API
 export const taskApi = {
-  list: async () => {
+ list: async () => {
     const response = await api.get('/tasksite/');
     const data = response.data;
     if (data.tasks && Array.isArray(data.tasks)) {
@@ -363,6 +364,24 @@ export const taskApi = {
     }
 
     return data;
+  },
+
+  // Paginated fetch — used by the Task Board infinite scroll
+  listPaginated: async (page: number = 1): Promise<import('@/types').TaskPaginatedResponse> => {
+    const response = await api.get('/tasksite/', { params: { page } });
+    const data = response.data;
+    const rawResults: any[] = data.results ?? data.tasks ?? [];
+    const results = rawResults.map((task: any) => ({
+      ...task,
+      attachments: task.attachments || [],
+      labels: task.label_details || task.labels || [],
+    }));
+    return {
+      count: data.count ?? results.length,
+      next: data.next ?? null,
+      previous: data.previous ?? null,
+      results,
+    };
   },
 
   get: async (taskId: number) => {
@@ -502,6 +521,12 @@ export const taskApi = {
     return response.data;
   },
 
+  // Pin or unpin a task
+  pinTask: async (taskId: number): Promise<PinTaskResponse> => {
+    const response = await api.post<PinTaskResponse>(`/tasksite/${taskId}/pin/`);
+    return response.data;
+  },
+
 
 };
 
@@ -634,8 +659,8 @@ export const chatApi = {
     return response.data;
   },
 
-  // 2. Fetch Messages for a specific Room
-  getRoomMessages: async (roomId: string, params?: { limit?: number; offset?: number }) => {
+ // 2. Fetch Messages for a specific Room
+  getRoomMessages: async (roomId: string, params?: { limit?: number; before?: string; after?: string }) => {
     const response = await api.get<ChatRoomMessagesResponse>(`/chat/rooms/${roomId}/messages/`, { params });
     return response.data;
   },
@@ -1039,8 +1064,14 @@ export class NotificationWebSocketService {
 export const notificationSocket = new NotificationWebSocketService();
 
 // Helper function to fetch notifications using existing auth
-export const fetchNotifications = async () => {
-  const response = await api.get('/notification/');
+export const fetchNotifications = async ({ pageParam = 1 }: { pageParam?: number } = {}) => {
+  const response = await api.get('/notification/', { params: { page: pageParam } });
+  return response.data;
+};
+
+// Delete all read notifications
+export const deleteReadNotifications = async (): Promise<import('@/types').DeleteReadNotificationsResponse> => {
+  const response = await api.delete('/notification/delete-all/');
   return response.data;
 };
 
@@ -1351,5 +1382,50 @@ uploadAttachment: async (noteId: number, file: File): Promise<import('@/types').
     await api.delete(`/quicknotes/attachments/${attachmentId}/`);
   },
 };
+
+// Calendar Daily Update API
+export const dailyUpdateApi = {
+  // Get the current user's daily update for a specific date — matched by both date AND userId
+  getMyUpdate: async (date: string, userId: number): Promise<DailyUpdate | null> => {
+    const response = await api.get<DailyUpdateListResponse | DailyUpdate[]>('/daily-updates/', {
+      params: { date },
+    });
+    const all: DailyUpdate[] = Array.isArray(response.data)
+      ? response.data
+      : (response.data as DailyUpdateListResponse).results ?? [];
+    // Match on BOTH date and user — prevents picking up another user's record
+    const match = all.find((u) => u.date === date && u.user === userId);
+    return match ?? null;
+  },
+
+  upsert: async (data: DailyUpdatePayload, userId: number): Promise<DailyUpdate> => {
+    const existing = await dailyUpdateApi.getMyUpdate(data.date, userId);
+    if (existing) {
+      const response = await api.patch<DailyUpdate>(`/daily-updates/${existing.id}/`, {
+        content: data.content,
+      });
+      return response.data;
+    }
+    const response = await api.post<DailyUpdate>('/daily-updates/', data);
+    return response.data;
+  },
+
+  // Admin / manager: list all users' updates 
+  listAll: async (params?: { date?: string; user?: number }): Promise<DailyUpdate[]> => {
+    const response = await api.get<DailyUpdateListResponse | DailyUpdate[]>(
+      '/daily-updates/',
+      { params }
+    );
+    const all: DailyUpdate[] = Array.isArray(response.data)
+      ? response.data
+      : (response.data as DailyUpdateListResponse).results ?? [];
+    // Guard: only show records that exactly match the requested date
+    if (params?.date) {
+      return all.filter((u) => u.date === params.date);
+    }
+    return all;
+  },
+};
+
 
 export default api;

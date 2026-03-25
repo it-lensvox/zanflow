@@ -512,30 +512,21 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
           onCancel={closePermissionDenied}
         />
 
-        <div className="fixed bottom-5 right-20 z-50">
+       <div className="fixed bottom-6 right-6 z-50">
           <button
             onClick={() => {
               setIsExpanded(true);
               setLastExpandedTime(Date.now());
             }}
-            className="flex items-center gap-3 px-4 py-3 bg-white rounded-full shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-200 hover:scale-105"
+            title="Open Thread"
+            className="relative w-12 h-12 bg-[#1a1a2e] rounded-full shadow-lg border border-[#2d2d4e] hover:bg-[#22223a] hover:shadow-xl transition-all duration-200 hover:scale-105 flex items-center justify-center text-white"
           >
-            <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold text-sm relative">
-              <MessageCircle className="w-5 h-5" />
-              {totalUnread > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white border-2 border-white">
-                  {totalUnread > 9 ? '9+' : totalUnread}
-                </span>
-              )}
-            </div>
-            <div className="flex flex-col items-start">
-              <span className="font-medium text-gray-900 text-sm">Thread</span>
-              {totalUnread > 0 && (
-                <span className="text-xs text-red-500 font-medium leading-none">
-                  {totalUnread} unread
-                </span>
-              )}
-            </div>
+            <MessageCircle className="w-6 h-6" />
+            {totalUnread > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white border-2 border-[#1a1a2e]">
+                {totalUnread > 9 ? '9+' : totalUnread}
+              </span>
+            )}
           </button>
         </div>
       </>
@@ -777,7 +768,7 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
         </div>
       ) : (
         /* DEFAULT MINI WIDGET */
-        <div className="fixed bottom-20 right-4 z-50">
+        <div className="fixed bottom-[76px] right-6 z-50">
           <div
             className="bg-white rounded-lg shadow-2xl border border-gray-200 flex overflow-hidden"
             style={{ width: isHistoryPanelOpen ? '680px' : '400px', height: '600px', transition: 'width 0.3s ease' }}

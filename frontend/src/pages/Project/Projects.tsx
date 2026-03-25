@@ -20,10 +20,10 @@ const GRID_PAGE_SIZE = 20;
 
 // Project type filter definitions — order matches the colour legend in the table
 const PROJECT_TYPE_FILTERS = [
-  { label: 'Client',           value: 'client',           dot: 'bg-blue-500'  },
-  { label: 'Internal',         value: 'internal',         dot: 'bg-green-500' },
-  { label: 'Content Creation', value: 'content_creation', dot: 'bg-pink-500'  },
-  { label: 'Ideas',            value: 'ideas',            dot: 'bg-yellow-500'},
+  { label: 'Client', value: 'client', dot: 'bg-blue-500' },
+  { label: 'Internal', value: 'internal', dot: 'bg-green-500' },
+  { label: 'Content Creation', value: 'content_creation', dot: 'bg-pink-500' },
+  { label: 'Ideas', value: 'ideas', dot: 'bg-yellow-500' },
 ] as const;
 
 export function Projects() {
@@ -37,18 +37,37 @@ export function Projects() {
     storageKey: 'projects-view-mode',
   });
 
-  const toggleFavorite = async (e: React.MouseEvent, project: Project) => {
+  const toggleFavorite = (e: React.MouseEvent, project: Project) => {
     e.preventDefault();
     e.stopPropagation();
 
-    try {
-      await projectsApi.update(project.id, {
-        is_favourite: !project.is_favourite,
+    // Optimistically update all matching cache keys immediately
+    const updateCache = (old: any): any => {
+      if (!old) return old;
+      const list: Project[] = Array.isArray(old) ? old : (old.results ?? []);
+      const updated = list.map((p) =>
+        p.id === project.id ? { ...p, is_favourite: !project.is_favourite } : p
+      );
+      return Array.isArray(old) ? updated : { ...old, results: updated };
+    };
+
+    queryClient.setQueriesData<any>({ queryKey: ['projects'] }, updateCache);
+   projectsApi
+      .update(project.id, { is_favourite: !project.is_favourite })
+      .then((response) => {
+      })
+      .catch((error) => {
+        console.error('[Favorite Toggle] API failed — rolling back. Error:', error);
+        const revertCache = (old: any): any => {
+          if (!old) return old;
+          const list: Project[] = Array.isArray(old) ? old : (old.results ?? []);
+          const reverted = list.map((p) =>
+            p.id === project.id ? { ...p, is_favourite: project.is_favourite } : p
+          );
+          return Array.isArray(old) ? reverted : { ...old, results: reverted };
+        };
+        queryClient.setQueriesData<any>({ queryKey: ['projects'] }, revertCache);
       });
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-    } catch (error) {
-      console.error('Failed to toggle favorite:', error);
-    }
   };
   const columns = getProjectsTableColumns(toggleFavorite);
   const { unreadCount } = useNotifications();

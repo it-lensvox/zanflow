@@ -43,6 +43,14 @@ export function useNotifications() {
 
       // Force refetch with resetQueries to ensure fresh data
       queryClient.resetQueries({ queryKey: ['notifications-initial'] });
+
+      // Real-time task sync: when a task-related notification arrives,
+      const isTaskNotification =
+        notification.related_object?.type === 'task' ||
+        notification.title?.toLowerCase().includes('task');
+        if (isTaskNotification) {
+          queryClient.refetchQueries({ queryKey: ['tasks'] });
+        }
     });
     
     return () => {
@@ -50,37 +58,39 @@ export function useNotifications() {
     };
   }, [queryClient]);
 
-  // Fetch and sync unread count on mount
+  // Fetch unread count using its own isolated query key — never touches 'notifications-initial'
+  // which is owned exclusively by useInfiniteQuery in NotificationsPage
   useEffect(() => {
     const initializeUnreadCount = async () => {
       try {
         const data = await queryClient.fetchQuery({
-          queryKey: ['notifications-initial'],
+          queryKey: ['notifications-unread-count'],
           queryFn: async () => {
-            const response = await api.get('/notification/');
+            const response = await api.get('/notification/', { params: { page: 1 } });
             return response.data;
           },
-          staleTime: 0,
+          staleTime: 30_000,
         });
-        
-        if ((data as any)?.unread_count !== undefined) {
-          setUnreadCount((data as any).unread_count);
+        if (data?.unread_count !== undefined) {
+          setUnreadCount(data.unread_count);
         }
       } catch (error) {
-        console.error('Failed to initialize unread count:', error);
+        console.error('[useNotifications] Failed to initialize unread count:', error);
       }
     };
 
     initializeUnreadCount();
 
+    // Subscribe only to the infinite query pages to sync unread count after panel opens
     const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
       if (
-        event?.query.queryKey[0] === 'notifications-initial' && 
+        event?.query.queryKey[0] === 'notifications-initial' &&
         event.type === 'updated'
       ) {
         const data = event.query.state.data as any;
-        if (data?.unread_count !== undefined) {
-          setUnreadCount(data.unread_count);
+        const firstPage = data?.pages?.[0];
+        if (firstPage?.unread_count !== undefined) {
+          setUnreadCount(firstPage.unread_count);
         }
       }
     });
