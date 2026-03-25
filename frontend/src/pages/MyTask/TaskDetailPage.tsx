@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect,useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
     ArrowLeft, Trash2, Save, Edit3, Loader2, ChevronDown, FileText, Send,
@@ -38,6 +38,22 @@ export function TaskDetailPage() {
     });
 
     const task: Task | undefined = taskData?.task || taskData;
+
+    const resolvedTaskId = useMemo(() => {
+        const num = Number(id);
+        const isSafe = Number.isFinite(num) && num > 0 && num < 1_000_000_000_000;
+        if (!isSafe) {
+            console.error(
+                '[TaskDetailPage] ❌ Invalid id from URL params:',
+                id,
+                '(raw type:', typeof id, ')',
+                '| task.heading:', task?.heading,
+                '| This will block the API call until a valid id is available.'
+            );
+            return 0;
+        }
+        return num;
+    }, [id, task?.heading]);
 
     // State management
     const [selectedStatus, setSelectedStatus] = useState<Task['status']>('pending');
@@ -209,20 +225,73 @@ export function TaskDetailPage() {
     }, [selectedStatus, task, newUsers.length, editableDescription, startDate, endDate, links, editableTitle]);
 
     // Mutations
+  // Mutations
     const updateTaskMutation = useMutation({
-        mutationFn: (updates: any) => taskApi.update(Number(id), updates),
+        mutationFn: (updates: any) => {
+            if (!resolvedTaskId || resolvedTaskId <= 0) {
+                const errMsg = `[TaskDetailPage] ❌ Blocked API call — resolvedTaskId is invalid: ${resolvedTaskId}`;
+                console.error(errMsg);
+                return Promise.reject(new Error(errMsg));
+            }
+            return taskApi.update(resolvedTaskId, updates);
+        },
         onSuccess: (data) => {
-            queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            const updatedTask: Task = (data as any)?.task ?? data;
+            queryClient.setQueryData(['tasks'], (old: any) => {
+                if (!old) return old;
+                if (old.pages) {
+                    const pagesWithout = old.pages.map((page: any) => ({
+                        ...page,
+                        results: page.results.filter((t: Task) => t.id !== updatedTask.id),
+                    }));
+                    return {
+                        ...old,
+                        pages: [
+                            { ...pagesWithout[0], results: [updatedTask, ...(pagesWithout[0]?.results ?? [])] },
+                            ...pagesWithout.slice(1),
+                        ],
+                    };
+                }
+                if (Array.isArray(old)) return [updatedTask, ...old.filter((t: Task) => t.id !== updatedTask.id)];
+                if (old.tasks) return { ...old, tasks: [updatedTask, ...old.tasks.filter((t: Task) => t.id !== updatedTask.id)] };
+                if (old.results) return { ...old, results: [updatedTask, ...old.results.filter((t: Task) => t.id !== updatedTask.id)] };
+                return old;
+            });
+
+            // Update all project-specific ['tasks-list', projectId] caches
+            const allTaskListQueries = queryClient.getQueryCache().findAll({ queryKey: ['tasks-list'], exact: false });
+            allTaskListQueries.forEach((query) => {
+                queryClient.setQueryData(query.queryKey, (old: any) => {
+                    if (!old) return old;
+                    if (Array.isArray(old)) return [updatedTask, ...old.filter((t: Task) => t.id !== updatedTask.id)];
+                    if (old.tasks) return { ...old, tasks: [updatedTask, ...old.tasks.filter((t: Task) => t.id !== updatedTask.id)] };
+                    if (old.results) return { ...old, results: [updatedTask, ...old.results.filter((t: Task) => t.id !== updatedTask.id)] };
+                    return old;
+                });
+            });
+
             queryClient.invalidateQueries({ queryKey: ['task', id] });
-            queryClient.invalidateQueries({ queryKey: ['task-detail', Number(id)] });
+            queryClient.invalidateQueries({ queryKey: ['task-detail', resolvedTaskId] });
             setHasUnsavedChanges(false);
             setNewUsers([]);
             setIsEditingDescription(false);
             setIsEditingTitle(false);
         },
-        onError: (error) => {
-            console.error('Failed to update task:', error);
-            alert('Failed to update task. Check console for details.');
+        onError: (error: any) => {
+            const status = error?.response?.status;
+            console.error(
+                '[TaskDetailPage] ❌ Update failed:',
+                '| resolvedTaskId:', resolvedTaskId,
+                '| HTTP status:', status,
+                '| error:', error?.message ?? error
+            );
+            if (error?.message?.includes('invalid')) {
+                alert(`Cannot save: task ID is invalid (got "${id}"). Please refresh the page.`);
+            } else if (status === 404) {
+                alert(`Task not found on server (404). Task ID: ${resolvedTaskId}. Please refresh the page.`);
+            } else {
+                alert('Failed to save changes. Please try again.');
+            }
         },
     });
 
@@ -256,12 +325,20 @@ export function TaskDetailPage() {
 
     const handleSaveStatus = async () => {
         if (!task) return;
+        if (!resolvedTaskId || resolvedTaskId <= 0) {
+            console.error('[TaskDetailPage] ❌ Save blocked — resolvedTaskId is 0 or invalid. id was:', id);
+            alert(`Cannot save: task ID is invalid (got "${id}"). Please refresh the page.`);
+            return;
+        }
 
         try {
             const updates: any = {};
             if (editableTitle !== (task.heading || '')) updates.heading = editableTitle;
             if (selectedStatus !== task.status) updates.status = selectedStatus;
-            if (newUsers.length > 0) updates.assigned_to = [...task.assigned_to, ...newUsers];
+            if (newUsers.length > 0) {
+                const existing = (task.assigned_to || []).map(Number);
+                updates.assigned_to = [...new Set([...existing, ...newUsers])];
+            }
             if (editableDescription !== task.description) updates.description = editableDescription;
 
             const originalStart = task.start_date?.split('T')[0] || '';
@@ -278,7 +355,7 @@ export function TaskDetailPage() {
             if (Object.keys(updates).length === 0) return;
             updateTaskMutation.mutate(updates);
         } catch (error) {
-            console.error('Error saving task:', error);
+            console.error('[TaskDetailPage] Error in handleSaveStatus:', error);
         }
     };
 

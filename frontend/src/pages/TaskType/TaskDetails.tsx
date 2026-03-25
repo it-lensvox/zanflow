@@ -21,9 +21,9 @@ import { DocumentPreview, useDocumentPreviewKeyboard } from '@/components/common
 import DeleteModal from '@/components/common/Deletemodal';
 import Threads from '../Project/Thread';
 import { useProjectDetails, TabType } from '@/hooks/useTaskDetails';
-import type { Task, FilteredDocument } from '@/types';
+import type { Task } from '@/types';
 
-// ─── Date Field Dropdown (portal) ─────────────────────────────────────────────
+// ─── Date Field Dropdown
 function DateFieldDropdown({
   show,
   dropdownPos,
