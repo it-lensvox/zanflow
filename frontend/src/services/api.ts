@@ -659,8 +659,8 @@ export const chatApi = {
     return response.data;
   },
 
-  // 2. Fetch Messages for a specific Room
-  getRoomMessages: async (roomId: string, params?: { limit?: number; offset?: number }) => {
+ // 2. Fetch Messages for a specific Room
+  getRoomMessages: async (roomId: string, params?: { limit?: number; before?: string; after?: string }) => {
     const response = await api.get<ChatRoomMessagesResponse>(`/chat/rooms/${roomId}/messages/`, { params });
     return response.data;
   },

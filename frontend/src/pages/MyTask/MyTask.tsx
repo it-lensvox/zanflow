@@ -527,9 +527,9 @@ export const MyTask: React.FC = () => {
                     defaultFilter="unread"
                 />
             )}
-            {showDateFieldDropdown && dropdownPos && ReactDOM.createPortal(
+            {showDateFieldDropdown && dropdownPos && dropdownPos.top !== undefined && ReactDOM.createPortal(
                 <div
-                    style={{ position: 'absolute', top: dropdownPos.top, left: dropdownPos.left, zIndex: 9999 }}
+                    style={{ position: 'absolute', top: dropdownPos?.top ?? 0, left: dropdownPos?.left ?? 0, zIndex: 9999 }}
                     className="bg-white border border-gray-200 rounded-lg shadow-lg min-w-[130px] py-1"
                     onMouseDown={(e) => e.stopPropagation()}
                 >

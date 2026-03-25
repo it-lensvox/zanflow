@@ -360,12 +360,38 @@ interface TaskTableColumnsProps {
 
 export const createTasksTableColumns = ({ onTaskClick, queryClient, user, navigate, dateField = 'end_date' }: TaskTableColumnsProps & { dateField?: 'end_date' | 'start_date' | 'created_at' }): TableColumn<Task>[] => {
 
+  // Helper: update ALL ['tasks-list', *] caches that exist in the cache
+  // This ensures project pages update instantly, not just the TaskBoard
+  const updateAllTaskListCaches = (updatedTask: Task) => {
+    const allTaskListQueries = queryClient.getQueryCache().findAll({ queryKey: ['tasks-list'], exact: false });
+    console.log('[taskConfig] updateAllTaskListCaches — found caches:', allTaskListQueries.map(q => q.queryKey));
+    allTaskListQueries.forEach((query) => {
+      queryClient.setQueryData(query.queryKey, (old: any) => {
+        if (!old) return old;
+        const list: Task[] = old.tasks ?? old.results ?? (Array.isArray(old) ? old : []);
+        // Only update if this task exists in this project's list
+        const exists = list.some((t: Task) => t.id === updatedTask.id);
+        if (!exists) return old;
+        const withoutTask = list.filter((t: Task) => t.id !== updatedTask.id);
+        const merged = [updatedTask, ...withoutTask];
+        console.log('[taskConfig] updateAllTaskListCaches — updated cache key:', query.queryKey);
+        if (old.tasks) return { ...old, tasks: merged };
+        if (old.results) return { ...old, results: merged };
+        if (Array.isArray(old)) return merged;
+        return merged;
+      });
+    });
+  };
   // Status Dropdown Component
   const StatusDropdown = ({ task }: { task: Task }) => {
     const [activeDropdown, setActiveDropdown] = useState(false);
     const statusConfig = getStatusConfig(task.status);
 
     const handleStatusChange = (newStatus: string) => {
+      console.log('[StatusChange] 🔍 Writing to cache key: ["tasks"]');
+      console.log('[StatusChange] 🔍 Task ID:', task.id, '| New status:', newStatus);
+      const taskListKeys = queryClient.getQueryCache().findAll({ queryKey: ['tasks-list'] });
+      console.log('[StatusChange] 🔍 Other task caches that exist (tasks-list):', taskListKeys.map(q => q.queryKey));
       queryClient.setQueryData(['tasks'], (old: any) => {
         if (!old) {
           console.warn('[StatusChange] Cache is empty — cannot reorder.');
@@ -402,11 +428,16 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
         console.warn('[StatusChange] ⚠️ Unknown cache shape — task not reordered:', old);
         return old;
       });
+
+      // Also update all project-specific caches
+      const updatedTaskForProjects = { ...task, status: newStatus, updated_at: new Date().toISOString() };
+      updateAllTaskListCaches(updatedTaskForProjects);
+
       setActiveDropdown(false);
 
       taskApi.update(task.id, { status: newStatus } as any).catch((error) => {
         console.error('[StatusChange] ❌ API update failed:', error);
-        queryClient.invalidateQueries({ queryKey: ['tasks'] });
+        queryClient?.invalidateQueries({ queryKey: ['tasks'] });
       });
     };
     const trigger = (
@@ -460,6 +491,10 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     const priorityOption = priorityOptions.find(opt => opt.value === task.priority);
 
     const handlePriorityChange = (newPriority: string) => {
+      console.log('[PriorityChange] 🔍 Writing to cache key: ["tasks"]');
+      console.log('[PriorityChange] 🔍 Task ID:', task.id, '| New priority:', newPriority);
+      const taskListKeys = queryClient.getQueryCache().findAll({ queryKey: ['tasks-list'] });
+      console.log('[PriorityChange] 🔍 Other task caches (tasks-list):', taskListKeys.map(q => q.queryKey));
       queryClient.setQueryData(['tasks'], (old: any) => {
         if (!old) {
           console.warn('[PriorityChange] Cache is empty — cannot reorder.');
@@ -496,6 +531,11 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
         console.warn('[PriorityChange] ⚠️ Unknown cache shape — task not reordered:', old);
         return old;
       });
+
+      // Also update all project-specific caches
+      const updatedTaskForProjects = { ...task, priority: newPriority, updated_at: new Date().toISOString() };
+      updateAllTaskListCaches(updatedTaskForProjects);
+
       setActiveDropdown(false);
 
       taskApi.update(task.id, { priority: newPriority } as any).catch((error) => {
@@ -584,6 +624,10 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
         console.warn('[DateChange] ⚠️ Unknown cache shape — task not reordered:', old);
         return old;
       });
+
+      // Also update all project-specific caches
+      const updatedTaskForProjects = { ...task, [field]: isoValue, updated_at: new Date().toISOString() };
+      updateAllTaskListCaches(updatedTaskForProjects);
 
       taskApi.update(task.id, { [field]: isoValue }).catch((error) => {
         console.error('Failed to update date:', error);
@@ -738,11 +782,14 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
       key: 'updated_at',
       label: <span className="text-[14px] font-bold tracking-wide text-gray-700">Updated</span>,
       width: '8%',
-      render: (task: Task) => (
-        <span className="text-[13px] text-gray-600 pl-1" title={formatDate(task.updated_at || '')}>
-          {task.updated_at ? formatRelativeTime(task.updated_at) : '—'}
-        </span>
-      ),
+      render: (task: Task) => {
+        if (!task) return <span className="text-[13px] text-gray-600 pl-1">—</span>;
+        return (
+          <span className="text-[13px] text-gray-600 pl-1" title={formatDate(task.updated_at || '')}>
+            {task.updated_at ? formatRelativeTime(task.updated_at) : '—'}
+          </span>
+        );
+      },
     },
     {
       key: 'duration',

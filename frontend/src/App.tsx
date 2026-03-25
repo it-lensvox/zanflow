@@ -21,7 +21,6 @@ const TaskDetailPage = lazy(() => import('@/pages/MyTask/TaskDetailPage').then(m
 const Teams = lazy(() => import('@/pages/TeamManagement/Teams').then(m => ({ default: m.Teams })));
 const UserManagement = lazy(() => import('@/pages/TeamManagement/UserManagement').then(m => ({ default: m.UserManagement })));
 const TeamPerformance = lazy(() => import('@/pages/TeamManagement/TeamPerformance').then(m => ({ default: m.TeamPerformance })));
-const ContentCreation = lazy(() => import('@/pages/TaskType/ContentCreation').then(m => ({ default: m.ContentCreation })));
 const TaskDetails = lazy(() => import('@/pages/TaskType/TaskDetails').then(m => ({ default: m.TaskDetails })));
 const Calendar = lazy(() => import('@/pages/Calendar/Calendar').then(m => ({ default: m.Calendar })));
 const NotificationsPage = lazy(() => import('@/pages/NotificationsPage').then(m => ({ default: m.NotificationsPage })));
@@ -98,14 +97,9 @@ function ProjectDetailWrapper() {
 
   if (!project) return null;
 
-  // 1. Content Creation specific UI
-  if (project.task_type === 'content_creation' || project.task_type === 'content-creation') {
-    return <ContentCreation />;
-  }
-
-  // 2. Extraction & OCR
-  const taskDetailsTypes = ['client', 'internal', 'Content Creation', 'ideas'];
-  if (taskDetailsTypes.includes(project.task_type)) {
+// All project types now use the unified TaskDetails component
+  const supportedTypes = ['client', 'internal', 'Content Creation', 'ideas', 'content_creation', 'content-creation'];
+  if (supportedTypes.includes(project.task_type)) {
     return <TaskDetails />;
   }
 }
