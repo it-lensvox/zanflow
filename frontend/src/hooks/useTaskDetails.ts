@@ -376,8 +376,8 @@ export function useProjectDetails() {
                     return {
                         ...old,
                         pages: [
-                            { ...old.pages[0], results: [newTask, ...(old.pages[0]?.results ?? [])] },
-                            ...old.pages.slice(1),
+                            { ...old.pages?.[0], results: [newTask, ...(old.pages?.[0]?.results ?? [])] },
+                            ...(old.pages?.slice(1) ?? []),
                         ],
                     };
                 });
@@ -416,8 +416,8 @@ export function useProjectDetails() {
                 return {
                     ...old,
                     pages: [
-                        { ...pages[0], results: [updatedTask, ...(pages[0]?.results ?? [])] },
-                        ...pages.slice(1),
+                        { ...pages?.[0], results: [updatedTask, ...(pages?.[0]?.results ?? [])] },
+                        ...(pages?.slice(1) ??[]),
                     ],
                 };
             });

@@ -461,8 +461,8 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
                 return {
                     ...old,
                     pages: [
-                        { ...old.pages[0], results: [optimisticTask, ...(old.pages[0]?.results ?? [])] },
-                        ...old.pages.slice(1),
+                        { ...old.pages?.[0], results: [optimisticTask, ...(old.pages?.[0]?.results ?? [])] },
+                        ...(old.pages?.slice(1) ??[]),
                     ],
                 };
             }
@@ -508,13 +508,13 @@ if (isModal && onSuccess) {
                         ...old,
                         pages: [
                             {
-                                ...old.pages[0],
+                                ...old.pages?.[0],
                                 results: [
                                     createdTask,
-                                    ...(old.pages[0]?.results ?? []).filter((t: Task) => t.id !== optimisticTask.id),
+                                    ...(old.pages?.[0]?.results ?? []).filter((t: Task) => t.id !== optimisticTask.id),
                                 ],
                             },
-                            ...old.pages.slice(1),
+                            ...(old.pages?.slice(1) ??[]),
                         ],
                     };
                 }

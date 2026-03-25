@@ -133,22 +133,24 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
                 return { results: [], count: 0, next: null, previous: null };
             }
         },
-        getNextPageParam: (lastPage) => {
-            if (lastPage.next) {
+       getNextPageParam: (lastPage) => {
+            if (!lastPage || !lastPage.next) return undefined;
+            try {
                 const url = new URL(lastPage.next);
                 const pageParam = url.searchParams.get('page');
                 return pageParam ? parseInt(pageParam) : undefined;
+            } catch {
+                return undefined;
             }
-            return undefined;
         },
         enabled: !!task.id,
         initialPageParam: 1,
     });
-
+ 
     // Flatten paginated documents
     const taskDocuments = React.useMemo(() => {
         if (!taskDocumentsData?.pages) return [];
-        return taskDocumentsData.pages.flatMap(page => page.results);
+        return taskDocumentsData.pages.flatMap(page => page?.results ?? []);
     }, [taskDocumentsData]);
 
     // Sync links when full details arrive
