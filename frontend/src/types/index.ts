@@ -861,6 +861,36 @@ export interface ChatUnreadUpdateEvent {
   };
 }
 
+// Unified room shape returned by /api/v1/chat/rooms/ (all room_types in one call)
+export interface ChatRoomListItem {
+  id: string;
+  name: string;
+  room_type: 'private' | 'group' | 'project' | 'team' | 'thread' | 'ai_bot' | 'global';
+  slug: string;
+  project: number | null;
+  participant_count: number;
+  participants: number[]; 
+  last_message: {
+    id: string;
+    sender_username: string;
+    content_preview: string;
+    created_at: string;
+  } | null;
+  unread_count: number;
+  is_member: boolean;
+  created_at: string;
+  updated_at: string;
+  is_active: boolean;
+  is_favourite: boolean;
+  parent_message: string | null;
+  created_by: {
+    id: number;
+    username: string;
+    full_name: string;
+    email: string;
+  } | null;
+}
+
 export interface ToastNotification {
   id: string;
   room_id: string;

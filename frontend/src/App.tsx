@@ -44,15 +44,15 @@ class ErrorBoundary extends Component<
     super(props);
     this.state = { hasError: false, error: null };
   }
- 
+
   static getDerivedStateFromError(error: Error) {
     return { hasError: true, error };
   }
- 
+
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error('[ErrorBoundary] Uncaught render error:', error, info.componentStack);
   }
- 
+
   render() {
     if (this.state.hasError) {
       return (
@@ -140,7 +140,7 @@ function ProjectDetailWrapper() {
 
   if (!project) return null;
 
-// All project types now use the unified TaskDetails component
+  // All project types now use the unified TaskDetails component
   const supportedTypes = ['client', 'internal', 'Content Creation', 'ideas', 'content_creation', 'content-creation'];
   if (supportedTypes.includes(project.task_type)) {
     return <TaskDetails />;
@@ -209,10 +209,15 @@ function AppRoutes() {
         <Route path="/documents" element={<Documents />} />
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/team-chat" element={<TeamChatModern />} />
+        <Route path="/team-chat/chat" element={<TeamChatModern />} />
+        <Route path="/team-chat/chat/:roomId" element={<TeamChatModern />} />
+        <Route path="/team-chat/teams" element={<TeamChatModern />} />
+        <Route path="/team-chat/teams/:roomId" element={<TeamChatModern />} />
+        <Route path="/team-chat/project" element={<TeamChatModern />} />
         <Route path="/team-chat/:projectId/:roomId" element={<TeamChatModern />} />
+        <Route path="/team-chat/unread" element={<TeamChatModern />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/quick-notes" element={<QuickNotesPage />} />
-        {/* Task Detail Page (full-page view) */}
         <Route path="/tasks/:id" element={<TaskDetailPage />} />
 
         {/* Taskboard Routes */}
@@ -276,7 +281,7 @@ function App() {
       <TaskDraftsProvider>
         <WebSocketProvider>
           <ErrorBoundary>
-          <AppRoutes />
+            <AppRoutes />
           </ErrorBoundary>
         </WebSocketProvider>
       </TaskDraftsProvider>

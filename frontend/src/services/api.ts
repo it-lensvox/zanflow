@@ -5,7 +5,7 @@ import type {
   GatewaySendMessagePayload, GatewayIncomingMessage, RefineTextPayload, RefineTextResponse, TaskResponse, TeamTypeChoicesResponse, PinTaskResponse,
   CreateTeamPayload, ProjectChatRoom, TeamChatRoom, ChatUnreadResponse, NotificationData, NotificationCallback, Team, ThreadRoom, ThreadSession, ThreadStorage, ThreadUIMessage, CreateThreadRoomPayload, WSJoinRoomCommand, WSSendMessageCommand, WSIncomingThreadMessage, WSUnreadUpdateSignal, ThreadMessagesResponse,
   InviteUserPayload, InviteUserResponse, InviteVerifyResponse, InviteAcceptPayload, InviteAcceptResponse, AIBotSendPayload, AIBotIncomingMessage, OrganizationSignupPayload, OrganizationSignupResponse,
-   DailyUpdate, DailyUpdatePayload, DailyUpdateListResponse,
+  DailyUpdate, DailyUpdatePayload, DailyUpdateListResponse,
 } from '@/types';
 
 export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.164:8000/api/v1';
@@ -78,11 +78,6 @@ api.interceptors.response.use(
               api.defaults.headers.common['Authorization'] = `Bearer ${newTokens.access}`;
               return newTokens;
             })
-            // .catch((refreshError) => {
-            //   clearTokens();
-            //   window.dispatchEvent(new CustomEvent('auth:token-expired'));
-            //   throw refreshError;
-            // })
             .catch((refreshError) => {
               clearTokens();
               window.dispatchEvent(new CustomEvent('auth:token-expired'));
@@ -349,7 +344,6 @@ export const taskApi = {
     const response = await api.get('/tasksite/', { params });
     const data = response.data;
     const taskArray = data.results || data.tasks;
-    
     if (taskArray && Array.isArray(taskArray)) {
       const mappedTasks = taskArray.map((task: any) => ({
         ...task,
@@ -373,7 +367,6 @@ export const taskApi = {
         attachments: task.attachments || [],
         labels: task.label_details || task.labels || []
       }));
-      
       mappedTasks.sort((a: any, b: any) => {
         const dateA = new Date(a.updated_at || a.created_at).getTime();
         const dateB = new Date(b.updated_at || b.created_at).getTime();
@@ -678,7 +671,7 @@ export const chatApi = {
     return response.data;
   },
 
- // 2. Fetch Messages for a specific Room
+  // 2. Fetch Messages for a specific Room
   getRoomMessages: async (roomId: string, params?: { limit?: number; before?: string; after?: string }) => {
     const response = await api.get<ChatRoomMessagesResponse>(`/chat/rooms/${roomId}/messages/`, { params });
     return response.data;
@@ -758,6 +751,12 @@ export const chatApi = {
   // Get room details with members
   getRoomDetails: async (roomId: string) => {
     const response = await api.get<ChatRoom>(`/chat/rooms/${roomId}/`);
+    return response.data;
+  },
+
+  // Fetch ALL rooms in a single call (private + team + project + thread etc.)
+  getAllRooms: async (): Promise<import('@/types').ChatRoomListItem[]> => {
+    const response = await api.get<import('@/types').ChatRoomListItem[]>('/chat/rooms/');
     return response.data;
   },
 
@@ -1384,11 +1383,11 @@ export const quickNotesApi = {
   deleteNote: async (id: number): Promise<void> => {
     await api.delete(`/quicknotes/notes/${id}/`);
   },
-uploadAttachment: async (noteId: number, file: File): Promise<import('@/types').QuickNoteAttachment> => {
+  uploadAttachment: async (noteId: number, file: File): Promise<import('@/types').QuickNoteAttachment> => {
     const formData = new FormData();
     formData.append('note', noteId.toString());
     formData.append('file', file);
-    
+
     const response = await api.post('/quicknotes/attachments/', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -1404,7 +1403,7 @@ uploadAttachment: async (noteId: number, file: File): Promise<import('@/types').
 
 // Calendar Daily Update API
 export const dailyUpdateApi = {
-  // Get the current user's daily update for a specific date — matched by both date AND userId
+  // Get the current user's daily update for a specific date
   getMyUpdate: async (date: string, userId: number): Promise<DailyUpdate | null> => {
     const response = await api.get<DailyUpdateListResponse | DailyUpdate[]>('/daily-updates/', {
       params: { date },
@@ -1412,7 +1411,6 @@ export const dailyUpdateApi = {
     const all: DailyUpdate[] = Array.isArray(response.data)
       ? response.data
       : (response.data as DailyUpdateListResponse).results ?? [];
-    // Match on BOTH date and user — prevents picking up another user's record
     const match = all.find((u) => u.date === date && u.user === userId);
     return match ?? null;
   },
@@ -1429,7 +1427,7 @@ export const dailyUpdateApi = {
     return response.data;
   },
 
-  // Admin / manager: list all users' updates 
+  // Admin / manager
   listAll: async (params?: { date?: string; user?: number }): Promise<DailyUpdate[]> => {
     const response = await api.get<DailyUpdateListResponse | DailyUpdate[]>(
       '/daily-updates/',
@@ -1438,7 +1436,6 @@ export const dailyUpdateApi = {
     const all: DailyUpdate[] = Array.isArray(response.data)
       ? response.data
       : (response.data as DailyUpdateListResponse).results ?? [];
-    // Guard: only show records that exactly match the requested date
     if (params?.date) {
       return all.filter((u) => u.date === params.date);
     }

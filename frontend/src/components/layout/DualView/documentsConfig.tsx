@@ -126,7 +126,6 @@ export const createDocumentsTableColumns = ({ onDeleteClick, onInfoClick }: Docu
     {
       key: 'name',
       label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Document</span>,
-      // width: '350px',  // Added width
       render: (doc: Document) => (
         <div className="flex items-center justify-between w-full group/cell">
           <div className="flex items-center gap-2 min-w-0 pr-2">
@@ -159,7 +158,7 @@ export const createDocumentsTableColumns = ({ onDeleteClick, onInfoClick }: Docu
     {
       key: 'project',
       label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Project</span>,
-      width: '180px',  // Added width
+      width: '180px',
       render: (doc: Document) => (
         <span className="text-[12px] text-gray-700 font-medium">
           {doc.project_name || 'General'}
@@ -204,7 +203,7 @@ export const createDocumentsTableColumns = ({ onDeleteClick, onInfoClick }: Docu
     },
     {
       key: 'created_by',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Uploaded By</span>,
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Shared By</span>,
       width: '180px',
       render: (doc: Document) => (
         <div className="flex items-center gap-2">
