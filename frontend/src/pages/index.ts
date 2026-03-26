@@ -8,7 +8,6 @@ export { Teams } from './TeamManagement/Teams';
 export { UserManagement } from './TeamManagement/UserManagement'
 export { TeamPerformance } from './TeamManagement/TeamPerformance';
 export { TaskDetails } from './TaskType/TaskDetails'
-export { ContentCreation } from './TaskType/ContentCreation';
 export { Documents } from './Documents/Documents';
 export { ProjectSettings } from './Project/ProjectSettings';
 export { Sidebar } from '../components/layout/Sidebar';

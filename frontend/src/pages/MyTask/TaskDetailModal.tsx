@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-    X, Trash2, Save, Edit3, Loader2, ChevronDown, FileText, Download, Send, Maximize2, Minimize2,
-    Clock, ListTodo, PlayCircle, CheckCircle, CheckSquare, Pause, Calendar, Plus, Link, ExternalLink,
+    X, Trash2, Save, Edit3, Loader2, ChevronDown, Send, Maximize2,
+    Clock, ListTodo, PlayCircle, CheckCircle, CheckSquare, Pause, Plus, Link,
 } from 'lucide-react';
 import { useMutation, useQueryClient, useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { taskApi, usersApi, documentsApi, projectsApi } from '@/services/api';
 import { useAuth } from '@/hooks/useAuth';
-import { Sidebar } from '@/components/layout/Sidebar';
 import { getStatusConfig } from '@/components/layout/DualView/taskConfig';
 import { Task, TaskAttachment, TaskLink } from '@/types';
 import { RichTextEditor } from '@/components/common/RichTextEditor';
@@ -133,7 +132,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
                 return { results: [], count: 0, next: null, previous: null };
             }
         },
-       getNextPageParam: (lastPage) => {
+        getNextPageParam: (lastPage) => {
             if (!lastPage || !lastPage.next) return undefined;
             try {
                 const url = new URL(lastPage.next);
@@ -146,7 +145,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
         enabled: !!task.id,
         initialPageParam: 1,
     });
- 
+
     // Flatten paginated documents
     const taskDocuments = React.useMemo(() => {
         if (!taskDocumentsData?.pages) return [];
@@ -244,7 +243,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
         queryKey: ['task-comments', task.id],
         queryFn: () => taskApi.getComments(task.id),
         enabled: !!task.id,
-        refetchInterval: 10000,
+        staleTime: Infinity,
     });
 
     const comments = React.useMemo(() => {
@@ -254,16 +253,21 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
         return [];
     }, [commentsData]);
 
-    const displayAttachments = React.useMemo(() => {
+    // Stabilize the attachments reference so fullTaskDetails and task.attachments
+    // don't cause two separate recomputes when both update after an invalidation
+    const resolvedApiAttachments = React.useMemo(() => {
         const remoteTask = fullTaskDetails?.task || fullTaskDetails;
-        const apiAttachments = remoteTask?.attachments || task.attachments || [];
+        return remoteTask?.attachments || task.attachments || [];
+    }, [fullTaskDetails, task.attachments]);
+
+    const displayAttachments = React.useMemo(() => {
         const documentAttachments = (taskDocuments || []).map((doc: any) => ({
             id: doc.id,
             file_name: doc.name || doc.original_file_name || doc.file_name,
             file_url: doc.source_file_url || doc.file_url,
             uploaded_at: doc.created_at
         }));
-        const combined = [...apiAttachments, ...documentAttachments];
+        const combined = [...resolvedApiAttachments, ...documentAttachments];
         const uniqueMap = new Map();
 
         combined.forEach(item => {
@@ -273,7 +277,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
         });
 
         return Array.from(uniqueMap.values());
-    }, [fullTaskDetails, task.attachments, taskDocuments]);
+    }, [resolvedApiAttachments, taskDocuments]);
 
     useEffect(() => {
         document.body.style.overflow = 'hidden';
@@ -339,7 +343,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
         if (e.target === e.currentTarget && !updateTaskMutation.isPending) onClose();
     };
 
- const handleSaveStatus = async () => {
+    const handleSaveStatus = async () => {
         if (!resolvedTaskId || resolvedTaskId <= 0) {
             console.error('[TaskDetailModal] ❌ Save blocked — resolvedTaskId is 0 or invalid. task.id was:', task.id);
             alert(`Cannot save: task ID is invalid (got "${task.id}"). Please close and reopen the task.`);
@@ -391,8 +395,8 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
         setUploadingDocs(true);
 
         try {
-
             await taskApi.uploadFiles(task.id, fileArray);
+
             const projectId = task.project;
 
             await queryClient.invalidateQueries({ queryKey: ['task-documents', task.id] });
@@ -402,11 +406,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
             if (projectId) {
                 await queryClient.invalidateQueries({ queryKey: ['all-documents', projectId.toString()] });
             }
-
-            await queryClient.refetchQueries({
-                queryKey: ['documents'],
-                type: 'active'
-            });
 
         } catch (err: any) {
             console.error('Upload failed:', err);

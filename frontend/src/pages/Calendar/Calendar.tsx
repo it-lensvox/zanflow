@@ -583,7 +583,7 @@ export const Calendar: React.FC = () => {
         queryKey: ['tasks-calendar'],
         queryFn: async () => {
             console.log('%c[Calendar:tasks-calendar] 📦 Fetching tasks (flat list — own key, safe from InfiniteQuery)', 'color:#8b5cf6;font-weight:bold');
-            const result = await taskApi.list();
+            const result = await taskApi.list({disable_pagination:true});
             const count = Array.isArray(result) ? result.length : result?.results?.length ?? result?.tasks?.length ?? '?';
             console.log('%c[Calendar:tasks-calendar] ✅ Tasks loaded', 'color:#22c55e;font-weight:bold', `| count: ${count}`, '| key: tasks-calendar (isolated ✓)');
             return result;

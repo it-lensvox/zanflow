@@ -492,7 +492,7 @@ if (isModal && onSuccess) {
                 formData.append('labels', String(id));
             });
             links.forEach(link => {
-                formData.append('links', link);
+                formData.append('uploaded_links', link);
             });
             assignedToList.forEach(id => {
                 formData.append('assigned_to', String(id));
