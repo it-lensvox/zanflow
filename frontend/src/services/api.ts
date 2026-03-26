@@ -513,7 +513,7 @@ export const taskApi = {
   },
 
   // Upload files directly to Exiting taskdetail
-  uploadFiles: async (taskId: number, files: File[]) => {
+uploadFiles: async (taskId: number, files: File[]) => {
     const formData = new FormData();
     files.forEach((file) => {
       formData.append('uploaded_files', file);
@@ -524,6 +524,7 @@ export const taskApi = {
         'Content-Type': 'multipart/form-data',
       },
     });
+
     return response.data;
   },
 

@@ -1,7 +1,7 @@
-import React, { useState, useEffect,useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
-    ArrowLeft, Trash2, Save, Edit3, Loader2, ChevronDown, FileText, Send,
+    ArrowLeft, Trash2, Save, Edit3, Loader2, ChevronDown, Send,
     Clock, ListTodo, PlayCircle, CheckCircle, CheckSquare, Pause, Plus, Link as LinkIcon,
 } from 'lucide-react';
 import { useMutation, useQueryClient, useQuery, useInfiniteQuery } from '@tanstack/react-query';
@@ -129,7 +129,7 @@ export function TaskDetailPage() {
                 return { results: [], count: 0, next: null, previous: null };
             }
         },
-       getNextPageParam: (lastPage) => {
+        getNextPageParam: (lastPage) => {
             if (!lastPage || !lastPage.next) return undefined;
             try {
                 const url = new URL(lastPage.next);
@@ -142,7 +142,7 @@ export function TaskDetailPage() {
         enabled: !!task?.id,
         initialPageParam: 1,
     });
- 
+
     // Flatten paginated documents
     const taskDocuments = React.useMemo(() => {
         if (!taskDocumentsData?.pages) return [];
@@ -154,9 +154,8 @@ export function TaskDetailPage() {
         queryKey: ['task-comments', id],
         queryFn: () => taskApi.getComments(Number(id)),
         enabled: !!id,
-        refetchInterval: 10000,
+        staleTime: Infinity,
     });
-
     const comments = React.useMemo(() => {
         if (!commentsData) return [];
         if (Array.isArray(commentsData)) return commentsData;
@@ -165,15 +164,18 @@ export function TaskDetailPage() {
     }, [commentsData]);
 
     // Display attachments
+    const resolvedApiAttachments = React.useMemo(() => {
+        return task?.attachments || [];
+    }, [task?.attachments]);
+
     const displayAttachments = React.useMemo(() => {
-        const apiAttachments = task?.attachments || [];
         const documentAttachments = (taskDocuments || []).map((doc: any) => ({
             id: doc.id,
             file_name: doc.name || doc.original_file_name || doc.file_name,
             file_url: doc.source_file_url || doc.file_url,
             uploaded_at: doc.created_at
         }));
-        const combined = [...apiAttachments, ...documentAttachments];
+        const combined = [...resolvedApiAttachments, ...documentAttachments];
         const uniqueMap = new Map();
 
         combined.forEach(item => {
@@ -183,7 +185,7 @@ export function TaskDetailPage() {
         });
 
         return Array.from(uniqueMap.values());
-    }, [task?.attachments, taskDocuments]);
+    }, [resolvedApiAttachments, taskDocuments]);
 
     // Fetch available users and project members
     useEffect(() => {
@@ -227,7 +229,7 @@ export function TaskDetailPage() {
     }, [selectedStatus, task, newUsers.length, editableDescription, startDate, endDate, links, editableTitle]);
 
     // Mutations
-  // Mutations
+    // Mutations
     const updateTaskMutation = useMutation({
         mutationFn: (updates: any) => {
             if (!resolvedTaskId || resolvedTaskId <= 0) {
@@ -371,10 +373,13 @@ export function TaskDetailPage() {
 
         try {
             await taskApi.uploadFiles(task.id, fileArray);
+
             const projectId = task.project || (task as any).project_details?.id;
+
             await queryClient.invalidateQueries({ queryKey: ['task-documents', id] });
             await queryClient.invalidateQueries({ queryKey: ['tasks'] });
             await queryClient.invalidateQueries({ queryKey: ['task', id] });
+            await queryClient.invalidateQueries({ queryKey: ['task-detail', resolvedTaskId] });
 
             if (projectId) {
                 await queryClient.invalidateQueries({ queryKey: ['all-documents', projectId.toString()] });
