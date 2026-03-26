@@ -218,3 +218,8 @@ class VersionDiffSerializer(serializers.Serializer):
     #     "removed": {"field2": "old_value"},
     #     "modified": {"field3": {"old": "x", "new": "y"}}
     # }
+class DocumentShareSerializer(serializers.Serializer):
+    """
+    Validates the incoming request to share a document.
+    """
+    user_id = serializers.IntegerField(required=True)

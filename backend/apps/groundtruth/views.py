@@ -3,6 +3,7 @@ Views for Ground Truth app.
 """
 import os
 import re
+from django.shortcuts import get_object_or_404
 from django.conf import settings  # Import settings for AWS URL construction
 from django_filters import rest_framework as filters
 from rest_framework import generics, permissions, status, viewsets
@@ -14,7 +15,11 @@ from rest_framework.views import APIView
 from apps.tasksite.models import TaskAttachment
 from apps.audit.services import get_object_history, log_action
 from django.db.models import Q
-from .models import Document, DocumentComment, GTVersion
+from .models import Document, DocumentComment, GTVersion, DocumentShare
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.auth import get_user_model
+from apps.notification.models import Notification
+from .serializers import DocumentShareSerializer
 from .serializers import (
     DocumentBulkImportSerializer,
     DocumentCommentSerializer,
@@ -52,14 +57,15 @@ class DocumentViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         
-        # Start with an optimized queryset including related data
         queryset = Document.objects.select_related(
             "project", "created_by", "current_gt_version"
-        ).prefetch_related("versions")
+        ).prefetch_related("versions", "shares") # Added "shares" for optimization
 
-        # FILTER: Show only if user is the creator OR a member of the project
+        # THE UPDATE: We added the third condition 'shares__shared_with=user'
         return queryset.filter(
-            Q(project__created_by=user) | Q(project__members=user)
+            Q(project__created_by=user) | 
+            Q(project__members=user) | 
+            Q(shares__shared_with=user)
         ).distinct()
 
     # 2. Re-add the serializer logic to fix the AssertionError
@@ -498,3 +504,77 @@ class ProjectAllDocumentsView(APIView):
             "total_files": len(all_documents),
             "documents": all_documents
         }, status=status.HTTP_200_OK)
+    
+class DocumentShareView(APIView):
+    """
+    Explicit endpoint to handle sharing a document with another user.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, document_id):
+        user = request.user
+        
+        # 1. Fetch document and strictly verify the user has access to it
+        document = get_object_or_404(
+            Document.objects.filter(
+                Q(project__created_by=user) | 
+                Q(project__members=user) | 
+                Q(shares__shared_with=user)
+            ).distinct(),
+            id=document_id
+        )
+
+        # 2. Validate request
+        serializer = DocumentShareSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        target_user_id = serializer.validated_data["user_id"]
+        User = get_user_model()
+
+        # 3. Check target user
+        try:
+            target_user = User.objects.get(id=target_user_id)
+        except User.DoesNotExist:
+            return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if target_user == user:
+            return Response(
+                {"detail": "You cannot share a document with yourself."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 4. Create or get share record
+        share_record, created = DocumentShare.objects.get_or_create(
+            document=document,
+            shared_with=target_user,
+            defaults={'created_by': user, 'updated_by': user}
+        )
+
+        # If it already existed, update the timestamp/updated_by to reflect the fresh share action
+        if not created:
+            share_record.updated_by = user
+            share_record.save(update_fields=['updated_by', 'updated_at'])
+
+        # 5. Log the audit trail (always log it so there is a record of the re-share)
+        log_action(
+            document, 
+            "shared", 
+            change_summary=f"Document shared with {target_user.username}",
+            user=user
+        )
+
+        # 6. Trigger notification (always ping the user, even if re-shared)
+        Notification.objects.create(
+            recipient=target_user,
+            actor=user,
+            title="Shared Document",
+            message=f"{user.first_name or user.username} shared the document '{document.name}' with you.",
+            notification_type=Notification.NotificationType.DOCUMENT_SHARED,
+            content_type=ContentType.objects.get_for_model(Document),
+            object_id=document.id,
+        )
+        
+        # Return success regardless of whether it was newly created or just re-shared
+        return Response(
+            {"detail": f"Document successfully shared with {target_user.username}."}, 
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
+        )
