@@ -194,3 +194,29 @@ class DocumentComment(TenantModel, UserStampedModel):
     
     def __str__(self):
         return f"Comment on {self.document.name} by {self.created_by}"
+
+class DocumentShare(TenantModel, UserStampedModel):
+    """
+    Tracks which users have been directly granted access to a document.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    
+    document = models.ForeignKey(
+        Document,
+        on_delete=models.CASCADE,
+        related_name="shares"
+    )
+    
+    shared_with = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="shared_documents"
+    )
+
+    class Meta:
+        db_table = "document_shares"
+        unique_together = ["document", "shared_with"] # Prevents duplicate sharing records
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.document.name} shared with {self.shared_with}"

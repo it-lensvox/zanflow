@@ -32,7 +32,7 @@ class Notification(TenantModel):
         PROJECT_ASSIGNED = 'project_assigned', 'Project Assigned'
         PROJECT_MEMBER_ADDED = 'project_member_added', 'Project Member Added'
         PROJECT_UPDATED = 'project_updated', 'Project Updated'
-        
+        DOCUMENT_SHARED = 'document_shared', 'Document Shared'
         # General
         MENTION = 'mention', 'Mention'
         REMINDER = 'reminder', 'Reminder'
