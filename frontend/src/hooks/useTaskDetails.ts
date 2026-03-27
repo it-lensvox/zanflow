@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
-import { projectsApi, taskApi, documentsApi, chatApi, usersApi } from '@/services/api';
+import { projectsApi, taskApi, documentsApi, chatApi, usersApi, notificationSocket, gatewaySocket } from '@/services/api';
 import { useViewMode } from '@/components/layout/DualView/useViewMode';
 import { useTableFilters, ColumnFilterConfig } from '@/hooks/useTableFilters';
 import { statusOptions, priorityOptions } from '@/components/layout/DualView/taskConfig';
@@ -274,7 +274,80 @@ export function useProjectDetails() {
         return () => document.removeEventListener('mousedown', handler);
     }, [showDateFieldDropdown]);
 
-    // ─── Handlers ─────────────────────────────────────────────────────────────────
+    // Real-time task sync via WebSocket notification 
+    useEffect(() => {
+        if (!id) return;
+        let debounceTimer: NodeJS.Timeout | null = null;
+        const processedTaskIds = new Set<string>();
+
+        const handleTaskNotification = async (taskId: number) => {
+            const dedupeKey = `${taskId}-${Math.floor(Date.now() / 2000)}`;
+            if (processedTaskIds.has(dedupeKey)) return;
+            processedTaskIds.add(dedupeKey);
+
+            try {
+                const response = await taskApi.get(taskId);
+                const fetchedTask = response.task || response;
+                if (
+                    String(fetchedTask.project) !== String(id) &&
+                    fetchedTask.project_details?.id !== Number(id)
+                ) return;
+                queryClient.invalidateQueries({ queryKey: ['tasks-list', id] });
+                queryClient.setQueryData(['tasks'], (old: any) => {
+                    if (!old?.pages) return old;
+                    const taskExistsInPages = old.pages.some((page: any) =>
+                        page.results?.some((t: Task) => t.id === fetchedTask.id)
+                    );
+                    if (taskExistsInPages) {
+                        return {
+                            ...old,
+                            pages: old.pages.map((page: any) => ({
+                                ...page,
+                                results: page.results.map((t: Task) =>
+                                    t.id === fetchedTask.id ? fetchedTask : t
+                                ),
+                            })),
+                        };
+                    }
+                    return {
+                        ...old,
+                        pages: [
+                            { ...old.pages[0], results: [fetchedTask, ...(old.pages[0]?.results ?? [])] },
+                            ...old.pages.slice(1),
+                        ],
+                    };
+                });
+            } catch (err) {
+                console.error('Failed to fetch real-time task:', err);
+            }
+        };
+
+        // Listen on notificationSocket
+        const unsubNotification = notificationSocket.onNotification((data) => {
+            if (data.related_object?.type !== 'task') return;
+            const taskId = Number(data.related_object.id);
+            if (taskId) handleTaskNotification(taskId);
+        });
+
+        // Listen on gatewaySocket
+        const handleGatewayMessage = (msg: any) => {
+            if (msg.type === 'SIGNAL' && msg.event === 'NEW_NOTIFICATION') {
+                const related = msg.data?.related_object;
+                if (related?.type !== 'task') return;
+                const taskId = Number(related.id);
+                if (taskId) handleTaskNotification(taskId);
+            }
+        };
+        const unsubGateway = gatewaySocket.onMessage(handleGatewayMessage);
+
+        return () => {
+            unsubNotification();
+            unsubGateway();
+            if (debounceTimer) clearTimeout(debounceTimer);
+            processedTaskIds.clear();
+        };
+    }, [id, queryClient]);
+    // Handlers 
     const handleMediaScroll = useCallback(
         (e: React.UIEvent<HTMLDivElement>) => {
             const target = e.currentTarget;
