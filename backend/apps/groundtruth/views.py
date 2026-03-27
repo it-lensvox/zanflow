@@ -19,6 +19,10 @@ from .models import Document, DocumentComment, GTVersion, DocumentShare
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth import get_user_model
 from apps.notification.models import Notification
+from apps.notification.serializers import NotificationSerializer
+from apps.audit.services import log_action
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 from .serializers import DocumentShareSerializer
 from .serializers import (
     DocumentBulkImportSerializer,
@@ -554,6 +558,12 @@ class DocumentShareView(APIView):
             share_record.updated_by = user
             share_record.save(update_fields=['updated_by', 'updated_at'])
 
+        # --- NEW CODE: "Touch" the document so its updated_at changes ---
+        document.updated_by = user
+        # This forces the document's updated_at timestamp to become "Just now"
+        document.save(update_fields=['updated_by', 'updated_at']) 
+        # ----------------------------------------------------------------
+        
         # 5. Log the audit trail (always log it so there is a record of the re-share)
         log_action(
             document, 
@@ -563,14 +573,25 @@ class DocumentShareView(APIView):
         )
 
         # 6. Trigger notification (always ping the user, even if re-shared)
-        Notification.objects.create(
+        notification = Notification.objects.create(
             recipient=target_user,
             actor=user,
             title="Shared Document",
             message=f"{user.first_name or user.username} shared the document '{document.name}' with you.",
             notification_type=Notification.NotificationType.DOCUMENT_SHARED,
             content_type=ContentType.objects.get_for_model(Document),
-            object_id=document.id,
+            object_id=str(document.id),  # <-- Added str() here to fix the UUID serialization error
+        )
+
+        # 7. Broadcast to WebSocket Gateway
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"user_{target_user.id}",
+            {
+                "type": "gateway_signal", # <-- Changed to match your consumer function!
+                "event": "NEW_NOTIFICATION",
+                "data": NotificationSerializer(notification).data
+            }
         )
         
         # Return success regardless of whether it was newly created or just re-shared
