@@ -256,6 +256,15 @@ export interface Document {
 export type FileType = 'pdf' | 'image' | 'json' | 'text' | 'video' | 'other';
 export type DocumentStatus = 'draft' | 'in_review' | 'approved' | 'archived';
 
+// Share Document types
+export interface ShareDocumentPayload {
+  user_id: number;
+}
+
+export interface ShareDocumentResponse {
+  detail: string;
+}
+
 // Test types
 export interface TestRun {
   id: string;
@@ -773,7 +782,7 @@ export interface UnreadCount {
 
 // WebSocket Notification System Types
 export interface NotificationRelatedObject {
-  type: 'task' | 'project' | 'message' | 'comment' | 'team';
+  type: 'task' | 'project' | 'message' | 'comment' | 'team' | 'document';
   id: string | number;
 }
 
@@ -796,10 +805,20 @@ export interface NotificationData {
     priority?: string;
     [key: string]: any;
   };
-  related_object?: NotificationRelatedObject;
+related_object?: NotificationRelatedObject;
+  related_object_info?: NotificationRelatedObject & { app?: string };
   time_since?: string;
   created_at?: string;
+  updated_at?: string;
   unread_count?: number;
+  actor?: {
+    id: number;
+    username: string;
+    first_name?: string;
+    last_name?: string;
+    full_name?: string;
+    email?: string;
+  };
 }
 
 // API response wrapper for notification list

@@ -11,6 +11,7 @@ import { createDocumentsTableColumns, DocumentGridCard } from '@/components/layo
 import { useNotifications } from '@/hooks/useNotifications';
 import { NotificationsPage } from '../NotificationsPage';
 import { DocumentPreview } from '@/components/common/DocumentPreview';
+import { DocumentShareModal } from '@/pages/Documents/DocumentShareModal';
 
 const FILE_TYPE_OPTIONS = [
   { value: '', label: 'All Types' },
@@ -204,6 +205,7 @@ export function Documents() {
   } | null>(null);
   const navigate = useNavigate();
   const [infoDoc, setInfoDoc] = useState<Document | null>(null);
+  const [shareDoc, setShareDoc] = useState<Document | null>(null);
   const { viewMode, setViewMode } = useViewMode({
     defaultMode: 'table',
   });
@@ -511,6 +513,9 @@ export function Documents() {
                             e.stopPropagation();
                             handleDeleteClick(e, doc);
                           }}
+                          onShareClick={(doc) => {
+                            setShareDoc(doc);
+                          }}
                         />
                       </div>
                     </div>
@@ -520,7 +525,7 @@ export function Documents() {
                 }}
                 tableProps={{
                   data: displayedDocuments,
-                  columns: createDocumentsTableColumns({ onDeleteClick: handleDeleteClick, onInfoClick: (doc) => setInfoDoc(doc) }),
+                  columns: createDocumentsTableColumns({ onDeleteClick: handleDeleteClick, onInfoClick: (doc) => setInfoDoc(doc), onShareClick: (doc) => setShareDoc(doc) }),
                   rowKey: (doc) => doc.id,
                   onRowClick: (doc) => handleDocumentClick(doc),
                   emptyState,
@@ -564,6 +569,11 @@ export function Documents() {
           onClose={() => setPreviewDoc(null)}
         />
       )}
+      <DocumentShareModal
+        isOpen={!!shareDoc}
+        onClose={() => setShareDoc(null)}
+        document={shareDoc}
+      />
     </div>
   );
 }

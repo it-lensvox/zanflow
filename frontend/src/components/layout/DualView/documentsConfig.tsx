@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Trash2, CheckCircle, Clock, File, Info } from 'lucide-react';
+import { FileText, Trash2, CheckCircle, Clock, File, Info, Share2 } from 'lucide-react';
 import { TablePopover } from '@/components/common';
 import { formatRelativeTime } from '@/lib/utils';
 import type { Document, DocumentStatus } from '@/types';
@@ -10,6 +10,7 @@ import { useQueryClient } from '@tanstack/react-query';
 interface DocumentTableColumnsProps {
   onDeleteClick: (e: React.MouseEvent, doc: Document) => void;
   onInfoClick?: (doc: Document) => void;
+  onShareClick?: (doc: Document) => void;
 }
 
 const getDocumentStatusConfig = (status: DocumentStatus) => {
@@ -63,7 +64,7 @@ const statusOptions: { value: DocumentStatus; label: string; icon: any }[] = [
   { value: 'archived', label: 'ARCHIVED', icon: FileText },
 ];
 
-export const createDocumentsTableColumns = ({ onDeleteClick, onInfoClick }: DocumentTableColumnsProps): TableColumn<Document>[] => {
+export const createDocumentsTableColumns = ({ onDeleteClick, onInfoClick, onShareClick }: DocumentTableColumnsProps): TableColumn<Document>[] => {
   const StatusDropdown = ({ doc }: { doc: Document }) => {
     const [activeDropdown, setActiveDropdown] = useState(false);
     const queryClient = useQueryClient();
@@ -144,6 +145,15 @@ export const createDocumentsTableColumns = ({ onDeleteClick, onInfoClick }: Docu
                 <Info className="w-4 h-4 text-gray-400 hover:text-blue-600" />
               </button>
             )}
+            {onShareClick && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onShareClick(doc); }}
+                className="p-1.5 hover:bg-blue-50 rounded"
+                title="Share Document"
+              >
+                <Share2 className="w-4 h-4 text-gray-400 hover:text-blue-600" />
+              </button>
+            )}
             <button
               onClick={(e) => { e.stopPropagation(); onDeleteClick(e, doc); }}
               className="p-1.5 hover:bg-red-50 rounded"
@@ -222,9 +232,10 @@ interface DocumentGridCardProps {
   document: Document;
   onDeleteClick: (e: React.MouseEvent, doc: Document) => void;
   onCardClick?: (doc: Document) => void;
+  onShareClick?: (doc: Document) => void;
 }
 
-export function DocumentGridCard({ document: doc, onDeleteClick, onCardClick }: DocumentGridCardProps) {
+export function DocumentGridCard({ document: doc, onDeleteClick, onCardClick, onShareClick }: DocumentGridCardProps) {
   const getStatusConfig = (status: DocumentStatus) => {
     const normalizedStatus = status.toLowerCase() as Lowercase<DocumentStatus>;
 
@@ -280,14 +291,25 @@ export function DocumentGridCard({ document: doc, onDeleteClick, onCardClick }: 
         </div>
       </div>
 
-      {/* Trash Button */}
-      <button
-        onClick={(e) => onDeleteClick(e, doc)}
-        className="absolute bottom-3 left-3 opacity-0 group-hover:opacity-100 transition-all duration-200 p-1.5 hover:bg-red-50 rounded text-gray-400 hover:text-red-600"
-        title="Delete Document"
-      >
-        <Trash2 className="w-4 h-4" />
-      </button>
+      {/* Action Buttons */}
+      <div className="absolute bottom-3 left-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
+        {onShareClick && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onShareClick(doc); }}
+            className="p-1.5 hover:bg-blue-50 rounded text-gray-400 hover:text-blue-600"
+            title="Share Document"
+          >
+            <Share2 className="w-4 h-4" />
+          </button>
+        )}
+        <button
+          onClick={(e) => onDeleteClick(e, doc)}
+          className="p-1.5 hover:bg-red-50 rounded text-gray-400 hover:text-red-600"
+          title="Delete Document"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
 
       {/* Status Badge */}
       <div className="absolute bottom-3 right-3">

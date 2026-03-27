@@ -1,0 +1,249 @@
+import { useState, useEffect, useRef } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { X, Search, Share2 } from 'lucide-react';
+import { Button } from '@/components/common';
+import { documentsApi, usersApi } from '@/services/api';
+import type { User as AppUser, Document } from '@/types';
+
+interface DocumentShareModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  document: Document | null;
+}
+
+export function DocumentShareModal({ isOpen, onClose, document: doc }: DocumentShareModalProps) {
+  const queryClient = useQueryClient();
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedUser, setSelectedUser] = useState<{ id: number; label: string } | null>(null);
+  const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const { data: usersData, isLoading: usersLoading } = useQuery({
+    queryKey: ['allUsers'],
+    queryFn: usersApi.listAll,
+    enabled: isOpen,
+    select: (data: AppUser[]) =>
+      data.map((user) => ({
+        value: user.id,
+        label: user.first_name && user.last_name
+          ? `${user.first_name} ${user.last_name}`
+          : user.username,
+        email: user.email,
+      })),
+  });
+
+  const shareMutation = useMutation({
+    mutationFn: ({ documentId, userId }: { documentId: string; userId: number }) =>
+      documentsApi.share(documentId, userId),
+    onSuccess: (data) => {
+      setSuccessMsg(data.detail || 'Document shared successfully!');
+      setSelectedUser(null);
+      setSearchQuery('');
+      // Invalidate documents query so the list refreshes (shared doc moves to top via updated_at)
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      // Auto-close after brief delay
+      setTimeout(() => {
+        handleClose();
+      }, 1500);
+    },
+    onError: (err: any) => {
+      setError(err.response?.data?.detail || 'Failed to share document.');
+    },
+  });
+
+  const handleClose = () => {
+    setUserDropdownOpen(false);
+    setSearchQuery('');
+    setSelectedUser(null);
+    setError('');
+    setSuccessMsg('');
+    onClose();
+  };
+
+  const handleShare = () => {
+    if (!doc || !selectedUser) return;
+    setError('');
+    setSuccessMsg('');
+    shareMutation.mutate({ documentId: doc.id, userId: selectedUser.id });
+  };
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setUserDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Close modal on Escape
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleClose();
+    };
+    if (isOpen) window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [isOpen]);
+
+  if (!isOpen || !doc) return null;
+
+  const filteredUsers = usersData?.filter((u) =>
+    u.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    u.email.toLowerCase().includes(searchQuery.toLowerCase())
+  ) || [];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop with blur */}
+      <div
+        className="absolute inset-0 bg-background/60 backdrop-blur-md transition-opacity"
+        onClick={handleClose}
+      />
+
+      {/* Modal Card */}
+      <div className="relative w-full max-w-[480px] bg-white rounded-xl shadow-2xl border border-gray-200 animate-in fade-in zoom-in duration-300">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <Share2 className="w-5 h-5 text-blue-600" />
+            <h3 className="text-lg font-semibold text-gray-800">Share Document</h3>
+          </div>
+          <button
+            onClick={handleClose}
+            className="p-1.5 rounded hover:bg-gray-100 transition-colors"
+          >
+            <X className="w-4 h-4 text-gray-500" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5 space-y-4">
+          {/* Document name display */}
+          <div className="text-sm text-gray-500">
+            Sharing: <span className="font-medium text-gray-700">{doc.name}</span>
+          </div>
+
+          {error && (
+            <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+              {error}
+            </div>
+          )}
+
+          {successMsg && (
+            <div className="rounded-lg bg-green-50 p-3 text-sm text-green-700 border border-green-200">
+              {successMsg}
+            </div>
+          )}
+
+          {/* User selector */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">Select User</label>
+            <div className="relative" ref={dropdownRef}>
+              {/* Trigger / Input */}
+              <div
+                className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm cursor-pointer"
+                onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+              >
+                {selectedUser ? (
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-2">
+                      <div className="h-6 w-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-700">
+                        {selectedUser.label.charAt(0)}
+                      </div>
+                      <span className="text-foreground">{selectedUser.label}</span>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedUser(null);
+                      }}
+                      className="p-0.5 hover:bg-gray-100 rounded"
+                    >
+                      <X className="w-3.5 h-3.5 text-gray-400" />
+                    </button>
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground">Click to select a user...</span>
+                )}
+              </div>
+
+              {/* Dropdown */}
+              {userDropdownOpen && (
+                <div className="absolute z-[60] mt-1 w-full bg-popover border rounded-lg shadow-lg max-h-64 overflow-hidden">
+                  {/* Search inside dropdown */}
+                  <div className="p-2 border-b">
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search users..."
+                        className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
+                        autoFocus
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                  </div>
+
+                  {/* User list */}
+                  <div className="max-h-48 overflow-y-auto py-1">
+                    {usersLoading ? (
+                      <div className="px-3 py-4 text-sm text-gray-400 text-center">Loading users...</div>
+                    ) : filteredUsers.length === 0 ? (
+                      <div className="px-3 py-4 text-sm text-gray-400 text-center">No users found</div>
+                    ) : (
+                      filteredUsers.map((user) => (
+                        <div
+                          key={user.value}
+                          className={`flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-accent hover:text-accent-foreground text-sm ${
+                            selectedUser?.id === user.value ? 'bg-accent/50' : ''
+                          }`}
+                          onClick={() => {
+                            setSelectedUser({ id: user.value, label: user.label });
+                            setUserDropdownOpen(false);
+                            setSearchQuery('');
+                          }}
+                        >
+                          <div className="h-7 w-7 rounded-full bg-blue-100 flex items-center justify-center text-[11px] font-bold text-blue-700 flex-shrink-0">
+                            {user.label.charAt(0)}
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-medium truncate">{user.label}</span>
+                            <span className="text-xs text-gray-400 truncate">{user.email}</span>
+                          </div>
+                          {selectedUser?.id === user.value && (
+                            <svg className="w-4 h-4 text-blue-600 ml-auto flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
+          <Button
+            onClick={handleShare}
+            disabled={!selectedUser || shareMutation.isPending}
+          >
+            {shareMutation.isPending ? 'Sharing...' : 'Share'}
+          </Button>
+          <Button variant="outline" onClick={handleClose}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}

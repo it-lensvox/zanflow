@@ -338,6 +338,15 @@ export const documentsApi = {
     const response = await api.get<AllDocumentsResponse>(url, { params });
     return response.data;
   },
+
+  // Share document with a user
+  share: async (documentId: string, userId: number): Promise<import('@/types').ShareDocumentResponse> => {
+    const response = await api.post<import('@/types').ShareDocumentResponse>(
+      `/documents/${documentId}/share/`,
+      { user_id: userId }
+    );
+    return response.data;
+  },
 };
 
 

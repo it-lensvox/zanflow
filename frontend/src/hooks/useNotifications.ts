@@ -25,9 +25,7 @@ export function useNotifications() {
     // Connect to notification WebSocket
     notificationSocket.connect();
     setIsConnected(notificationSocket.isConnected());
-    
     const unsubscribe = notificationSocket.onNotification((notification) => {
-      
       // 4. Play the sound when a new notification arrives
       if (audioRef.current) {
         audioRef.current.currentTime = 0;
@@ -36,30 +34,47 @@ export function useNotifications() {
         });
       }
 
-      // Update unread count from WebSocket notification
+      // Update unread count: increment locally for every new unread notification,
       if (notification.unread_count !== undefined) {
         setUnreadCount(notification.unread_count);
+      } else if (!notification.is_read) {
+        setUnreadCount((prev) => prev + 1);
+        queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] });
       }
 
       // Force refetch with resetQueries to ensure fresh data
       queryClient.resetQueries({ queryKey: ['notifications-initial'] });
 
       // Real-time task sync: when a task-related notification arrives,
+      const relatedType = notification.related_object?.type || notification.related_object_info?.type;
+
       const isTaskNotification =
-        notification.related_object?.type === 'task' ||
+        relatedType === 'task' ||
         notification.title?.toLowerCase().includes('task');
-        if (isTaskNotification) {
-          queryClient.refetchQueries({ queryKey: ['tasks'] });
-        }
+      if (isTaskNotification) {
+        queryClient.refetchQueries({ queryKey: ['tasks'] });
+      }
+
+      // Real-time document sync: when a document_shared notification arrives,
+      const isDocumentNotification =
+        relatedType === 'document' ||
+        notification.notification_type === 'document_shared' ||
+        notification.notification_type === 'DOCUMENT_SHARED';
+
+      console.log('[useNotifications] 📄 isDocumentNotification:', isDocumentNotification, '| relatedType:', relatedType, '| notification_type:', notification.notification_type);
+
+      if (isDocumentNotification) {
+        console.log('[useNotifications] 📄 >>> Invalidating documents queries for receiver...');
+        queryClient.invalidateQueries({ queryKey: ['documents'] });
+      }
     });
-    
+
     return () => {
       unsubscribe();
     };
   }, [queryClient]);
 
-  // Fetch unread count using its own isolated query key — never touches 'notifications-initial'
-  // which is owned exclusively by useInfiniteQuery in NotificationsPage
+  // Fetch unread count 
   useEffect(() => {
     const initializeUnreadCount = async () => {
       try {

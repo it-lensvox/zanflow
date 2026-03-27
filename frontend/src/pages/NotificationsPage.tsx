@@ -176,12 +176,17 @@ export function NotificationsPage({
       }
     }
 
-    // Navigate based on related object or metadata
-    if (n.related_object?.type === 'task' || n.metadata?.task_id) {
-      const taskId = n.related_object?.id || n.metadata?.task_id;
+  // Navigate based on related object or metadata
+    const relatedType = n.related_object?.type || n.related_object_info?.type;
+    const relatedId = n.related_object?.id || n.related_object_info?.id;
+
+    if (relatedType === 'document' && relatedId) {
+      navigate(`/documents`);
+    } else if (relatedType === 'task' || n.metadata?.task_id) {
+      const taskId = relatedId || n.metadata?.task_id;
       navigate(`/tasks/${taskId}`);
-    } else if (n.related_object?.type === 'project' || n.metadata?.project_id) {
-      const projectId = n.related_object?.id || n.metadata?.project_id;
+    } else if (relatedType === 'project' || n.metadata?.project_id) {
+      const projectId = relatedId || n.metadata?.project_id;
       navigate(`/projects/${projectId}`);
     }
 
