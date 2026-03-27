@@ -470,68 +470,84 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
             if (Array.isArray(old)) return { pages: [{ count: old.length + 1, next: null, previous: null, results: [optimisticTask, ...old] }], pageParams: [1] };
             return old;
         });
+       // Optimistically show success and close modal
        setShowSuccessView(true);
-if (isModal && onSuccess) {
-    onSuccess(optimisticTask); 
-} else {
-    navigate('/taskboard');
-}
+       if (isModal && onSuccess) {
+           onSuccess(optimisticTask);
+       } else {
+           navigate('/taskboard');
+       }
 
-        // Fire API call in background
-        try {
-            const formData = new FormData();
-            formData.append('heading', heading);
-            formData.append('description', description);
-            if (startDate) formData.append('start_date', `${startDate}T09:00:00Z`);
-            if (endDate) formData.append('end_date', `${endDate}T18:00:00Z`);
-            formData.append('duration_time', duration);
-            formData.append('status', status);
-            formData.append('priority', priority);
-            formData.append('project', String(projectId));
-            selectedLabelIds.forEach(id => {
-                formData.append('labels', String(id));
-            });
-            links.forEach(link => {
-                formData.append('uploaded_links', link);
-            });
-            assignedToList.forEach(id => {
-                formData.append('assigned_to', String(id));
-            });
-            attachments.forEach((file) => {
-                formData.append('uploaded_files', file);
-            });
-            const apiResponse = await taskApi.create(formData);
-            const createdTask: Task = apiResponse?.task || apiResponse;
-            queryClient.setQueryData(['tasks'], (old: any) => {
-                if (old?.pages) {
-                    return {
-                        ...old,
-                        pages: [
-                            {
-                                ...old.pages?.[0],
-                                results: [
-                                    createdTask,
-                                    ...(old.pages?.[0]?.results ?? []).filter((t: Task) => t.id !== optimisticTask.id),
-                                ],
-                            },
-                            ...(old.pages?.slice(1) ??[]),
-                        ],
-                    };
-                }
-                return old;
-            });
-        } catch (err: any) {
-            if (previousTasksSnapshot !== undefined) {
-                queryClient.setQueryData(['tasks'], previousTasksSnapshot);
-            } else {
-                queryClient.invalidateQueries({ queryKey: ['tasks'] });
-            }
-            console.error('❌ [CreateTask] Upload failed:', err);
-            console.error('❌ [CreateTask] Error details:', err.response?.data);
-            setError(err.response?.data?.message || 'Failed to create task. Please check your inputs.');
-            setLoading(false);
-            setShowSuccessView(false);
-        }
+       // Fire API call in background
+       try {
+           const formData = new FormData();
+           formData.append('heading', heading);
+           formData.append('description', description);
+           if (startDate) formData.append('start_date', `${startDate}T09:00:00Z`);
+           if (endDate) formData.append('end_date', `${endDate}T18:00:00Z`);
+           formData.append('duration_time', duration);
+           formData.append('status', status);
+           formData.append('priority', priority);
+           formData.append('project', String(projectId));
+           selectedLabelIds.forEach(id => {
+               formData.append('labels', String(id));
+           });
+           links.forEach(link => {
+               formData.append('uploaded_links', link);
+           });
+           assignedToList.forEach(id => {
+               formData.append('assigned_to', String(id));
+           });
+           attachments.forEach((file) => {
+               formData.append('uploaded_files', file);
+           });
+           const apiResponse = await taskApi.create(formData);
+           const createdTask: Task = apiResponse?.task || apiResponse;
+
+           // Replace optimistic task with real task in Taskboard cache
+           queryClient.setQueryData(['tasks'], (old: any) => {
+               if (old?.pages) {
+                   return {
+                       ...old,
+                       pages: [
+                           {
+                               ...old.pages?.[0],
+                               results: [
+                                   createdTask,
+                                   ...(old.pages?.[0]?.results ?? []).filter((t: Task) => t.id !== optimisticTask.id),
+                               ],
+                           },
+                           ...(old.pages?.slice(1) ?? []),
+                       ],
+                   };
+               }
+               return old;
+           });
+
+           // Replace optimistic task with real task in Project page cache
+           const projId = String(projectId);
+           queryClient.setQueryData(['tasks-list', projId], (old: any) => {
+               if (!old) return old;
+               const list: Task[] = old.tasks ?? old.results ?? (Array.isArray(old) ? old : []);
+               const merged = [createdTask, ...list.filter((t) => t.id !== optimisticTask.id && t.id !== createdTask.id)];
+               if (old.tasks) return { ...old, tasks: merged };
+               if (old.results) return { ...old, results: merged };
+               return merged;
+           });
+       } catch (err: any) {
+           if (previousTasksSnapshot !== undefined) {
+               queryClient.setQueryData(['tasks'], previousTasksSnapshot);
+           } else {
+               queryClient.invalidateQueries({ queryKey: ['tasks'] });
+           }
+           // Also rollback the project page cache
+           queryClient.invalidateQueries({ queryKey: ['tasks-list'] });
+           console.error('❌ [CreateTask] Upload failed:', err);
+           console.error('❌ [CreateTask] Error details:', err.response?.data);
+           setError(err.response?.data?.message || 'Failed to create task. Please check your inputs.');
+           setLoading(false);
+           setShowSuccessView(false);
+       }
     };
 
     if (showSuccessView) {

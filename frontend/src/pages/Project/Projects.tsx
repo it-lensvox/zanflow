@@ -1,9 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { FolderKanban, Bell } from 'lucide-react';
 import { Button, Card, CardContent } from '@/components/common';
-import { projectsApi } from '@/services/api';
+import { projectsApi, notificationSocket, gatewaySocket } from '@/services/api';
 import type { Project } from '@/types';
 import { cn } from '@/lib/utils';
 import { ViewToggle, DualView, useViewMode, } from '@/components/layout/DualView';
@@ -17,7 +17,7 @@ import { CreateProjectModal } from './CreateProjectModal';
 import { useNotifications } from '@/hooks/useNotifications';
 
 
-// Project type filter definitions — order matches the colour legend in the table
+// Project type filter definitions 
 const PROJECT_TYPE_FILTERS = [
   { label: 'Client', value: 'client', dot: 'bg-blue-500' },
   { label: 'Internal', value: 'internal', dot: 'bg-green-500' },
@@ -96,6 +96,42 @@ export function Projects() {
     }
     return [];
   })() as Project[];
+
+  // ─── Real-time project sync via WebSocket notification 
+  useEffect(() => {
+    const processedIds = new Set<string>();
+
+    const handleProjectNotification = (relatedObject: { type: string; id: string | number }) => {
+      if (relatedObject.type !== 'project') return;
+
+      const dedupeKey = `${relatedObject.id}-${Math.floor(Date.now() / 2000)}`;
+      if (processedIds.has(dedupeKey)) return;
+      processedIds.add(dedupeKey);
+
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+    };
+
+    const unsubNotification = notificationSocket.onNotification((data) => {
+      if (data.related_object?.type === 'project') {
+        handleProjectNotification(data.related_object);
+      }
+    });
+
+    const unsubGateway = gatewaySocket.onMessage((msg: any) => {
+      if (msg.type === 'SIGNAL' && msg.event === 'NEW_NOTIFICATION') {
+        const related = msg.data?.related_object;
+        if (related?.type === 'project') {
+          handleProjectNotification(related);
+        }
+      }
+    });
+
+    return () => {
+      unsubNotification();
+      unsubGateway();
+      processedIds.clear();
+    };
+  }, [queryClient]);
 
   // Filter configuration
   const filterConfig: ColumnFilterConfig[] = [
