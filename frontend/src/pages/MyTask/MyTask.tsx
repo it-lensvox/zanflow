@@ -13,6 +13,7 @@ import { createTasksTableColumns, TaskGridCard, getStatusConfig, priorityOptions
 import { useTableFilters, ColumnFilterConfig } from '@/hooks/useTableFilters';
 import { SearchFilter, ListFilter, DateFilter, FilterHeaderWrapper } from '@/components/layout/DualView/FilterComponents';
 import { Button } from '@/components/common/Button';
+import { InlineCreateRow } from '@/components/layout/CreateTask/InlineCreateRow';
 import { useNotifications } from '@/hooks/useNotifications';
 import { NotificationsPage } from '../NotificationsPage';
 
@@ -78,6 +79,7 @@ export const MyTask: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [showAITaskModal, setShowAITaskModal] = useState(false);
+    const [isInlineCreating, setIsInlineCreating] = useState(false);
     const activeFilter = location.pathname.split('/').filter(p => p)[1]?.toUpperCase() || 'ALL';
 
     const { data: usersData } = useQuery({
@@ -534,10 +536,10 @@ export const MyTask: React.FC = () => {
                                 </div>
                             )}
 
-                            {viewMode === 'table' && (
+                            {viewMode === 'table' && !isInlineCreating && (
                                 <div
                                     className="p-3 border-t border-[#dfe1e6] bg-white cursor-pointer hover:bg-gray-50 transition-colors rounded-b-md -mt-px"
-                                    onClick={() => navigate('/taskboard/create')}
+                                    onClick={() => setIsInlineCreating(true)}
                                 >
                                     <div className="flex items-center gap-2 text-gray-500 text-[13px] font-medium pl-1">
                                         <Plus className="w-4 h-4 text-gray-400 group-hover:text-blue-600 transition-colors" />
@@ -545,13 +547,16 @@ export const MyTask: React.FC = () => {
                                     </div>
                                 </div>
                             )}
+                            {viewMode === 'table' && isInlineCreating && (
+                                <InlineCreateRow
+                                    columns={tableColumns}
+                                    onCancel={() => setIsInlineCreating(false)}
+                                    queryClient={queryClient}
+                                />
+                            )}
                         </div>
                     </div>
                 </>
-                //     )
-                // ) : (
-                //     <Outlet />
-                // )}
             ) : (
                 <Outlet />
             )}

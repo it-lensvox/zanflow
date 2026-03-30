@@ -227,31 +227,7 @@ export function CreateProjectModal({ isOpen, onClose, navigateOnSuccess = false 
                         />
                     </div>
 
-                    {/* Description Section */}
-                    <div className="space-y-2">
-                        <label htmlFor="description" className="text-sm font-medium">
-                            Description
-                        </label>
-                        <RichTextEditor
-                            value={formData.description}
-                            onChange={handleDescriptionChange}
-                            placeholder="Enter project description (optional)"
-                            minHeight="120px"
-                            maxHeight="250px"
-                            features={{
-                                bold: true,
-                                italic: true,
-                                underline: true,
-                                link: true,
-                                bulletList: true,
-                                orderedList: true,
-                                heading: true,
-                                table: false,
-                                image: false,
-                                codeBlock: false,
-                            }}
-                        />
-                    </div>
+
 
                     {/* Assigned To (Split UI) */}
                     <div className="space-y-3">
