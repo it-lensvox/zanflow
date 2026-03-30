@@ -565,3 +565,28 @@ def delete_expired_notifications() -> Dict[str, int]:
         'unread_deleted': unread_deleted,
         'total_deleted': read_deleted + unread_deleted
     }
+
+def notify_task_assignees_added(task, actor: User, new_assignees: List[User]) -> List[Notification]:
+    """
+    Send notifications specifically to users who are newly assigned to an existing task.
+    """
+    if not new_assignees:
+        return []
+    
+    project_name = task.project.name if getattr(task, 'project', None) else "No Project"
+    
+    return notify(
+        recipients=new_assignees,
+        title="Assigned to Task",
+        message=f"You have been assigned to task '{task.heading}' in project '{project_name}'",
+        notification_type=Notification.NotificationType.TASK_ASSIGNED,
+        actor=actor,
+        priority=_get_priority_from_task(task),
+        related_object=task,
+        metadata={
+            'task_id': task.id,
+            'task_heading': task.heading,
+            'project_name': project_name,
+            'priority': task.priority,
+        }
+    )

@@ -21,6 +21,7 @@ from apps.notification.services import (
     notify_task_created,
     notify_task_status_updated,
     notify_task_comment,
+    notify_task_assignees_added
 )
 class AllUsersListView(APIView):
     authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
@@ -139,6 +140,12 @@ class TaskRetrieveUpdateView(APIView):
     def patch(self, request, task_id):
         task = get_object_or_404(Task, id=task_id)
         old_status = task.status
+        
+        # ================================================================
+        # 1. Capture existing assignees BEFORE the update
+        # ================================================================
+        old_assignee_ids = set(task.assigned_to.values_list('id', flat=True))
+
         if request.user.is_manager:
             serializer = TaskSerializer(task, data=request.data, partial=True, context={'request': request})
         else:
@@ -159,23 +166,42 @@ class TaskRetrieveUpdateView(APIView):
             serializer = TaskStatusUpdateSerializer(task, data=request.data, partial=True)
 
         if serializer.is_valid():
-            serializer.save()
-             # ================================================================
+            # Save the serializer and capture the updated task instance
+            updated_task = serializer.save()
+            
+            # ================================================================
             # TRIGGER NOTIFICATION: Status Updated (only if status changed)
             # ================================================================
-            new_status = task.status
+            new_status = updated_task.status
             if old_status != new_status:
                 notify_task_status_updated(
-                    task=task,
+                    task=updated_task,
                     actor=request.user,
                     old_status=old_status,
                     new_status=new_status
                 )
+                
             # ================================================================
+            # TRIGGER NOTIFICATION: New Assignees Added
+            # ================================================================
+            new_assignee_ids = set(updated_task.assigned_to.values_list('id', flat=True))
+            added_assignee_ids = new_assignee_ids - old_assignee_ids
+            
+            if added_assignee_ids:
+                # Fetch only the users who were just added
+                added_users = list(updated_task.assigned_to.filter(id__in=added_assignee_ids))
+                notify_task_assignees_added(
+                    task=updated_task,
+                    actor=request.user,
+                    new_assignees=added_users
+                )
+            # ================================================================
+
             return Response({
                 "message": "Task updated successfully",
                 "task": serializer.data
             }, status=status.HTTP_200_OK)
+            
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, task_id): 
