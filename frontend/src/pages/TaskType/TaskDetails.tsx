@@ -9,7 +9,7 @@ import {
   Grid3X3,
   Settings,
   MessageCircle,
-  Search,
+  Search, FileText, Info, X, Calendar, User
 } from 'lucide-react';
 import { DualView, ViewToggle } from '@/components/layout/DualView';
 import { createDocumentsTableColumns, DocumentGridCard } from '@/components/layout/DualView/documentsConfig';
@@ -17,13 +17,15 @@ import { TaskGridCard, createTasksTableColumns, getStatusConfig, priorityOptions
 import { TaskDetailModal } from '../MyTask/TaskDetailModal';
 import { SearchFilter, ListFilter, DateFilter, FilterHeaderWrapper } from '@/components/layout/DualView/FilterComponents';
 import { CreateTask } from '@/pages/MyTask/CreateTask';
+import { InlineCreateRow } from '@/components/layout/CreateTask/InlineCreateRow';
 import { DocumentPreview, useDocumentPreviewKeyboard } from '@/components/common/DocumentPreview';
+import { DocumentShareModal } from '@/pages/Documents/DocumentShareModal';
 import DeleteModal from '@/components/common/Deletemodal';
 import Threads from '../Project/Thread';
 import { useProjectDetails, TabType } from '@/hooks/useTaskDetails';
 import type { Task, FilteredDocument } from '@/types';
 
-// ─── Date Field Dropdown (portal) ─────────────────────────────────────────────
+//Date Field Dropdown
 function DateFieldDropdown({
   show,
   dropdownPos,
@@ -51,9 +53,8 @@ function DateFieldDropdown({
             e.stopPropagation();
             onSelect(opt.value);
           }}
-          className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-purple-50 hover:text-purple-700 transition-colors ${
-            dateField === opt.value ? 'font-semibold text-purple-600 bg-purple-50' : 'text-gray-700'
-          }`}
+          className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-purple-50 hover:text-purple-700 transition-colors ${dateField === opt.value ? 'font-semibold text-purple-600 bg-purple-50' : 'text-gray-700'
+            }`}
         >
           {dateField === opt.value && <span className="mr-1.5">✓</span>}
           {opt.label}
@@ -64,7 +65,7 @@ function DateFieldDropdown({
   );
 }
 
-// ─── Document Filter Bar ──────────────────────────────────────────────────────
+// ─── Document Filter Bar 
 function DocumentFilterBar({
   documentFilter,
   selectedTaskId,
@@ -90,11 +91,10 @@ function DocumentFilterBar({
           <button
             key={f}
             onClick={() => handleFilterChange(f)}
-            className={`px-5 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 capitalize ${
-              documentFilter === f
+            className={`px-5 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 capitalize ${documentFilter === f
                 ? 'bg-black text-white shadow-md'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
+              }`}
           >
             {f.charAt(0).toUpperCase() + f.slice(1)}
           </button>
@@ -134,9 +134,8 @@ function DocumentFilterBar({
                       <button
                         key={option.task_id}
                         onClick={() => handleTaskSelect(option.task_id)}
-                        className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors duration-150 border-b border-gray-100 last:border-b-0 ${
-                          selectedTaskId === option.task_id ? 'bg-gray-100' : ''
-                        }`}
+                        className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors duration-150 border-b border-gray-100 last:border-b-0 ${selectedTaskId === option.task_id ? 'bg-gray-100' : ''
+                          }`}
                       >
                         <p className="text-sm font-medium text-gray-900">{option.task_heading}</p>
                       </button>
@@ -155,9 +154,8 @@ function DocumentFilterBar({
         <ViewToggle viewMode={docViewMode} onViewModeChange={setDocViewMode} />
         {documentFilter === 'project' && (
           <label
-            className={`flex items-center gap-2 px-5 py-2.5 bg-black text-white rounded-lg font-medium text-sm cursor-pointer hover:bg-gray-800 transition-all duration-200 shadow-sm ${
-              isUploading ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
+            className={`flex items-center gap-2 px-5 py-2.5 bg-black text-white rounded-lg font-medium text-sm cursor-pointer hover:bg-gray-800 transition-all duration-200 shadow-sm ${isUploading ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
           >
             <input
               ref={fileInputRef}
@@ -177,12 +175,12 @@ function DocumentFilterBar({
   );
 }
 
-// ─── Main Unified Component ───────────────────────────────────────────────────
+// ─── Main Unified Component 
 export function TaskDetails() {
   const ctx = useProjectDetails();
   useDocumentPreviewKeyboard(() => ctx.setPreviewDocument(null));
 
-  // DateFieldLabel — memoised button rendered inline in filter headers
+  // DateFieldLabel 
   const DateFieldLabel = useMemo(
     () => (
       <button
@@ -254,11 +252,10 @@ export function TaskDetails() {
               <button
                 key={key}
                 onClick={() => ctx.setActiveTab(key)}
-                className={`px-8 py-3.5 rounded-t-lg border-b-[3px] text-[0.95rem] font-semibold cursor-pointer transition-all duration-200 ${
-                  ctx.activeTab === key
+                className={`px-8 py-3.5 rounded-t-lg border-b-[3px] text-[0.95rem] font-semibold cursor-pointer transition-all duration-200 ${ctx.activeTab === key
                     ? 'bg-slate-100 text-black border-b-2 border-black'
                     : 'border-transparent text-slate-500 hover:text-black hover:bg-slate-50'
-                }`}
+                  }`}
               >
                 {label}
               </button>
@@ -269,18 +266,16 @@ export function TaskDetails() {
               <div className="flex items-center bg-white p-1 gap-1 ml-auto">
                 <button
                   onClick={() => ctx.setViewMode('list')}
-                  className={`p-1.5 rounded transition-colors ${
-                    ctx.viewMode === 'list' ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:bg-gray-50'
-                  }`}
+                  className={`p-1.5 rounded transition-colors ${ctx.viewMode === 'list' ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:bg-gray-50'
+                    }`}
                   title="List View"
                 >
                   <List className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => ctx.setViewMode('grid')}
-                  className={`p-1.5 rounded transition-colors ${
-                    ctx.viewMode === 'grid' ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:bg-gray-50'
-                  }`}
+                  className={`p-1.5 rounded transition-colors ${ctx.viewMode === 'grid' ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:bg-gray-50'
+                    }`}
                   title="Grid View"
                 >
                   <Grid3X3 className="w-4 h-4" />
@@ -290,9 +285,8 @@ export function TaskDetails() {
 
             {/* Create Task */}
             <button
-              className={`flex items-center gap-2 px-6 py-3.5 border-b-[3px] border-transparent text-slate-500 font-semibold text-[0.95rem] cursor-pointer transition-all duration-200 hover:bg-gradient-to-r hover:from-[#5568d3] hover:to-[#65408b] hover:text-white rounded-t-lg ${
-                ctx.activeTab !== 'tasks' ? 'ml-auto' : ''
-              }`}
+              className={`flex items-center gap-2 px-6 py-3.5 border-b-[3px] border-transparent text-slate-500 font-semibold text-[0.95rem] cursor-pointer transition-all duration-200 hover:bg-gradient-to-r hover:from-[#5568d3] hover:to-[#65408b] hover:text-white rounded-t-lg ${ctx.activeTab !== 'tasks' ? 'ml-auto' : ''
+                }`}
               onClick={() => ctx.setIsCreateTaskModalOpen(true)}
             >
               Create Task
@@ -359,10 +353,10 @@ export function TaskDetails() {
                                       ['project', 'heading', 'labels'].includes(col.key)
                                         ? 'search'
                                         : ['status', 'priority', 'assigned_to'].includes(col.key)
-                                        ? 'list'
-                                        : col.key === ctx.dateField
-                                        ? 'date'
-                                        : 'none'
+                                          ? 'list'
+                                          : col.key === ctx.dateField
+                                            ? 'date'
+                                            : 'none'
                                     }
                                     isActive={ctx.activeFilterKey === col.key}
                                     filterContent={
@@ -473,6 +467,35 @@ export function TaskDetails() {
                             onFilter: ctx.handleFilter,
                           }}
                         />
+
+                        {/* Inline create row  */}
+                        {ctx.viewMode === 'list' && !ctx.isInlineCreating && (
+                          <div
+                            className="p-3 border border-t-0 border-[#dfe1e6] bg-white cursor-pointer hover:bg-gray-50 transition-colors rounded-b-md"
+                            onClick={() => ctx.setIsInlineCreating(true)}
+                          >
+                            <div className="flex items-center gap-2 text-gray-500 text-[13px] font-medium pl-1">
+                              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                              </svg>
+                              <span className="hover:text-blue-600 transition-colors">Create Task</span>
+                            </div>
+                          </div>
+                        )}
+                        {ctx.viewMode === 'list' && ctx.isInlineCreating && (
+                          <InlineCreateRow
+                            columns={createTasksTableColumns({
+                              onTaskClick: ctx.setSelectedTask,
+                              queryClient: ctx.queryClient,
+                              user: ctx.user,
+                              navigate: ctx.navigate,
+                              dateField: ctx.dateField,
+                            })}
+                            onCancel={() => ctx.setIsInlineCreating(false)}
+                            queryClient={ctx.queryClient}
+                            fixedProjectId={ctx.id ? Number(ctx.id) : undefined}
+                          />
+                        )}
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -554,6 +577,7 @@ export function TaskDetails() {
                           document={doc}
                           onCardClick={(d) => ctx.handleDocumentClick(d as any)}
                           onDeleteClick={(e, d) => ctx.handleDeleteClick(e, d)}
+                          onShareClick={(d) => ctx.setShareDoc(d as any)}
                         />
                       ),
                       gridClassName: 'grid gap-4 md:grid-cols-2 lg:grid-cols-3',
@@ -585,6 +609,8 @@ export function TaskDetails() {
                       }),
                       columns: createDocumentsTableColumns({
                         onDeleteClick: (e, doc) => ctx.handleDeleteClick(e, doc),
+                        onInfoClick: (doc) => ctx.setInfoDoc(doc),
+                        onShareClick: (doc) => ctx.setShareDoc(doc),
                       }),
                       rowKey: (doc: any) => doc.id,
                       onRowClick: (doc: any) => ctx.handleDocumentClick(doc),
@@ -625,6 +651,46 @@ export function TaskDetails() {
           onClose={() => ctx.setPreviewDocument(null)}
         />
       )}
+      {/* Document Info Panel — same as /documents page */}
+      {ctx.infoDoc && (
+        <div className="fixed inset-0 z-50 flex justify-end pointer-events-none">
+          <div className="pointer-events-auto w-[340px] h-full bg-white border-l border-gray-200 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-50">
+              <div className="flex items-center gap-2">
+                <Info className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-semibold text-gray-800">Document Info</span>
+              </div>
+              <button onClick={() => ctx.setInfoDoc(null)} className="p-1.5 rounded hover:bg-gray-200 transition-colors">
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
+              {[
+                { icon: <FileText className="w-4 h-4 text-blue-500" />, label: 'File Name', value: ctx.infoDoc.original_file_name || ctx.infoDoc.name },
+                { icon: <User className="w-4 h-4 text-blue-500" />, label: 'Uploaded By', value: ctx.infoDoc.created_by?.full_name || 'System' },
+                { icon: <Calendar className="w-4 h-4 text-rose-500" />, label: 'Created At', value: ctx.infoDoc.created_at ? new Date(ctx.infoDoc.created_at).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A' },
+                { icon: <Calendar className="w-4 h-4 text-amber-500" />, label: 'Updated At', value: ctx.infoDoc.updated_at ? new Date(ctx.infoDoc.updated_at).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A' },
+              ].map((row, i) => (
+                <div key={i} className="flex items-start gap-3 py-1.5 border-b border-gray-50 last:border-0">
+                  <div className="mt-0.5 flex-shrink-0">{row.icon}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">{row.label}</div>
+                    <div className="text-[12px] text-gray-700 break-all">{row.value}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Document Share Modal — same as /documents page */}
+      <DocumentShareModal
+        isOpen={!!ctx.shareDoc}
+        onClose={() => ctx.setShareDoc(null)}
+        document={ctx.shareDoc}
+      />
+
 
       {ctx.isCreateTaskModalOpen && (
         <CreateTask

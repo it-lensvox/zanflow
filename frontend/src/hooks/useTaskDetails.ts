@@ -32,9 +32,10 @@ export function useProjectDetails() {
         storageKey: 'project-documents-view-mode',
     });
 
-    // ─── Modal State ─────────────────────────────────────────────────────────────
+   // ─── Modal State ─────────────────────────────────────────────────────────────
     const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+    const [isInlineCreating, setIsInlineCreating] = useState(false);
 
     // ─── Upload State ─────────────────────────────────────────────────────────────
     const [isUploading, setIsUploading] = useState(false);
@@ -42,7 +43,7 @@ export function useProjectDetails() {
     const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // ─── Preview / Delete State ──────────────────────────────────────────────────
+    // ─── Preview / Delete State 
     const [previewDocument, setPreviewDocument] = useState<{
         url: string;
         fileName: string;
@@ -50,15 +51,17 @@ export function useProjectDetails() {
     } | null>(null);
     const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+     const [infoDoc, setInfoDoc] = useState<any | null>(null);
+    const [shareDoc, setShareDoc] = useState<any | null>(null);
 
-    // ─── Document Filter State ───────────────────────────────────────────────────
+    // ─── Document Filter State 
     const [documentFilter, setDocumentFilter] = useState<'project' | 'task'>('project');
     const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
     const [taskSearchQuery, setTaskSearchQuery] = useState('');
     const [showTaskDropdown, setShowTaskDropdown] = useState(false);
     const taskDropdownRef = useRef<HTMLDivElement>(null);
 
-    // ─── Date Filter State ───────────────────────────────────────────────────────
+    // ─── Date Filter State 
     const [dateField, setDateField] = useState<'end_date' | 'start_date' | 'created_at'>('end_date');
     const [showDateFieldDropdown, setShowDateFieldDropdown] = useState(false);
     const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
@@ -712,9 +715,11 @@ export function useProjectDetails() {
         docViewMode,
         setDocViewMode,
 
-        // Modals
+     // Modals
         isCreateTaskModalOpen,
         setIsCreateTaskModalOpen,
+        isInlineCreating,
+        setIsInlineCreating,
         selectedTask,
         setSelectedTask,
         previewDocument,
@@ -722,6 +727,12 @@ export function useProjectDetails() {
         deleteConfirm,
         setDeleteConfirm,
         isDeleting,
+
+        // Document info & share
+        infoDoc,
+        setInfoDoc,
+        shareDoc,
+        setShareDoc,
 
         // Upload
         isUploading,
