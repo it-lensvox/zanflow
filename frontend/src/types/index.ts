@@ -875,7 +875,9 @@ export interface ChatUnreadUpdateEvent {
   event: 'CHAT_UNREAD_UPDATE';
   data: {
     room_id: string;
+    room_type?: string;
     total_unread: number;
+    thread_unread?: number;
     room_unread: number;
   };
 }

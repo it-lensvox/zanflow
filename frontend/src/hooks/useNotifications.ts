@@ -7,6 +7,7 @@ import notificationSoundFile from '../public/assets/notification-sound.mp3';
 export function useNotifications() {
   const [notifications, setNotifications] = useState<NotificationData[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
   const [isConnected, setIsConnected] = useState(false);
   const queryClient = useQueryClient();
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -69,8 +70,27 @@ export function useNotifications() {
       }
     });
 
+    // Subscribe to chat unread updates from the notification socket
+    const unsubscribeChat = notificationSocket.onChatUnreadUpdate((data) => {
+      if (data.total_unread !== undefined) {
+        setChatUnreadCount((prevCount) => {
+          // Play the sound when a new chat message arrives (unread count increases)
+          if (data.total_unread > prevCount && audioRef.current) {
+            audioRef.current.currentTime = 0;
+            audioRef.current.play().catch((error) => {
+              console.warn('Browser prevented audio playback:', error);
+            });
+          }
+          return data.total_unread;
+        });
+      }
+      // Invalidate chat queries so other components automatically update their unread counters
+      queryClient.invalidateQueries({ queryKey: ['chat-unread'] });
+    });
+
     return () => {
       unsubscribe();
+      unsubscribeChat();
     };
   }, [queryClient]);
 
@@ -96,6 +116,27 @@ export function useNotifications() {
 
     initializeUnreadCount();
 
+    // Initialize chat unread count on mount
+    const initializeChatUnreadCount = async () => {
+      try {
+        const data = await queryClient.fetchQuery({
+          queryKey: ['chat-unread'],
+          queryFn: async () => {
+            const response = await api.get('/chat/unread/');
+            return response.data;
+          },
+          staleTime: 30_000,
+        });
+        if (data?.total_unread !== undefined) {
+          setChatUnreadCount(data.total_unread);
+        }
+      } catch (error) {
+        console.error('[useNotifications] Failed to initialize chat unread count:', error);
+      }
+    };
+
+    initializeChatUnreadCount();
+
     // Subscribe only to the infinite query pages to sync unread count after panel opens
     const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
       if (
@@ -119,7 +160,8 @@ export function useNotifications() {
 
   return {
     notifications,
-    unreadCount,
+    unreadCount, 
+    chatUnreadCount,
     isConnected,
     setNotifications,
     triggerRefetch,
