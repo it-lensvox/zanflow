@@ -646,47 +646,39 @@ class ChatMessageService:
     def _send_notification(message: ChatMessage):
         """
         Send notification for new message.
-        Integrates with existing notification app.
-        
-        Args:
-            message: ChatMessage instance
         """
         try:
-            # Import notification service - adjust import based on your notification app structure
-            from apps.notification.services import NotificationService
+            from apps.notification.services import notify_new_chat_message
             
             room = message.room
             sender = message.sender
             
-            # Get recipients (all participants except sender)
+            if not sender:
+                return
+            
             if room.room_type == ChatRoom.RoomType.PRIVATE:
-                recipients = room.participants.exclude(id=sender.id)
-            elif room.room_type == ChatRoom.RoomType.PROJECT:
-                # Only notify unmuted members
+                recipients = list(room.participants.exclude(id=sender.id))
+            elif room.room_type in [ChatRoom.RoomType.PROJECT, ChatRoom.RoomType.TEAM, ChatRoom.RoomType.THREAD]:
                 memberships = ChatRoomMembership.objects.filter(
                     room=room,
                     is_muted=False
                 ).exclude(user=sender)
-                recipients = User.objects.filter(
+                recipients = list(User.objects.filter(
                     id__in=memberships.values_list('user_id', flat=True)
-                )
+                ))
             else:
-                # Global chat - might want to limit notifications
-                return  # Skip notifications for global chat
+                return
             
-            # Create notifications
-            for recipient in recipients:
-                NotificationService.create_notification(
-                    recipient=recipient,
-                    title=f"New message from {sender.username}",
-                    message=message.content[:100],
-                    notification_type='chat_message',
-                    related_object_id=str(message.id),
-                    related_object_type='chat_message'
+            if recipients:
+                notify_new_chat_message(
+                    room=room,
+                    message=message,
+                    actor=sender,
+                    recipients=recipients
                 )
                 
-        except ImportError:
-            logger.warning("Notification app not available, skipping message notification")
+        except ImportError as e:
+            logger.warning(f"Notification app not available or import failed: {e}")
         except Exception as e:
             logger.error(f"Failed to send chat notification: {str(e)}")
 

@@ -39,6 +39,7 @@ def should_notify(user: User, notification_type: str) -> bool:
         'mention': 'mention_notifications',
         'system': 'system_notifications',
         'reminder': 'system_notifications',
+        'new_message': 'system_notifications',
     }
     
     preference_field = type_to_preference.get(notification_type, 'system_notifications')
@@ -588,5 +589,34 @@ def notify_task_assignees_added(task, actor: User, new_assignees: List[User]) ->
             'task_heading': task.heading,
             'project_name': project_name,
             'priority': task.priority,
+        }
+    )
+
+# ============================================================================
+# CHAT-SPECIFIC NOTIFICATION FUNCTIONS
+# ============================================================================
+
+def notify_new_chat_message(room, message, actor: User, recipients: List[User]) -> List[Notification]:
+    """
+    Send notifications when a new chat message is received.
+    """
+    if not recipients:
+        return []
+    
+    content_preview = message.content[:100] if message.content else "Sent an attachment"
+    
+    return notify(
+        recipients=recipients,
+        title=f"New message from {actor.first_name or actor.username}",
+        message=content_preview,
+        notification_type='new_message',  # Hardcoded string to avoid Enum lookup errors
+        actor=actor,
+        priority=Notification.Priority.MEDIUM,
+        related_object=None,  # <-- FIX: Set to None to prevent UUID vs Integer crashes!
+        metadata={
+            'room_id': str(room.id),
+            'room_name': room.name,
+            'message_id': str(message.id),
+            'related_type': 'message'
         }
     )
