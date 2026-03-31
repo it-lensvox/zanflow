@@ -334,7 +334,7 @@ export function NotificationsPage({
                       {n.metadata?.task_heading || n.metadata?.project_name || n.title}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                      {n.message}
+                      {n.message ? n.message.replace(/<[^>]*>?/gm, '').trim() : ''}
                     </p>
                   </div>
                 );
