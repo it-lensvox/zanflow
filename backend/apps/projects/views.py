@@ -400,6 +400,20 @@ class ProjectViewSet(viewsets.ModelViewSet):
         Remove a member from the project.
         """
         project = self.get_object()
+        
+        # --- SECURITY CHECK: Only allow owners/creators to remove members ---
+        is_creator = project.created_by == request.user
+        is_owner_member = project.members.through.objects.filter(
+            project=project, 
+            user=request.user, 
+            role='owner'
+        ).exists()
+
+        if not (is_creator or is_owner_member):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("You do not have permission to remove members. Only the project owner can do this.")
+        # --- END SECURITY CHECK ---
+
         try:
             membership = ProjectMembership.objects.get(project=project, user_id=user_id)
             membership.delete()
