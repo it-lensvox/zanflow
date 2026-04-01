@@ -1,4 +1,3 @@
-# apps/users/backends.py (or auth.py)
 from django.contrib.auth.backends import ModelBackend
 from django.contrib.auth import get_user_model
 from django.db.models import Q
@@ -17,9 +16,11 @@ class EmailOrUsernameModelBackend(ModelBackend):
         except User.DoesNotExist:
             return None
         except User.MultipleObjectsReturned:
-            # In case multiple users have the same email, pick the first active one
-            return User.objects.filter(Q(username__iexact=username) | Q(email__iexact=username)).order_by('id').first()
+            # FIX: Assign to 'user' instead of returning immediately!
+            user = User.objects.filter(Q(username__iexact=username) | Q(email__iexact=username)).order_by('id').first()
 
+        # Now, EVERY user must pass this password check before being returned
         if user.check_password(password) and self.user_can_authenticate(user):
             return user
+            
         return None
