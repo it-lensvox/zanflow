@@ -66,21 +66,29 @@ export function Login() {
   const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   // Toast state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  const showToast = (message: string, type: 'success' | 'error') => {
+  const showToast = (message: string, type: 'success' | 'error', autoClose: boolean = true) => {
     setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
+    if (autoClose) {
+      setTimeout(() => setToast(null), 4000);
+    }
   };
 
   const handleSendOTP = async () => {
+    // 1. Show the success message immediately when the button is clicked
+    showToast("If this email is registered, an OTP has been sent.", "success", false);
+    
     try {
+      // 2. Perform the 5-6 second API call in the background
       await authApi.forgotPassword(forgotEmail);
-      showToast("OTP sent successfully to your email", "success");
-    } catch (err) {
-      showToast("Failed to send OTP. Please check your email.", "error");
+    } catch (err: any) {
+      // 3. Only update the UI again if the network request actually fails
+      const errorMessage = err?.response?.data?.detail || "Failed to process request. Please try again.";
+      showToast(errorMessage, "error");
     }
   }
 
@@ -136,15 +144,6 @@ export function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/50">
-      {/* Toast Notifications */}
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
-
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Welcome To DYUKSA</CardTitle>
@@ -169,15 +168,34 @@ export function Login() {
                 required
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 relative">
               <Input
                 id="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
                 required
+                className="pr-10"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? (
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a10.05 10.05 0 011.52-3.4m4.68-1.68c1.07-.66 2.34-1.04 3.68-1.04 4.478 0 8.268 2.943 9.542 7a10.06 10.06 0 01-1.38 3.02m-7.23-3.64l-4.5 4.5" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3l18 18" />
+                  </svg>
+                )}
+              </button>
             </div>
             <div className="flex justify-end">
               <button
@@ -217,6 +235,7 @@ export function Login() {
                   setResetToken('');
                   setNewPassword('');
                   setConfirmPassword('');
+                  setToast(null);
                 }}
                 className="absolute right-4 top-4 text-muted-foreground hover:text-foreground"
               >✕</button>
@@ -228,6 +247,31 @@ export function Login() {
               </p>
             </CardHeader>
             <CardContent>
+              {/* Inline Notification */}
+              {toast && (
+                <div className={`mb-4 flex items-start gap-3 rounded-lg p-3 animate-in fade-in zoom-in duration-200 ${
+                  toast.type === 'success' 
+                    ? 'bg-green-50 text-green-900 border border-green-200' 
+                    : 'bg-red-50 text-red-900 border border-red-200'
+                }`}>
+                  <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${
+                    toast.type === 'success' ? 'bg-green-500' : 'bg-red-500'
+                  }`}>
+                    {toast.type === 'success' ? (
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                    ) : (
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    )}
+                  </div>
+                  <div className="flex-1 text-sm font-medium mt-0.5">{toast.message}</div>
+                  <button onClick={() => setToast(null)} className={`flex-shrink-0 mt-0.5 ${
+                    toast.type === 'success' ? 'text-green-400 hover:text-green-600' : 'text-red-400 hover:text-red-600'
+                  }`}>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                </div>
+              )}
+
               {step === 1 ? (
                 /* Form 1: OTP Flow */
                 <div className="space-y-4">
@@ -241,7 +285,19 @@ export function Login() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Enter OTP</label>
                     <div className="flex gap-2 items-center">
-                      <Input placeholder="4-digit code" maxLength={4} className="text-center tracking-widest" value={otp} onChange={(e) => setOtp(e.target.value)} />
+                      <Input 
+                        placeholder="4-digit code" 
+                        maxLength={4} 
+                        className="text-center tracking-widest" 
+                        value={otp} 
+                        onChange={(e) => {
+                          setOtp(e.target.value);
+                          // Clear the success message as soon as the user starts typing
+                          if (toast?.type === 'success') {
+                            setToast(null);
+                          }
+                        }} 
+                      />
                     </div>
                   </div>
                   <Button

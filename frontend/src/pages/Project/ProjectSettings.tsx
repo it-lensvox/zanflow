@@ -66,6 +66,7 @@ export function ProjectSettings() {
   const [errorMessage, setErrorMessage] = useState('');
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteModalType, setDeleteModalType] = useState<'confirm' | 'denied'>('confirm');
+  const [memberToDelete, setMemberToDelete] = useState<{ id: number; name: string } | null>(null);
   const { user: currentUser } = useAuth();
 
   const { data: project, isLoading } = useQuery({
@@ -152,6 +153,17 @@ export function ProjectSettings() {
       setTempUser(null);
       setTempRole('');
     },
+  });
+
+  const removeMemberMutation = useMutation({
+    mutationFn: (userId: number) => projectsApi.removeMember(Number(id), userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
+    },
+    onError: () => {
+      setErrorMessage('Failed to remove member from the project.');
+      setShowErrorModal(true);
+    }
   });
 
   const deleteLabelMutation = useMutation({
@@ -244,6 +256,11 @@ export function ProjectSettings() {
   }
 
   const labels = project.labels || [];
+
+  // Determine if the current user has owner privileges
+  const isOwner = project?.created_by?.id === currentUser?.id || 
+                  project?.created_by === currentUser?.id || 
+                  project?.members?.some((m: any) => m.user?.id === currentUser?.id && m.role === 'owner');
 
   return (
     <div className="w-full max-w-3xl mx-auto px-6 py-8 space-y-6">
@@ -376,8 +393,23 @@ export function ProjectSettings() {
                         key={member.id}
                         className={`flex items-center justify-between px-3 py-2 ${index !== project.members.length - 1 ? 'border-b' : ''}`}
                       >
-                        <span className="font-medium">{displayName}</span>
-                        <span className="text-muted-foreground">{roleLabel}</span>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{displayName}</span>
+                          <span className="text-xs text-muted-foreground">{roleLabel}</span>
+                        </div>
+                        
+                        {/* Only render the delete button if the user is the owner */}
+                        {isOwner && (
+                          <button
+                            type="button"
+                            className="text-muted-foreground hover:text-destructive p-1 transition-colors"
+                            onClick={() => setMemberToDelete({ id: member.user.id, name: displayName })}
+                            disabled={removeMemberMutation.isPending}
+                            title="Remove member"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     );
                   })}
@@ -700,7 +732,6 @@ export function ProjectSettings() {
           </CardContent>
         </Card>
       )}
-      {/* Error Popup Modal */}
       <DeleteModal
         isOpen={deleteModalOpen}
         type={deleteModalType}
@@ -713,6 +744,24 @@ export function ProjectSettings() {
         onCancel={() => setDeleteModalOpen(false)}
         isDeleting={deleteMutation.isPending}
       />
+
+      {/* New Modal for Removing Members */}
+      <DeleteModal
+        isOpen={!!memberToDelete}
+        type="confirm"
+        itemType="member"
+        itemName={memberToDelete?.name}
+        onConfirm={() => {
+          if (memberToDelete) {
+            removeMemberMutation.mutate(memberToDelete.id, {
+              onSettled: () => setMemberToDelete(null) // Close the modal when the request finishes
+            });
+          }
+        }}
+        onCancel={() => setMemberToDelete(null)}
+        isDeleting={removeMemberMutation.isPending}
+      />
+
       {showErrorModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in zoom-in duration-200">
           <div className="bg-background border rounded-lg shadow-xl max-w-md w-full p-6 space-y-4 mx-4">
