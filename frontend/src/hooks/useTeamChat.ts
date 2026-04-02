@@ -190,7 +190,6 @@ export function useTeamChat() {
           queryKey: ['chat-room-details', matchedRoom.id],
           queryFn: () => chatApi.getRoomDetails(matchedRoom.id),
         });
-        queryClient.invalidateQueries({ queryKey: ['chat-messages', matchedRoom.id] });
       }
     }
   }, [urlRoomId, urlProjectId, projectRoomsData]);
@@ -210,7 +209,6 @@ export function useTeamChat() {
           queryKey: ['chat-room-details', matchedRoom.id],
           queryFn: () => chatApi.getRoomDetails(matchedRoom.id),
         });
-        queryClient.invalidateQueries({ queryKey: ['chat-messages', matchedRoom.id] });
       }
     }
   }, [urlRoomId, urlProjectId, teamRoomsData]);
@@ -251,7 +249,6 @@ export function useTeamChat() {
           queryKey: ['chat-room-details', matchedRoom.id],
           queryFn: () => chatApi.getRoomDetails(matchedRoom.id),
         });
-        queryClient.invalidateQueries({ queryKey: ['chat-messages', matchedRoom.id] });
       }
     }
   }, [urlRoomId, urlProjectId, privateRoomsData, currentUser?.id]);
@@ -985,7 +982,6 @@ export function useTeamChat() {
 
     setActiveRoom(null);
     activeRoomRef.current = null;
-    queryClient.resetQueries({ queryKey: ['chat-messages'] });
     createRoomMutation.mutate(userId);
   };
 
@@ -1006,9 +1002,6 @@ export function useTeamChat() {
       queryKey: ['chat-room-details', projectRoom.id],
       queryFn: () => chatApi.getRoomDetails(projectRoom.id),
     });
-
-    queryClient.resetQueries({ queryKey: ['chat-messages'] });
-    queryClient.invalidateQueries({ queryKey: ['chat-messages', projectRoom.id] });
 
     const projectId = (projectRoom as any).project_id ?? (projectRoom as any).project ?? '';
     if (projectId) navigate(`/team-chat/${projectId}/${projectRoom.id}`);
@@ -1032,9 +1025,6 @@ export function useTeamChat() {
       queryKey: ['chat-room-details', teamRoom.id],
       queryFn: () => chatApi.getRoomDetails(teamRoom.id),
     });
-
-    queryClient.resetQueries({ queryKey: ['chat-messages'] });
-    queryClient.invalidateQueries({ queryKey: ['chat-messages', teamRoom.id] });
   };
 
   //  Message Actions 
@@ -1132,7 +1122,7 @@ export function useTeamChat() {
   useEffect(() => {
     if (isPaginatingRef.current) return;
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      messagesEndRef.current.scrollIntoView({ behavior: 'auto' });
     }
   }, [messages]);
 

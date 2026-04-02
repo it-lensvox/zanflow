@@ -11,6 +11,7 @@ import {
     Loader2,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { taskApi, dailyUpdateApi } from '@/services/api';
 import { useAuth } from '@/hooks/useAuth';
 import { TaskDetailModal } from '../MyTask/TaskDetailModal';
@@ -604,6 +605,7 @@ const TaskListSidebar: React.FC<TaskListSidebarProps> = ({
 
 export const Calendar: React.FC = () => {
     const { user } = useAuth();
+    const navigate = useNavigate();
     const [currentDate, setCurrentDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<ViewMode>('month');
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -763,7 +765,7 @@ export const Calendar: React.FC = () => {
                 <div className="w-10 h-10 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin" />
                 <p>Loading calendar...</p>
             </div>
-        );
+        
     }
 
     return (
@@ -780,12 +782,17 @@ export const Calendar: React.FC = () => {
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full xl:w-auto">
                     {[
-                        { label: 'Total', value: taskStats.total, color: 'text-gray-900' },
-                        { label: 'Done', value: taskStats.completed, color: 'text-green-600' },
-                        { label: 'Active', value: taskStats.inProgress, color: 'text-blue-600' },
-                        { label: 'Pending', value: taskStats.pending, color: 'text-yellow-600' },
+                        // CHANGE "/task-board" BELOW TO WHATEVER YOUR ACTUAL URL PATH IS
+                        { label: 'Total', value: taskStats.total, color: 'text-gray-900', filterUrl: '/taskboard' },
+                        { label: 'Done', value: taskStats.completed, color: 'text-green-600', filterUrl: '/taskboard' },
+                        { label: 'Active', value: taskStats.inProgress, color: 'text-blue-600', filterUrl: '/taskboard' },
+                        { label: 'Pending', value: taskStats.pending, color: 'text-yellow-600', filterUrl: '/taskboard' },
                     ].map((stat) => (
-                        <div key={stat.label} className="flex flex-col items-center justify-center px-6 py-3 bg-white rounded-xl border border-gray-200 shadow-sm min-w-[100px]">
+                        <div 
+                            key={stat.label} 
+                            onClick={() => navigate(stat.filterUrl)}
+                            className="flex flex-col items-center justify-center px-6 py-3 bg-white rounded-xl border border-gray-200 shadow-sm min-w-[100px] cursor-pointer hover:shadow-md hover:border-blue-200 transition-all duration-200 hover:-translate-y-0.5"
+                        >
                             <span className={`text-2xl font-bold ${stat.color}`}>{stat.value}</span>
                             <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{stat.label}</span>
                         </div>
