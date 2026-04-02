@@ -142,11 +142,13 @@ const DayCell: React.FC<DayCellProps> = ({ day, onTaskClick, onDateClick }) => {
 interface DaysViewProps {
     currentDate: Date;
     tasks: Task[];
+    selectedDate: Date | null;
     onTaskClick: (task: Task) => void;
+    onDateClick: (date: Date) => void;
     viewMode: 'day' | 'work_week' | 'week';
 }
 
-const DaysView: React.FC<DaysViewProps> = ({ currentDate, tasks, onTaskClick, viewMode }) => {
+const DaysView: React.FC<DaysViewProps> = ({ currentDate, tasks, selectedDate, onTaskClick, onDateClick, viewMode }) => {
     const getDays = () => {
         const days: Date[] = [];
         if (viewMode === 'day') {
@@ -210,8 +212,18 @@ const DaysView: React.FC<DaysViewProps> = ({ currentDate, tasks, onTaskClick, vi
                 {displayDays.map((day, index) => {
                     const dayTasks = getTasksForDate(day);
                     const isToday = day.toDateString() === today.toDateString();
+                    const isSelected = selectedDate?.toDateString() === day.toDateString();
+                    
                     return (
-                        <div key={index} className={`p-2 flex flex-col gap-2 ${isToday ? 'bg-blue-50/10' : ''}`}>
+                        <div 
+                            key={index} 
+                            className={`
+                                p-2 flex flex-col gap-2 cursor-pointer transition-colors hover:bg-gray-50
+                                ${isToday ? 'bg-blue-50/10' : ''}
+                                ${isSelected ? 'ring-2 ring-inset ring-blue-400 bg-blue-50/20' : ''}
+                            `}
+                            onClick={() => onDateClick(day)}
+                        >
                             {dayTasks.map((task) => (
                                 <TaskEvent key={task.id} task={task} onClick={onTaskClick} />
                             ))}
@@ -597,12 +609,27 @@ export const Calendar: React.FC = () => {
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const { data: tasksData, isLoading } = useQuery({
-        queryKey: ['tasks-calendar'],
+        // Add year and month to the queryKey so it refetches when you change months
+        queryKey: ['tasks-calendar', currentDate.getFullYear(), currentDate.getMonth()],
         queryFn: async () => {
-            console.log('%c[Calendar:tasks-calendar] 📦 Fetching tasks (flat list — own key, safe from InfiniteQuery)', 'color:#8b5cf6;font-weight:bold');
-            const result = await taskApi.list({disable_pagination:true});
+            // Calculate the boundaries of the currently viewed month
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            
+            // Pad the start and end by a few days to cover the visible days from previous/next months in the grid
+            const firstDay = new Date(year, month, -7).toISOString().split('T')[0]; 
+            const lastDay = new Date(year, month + 1, 7).toISOString().split('T')[0];
+
+            console.log('%c[Calendar:tasks-calendar] 📦 Fetching tasks for date range', 'color:#8b5cf6;font-weight:bold', firstDay, 'to', lastDay);
+            
+            // Send the date filters instead of disable_pagination
+            const result = await taskApi.list({
+                start_date__gte: firstDay,
+                end_date__lte: lastDay
+            });
+            
             const count = Array.isArray(result) ? result.length : result?.results?.length ?? result?.tasks?.length ?? '?';
-            console.log('%c[Calendar:tasks-calendar] ✅ Tasks loaded', 'color:#22c55e;font-weight:bold', `| count: ${count}`, '| key: tasks-calendar (isolated ✓)');
+            console.log('%c[Calendar:tasks-calendar] ✅ Tasks loaded', 'color:#22c55e;font-weight:bold', `| count: ${count}`);
             return result;
         },
         enabled: !!user,
@@ -848,7 +875,9 @@ export const Calendar: React.FC = () => {
                         <DaysView
                             currentDate={currentDate}
                             tasks={tasks}
+                            selectedDate={selectedDate}
                             onTaskClick={handleTaskClick}
+                            onDateClick={handleDateClick}
                             viewMode={viewMode as 'day' | 'work_week' | 'week'}
                         />
                     )}

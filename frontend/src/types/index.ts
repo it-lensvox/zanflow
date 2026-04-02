@@ -202,6 +202,17 @@ export interface TaskResponse {
   task: Task;
 }
 
+// Task API Query Parameters for filtering (resolves Calendar performance overhead)
+export interface TaskFilterParams {
+  project_id?: number;
+  disable_pagination?: boolean;
+  start_date__gte?: string;
+  end_date__lte?: string;
+  month?: number;
+  year?: number;
+  [key: string]: any;
+}
+
 // Paginated task list response (DRF standard envelope)
 export interface TaskPaginatedResponse {
   count: number;

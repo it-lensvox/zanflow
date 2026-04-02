@@ -5,7 +5,7 @@ import type {
   GatewaySendMessagePayload, GatewayIncomingMessage, RefineTextPayload, RefineTextResponse, TaskResponse, TeamTypeChoicesResponse, PinTaskResponse,
   CreateTeamPayload, ProjectChatRoom, TeamChatRoom, ChatUnreadResponse, NotificationData, NotificationCallback, Team, ThreadRoom, ThreadSession, ThreadStorage, ThreadUIMessage, CreateThreadRoomPayload, WSJoinRoomCommand, WSSendMessageCommand, WSIncomingThreadMessage, WSUnreadUpdateSignal, ThreadMessagesResponse,
   InviteUserPayload, InviteUserResponse, InviteVerifyResponse, InviteAcceptPayload, InviteAcceptResponse, AIBotSendPayload, AIBotIncomingMessage, OrganizationSignupPayload, OrganizationSignupResponse,
-  DailyUpdate, DailyUpdatePayload, DailyUpdateListResponse,
+  DailyUpdate, DailyUpdatePayload, DailyUpdateListResponse, TaskFilterParams,
 } from '@/types';
 
 export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.164:8000/api/v1';
@@ -353,7 +353,7 @@ export const documentsApi = {
 
 // Add New Task API
 export const taskApi = {
-  list: async (params?: { project_id?: number; disable_pagination?: boolean }) => {
+  list: async (params?: TaskFilterParams) => {
     const response = await api.get('/tasksite/', { params });
     const data = response.data;
     const taskArray = data.results || data.tasks;
