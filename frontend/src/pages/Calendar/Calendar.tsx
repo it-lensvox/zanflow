@@ -622,10 +622,11 @@ export const Calendar: React.FC = () => {
 
             console.log('%c[Calendar:tasks-calendar] 📦 Fetching tasks for date range', 'color:#8b5cf6;font-weight:bold', firstDay, 'to', lastDay);
             
-            // Send the date filters instead of disable_pagination
+            // Send the date filters AND disable_pagination to get all tasks in this range
             const result = await taskApi.list({
                 start_date__gte: firstDay,
-                end_date__lte: lastDay
+                end_date__lte: lastDay,
+                disable_pagination: true
             });
             
             const count = Array.isArray(result) ? result.length : result?.results?.length ?? result?.tasks?.length ?? '?';
