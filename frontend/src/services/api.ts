@@ -340,11 +340,11 @@ export const documentsApi = {
     return response.data;
   },
 
-  // Share document with a user
-  share: async (documentId: string, userId: number): Promise<import('@/types').ShareDocumentResponse> => {
+  // Share document with a user or project
+  share: async (documentId: string, payload: import('@/types').ShareDocumentPayload): Promise<import('@/types').ShareDocumentResponse> => {
     const response = await api.post<import('@/types').ShareDocumentResponse>(
       `/documents/${documentId}/share/`,
-      { user_id: userId }
+      payload
     );
     return response.data;
   },

@@ -256,9 +256,9 @@ export interface Document {
 export type FileType = 'pdf' | 'image' | 'json' | 'text' | 'video' | 'other';
 export type DocumentStatus = 'draft' | 'in_review' | 'approved' | 'archived';
 
-// Share Document types
 export interface ShareDocumentPayload {
-  user_id: number;
+  user_id?: number;
+  project_id?: number;
 }
 
 export interface ShareDocumentResponse {

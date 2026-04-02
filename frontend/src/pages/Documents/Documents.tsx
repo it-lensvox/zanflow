@@ -420,68 +420,50 @@ export function Documents() {
           {/* Search and Filters */}
           <div className="px-8 shrink-0"><Card>
             <CardContent className="p-4">
-              <div className="flex flex-col gap-4">
-                <div className="flex gap-4">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search documents..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowFilters(!showFilters)}
-                  >
-                    <Filter className="h-4 w-4 mr-2" />
-                    Filters
-                    <ChevronDown
-                      className={`h-4 w-4 ml-2 transition-transform ${showFilters ? 'rotate-180' : ''}`}
-                    />
-                  </Button>
-                  {hasActiveFilters && (
-                    <Button variant="ghost" onClick={clearFilters}>
-                      Clear
-                    </Button>
-                  )}
+            <div className="flex flex-wrap items-center gap-4">
+                <div className="relative flex-1 min-w-[250px]">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search documents..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
                 </div>
 
-                {showFilters && (
-                  <div className="flex flex-wrap gap-4 pt-4 border-t">
-                    <div className="space-y-1">
-                      <label className="text-sm font-medium">Project</label>
-                      <select
-                        value={projectFilter}
-                        onChange={(e) => updateFilter('project', e.target.value)}
-                        className="flex h-10 w-48 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      >
-                        <option value="">All Projects</option>
-                        {projects.map((project: Project) => (
-                          <option key={project.id} value={project.id}>
-                            {project.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={projectFilter}
+                    onChange={(e) => updateFilter('project', e.target.value)}
+                    className="flex h-10 w-64 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    <option value="">All Projects</option>
+                    {projects.map((project: Project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-                    {/* Status Filter */}
-                    <div className="space-y-1">
-                      <label className="text-sm font-medium">File Type</label>
-                      <select
-                        value={fileTypeFilter}
-                        onChange={(e) => updateFilter('file_type', e.target.value)}
-                        className="flex h-10 w-40 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      >
-                        {FILE_TYPE_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={fileTypeFilter}
+                    onChange={(e) => updateFilter('file_type', e.target.value)}
+                    className="flex h-10 w-40 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    {FILE_TYPE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {hasActiveFilters && (
+                  <Button variant="ghost" onClick={clearFilters} className="px-3">
+                    Clear
+                  </Button>
                 )}
               </div>
             </CardContent>

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { X, Search, Share2 } from 'lucide-react';
 import { Button } from '@/components/common';
-import { documentsApi, usersApi } from '@/services/api';
+import { documentsApi, usersApi, projectsApi } from '@/services/api';
 import type { User as AppUser, Document } from '@/types';
 
 interface DocumentShareModalProps {
@@ -13,9 +13,12 @@ interface DocumentShareModalProps {
 
 export function DocumentShareModal({ isOpen, onClose, document: doc }: DocumentShareModalProps) {
   const queryClient = useQueryClient();
+  const [shareType, setShareType] = useState<'user' | 'project'>('user');
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [projectDropdownOpen, setProjectDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState<{ id: number; label: string } | null>(null);
+  const [selectedProject, setSelectedProject] = useState<{ id: number; label: string } | null>(null);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -23,7 +26,7 @@ export function DocumentShareModal({ isOpen, onClose, document: doc }: DocumentS
   const { data: usersData, isLoading: usersLoading } = useQuery({
     queryKey: ['allUsers'],
     queryFn: usersApi.listAll,
-    enabled: isOpen,
+    enabled: isOpen && shareType === 'user',
     select: (data: AppUser[]) =>
       data.map((user) => ({
         value: user.id,
@@ -34,9 +37,22 @@ export function DocumentShareModal({ isOpen, onClose, document: doc }: DocumentS
       })),
   });
 
+  const { data: projectsData, isLoading: projectsLoading } = useQuery({
+    queryKey: ['allProjects'],
+    queryFn: () => projectsApi.list(),
+    enabled: isOpen && shareType === 'project',
+    select: (data: any) => {
+      const items = Array.isArray(data) ? data : data.results || [];
+      return items.map((p: any) => ({
+        value: p.id,
+        label: p.name,
+      }));
+    },
+  });
+
   const shareMutation = useMutation({
-    mutationFn: ({ documentId, userId }: { documentId: string; userId: number }) =>
-      documentsApi.share(documentId, userId),
+    mutationFn: ({ documentId, payload }: { documentId: string; payload: import('@/types').ShareDocumentPayload }) =>
+      documentsApi.share(documentId, payload),
     onSuccess: (data) => {
       setSuccessMsg(data.detail || 'Document shared successfully!');
       setSelectedUser(null);
@@ -55,18 +71,28 @@ export function DocumentShareModal({ isOpen, onClose, document: doc }: DocumentS
 
   const handleClose = () => {
     setUserDropdownOpen(false);
+    setProjectDropdownOpen(false);
     setSearchQuery('');
     setSelectedUser(null);
+    setSelectedProject(null);
     setError('');
     setSuccessMsg('');
     onClose();
   };
 
   const handleShare = () => {
-    if (!doc || !selectedUser) return;
+    if (!doc) return;
+    if (shareType === 'user' && !selectedUser) return;
+    if (shareType === 'project' && !selectedProject) return;
+    
     setError('');
     setSuccessMsg('');
-    shareMutation.mutate({ documentId: doc.id, userId: selectedUser.id });
+    
+    const payload = shareType === 'user' 
+      ? { user_id: selectedUser!.id }
+      : { project_id: selectedProject!.id };
+      
+    shareMutation.mutate({ documentId: doc.id, payload });
   };
 
   // Close dropdown on outside click
@@ -74,6 +100,7 @@ export function DocumentShareModal({ isOpen, onClose, document: doc }: DocumentS
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setUserDropdownOpen(false);
+        setProjectDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -94,6 +121,10 @@ export function DocumentShareModal({ isOpen, onClose, document: doc }: DocumentS
   const filteredUsers = usersData?.filter((u) =>
     u.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
     u.email.toLowerCase().includes(searchQuery.toLowerCase())
+  ) || [];
+
+  const filteredProjects = projectsData?.filter((p: any) =>
+    p.label.toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];
 
   return (
@@ -139,16 +170,50 @@ export function DocumentShareModal({ isOpen, onClose, document: doc }: DocumentS
             </div>
           )}
 
-          {/* User selector */}
+          {/* Share Type Selector */}
+          <div className="flex items-center gap-4 mb-4">
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+              <input
+                type="radio"
+                name="shareType"
+                value="user"
+                checked={shareType === 'user'}
+                onChange={() => {
+                  setShareType('user');
+                  setSearchQuery('');
+                }}
+                className="text-blue-600 focus:ring-blue-500"
+              />
+              Share with User
+            </label>
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+              <input
+                type="radio"
+                name="shareType"
+                value="project"
+                checked={shareType === 'project'}
+                onChange={() => {
+                  setShareType('project');
+                  setSearchQuery('');
+                }}
+                className="text-blue-600 focus:ring-blue-500"
+              />
+              Share with Project
+            </label>
+          </div>
+
+          {/* User/Project selector */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Select User</label>
+            <label className="text-sm font-medium text-gray-700">
+              Select {shareType === 'user' ? 'User' : 'Project'}
+            </label>
             <div className="relative" ref={dropdownRef}>
               {/* Trigger / Input */}
               <div
                 className="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 py-2 text-sm cursor-pointer"
-                onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                onClick={() => shareType === 'user' ? setUserDropdownOpen(!userDropdownOpen) : setProjectDropdownOpen(!projectDropdownOpen)}
               >
-                {selectedUser ? (
+                {shareType === 'user' && selectedUser ? (
                   <div className="flex items-center justify-between w-full">
                     <div className="flex items-center gap-2">
                       <div className="h-6 w-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-700">
@@ -166,13 +231,31 @@ export function DocumentShareModal({ isOpen, onClose, document: doc }: DocumentS
                       <X className="w-3.5 h-3.5 text-gray-400" />
                     </button>
                   </div>
+                ) : shareType === 'project' && selectedProject ? (
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-2">
+                      <div className="h-6 w-6 rounded-full bg-purple-100 flex items-center justify-center text-[10px] font-bold text-purple-700">
+                        {selectedProject.label.charAt(0)}
+                      </div>
+                      <span className="text-foreground">{selectedProject.label}</span>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedProject(null);
+                      }}
+                      className="p-0.5 hover:bg-gray-100 rounded"
+                    >
+                      <X className="w-3.5 h-3.5 text-gray-400" />
+                    </button>
+                  </div>
                 ) : (
-                  <span className="text-muted-foreground">Click to select a user...</span>
+                  <span className="text-muted-foreground">Click to select a {shareType}...</span>
                 )}
               </div>
 
               {/* Dropdown */}
-              {userDropdownOpen && (
+              {(userDropdownOpen || projectDropdownOpen) && (
                 <div className="absolute z-[60] mt-1 w-full bg-popover border rounded-lg shadow-lg max-h-64 overflow-hidden">
                   {/* Search inside dropdown */}
                   <div className="p-2 border-b">
@@ -182,7 +265,7 @@ export function DocumentShareModal({ isOpen, onClose, document: doc }: DocumentS
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search users..."
+                        placeholder={`Search ${shareType}s...`}
                         className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                         autoFocus
                         onClick={(e) => e.stopPropagation()}
@@ -190,39 +273,73 @@ export function DocumentShareModal({ isOpen, onClose, document: doc }: DocumentS
                     </div>
                   </div>
 
-                  {/* User list */}
+                  {/* List */}
                   <div className="max-h-48 overflow-y-auto py-1">
-                    {usersLoading ? (
-                      <div className="px-3 py-4 text-sm text-gray-400 text-center">Loading users...</div>
-                    ) : filteredUsers.length === 0 ? (
-                      <div className="px-3 py-4 text-sm text-gray-400 text-center">No users found</div>
+                    {shareType === 'user' ? (
+                      usersLoading ? (
+                        <div className="px-3 py-4 text-sm text-gray-400 text-center">Loading users...</div>
+                      ) : filteredUsers.length === 0 ? (
+                        <div className="px-3 py-4 text-sm text-gray-400 text-center">No users found</div>
+                      ) : (
+                        filteredUsers.map((user) => (
+                          <div
+                            key={user.value}
+                            className={`flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-accent hover:text-accent-foreground text-sm ${
+                              selectedUser?.id === user.value ? 'bg-accent/50' : ''
+                            }`}
+                            onClick={() => {
+                              setSelectedUser({ id: user.value, label: user.label });
+                              setUserDropdownOpen(false);
+                              setSearchQuery('');
+                            }}
+                          >
+                            <div className="h-7 w-7 rounded-full bg-blue-100 flex items-center justify-center text-[11px] font-bold text-blue-700 flex-shrink-0">
+                              {user.label.charAt(0)}
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                              <span className="font-medium truncate">{user.label}</span>
+                              <span className="text-xs text-gray-400 truncate">{user.email}</span>
+                            </div>
+                            {selectedUser?.id === user.value && (
+                              <svg className="w-4 h-4 text-blue-600 ml-auto flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                            )}
+                          </div>
+                        ))
+                      )
                     ) : (
-                      filteredUsers.map((user) => (
-                        <div
-                          key={user.value}
-                          className={`flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-accent hover:text-accent-foreground text-sm ${
-                            selectedUser?.id === user.value ? 'bg-accent/50' : ''
-                          }`}
-                          onClick={() => {
-                            setSelectedUser({ id: user.value, label: user.label });
-                            setUserDropdownOpen(false);
-                            setSearchQuery('');
-                          }}
-                        >
-                          <div className="h-7 w-7 rounded-full bg-blue-100 flex items-center justify-center text-[11px] font-bold text-blue-700 flex-shrink-0">
-                            {user.label.charAt(0)}
+                      projectsLoading ? (
+                        <div className="px-3 py-4 text-sm text-gray-400 text-center">Loading projects...</div>
+                      ) : filteredProjects.length === 0 ? (
+                        <div className="px-3 py-4 text-sm text-gray-400 text-center">No projects found</div>
+                      ) : (
+                        filteredProjects.map((project: any) => (
+                          <div
+                            key={project.value}
+                            className={`flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-accent hover:text-accent-foreground text-sm ${
+                              selectedProject?.id === project.value ? 'bg-accent/50' : ''
+                            }`}
+                            onClick={() => {
+                              setSelectedProject({ id: project.value, label: project.label });
+                              setProjectDropdownOpen(false);
+                              setSearchQuery('');
+                            }}
+                          >
+                            <div className="h-7 w-7 rounded-full bg-purple-100 flex items-center justify-center text-[11px] font-bold text-purple-700 flex-shrink-0">
+                              {project.label.charAt(0)}
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                              <span className="font-medium truncate">{project.label}</span>
+                            </div>
+                            {selectedProject?.id === project.value && (
+                              <svg className="w-4 h-4 text-purple-600 ml-auto flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                            )}
                           </div>
-                          <div className="flex flex-col min-w-0">
-                            <span className="font-medium truncate">{user.label}</span>
-                            <span className="text-xs text-gray-400 truncate">{user.email}</span>
-                          </div>
-                          {selectedUser?.id === user.value && (
-                            <svg className="w-4 h-4 text-blue-600 ml-auto flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                          )}
-                        </div>
-                      ))
+                        ))
+                      )
                     )}
                   </div>
                 </div>
@@ -235,7 +352,7 @@ export function DocumentShareModal({ isOpen, onClose, document: doc }: DocumentS
         <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
           <Button
             onClick={handleShare}
-            disabled={!selectedUser || shareMutation.isPending}
+            disabled={(shareType === 'user' && !selectedUser) || (shareType === 'project' && !selectedProject) || shareMutation.isPending}
           >
             {shareMutation.isPending ? 'Sharing...' : 'Share'}
           </Button>
