@@ -78,7 +78,11 @@ class ProjectSerializer(serializers.ModelSerializer):
         return obj.members.count()
     
     def get_document_count(self, obj):
-        return obj.documents.count() if hasattr(obj, "documents") else 0
+        from apps.groundtruth.models import Document
+        from django.db.models import Q
+        return Document.objects.filter(
+            Q(project=obj) | Q(shares__shared_project=obj)
+        ).distinct().count()
     
     def get_is_favourite(self, obj):
         request = self.context.get('request')

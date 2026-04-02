@@ -311,12 +311,15 @@ class ProjectViewSet(viewsets.ModelViewSet):
         """
         project = self.get_object()
         
-        # Get document stats
+        # Get document stats (Including Shared Documents)
         from apps.groundtruth.models import Document
-        doc_stats = Document.objects.filter(project=project).aggregate(
-            total=Count("id"),
-            approved=Count("id", filter=Q(status=Document.Status.APPROVED)),
-            pending=Count("id", filter=Q(status__in=[Document.Status.DRAFT, Document.Status.IN_REVIEW])),
+        doc_stats = Document.objects.filter(
+            Q(project=project) | Q(shares__shared_project=project)
+        ).aggregate(
+            # Using distinct=True prevents duplicate counting from the SQL join
+            total=Count("id", distinct=True),
+            approved=Count("id", filter=Q(status=Document.Status.APPROVED), distinct=True),
+            pending=Count("id", filter=Q(status__in=[Document.Status.DRAFT, Document.Status.IN_REVIEW]), distinct=True),
         )
         
         # Get test run stats
