@@ -18,7 +18,7 @@ import type { Task, DailyUpdate, DailyUpdatePayload } from '@/types';
 import { getStatusConfig } from '@/components/layout/DualView/taskConfig';
 
 // --- Types & Constants ---
-type ViewMode = 'month' | 'week';
+type ViewMode = 'day' | 'work_week' | 'week' | 'month';
 
 const DAYS_OF_WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = [
@@ -139,27 +139,41 @@ const DayCell: React.FC<DayCellProps> = ({ day, onTaskClick, onDateClick }) => {
     );
 };
 
-interface WeekViewProps {
+interface DaysViewProps {
     currentDate: Date;
     tasks: Task[];
     onTaskClick: (task: Task) => void;
+    viewMode: 'day' | 'work_week' | 'week';
 }
 
-const WeekView: React.FC<WeekViewProps> = ({ currentDate, tasks, onTaskClick }) => {
-    const getWeekDays = () => {
+const DaysView: React.FC<DaysViewProps> = ({ currentDate, tasks, onTaskClick, viewMode }) => {
+    const getDays = () => {
         const days: Date[] = [];
+        if (viewMode === 'day') {
+            days.push(new Date(currentDate));
+            return days;
+        }
+        
         const startOfWeek = new Date(currentDate);
         startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
 
-        for (let i = 0; i < 7; i++) {
-            const day = new Date(startOfWeek);
-            day.setDate(startOfWeek.getDate() + i);
-            days.push(day);
+        if (viewMode === 'work_week') {
+            for (let i = 1; i <= 5; i++) { // Monday to Friday
+                const day = new Date(startOfWeek);
+                day.setDate(startOfWeek.getDate() + i);
+                days.push(day);
+            }
+        } else {
+            for (let i = 0; i < 7; i++) {
+                const day = new Date(startOfWeek);
+                day.setDate(startOfWeek.getDate() + i);
+                days.push(day);
+            }
         }
         return days;
     };
 
-    const weekDays = getWeekDays();
+    const displayDays = getDays();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -173,15 +187,18 @@ const WeekView: React.FC<WeekViewProps> = ({ currentDate, tasks, onTaskClick }) 
                 endDate === dateStr;
         });
     };
+    
+    // Explicit tailwind strings for JIT compiler
+    const gridColsClass = displayDays.length === 1 ? 'grid-cols-1' : displayDays.length === 5 ? 'grid-cols-5' : 'grid-cols-7';
 
     return (
         <div className="flex flex-col h-full bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-            <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
-                {weekDays.map((day, index) => {
+            <div className={`grid ${gridColsClass} border-b border-gray-200 bg-gray-50`}>
+                {displayDays.map((day, index) => {
                     const isToday = day.toDateString() === today.toDateString();
                     return (
                         <div key={index} className={`flex flex-col items-center justify-center py-3 px-2 border-r border-gray-200 last:border-r-0 ${isToday ? 'bg-blue-50/50' : ''}`}>
-                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{DAYS_OF_WEEK[index]}</span>
+                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{DAYS_OF_WEEK[day.getDay()]}</span>
                             <span className={`text-lg font-bold ${isToday ? 'text-blue-600 bg-blue-100 w-8 h-8 flex items-center justify-center rounded-full' : 'text-gray-900'}`}>
                                 {day.getDate()}
                             </span>
@@ -189,8 +206,8 @@ const WeekView: React.FC<WeekViewProps> = ({ currentDate, tasks, onTaskClick }) 
                     );
                 })}
             </div>
-            <div className="grid grid-cols-7 flex-1 min-h-[500px] divide-x divide-gray-200">
-                {weekDays.map((day, index) => {
+            <div className={`grid ${gridColsClass} flex-1 min-h-[500px] divide-x divide-gray-200`}>
+                {displayDays.map((day, index) => {
                     const dayTasks = getTasksForDate(day);
                     const isToday = day.toDateString() === today.toDateString();
                     return (
@@ -644,11 +661,13 @@ export const Calendar: React.FC = () => {
 
     const calendarDays = useMemo(() => getCalendarDays(), [getCalendarDays]);
 
-    const navigateMonth = (direction: 'prev' | 'next') => {
+    const navigateDate = (direction: 'prev' | 'next') => {
         setCurrentDate((prev) => {
             const newDate = new Date(prev);
             if (viewMode === 'month') {
                 newDate.setMonth(prev.getMonth() + (direction === 'next' ? 1 : -1));
+            } else if (viewMode === 'day') {
+                newDate.setDate(prev.getDate() + (direction === 'next' ? 1 : -1));
             } else {
                 newDate.setDate(prev.getDate() + (direction === 'next' ? 7 : -7));
             }
@@ -685,10 +704,15 @@ export const Calendar: React.FC = () => {
         if (viewMode === 'month') {
             return `${MONTHS[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
         }
+        if (viewMode === 'day') {
+            return `${currentDate.getDate()} ${MONTHS[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
+        }
+        
         const startOfWeek = new Date(currentDate);
-        startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+        startOfWeek.setDate(currentDate.getDate() - currentDate.getDay() + (viewMode === 'work_week' ? 1 : 0));
+        
         const endOfWeek = new Date(startOfWeek);
-        endOfWeek.setDate(startOfWeek.getDate() + 6);
+        endOfWeek.setDate(startOfWeek.getDate() + (viewMode === 'work_week' ? 4 : 6));
 
         if (startOfWeek.getMonth() === endOfWeek.getMonth()) {
             return `${MONTHS[startOfWeek.getMonth()]} ${startOfWeek.getDate()} - ${endOfWeek.getDate()}, ${startOfWeek.getFullYear()}`;
@@ -753,13 +777,13 @@ export const Calendar: React.FC = () => {
                     
                     <div className="flex items-center gap-1 bg-gray-50 rounded-lg border border-gray-200 p-1">
                         <button 
-                            onClick={() => navigateMonth('prev')}
+                            onClick={() => navigateDate('prev')}
                             className="p-1.5 hover:bg-white hover:shadow-sm rounded-md transition-all text-gray-600"
                         >
                             <ChevronLeft size={20} />
                         </button>
                         <button 
-                            onClick={() => navigateMonth('next')}
+                            onClick={() => navigateDate('next')}
                             className="p-1.5 hover:bg-white hover:shadow-sm rounded-md transition-all text-gray-600"
                         >
                             <ChevronRight size={20} />
@@ -775,20 +799,20 @@ export const Calendar: React.FC = () => {
                     {getHeaderTitle()}
                 </h2>
 
-                <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200 w-full sm:w-auto">
-                    {(['month', 'week'] as ViewMode[]).map((mode) => (
+                <div className="flex flex-wrap bg-gray-100 p-1 rounded-lg border border-gray-200 w-full sm:w-auto">
+                    {(['day', 'work_week', 'week', 'month'] as ViewMode[]).map((mode) => (
                         <button
                             key={mode}
                             onClick={() => setViewMode(mode)}
                             className={`
-                                flex items-center justify-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all flex-1 sm:flex-none
+                                flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all flex-1 sm:flex-none whitespace-nowrap
                                 ${viewMode === mode 
                                     ? 'bg-white text-blue-600 shadow-sm' 
                                     : 'text-gray-500 hover:text-gray-900'}
                             `}
                         >
-                            {mode === 'month' ? <Grid3X3 size={16} /> : <List size={16} />}
-                            <span className="capitalize">{mode}</span>
+                            {mode === 'month' ? <Grid3X3 size={16} /> : mode === 'day' ? <CalendarIcon size={16} /> : <List size={16} />}
+                            <span className="capitalize">{mode.replace('_', ' ')}</span>
                         </button>
                     ))}
                 </div>
@@ -821,10 +845,11 @@ export const Calendar: React.FC = () => {
                             </div>
                         </>
                     ) : (
-                        <WeekView
+                        <DaysView
                             currentDate={currentDate}
                             tasks={tasks}
                             onTaskClick={handleTaskClick}
+                            viewMode={viewMode as 'day' | 'work_week' | 'week'}
                         />
                     )}
                 </div>
