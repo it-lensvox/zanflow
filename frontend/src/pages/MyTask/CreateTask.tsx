@@ -54,8 +54,8 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
     // ── Local form state
     const [heading, setHeading] = useState(savedDraft?.heading ?? '');
     const [description, setDescription] = useState(savedDraft?.description ?? '');
-    const [startDate, setStartDate] = useState(savedDraft?.startDate ?? '');
-    const [endDate, setEndDate] = useState(savedDraft?.endDate ?? '');
+    const [startDate, setStartDate] = useState(savedDraft?.startDate ?? location.state?.startDate ?? '');
+    const [endDate, setEndDate] = useState(savedDraft?.endDate ?? location.state?.endDate ?? '');
     const [assignedToList, setAssignedToList] = useState<number[]>(savedDraft?.assignedToList ?? []);
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
@@ -473,10 +473,11 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
        // Optimistically show success and close modal
        setShowSuccessView(true);
        if (isModal && onSuccess) {
-           onSuccess(optimisticTask);
-       } else {
-           navigate('/taskboard');
-       }
+        onSuccess(optimisticTask);
+    } else {
+        const fromCalendar = location.state?.startDate !== undefined;
+        navigate(fromCalendar ? '/calendar' : '/taskboard');
+    }
 
        // Fire API call in background
        try {
@@ -526,6 +527,10 @@ export const CreateTask: React.FC<CreateTaskProps> = ({
 
            // Replace optimistic task with real task in Project page cache
            const projId = String(projectId);
+           
+           // Invalidate the Calendar query specifically so it refetches the new task immediately
+           queryClient.invalidateQueries({ queryKey: ['tasks-calendar'] });
+
            queryClient.setQueryData(['tasks-list', projId], (old: any) => {
                if (!old) return old;
                const list: Task[] = old.tasks ?? old.results ?? (Array.isArray(old) ? old : []);

@@ -9,6 +9,7 @@ import {
     ClipboardList,
     Send,
     Loader2,
+    CalendarPlus,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -181,7 +182,8 @@ const DaysView: React.FC<DaysViewProps> = ({ currentDate, tasks, selectedDate, o
     today.setHours(0, 0, 0, 0);
 
     const getTasksForDate = (date: Date) => {
-        const dateStr = date.toISOString().split('T')[0];
+        // Use local timezone formatting instead of UTC to prevent day-shifting
+        const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
         return tasks.filter((task) => {
             const startDate = task.start_date?.split('T')[0];
             const endDate = task.end_date?.split('T')[0];
@@ -304,7 +306,15 @@ const TaskListSidebar: React.FC<TaskListSidebarProps> = ({
     currentUser,
 }) => {
     const queryClient = useQueryClient();
+    const navigate = useNavigate();
     const [showUpdateForm, setShowUpdateForm] = useState(false);
+
+    const handleCreateTask = () => {
+        const dateStr = selectedDate ? toISODate(selectedDate) : '';
+        navigate('/taskboard/create', { 
+            state: { startDate: dateStr, endDate: dateStr } 
+        });
+    };
     const [form, setForm] = useState<UpdateFormFields>(EMPTY_FORM);
 
     const isAdminOrManager = currentUser?.role === 'admin' || currentUser?.role === 'manager';
@@ -404,21 +414,37 @@ const TaskListSidebar: React.FC<TaskListSidebarProps> = ({
             {/* Sidebar Header */}
             <div className="flex items-center justify-between p-4 bg-gray-50 border-b border-gray-200">
                 <h3 className="text-sm font-semibold text-gray-900">{formatDateLong(selectedDate)}</h3>
-                <button
-                    onClick={onClose}
-                    className="p-1 rounded-md text-gray-500 hover:bg-gray-200 hover:text-gray-700 transition-colors"
-                >
-                    <span className="text-lg leading-none">&times;</span>
-                </button>
+                <div className="flex items-center gap-1">
+                    <button
+                        onClick={handleCreateTask}
+                        className="p-1.5 rounded-md text-blue-600 hover:bg-blue-100 transition-colors flex items-center justify-center"
+                        title="Create new task for this date"
+                    >
+                        <CalendarPlus size={18} />
+                    </button>
+                    <button
+                        onClick={onClose}
+                        className="p-1.5 rounded-md text-gray-500 hover:bg-gray-200 hover:text-gray-700 transition-colors flex items-center justify-center"
+                        title="Close"
+                    >
+                        <span className="text-lg leading-none">&times;</span>
+                    </button>
+                </div>
             </div>
 
             <div className="flex-1 overflow-y-auto">
                 {/* ── Task List Section ── */}
                 <div className="p-4">
-                    {tasks.length === 0 ? (
+                {tasks.length === 0 ? (
                         <div className="flex flex-col items-center justify-center text-center py-6">
                             <CalendarIcon className="w-10 h-10 text-gray-300 mb-2" />
                             <p className="text-sm text-gray-500">No tasks scheduled for this day</p>
+                            <button 
+                                onClick={handleCreateTask}
+                                className="mt-3 flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors"
+                            >
+                                <CalendarPlus size={14} /> Create Task
+                            </button>
                         </div>
                     ) : (
                         <div className="space-y-3">
@@ -667,7 +693,8 @@ export const Calendar: React.FC = () => {
 
         const currentDateIter = new Date(startDate);
         while (currentDateIter <= endDate) {
-            const dateStr = currentDateIter.toISOString().split('T')[0];
+            // Use local timezone formatting instead of UTC to prevent day-shifting
+            const dateStr = `${currentDateIter.getFullYear()}-${String(currentDateIter.getMonth() + 1).padStart(2, '0')}-${String(currentDateIter.getDate()).padStart(2, '0')}`;
             const dayTasks = tasks.filter((task: Task) => {
                 const startDateStr = task.start_date?.split('T')[0];
                 const endDateStr = task.end_date?.split('T')[0];
@@ -719,7 +746,8 @@ export const Calendar: React.FC = () => {
 
     const selectedDateTasks = useMemo(() => {
         if (!selectedDate) return [];
-        const dateStr = selectedDate.toISOString().split('T')[0];
+        // Use local timezone formatting instead of UTC to prevent day-shifting
+        const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
         return tasks.filter((task: Task) => {
             const startDateStr = task.start_date?.split('T')[0];
             const endDateStr = task.end_date?.split('T')[0];
@@ -786,7 +814,7 @@ export const Calendar: React.FC = () => {
                         { label: 'Total', value: taskStats.total, color: 'text-gray-900', filterUrl: '/taskboard' },
                         { label: 'Done', value: taskStats.completed, color: 'text-green-600', filterUrl: '/taskboard' },
                         { label: 'Active', value: taskStats.inProgress, color: 'text-blue-600', filterUrl: '/taskboard' },
-                        { label: 'Pending', value: taskStats.pending, color: 'text-yellow-600', filterUrl: '/taskboard' },
+                        { label: 'Pending', value: taskStats.pending, color: 'text-yellow-600', filterUrl: '/taskboard?status=pending' },
                     ].map((stat) => (
                         <div 
                             key={stat.label} 
