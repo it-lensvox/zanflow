@@ -4,7 +4,7 @@ import {
   NotebookPen, Plus, FolderPlus, Maximize2, X, Folder, FileText, MoreVertical, Paperclip, Loader2, Trash2,
 } from 'lucide-react';
 import { cn, formatRelativeTime } from '@/lib/utils';
-import { quickNotesApi } from '@/services/api';
+import { quickNotesApi, projectsApi, authApi } from '@/services/api';
 import type { QuickNote, QuickNoteFolder } from '@/types';
 import DeleteModal from '@/components/common/Deletemodal';
 import { DocumentPreview } from '@/components/common/DocumentPreview'; 
@@ -18,6 +18,7 @@ export interface QuickNotesState {
   selectedNoteId: number | 'pending' | null;
   isLoading: boolean;
   pendingNote: { folderId: number | null } | null;
+  currentUserId: number | null;
 }
 
 function getDefaultState(): QuickNotesState {
@@ -28,28 +29,31 @@ function getDefaultState(): QuickNotesState {
     selectedNoteId: null,
     isLoading: true,
     pendingNote: null,
+    currentUserId: null,
   };
 }
 
 export function useQuickNotes() {
   const [state, setState] = useState<QuickNotesState>(getDefaultState);
 
-  // Load folders + notes from backend on mount
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const [folders, notesResp] = await Promise.all([
-          quickNotesApi.getFolders(),
-          quickNotesApi.getNotes(),
-        ]);
-        if (cancelled) return;
-        setState((prev) => ({
-          ...prev,
-          folders,
-          notes: notesResp.results,
-          isLoading: false,
-        }));
+// Load folders + notes from backend on mount
+useEffect(() => {
+  let cancelled = false;
+  async function load() {
+    try {
+      const [folders, notesResp, currentUser] = await Promise.all([
+        quickNotesApi.getFolders(),
+        quickNotesApi.getNotes(),
+        authApi.getMe(),
+      ]);
+      if (cancelled) return;
+      setState((prev) => ({
+        ...prev,
+        folders,
+        notes: notesResp.results,
+        isLoading: false,
+        currentUserId: currentUser.id,
+      }));
       } catch {
         if (!cancelled) setState((prev) => ({ ...prev, isLoading: false }));
       }
@@ -223,8 +227,23 @@ export function useQuickNotes() {
     }));
   };
 
+  const attachNoteToProject = async (noteId: number, projectId: number | null): Promise<void> => {
+    setState((prev) => ({
+      ...prev,
+      notes: prev.notes.map((n) =>
+        n.id === noteId ? { ...n, project: projectId, updated_at: new Date().toISOString() } : n,
+      ),
+    }));
+    try {
+      await quickNotesApi.updateNote(noteId, { project: projectId });
+    } catch (err) {
+      console.error('[QuickNotes] attachNoteToProject failed:', err);
+    }
+  };
+
   return {
     state,
+    attachNoteToProject,
     getNotesForFolder,
     getNoteTitle,
     createNote,
@@ -499,6 +518,89 @@ export function FolderSidebar({
 
 // Notes list
 
+// --- Project Attach Modal Component ---
+function AttachProjectModal({
+  isOpen,
+  onClose,
+  onAttach,
+  currentProjectId,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onAttach: (projectId: number | null) => void;
+  currentProjectId?: number | null;
+}) {
+  const [projects, setProjects] = useState<import('@/types').ProjectMinimal[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedId, setSelectedId] = useState<number | null>(currentProjectId ?? null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setLoading(true);
+      projectsApi.list({ disable_pagination: true } as any)
+        .then(res => setProjects(res.results || (res as any)))
+        .finally(() => setLoading(false));
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    setSelectedId(currentProjectId ?? null);
+  }, [currentProjectId, isOpen]);
+
+  if (!isOpen) return null;
+
+  // Filter logic to separate the current project from the remaining list
+  const currentProject = projects.find(p => p.id === currentProjectId);
+  const remainingProjects = projects.filter(p => p.id !== currentProjectId);
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-sm">
+      <div className="w-[400px] rounded-lg border border-border bg-card p-6 shadow-lg animate-in fade-in zoom-in-95 duration-200">
+        <h2 className="text-lg font-semibold mb-4 text-foreground">Attach Note to Project</h2>
+        {loading ? (
+          <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+        ) : (
+          <div className="space-y-4 mb-6">
+            {currentProject && (
+              <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-md">
+                <p className="text-[10px] text-green-500 font-bold uppercase tracking-wider mb-1">Currently Attached To</p>
+                <p className="text-sm font-semibold text-foreground">{currentProject.name}</p>
+              </div>
+            )}
+            
+            <div>
+              <p className="text-xs text-muted-foreground font-medium mb-2 uppercase tracking-wider">
+                {currentProject ? 'Change to another project' : 'Select a project'}
+              </p>
+              <div className="max-h-[200px] overflow-y-auto space-y-1 border border-border rounded-md p-1 bg-muted/20">
+                <button
+                  onClick={() => setSelectedId(null)}
+                  className={cn("w-full text-left px-3 py-2 text-sm rounded-md transition-colors", selectedId === null ? "bg-primary/10 text-primary font-medium" : "hover:bg-accent text-foreground")}
+                >
+                  None (Make Personal Note)
+                </button>
+                {remainingProjects.map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => setSelectedId(p.id)}
+                    className={cn("w-full text-left px-3 py-2 text-sm rounded-md transition-colors", selectedId === p.id ? "bg-primary/10 text-primary font-medium" : "hover:bg-accent text-foreground")}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+        <div className="flex justify-end gap-3">
+          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-accent rounded-md transition-colors">Cancel</button>
+          <button onClick={() => { onAttach(selectedId); onClose(); }} className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground hover:opacity-90 rounded-md transition-colors">Confirm</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface NotesListProps {
   state: QuickNotesState;
   visibleNotes: QuickNote[];
@@ -507,6 +609,7 @@ interface NotesListProps {
   onNewNote: () => void;
   onRenameNote: (noteId: number, newTitle: string) => void;
   onDeleteNote: (noteId: number) => void;
+  onAttachToProject: (noteId: number, projectId: number | null) => void;
 }
 
 export function NotesList({
@@ -517,9 +620,11 @@ export function NotesList({
   onNewNote,
   onRenameNote,
   onDeleteNote,
+  onAttachToProject,
 }: NotesListProps) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [renamingId, setRenamingId] = useState<number | null>(null);
+  const [attachTarget, setAttachTarget] = useState<QuickNote | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const renameInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -661,12 +766,25 @@ export function NotesList({
                     >
                       Rename
                     </button>
-                    <button
-                      onClick={(e) => handleDeleteClick(e, note)}
-                      className="w-full text-left px-3 py-1.5 text-xs text-destructive hover:bg-accent transition-colors"
-                    >
-                      Delete
-                    </button>
+                    
+                    {/* Only show Attach to Project if the current user is the creator */}
+                    {note.user === state.currentUserId && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); setAttachTarget(note); }}
+                        className="w-full text-left px-3 py-1.5 text-xs text-foreground hover:bg-accent transition-colors"
+                      >
+                        Attach to Project
+                      </button>
+                    )}
+
+                    {note.user === state.currentUserId && (
+                      <button
+                        onClick={(e) => handleDeleteClick(e, note)}
+                        className="w-full text-left px-3 py-1.5 text-xs text-destructive hover:bg-accent transition-colors"
+                      >
+                        Delete
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -674,6 +792,16 @@ export function NotesList({
           })
         )}
    </div>
+
+      {/* Attach Project Modal */}
+      <AttachProjectModal
+        isOpen={!!attachTarget}
+        onClose={() => setAttachTarget(null)}
+        currentProjectId={attachTarget?.project}
+        onAttach={(projectId) => {
+          if (attachTarget) onAttachToProject(attachTarget.id, projectId);
+        }}
+      />
 
       {/* Delete confirmation modal for notes */}
       <DeleteModal
@@ -915,6 +1043,7 @@ interface QuickNotesContentProps {
   onDeleteNote: (noteId: number) => void;
   onAddAttachment: (noteId: number, attachment: import('@/types').QuickNoteAttachment) => void;
   onRemoveAttachment: (noteId: number, attachmentId: number) => void;
+  onAttachToProject: (noteId: number, projectId: number | null) => void;
   state: QuickNotesState;
   getNotesForFolder: (folderId: number | 'all') => QuickNote[];
   getNoteTitle: (note: QuickNote) => string;
@@ -934,6 +1063,7 @@ export function QuickNotesContent({
   onDeleteNote,
   onAddAttachment,
   onRemoveAttachment,
+  onAttachToProject,
   state,
   getNotesForFolder,
   getNoteTitle,
@@ -971,6 +1101,7 @@ export function QuickNotesContent({
         onNewNote={onNewNote}
         onRenameNote={onRenameNote}
         onDeleteNote={onDeleteNote}
+        onAttachToProject={onAttachToProject}
       />
       <NoteEditor
         selectedNote={selectedNote}

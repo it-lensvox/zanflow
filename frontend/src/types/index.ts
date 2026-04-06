@@ -1269,7 +1269,9 @@ export interface QuickNoteAttachment {
 // Backend note shape 
 export interface QuickNote {
   id: number;
+  user: number;
   folder: number | null;
+  project?: number | null;
   title: string;
   content: string;
   created_at: string;
@@ -1299,6 +1301,7 @@ export interface UpdateQuickNoteFolderPayload {
 export interface CreateQuickNotePayload {
   content: string;
   folder?: number | null;
+  project?: number | null;
 }
 
 // Payload for updating a note
@@ -1306,6 +1309,7 @@ export interface UpdateQuickNotePayload {
   title?: string;
   content?: string;
   folder?: number | null;
+  project?: number | null;
 }
 
 // Calendar Daily Update Types
