@@ -603,7 +603,7 @@ const TaskListSidebar: React.FC<TaskListSidebarProps> = ({
                     )}
 
                     {/* ── Admin / Manager: All Team Updates ── */}
-                    {isAdminOrManager && (
+                    {isAdminOrManager ? (
                         <div className="mt-2 space-y-2">
                             <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
                                 Team Updates
@@ -620,6 +620,15 @@ const TaskListSidebar: React.FC<TaskListSidebarProps> = ({
                                 allUpdates.map((upd) => renderUpdateCard(upd))
                             )}
                         </div>
+                    ) : (
+                        myUpdate && !showUpdateForm && (
+                            <div className="mt-2 space-y-2">
+                                <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                                    My Update
+                                </p>
+                                {renderUpdateCard(myUpdate)}
+                            </div>
+                        )
                     )}
                 </div>
             </div>
