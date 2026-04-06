@@ -6,7 +6,7 @@ import {
   FolderKanban, FileText, CheckCircle, Clock, ArrowRight, ChevronDown, Calendar, Users, Bell,
 } from 'lucide-react';
 import { Button, Card, CardContent, CardHeader, CardTitle } from '@/components/common';
-import { projectsApi, documentsApi, taskApi, notificationsApi, } from '@/services/api';
+import { projectsApi, documentsApi, taskApi } from '@/services/api';
 import { formatRelativeTime, getStatusColor } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import type { Project, Document } from '@/types';
@@ -15,6 +15,8 @@ import { NotificationsPage } from './NotificationsPage';
 import { ProjectGridCard } from '@/components/layout/DualView/projectsConfig';
 import { useOutletContext } from 'react-router-dom';
 import { CreateProjectModal } from '@/pages/Project/CreateProjectModal';
+import { useNotifications } from '@/hooks/useNotifications';
+import { DocumentPreview } from '@/components/common/DocumentPreview';
 
 // Type Definitions
 type TaskStatus = 'pending' | 'backlog' | 'in_progress' | 'completed' | 'deployed' | 'deferred' | 'review';
@@ -59,6 +61,21 @@ export function Dashboard() {
   const [openDocDropdownId, setOpenDocDropdownId] = React.useState<string | null>(null);
   const [docDropdownPos, setDocDropdownPos] = React.useState<{ top: number; left: number } | null>(null);
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<{ url: string; fileName: string; fileType: string } | null>(null);
+  const { unreadCount } = useNotifications();
+
+  const handleDocumentClick = async (doc: Document) => {
+    try {
+      const response = await documentsApi.getDownloadUrl(doc.project, { document_id: doc.id });
+      setPreviewDoc({
+        url: response.url,
+        fileName: doc.original_file_name || doc.name,
+        fileType: doc.file_type,
+      });
+    } catch (error) {
+      console.error('Failed to get download URL:', error);
+    }
+  };
 
   // Data Fetching
   const { data: projectsData, isLoading: projectsLoading } = useQuery({
@@ -72,21 +89,27 @@ export function Dashboard() {
   });
 
   const { data: tasksResponse } = useQuery({
-    queryKey: ['tasks'],
-    queryFn: () => taskApi.list(),
+    queryKey: ['tasks-dashboard'],
+    queryFn: async () => {
+      console.log('%c[Dashboard:tasks-dashboard] 📦 Fetching tasks (flat list — own key, safe from InfiniteQuery)', 'color:#f59e0b;font-weight:bold');
+      const result = await taskApi.list();
+      const count = Array.isArray(result) ? result.length : result?.results?.length ?? result?.tasks?.length ?? '?';
+      console.log('%c[Dashboard:tasks-dashboard] ✅ Tasks loaded', 'color:#22c55e;font-weight:bold', `| count: ${count}`, '| key: tasks-dashboard (isolated ✓)');
+      return result;
+    },
   });
 
   // Data Processing
-const projects = (() => {
-  if (!projectsData) return [];
-  if (Array.isArray(projectsData)) return projectsData;
-  if (projectsData.results && Array.isArray(projectsData.results)) {
-    return projectsData.results;
-  }
-  return [];
-})() as Project[];
+  const projects = (() => {
+    if (!projectsData) return [];
+    if (Array.isArray(projectsData)) return projectsData;
+    if (projectsData.results && Array.isArray(projectsData.results)) {
+      return projectsData.results;
+    }
+    return [];
+  })() as Project[];
 
-const documents = (documentsData?.results || []) as Document[];
+  const documents = (documentsData?.results || []) as Document[];
 
   const allTasks: Task[] = React.useMemo(() => {
     if (!tasksResponse) {
@@ -131,7 +154,9 @@ const documents = (documentsData?.results || []) as Document[];
     try {
       await taskApi.update(taskId, { status: newStatus });
 
-      queryClient.setQueryData(['tasks'], (old: any) => {
+      console.log('%c[Dashboard:tasks-dashboard] 🔄 Status update → writing to tasks-dashboard (not tasks ✓)', 'color:#f59e0b;font-weight:bold', `taskId: ${taskId}`, `→ ${newStatus}`);
+      // Update the dashboard's own flat cache for instant UI feedback
+      queryClient.setQueryData(['tasks-dashboard'], (old: any) => {
         if (!old) return old;
         const update = (list: any[]) => list.map(t => t.id === taskId ? { ...t, status: newStatus } : t);
         if (Array.isArray(old.tasks)) return { ...old, tasks: update(old.tasks) };
@@ -140,7 +165,9 @@ const documents = (documentsData?.results || []) as Document[];
         return old;
       });
 
+      // Also invalidate the taskboard's InfiniteQuery so it stays in sync
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks-dashboard'] });
     } catch (error) {
       console.error("Failed to update status:", error);
     } finally {
@@ -184,16 +211,9 @@ const documents = (documentsData?.results || []) as Document[];
 
 
   const recentProjects = Array.isArray(projects)
-  ? projects.filter(p => p.is_favourite).slice(0, 6)
-  : [];
+    ? projects.filter(p => p.is_favourite).slice(0, 6)
+    : [];
   const recentDocuments = Array.isArray(documents) ? documents.slice(0, 5) : [];
-
-  // Fetch unread count for the badge
-  const { data: summary } = useQuery({
-    queryKey: ['notifications-summary'],
-    queryFn: () => notificationsApi.getSummary(),
-    refetchInterval: 30000,
-  });
 
   const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A';
@@ -253,9 +273,9 @@ const documents = (documentsData?.results || []) as Document[];
               onClick={() => setIsActivityOpen(!isActivityOpen)}
             >
               <Bell className="h-5 w-5" />
-              {(summary?.unread ?? 0) > 0 && (
+              {unreadCount > 0 && (
                 <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                  {summary?.unread}
+                  {unreadCount}
                 </span>
               )}
             </Button>
@@ -287,7 +307,7 @@ const documents = (documentsData?.results || []) as Document[];
                         className="fixed inset-0 z-10"
                         onClick={() => setShowStatusFilter(false)}
                       />
-                      <div className="absolute left-0 mt-2 w-48 bg-white rounded-lg shadow-lg border z-20 py-1">
+                      <div className="absolute left-0 mt-2 w-48 bg-popover rounded-lg shadow-lg border border-border z-20 py-1">
                         {statusOptions.map((option) => (
                           <button
                             key={option.value}
@@ -295,7 +315,7 @@ const documents = (documentsData?.results || []) as Document[];
                               setSelectedTaskStatus(option.value);
                               setShowStatusFilter(false);
                             }}
-                            className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 transition-colors flex items-center justify-between ${selectedTaskStatus === option.value ? 'bg-gray-100' : ''
+                            className={`w-full px-4 py-2 text-left text-sm hover:bg-accent transition-colors flex items-center justify-between ${selectedTaskStatus === option.value ? 'bg-accent' : ''
                               }`}
                           >
                             <span className={option.color}>{option.label}</span>
@@ -313,11 +333,11 @@ const documents = (documentsData?.results || []) as Document[];
             <CardContent>
               {filteredTasks.length === 0 ? (
                 <div className="text-center py-12">
-                  <Clock className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                  <Clock className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
                   <p className="text-sm text-muted-foreground mb-2">
                     No {selectedTaskStatus} tasks assigned to you
                   </p>
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-muted-foreground/60">
                     {myAssignedTasks.length > 0
                       ? `You have ${myAssignedTasks.length} total assigned task(s) in other statuses`
                       : 'No tasks are currently assigned to you'}
@@ -331,7 +351,7 @@ const documents = (documentsData?.results || []) as Document[];
                       <div
                         key={task.id}
                         onClick={() => navigate(`/taskboard/${task.status.toLowerCase()}`)}
-                        className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors cursor-pointer border border-gray-100"
+                        className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors cursor-pointer border border-border"
                       >
                         {/* Left Section: Task Info */}
                         <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -391,7 +411,7 @@ const documents = (documentsData?.results || []) as Document[];
                                 />
                                 <div
                                   style={{ top: dropdownPos.top, left: dropdownPos.left }}
-                                  className="fixed w-48 bg-white rounded-lg shadow-xl border border-gray-100 z-50 py-1 animate-in fade-in zoom-in-95 duration-100"
+                                  className="fixed w-48 bg-popover rounded-lg shadow-xl border border-border z-50 py-1 animate-in fade-in zoom-in-95 duration-100"
                                 >
                                   {statusOptions.map((opt) => (
                                     <button
@@ -400,7 +420,7 @@ const documents = (documentsData?.results || []) as Document[];
                                         handleStatusUpdate(task.id, opt.value, e as any);
                                         setOpenTaskDropdownId(null);
                                       }}
-                                      className={`w-full px-4 py-2.5 text-left text-xs font-medium hover:bg-gray-50 transition-colors flex items-center justify-between gap-2 ${task.status === opt.value ? 'bg-gray-50' : ''}`}
+                                      className={`w-full px-4 py-2.5 text-left text-xs font-medium hover:bg-accent transition-colors flex items-center justify-between gap-2 ${task.status === opt.value ? 'bg-accent' : ''}`}
                                     >
                                       <span className={opt.color}>{opt.label}</span>
                                       {task.status === opt.value && (
@@ -443,12 +463,9 @@ const documents = (documentsData?.results || []) as Document[];
             <CardContent>
               {recentDocuments.length === 0 ? (
                 <div className="text-center py-10">
-                  <FileText className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+                  <FileText className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
                   <p className="text-sm text-muted-foreground mb-2">No documents yet</p>
                   <Link to="/projects">
-                    {/* <Button variant="outline" size="sm" className="mt-2">
-                      Create Document
-                    </Button> */}
                   </Link>
                 </div>
               ) : (
@@ -457,18 +474,18 @@ const documents = (documentsData?.results || []) as Document[];
                     const statusColorClass = getStatusColor(doc.status);
 
                     return (
-                      <Link
+                      <div
                         key={doc.id}
-                        to={`/documents/${doc.id}`}
-                        className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors cursor-pointer border border-gray-100"
+                        onClick={() => handleDocumentClick(doc)}
+                        className="flex items-center justify-between p-3 rounded-lg hover:bg-muted transition-colors cursor-pointer border border-border"
                       >
                         {/* Left Section: Document Info */}
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           <div className="flex-1 min-w-0">
                             <div className="font-medium truncate">{doc.name}</div>
-                            <div className="text-sm text-muted-foreground truncate">
+                            {/* <div className="text-sm text-muted-foreground truncate">
                               {doc.project_name || `Project ${doc.project}`}
-                            </div>
+                            </div> */}
                           </div>
                         </div>
 
@@ -516,7 +533,7 @@ const documents = (documentsData?.results || []) as Document[];
                                 />
                                 <div
                                   style={{ top: docDropdownPos.top, left: docDropdownPos.left }}
-                                  className="fixed w-36 bg-white rounded-lg shadow-xl border border-gray-100 z-50 py-1 animate-in fade-in zoom-in-95 duration-100"
+                                  className="fixed w-36 bg-popover rounded-lg shadow-xl border border-border z-50 py-1 animate-in fade-in zoom-in-95 duration-100"
                                   onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
@@ -530,12 +547,12 @@ const documents = (documentsData?.results || []) as Document[];
                                         handleDocStatusUpdate(doc.id, status, e as any);
                                         setOpenDocDropdownId(null);
                                       }}
-                                      className={`w-full px-4 py-2 text-left text-xs font-medium hover:bg-gray-50 transition-colors flex items-center justify-between gap-2 ${doc.status === status ? 'bg-gray-50' : ''}`}
+                                      className={`w-full px-4 py-2 text-left text-xs font-medium hover:bg-accent transition-colors flex items-center justify-between gap-2 ${doc.status === status ? 'bg-accent' : ''}`}
                                     >
                                       <span className={
-                                        status === 'approved' ? 'text-green-600' :
-                                          status === 'in_review' ? 'text-yellow-600' :
-                                            status === 'archived' ? 'text-gray-500' : 'text-gray-600'
+                                        status === 'approved' ? 'text-green-600 dark:text-green-400' :
+                                          status === 'in_review' ? 'text-yellow-600 dark:text-yellow-400' :
+                                            status === 'archived' ? 'text-muted-foreground' : 'text-foreground'
                                       }>
                                         {status.replace('_', ' ').toUpperCase()}
                                       </span>
@@ -555,7 +572,7 @@ const documents = (documentsData?.results || []) as Document[];
                             )}
                           </div>
                         </div>
-                      </Link>
+                      </div>
                     );
                   })}
                 </div>
@@ -568,7 +585,7 @@ const documents = (documentsData?.results || []) as Document[];
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2">
-              <h2 className="text-xl font-bold">Recent Projects</h2>
+              <h2 className="text-xl font-bold">Favourite Projects</h2>
             </CardTitle>
             <Link to="/projects">
               <Button variant="ghost" size="sm">
@@ -617,30 +634,44 @@ const documents = (documentsData?.results || []) as Document[];
               <Link to="/documents">
                 <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
                   <FileText className="h-6 w-6" />
-                  <span>Browse Documents</span>
+                  <span>Documents</span>
                 </Button>
               </Link>
               <Link to="/documents?status=in_review">
                 <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
                   <Clock className="h-6 w-6" />
-                  <span>Review Queue</span>
+                  <span>Review Doc</span>
                 </Button>
               </Link>
               <Link to="/documents?status=approved">
                 <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
                   <CheckCircle className="h-6 w-6" />
-                  <span>Approved Docs</span>
+                  <span>Approved Doc</span>
                 </Button>
               </Link>
             </div>
           </CardContent>
         </Card>
       </div>
+      {isActivityOpen && (
+        <NotificationsPage
+          onClose={() => setIsActivityOpen(false)}
+          defaultFilter="unread"
+        />
+      )}
       <CreateProjectModal
         isOpen={isCreateProjectModalOpen}
         onClose={() => setIsCreateProjectModalOpen(false)}
         navigateOnSuccess={true}
       />
+      {previewDoc && (
+        <DocumentPreview
+          url={previewDoc.url}
+          fileName={previewDoc.fileName}
+          fileType={previewDoc.fileType}
+          onClose={() => setPreviewDoc(null)}
+        />
+      )}
     </div>
   );
 }

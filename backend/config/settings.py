@@ -94,7 +94,8 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
-REDIS_URL = config("REDIS_URL", default="redis://localhost:6379/0")
+#REDIS_URL = config("REDIS_URL", default="redis://localhost:6379/0")
+REDIS_URL = config("REDIS_URL", default="redis://redis:6379/0")
 
 CHANNEL_LAYERS = {
     "default": {

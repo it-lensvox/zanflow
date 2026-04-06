@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Trash2, CheckCircle, Clock, File } from 'lucide-react';
+import { FileText, Trash2, CheckCircle, Clock, File, Info, Share2 } from 'lucide-react';
 import { TablePopover } from '@/components/common';
 import { formatRelativeTime } from '@/lib/utils';
 import type { Document, DocumentStatus } from '@/types';
@@ -9,6 +9,8 @@ import { useQueryClient } from '@tanstack/react-query';
 
 interface DocumentTableColumnsProps {
   onDeleteClick: (e: React.MouseEvent, doc: Document) => void;
+  onInfoClick?: (doc: Document) => void;
+  onShareClick?: (doc: Document) => void;
 }
 
 const getDocumentStatusConfig = (status: DocumentStatus) => {
@@ -62,7 +64,7 @@ const statusOptions: { value: DocumentStatus; label: string; icon: any }[] = [
   { value: 'archived', label: 'ARCHIVED', icon: FileText },
 ];
 
-export const createDocumentsTableColumns = ({ onDeleteClick }: DocumentTableColumnsProps): TableColumn<Document>[] => {
+export const createDocumentsTableColumns = ({ onDeleteClick, onInfoClick, onShareClick }: DocumentTableColumnsProps): TableColumn<Document>[] => {
   const StatusDropdown = ({ doc }: { doc: Document }) => {
     const [activeDropdown, setActiveDropdown] = useState(false);
     const queryClient = useQueryClient();
@@ -125,7 +127,6 @@ export const createDocumentsTableColumns = ({ onDeleteClick }: DocumentTableColu
     {
       key: 'name',
       label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Document</span>,
-      // width: '350px',  // Added width
       render: (doc: Document) => (
         <div className="flex items-center justify-between w-full group/cell">
           <div className="flex items-center gap-2 min-w-0 pr-2">
@@ -134,23 +135,40 @@ export const createDocumentsTableColumns = ({ onDeleteClick }: DocumentTableColu
               {doc.name}
             </span>
           </div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDeleteClick(e, doc);
-            }}
-            className="opacity-0 group-hover:opacity-100 transition-all duration-200 p-1.5 hover:bg-red-50 rounded flex-shrink-0"
-            title="Delete Document"
-          >
-            <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-600" />
-          </button>
+          <div className="opacity-0 group-hover/cell:opacity-100 transition-all duration-200 flex items-center gap-0.5 flex-shrink-0">
+            {onInfoClick && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onInfoClick(doc); }}
+                className="p-1.5 hover:bg-blue-50 rounded"
+                title="Document Info"
+              >
+                <Info className="w-4 h-4 text-gray-400 hover:text-blue-600" />
+              </button>
+            )}
+            {onShareClick && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onShareClick(doc); }}
+                className="p-1.5 hover:bg-blue-50 rounded"
+                title="Share Document"
+              >
+                <Share2 className="w-4 h-4 text-gray-400 hover:text-blue-600" />
+              </button>
+            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); onDeleteClick(e, doc); }}
+              className="p-1.5 hover:bg-red-50 rounded"
+              title="Delete Document"
+            >
+              <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-600" />
+            </button>
+          </div>
         </div>
       ),
     },
     {
       key: 'project',
       label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Project</span>,
-      width: '180px',  // Added width
+      width: '180px',
       render: (doc: Document) => (
         <span className="text-[12px] text-gray-700 font-medium">
           {doc.project_name || 'General'}
@@ -161,22 +179,42 @@ export const createDocumentsTableColumns = ({ onDeleteClick }: DocumentTableColu
       key: 'file_type',
       label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Type</span>,
       width: '120px',
-      render: (doc: Document) => (
-        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600 uppercase border border-gray-200">
-          {doc.file_type}
-        </span>
-      ),
+      render: (doc: Document) => {
+        const getFileType = (doc: Document): string => {
+          if (doc.name) {
+            const ext = doc.name.split('.').pop()?.toLowerCase();
+            if (ext) return ext;
+          }
+          return doc.file_type || 'unknown';
+        };
+
+        return (
+          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600 uppercase border border-gray-200">
+            {getFileType(doc)}
+          </span>
+        );
+      },
     },
     {
       key: 'status',
       label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Status</span>,
-      width: '120px',  // Reduced from 140px
+      width: '120px',
       render: (doc: Document) => <StatusDropdown doc={doc} />,
     },
     {
+      key: 'updated_at',
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Updated</span>,
+      width: '120px',
+      render: (doc: Document) => (
+        <span className="text-[12px] text-gray-500">
+          {formatRelativeTime(doc.updated_at)}
+        </span>
+      ),
+    },
+    {
       key: 'created_by',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Uploaded By</span>,
-      width: '180px',  // Added width
+      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Shared By</span>,
+      width: '180px',
       render: (doc: Document) => (
         <div className="flex items-center gap-2">
           <div className="h-6 w-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-700">
@@ -193,9 +231,11 @@ export const createDocumentsTableColumns = ({ onDeleteClick }: DocumentTableColu
 interface DocumentGridCardProps {
   document: Document;
   onDeleteClick: (e: React.MouseEvent, doc: Document) => void;
+  onCardClick?: (doc: Document) => void;
+  onShareClick?: (doc: Document) => void;
 }
 
-export function DocumentGridCard({ document: doc, onDeleteClick }: DocumentGridCardProps) {
+export function DocumentGridCard({ document: doc, onDeleteClick, onCardClick, onShareClick }: DocumentGridCardProps) {
   const getStatusConfig = (status: DocumentStatus) => {
     const normalizedStatus = status.toLowerCase() as Lowercase<DocumentStatus>;
 
@@ -222,7 +262,7 @@ export function DocumentGridCard({ document: doc, onDeleteClick }: DocumentGridC
 
   return (
     <div
-      onClick={() => window.location.href = `/documents/${doc.id}`}
+      onClick={() => onCardClick ? onCardClick(doc) : (window.location.href = `/documents/${doc.id}`)}
       className="bg-white rounded-xl p-4 transition-all duration-300 cursor-pointer text-gray-800 hover:shadow-lg hover:-translate-y-0.5 border border-[#d0d5dd] relative hover:z-50 h-full group"
     >
       {/* Header */}
@@ -251,14 +291,25 @@ export function DocumentGridCard({ document: doc, onDeleteClick }: DocumentGridC
         </div>
       </div>
 
-      {/* Trash Button */}
-      <button
-        onClick={(e) => onDeleteClick(e, doc)}
-        className="absolute bottom-3 left-3 opacity-0 group-hover:opacity-100 transition-all duration-200 p-1.5 hover:bg-red-50 rounded text-gray-400 hover:text-red-600"
-        title="Delete Document"
-      >
-        <Trash2 className="w-4 h-4" />
-      </button>
+      {/* Action Buttons */}
+      <div className="absolute bottom-3 left-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
+        {onShareClick && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onShareClick(doc); }}
+            className="p-1.5 hover:bg-blue-50 rounded text-gray-400 hover:text-blue-600"
+            title="Share Document"
+          >
+            <Share2 className="w-4 h-4" />
+          </button>
+        )}
+        <button
+          onClick={(e) => onDeleteClick(e, doc)}
+          className="p-1.5 hover:bg-red-50 rounded text-gray-400 hover:text-red-600"
+          title="Delete Document"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
 
       {/* Status Badge */}
       <div className="absolute bottom-3 right-3">

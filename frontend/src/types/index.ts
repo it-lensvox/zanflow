@@ -8,8 +8,39 @@ export interface User {
   role: 'admin' | 'manager' | 'annotator' | 'viewer';
   avatar?: string;
   is_active: boolean;
+  is_superuser?: boolean;
   date_joined: string;
   skills?: string[];
+}
+
+// User Management 
+// Invite User
+export interface InviteUserPayload {
+  email: string;
+  role: 'admin' | 'manager' | 'annotator' | 'viewer';
+}
+
+export interface InviteUserResponse {
+  detail: string;
+}
+
+// Invite Accept (Setup Account page)
+export interface InviteVerifyResponse {
+  email: string;
+  role: 'admin' | 'manager' | 'annotator' | 'viewer';
+}
+
+export interface InviteAcceptPayload {
+  token: string;
+  username: string;
+  password: string;
+  password_confirm: string;
+  first_name: string;
+  last_name: string;
+}
+
+export interface InviteAcceptResponse {
+  detail: string;
 }
 
 // Minimal user info for nested references
@@ -155,13 +186,39 @@ export interface Task {
   attachments?: TaskAttachment[];
   created_at?: string;
   updated_at?: string;
+  is_pinned?: boolean;
   comments?: TaskComment[];
+}
+
+// Pin task API response
+export interface PinTaskResponse {
+  message: string;
+  is_pinned: boolean;
 }
 
 // Update TaskResponse to use the interface
 export interface TaskResponse {
   message: string;
   task: Task;
+}
+
+// Task API Query Parameters for filtering (resolves Calendar performance overhead)
+export interface TaskFilterParams {
+  project_id?: number;
+  disable_pagination?: boolean;
+  start_date__gte?: string;
+  end_date__lte?: string;
+  month?: number;
+  year?: number;
+  [key: string]: any;
+}
+
+// Paginated task list response (DRF standard envelope)
+export interface TaskPaginatedResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: Task[];
 }
 
 // In taskdetailmodal comment section 
@@ -209,6 +266,15 @@ export interface Document {
 
 export type FileType = 'pdf' | 'image' | 'json' | 'text' | 'video' | 'other';
 export type DocumentStatus = 'draft' | 'in_review' | 'approved' | 'archived';
+
+export interface ShareDocumentPayload {
+  user_id?: number;
+  project_id?: number;
+}
+
+export interface ShareDocumentResponse {
+  detail: string;
+}
 
 // Test types
 export interface TestRun {
@@ -315,6 +381,25 @@ export interface LoginCredentials {
 export interface AuthTokens {
   access: string;
   refresh: string;
+}
+
+// Sign Up page
+export interface OrganizationSignupPayload {
+  company_name: string;
+  admin_email: string;
+  password: string;
+  password_confirm: string;
+}
+
+export interface OrganizationSignupResponse {
+  message: string;
+  organization: {
+    id: number;
+    name: string;
+    slug: string;
+  };
+  user: Pick<User, 'id' | 'username' | 'email' | 'role'>;
+  tokens: AuthTokens;
 }
 
 // Tool: PdfVsHtml types
@@ -432,28 +517,6 @@ export interface AITaskSuggestionResponse {
   };
 }
 
-// API Testing Tool types
-export interface APICollection {
-  id: string;
-  name: string;
-  description?: string;
-  project_id?: number;
-  api_count: number;
-  execution_order: 'sequential' | 'parallel';
-  environment_variables: Record<string, string>;
-  tags: string[];
-  is_active: boolean;
-  created_by?: UserMinimal;
-  created_at: string;
-  updated_at: string;
-  last_run?: {
-    id: string;
-    status: string;
-    executed_at: string;
-    success_rate: number;
-  } | null;
-}
-
 export interface APIEndpoint {
   id: string;
   collection: string;
@@ -498,59 +561,6 @@ export interface AuthCredential {
   updated_at: string;
 }
 
-export interface ExecutionRun {
-  id: string;
-  collection: APICollection;
-  executed_by?: UserMinimal;
-  status: 'pending' | 'running' | 'completed' | 'partial_failure' | 'failed' | 'cancelled';
-  started_at?: string;
-  completed_at?: string;
-  total_apis: number;
-  successful_count: number;
-  failed_count: number;
-  skipped_count: number;
-  trigger_type: 'manual' | 'scheduled' | 'webhook' | 'ci_cd';
-  environment?: Record<string, string>;
-  notes?: string;
-  duration_seconds?: number;
-  success_rate: number;
-  results?: ExecutionResult[];
-  created_at: string;
-  updated_at: string;
-}
-
-export interface ExecutionResult {
-  id: string;
-  execution_run: string;
-  api_endpoint?: string;
-  endpoint_name: string;
-  endpoint_method: string;
-  status: 'success' | 'failed' | 'error' | 'timeout' | 'skipped';
-  request_url: string;
-  request_headers?: Record<string, string>;
-  request_body?: string;
-  response_status_code?: number;
-  response_headers?: Record<string, string>;
-  response_body?: string;
-  response_size_bytes?: number;
-  execution_time_ms: number;
-  error_message?: string;
-  error_type?: string;
-  assertions_passed: boolean;
-  assertion_details?: Record<string, any>;
-  extracted_variables?: Record<string, any>;
-  retry_attempt: number;
-  created_at: string;
-}
-
-export interface APITestingDashboard {
-  total_collections: number;
-  total_endpoints: number;
-  endpoints_by_method: Record<string, number>;
-  recent_runs: ExecutionRun[];
-  success_rate_last_30_days: number;
-}
-
 export interface CreateCollectionPayload {
   name: string;
   description?: string;
@@ -558,50 +568,6 @@ export interface CreateCollectionPayload {
   execution_order?: 'sequential' | 'parallel';
   environment_variables?: Record<string, string>;
   tags?: string[];
-}
-
-export interface CreateEndpointPayload {
-  collection: string;
-  name: string;
-  description?: string;
-  http_method: string;
-  url: string;
-  headers?: Record<string, string>;
-  query_params?: Record<string, string>;
-  request_body?: Record<string, any> | string;
-  body_type?: string;
-  expected_status_code?: number;
-  expected_response_contains?: Record<string, any>;
-  timeout_seconds?: number;
-  retry_count?: number;
-  sort_order?: number;
-  extract_variables?: Record<string, string>;
-  depends_on?: string;
-}
-
-export interface CreateCredentialPayload {
-  collection: string;
-  name: string;
-  auth_type: string;
-  token?: string;
-  username?: string;
-  password?: string;
-  api_key?: string;
-  api_key_name?: string;
-  header_name?: string;
-  header_prefix?: string;
-  access_token?: string;
-  refresh_token?: string;
-  expires_at?: string;
-  auto_refresh?: boolean;
-  refresh_url?: string;
-  refresh_payload?: Record<string, any>;
-}
-
-export interface RunCollectionPayload {
-  credential_id?: string;
-  environment_overrides?: Record<string, string>;
-  notes?: string;
 }
 
 // Calendar Event types
@@ -685,6 +651,7 @@ export interface ChatRoomMembership {
   last_read_at: string | null;
   is_muted: boolean;
   room_role: 'owner' | 'admin' | 'member';
+  is_favourite: boolean;
 }
 
 export interface ChatRoom {
@@ -698,7 +665,12 @@ export interface ChatRoom {
   created_by?: ChatUserMinimal;
   memberships?: ChatRoomMembership[];
   current_user_membership?: ChatRoomMembership;
-  last_message?: string | null;
+  last_message?: {
+    id: string;
+    sender_username: string;
+    content_preview: string;
+    created_at: string;
+  } | null;
   unread_count?: number;
   is_member?: boolean;
   created_at: string;
@@ -722,6 +694,14 @@ export interface ChatMessage {
   is_deleted: boolean;
   is_read?: boolean;
   attachments?: any[];
+}
+
+// Optimistic message status for UI rendering
+export type OptimisticMessageStatus = 'sending' | 'sent' | 'error';
+
+export interface OptimisticChatMessage extends ChatMessage {
+  optimisticStatus?: OptimisticMessageStatus;
+  optimisticId?: string;
 }
 
 export interface ChatRoomMessagesResponse {
@@ -793,12 +773,13 @@ export interface GatewaySendMessagePayload {
 }
 
 export interface GatewayIncomingMessage {
-  type: 'CHAT_MESSAGE' | 'notification' | 'GATEWAY_CONNECTED' | 'PRESENCE' | 'room_created';
+  type: 'CHAT_MESSAGE' | 'SIGNAL' | 'GATEWAY_CONNECTED' | 'PRESENCE' | 'PRESENCE_SYNC' | 'room_created';
+  event?: 'NEW_NOTIFICATION' | 'CHAT_UNREAD_UPDATE';
   message?: ChatMessage;
-  data?: ChatMessage; 
+  data?: ChatMessage | NotificationData | any;
   room_id?: string;
   user_id?: number;
-  notification?: any;
+  online_users?: number[];
   status?: 'online' | 'offline';
   username?: string;
   room?: any;
@@ -810,10 +791,550 @@ export interface UnreadCount {
   count: number;
 }
 
+// WebSocket Notification System Types
+export interface NotificationRelatedObject {
+  type: 'task' | 'project' | 'message' | 'comment' | 'team' | 'document';
+  id: string | number;
+}
+
+// Individual notification data structure
+export interface NotificationData {
+  id: number;
+  title: string;
+  message?: string;
+  notification_type?: string;
+  priority?: string;
+  actor_name?: string | null;
+  is_read: boolean;
+  metadata?: {
+    task_id?: number;
+    task_heading?: string;
+    project_id?: string | number;
+    project_name?: string;
+    old_status?: string;
+    new_status?: string;
+    priority?: string;
+    [key: string]: any;
+  };
+related_object?: NotificationRelatedObject;
+  related_object_info?: NotificationRelatedObject & { app?: string };
+  time_since?: string;
+  created_at?: string;
+  updated_at?: string;
+  unread_count?: number;
+  actor?: {
+    id: number;
+    username: string;
+    first_name?: string;
+    last_name?: string;
+    full_name?: string;
+    email?: string;
+  };
+}
+
+// API response wrapper for notification list
+export interface NotificationListResponse {
+  message: string;
+  total: number;
+  unread_count: number;
+  limit: number;
+  offset: number;
+  notifications: NotificationData[];
+}
+
+// Response type for delete-read notifications API
+export interface DeleteReadNotificationsResponse {
+  message: string;
+  deleted_count: number;
+}
+
+// WebSocket notification event wrapper
+export interface WebSocketNotificationEvent {
+  type: 'SIGNAL';
+  event: 'NEW_NOTIFICATION';
+  data: NotificationData;
+}
+
+// Callback type for notification listeners
+export type NotificationCallback = (notification: NotificationData) => void;
+
+// Team chat and thread chattotal badge unread_count
+export interface ChatUnreadResponse {
+  total_unread: number;
+  thread_unread: number;
+  rooms_with_unread: number;
+  by_room: Record<string, {
+    name: string;
+    unread_count: number;
+    room_type: string;
+    last_message_at?: string;
+    project_id?: string;
+  }>;
+}
+
+// Presence event from WebSocket gateway
+export interface PresenceEvent {
+  type: 'PRESENCE';
+  status: 'online' | 'offline';
+  user_id: number;
+  username: string | null;
+}
+
+// Chat unread update WebSocket event
+export interface ChatUnreadUpdateEvent {
+  type: 'SIGNAL';
+  event: 'CHAT_UNREAD_UPDATE';
+  data: {
+    room_id: string;
+    room_type?: string;
+    total_unread: number;
+    thread_unread?: number;
+    room_unread: number;
+  };
+}
+
+// Unified room shape returned by /api/v1/chat/rooms/ (all room_types in one call)
+export interface ChatRoomListItem {
+  id: string;
+  name: string;
+  room_type: 'private' | 'group' | 'project' | 'team' | 'thread' | 'ai_bot' | 'global';
+  slug: string;
+  project: number | null;
+  participant_count: number;
+  participants: number[]; 
+  last_message: {
+    id: string;
+    sender_username: string;
+    content_preview: string;
+    created_at: string;
+  } | null;
+  unread_count: number;
+  is_member: boolean;
+  created_at: string;
+  updated_at: string;
+  is_active: boolean;
+  is_favourite: boolean;
+  parent_message: string | null;
+  created_by: {
+    id: number;
+    username: string;
+    full_name: string;
+    email: string;
+  } | null;
+}
+
 export interface ToastNotification {
   id: string;
   room_id: string;
   sender_name: string;
   message_preview: string;
   timestamp: string;
+}
+
+// THREADS TYPES
+
+// Sender information in thread messages
+export interface ThreadSender {
+  username: string;
+  full_name?: string;
+  avatar?: string;
+}
+
+// Thread message from backend
+export interface ThreadMessage {
+  id: string;
+  room_id: string;
+  sender: ThreadSender;
+  content: string;
+  is_ai_generated: boolean;
+  timestamp: Date;
+}
+
+// Thread room (session)
+export interface ThreadRoom {
+  id: string;
+  slug: string;
+  name: string;
+  room_type: string;
+  project: number;
+  created_at: string;
+  updated_at: string;
+  is_active: boolean;
+  unread_count: number;
+  created_by?: {
+    id: number;
+    username: string;
+    full_name: string;
+    email: string;
+  };
+  participants?: Array<{
+    id: number;
+    username: string;
+    full_name: string;
+    email: string;
+  }>;
+  current_user_membership?: {
+    id: string;
+    joined_at: string;
+    last_read_at: string;
+    is_muted: boolean;
+    room_role: string;
+  };
+}
+
+// Thread messages response from backend API
+export interface ThreadMessagesResponse {
+  messages: Array<{
+    id: string;
+    room: string;
+    sender: {
+      id: number | null;
+      username: string;
+      full_name: string;
+      email: string;
+    } | null;
+    message_type: string;
+    content: string;
+    attachment: string | null;
+    attachment_name: string;
+    metadata: Record<string, any>;
+    reply_to: string | null;
+    reply_to_preview: string | null;
+    created_at: string;
+    updated_at: string;
+    is_deleted: boolean;
+    is_own_message: boolean;
+  }>;
+  count: number;
+  has_more: boolean;
+}
+
+// Local thread session for UI state
+export interface ThreadSession {
+  id: string;
+  room_id: string;
+  slug: string;
+  projectId: number;
+  title: string;
+  messages: ThreadUIMessage[];
+  createdAt: Date;
+  updatedAt: Date;
+  unreadCount: number;
+  lastReadAt: Date | null;
+  createdById?: number;
+}
+
+// UI message format
+export interface ThreadUIMessage {
+  id: string;
+  text: string;
+  sender: 'user' | 'system' | 'other';
+  timestamp: Date;
+  isAI?: boolean;
+  senderName?: string;
+  senderId?: number | null;
+}
+
+// Props for Threads component
+export interface ThreadsProps {
+  projectId: number;
+  projectName: string;
+}
+
+// Local storage structure
+export interface ThreadStorage {
+  sessions: ThreadSession[];
+  lastActiveSessionId: string | null;
+}
+
+// Create thread room payload
+export interface CreateThreadRoomPayload {
+  project_id: number;
+  name: string;
+}
+
+
+// WebSocket command types
+export type WebSocketCommand =
+  | 'join_room'
+  | 'send_message'
+  | 'leave_room';
+
+// WebSocket join room command
+export interface WSJoinRoomCommand {
+  command: 'join_room';
+  room_slug: string;
+}
+
+// WebSocket send message command
+export interface WSSendMessageCommand {
+  command: 'send_message';
+  room_id: string;
+  content: string;
+}
+
+// WebSocket incoming message
+export interface WSIncomingThreadMessage {
+  type: 'CHAT_MESSAGE';
+  data: {
+    id: string;
+    room_id: string;
+    sender: {
+      id: number | null;
+      username: string;
+      full_name?: string;
+    };
+    message_type: string;
+    content: string;
+    attachment_url: string | null;
+    attachment_name: string;
+    reply_to: string | null;
+    created_at: string;
+    is_deleted: boolean;
+    is_ai_generated: boolean;
+    thread_count: number;
+  };
+}
+
+// WebSocket unread update signal
+export interface WSUnreadUpdateSignal {
+  type: 'SIGNAL';
+  event: 'CHAT_UNREAD_UPDATE';
+  data: {
+    room_id: string;
+    room_type: 'thread' | 'project' | 'direct' | 'team' | string;
+    thread_unread: number;
+    total_unread: number;
+    room_unread: number;
+  };
+}
+
+// Combined WebSocket message types
+export type WSThreadMessage = WSIncomingThreadMessage | WSUnreadUpdateSignal;
+
+// Document Filter Types for ContentCreation
+export interface ProjectDocument {
+  id: string;
+  file_name: string;
+  file_url: string;
+  uploaded_at: string;
+  source: 'Project';
+  task_id: null;
+  task_heading: null;
+}
+
+export interface TaskDocument {
+  id: number;
+  file_name: string;
+  file_url: string;
+  uploaded_at: string;
+  source: 'Task';
+  task_id: number;
+  task_heading: string;
+}
+
+export type FilteredDocument = ProjectDocument | TaskDocument;
+
+// Task Details and Content Creation--> Document section Filter documents based on selected filter
+export interface AllDocumentsResponse {
+  message: string;
+  total_files: number;
+  documents: FilteredDocument[];
+}
+
+export interface TaskOption {
+  task_id: number;
+  task_heading: string;
+}
+
+
+// AI BOT TYPES
+
+// Page context sent with every AI Bot message
+export interface AIBotContext {
+  page: string;
+  id: number | string | null;
+}
+
+// Outgoing message payload to WebSocket
+export interface AIBotSendPayload {
+  message: string;
+  context: AIBotContext;
+}
+
+// Incoming message types from backend WebSocket
+export type AIBotMessageType = 'system' | 'ai_chunk' | 'ai_done' | 'ai_complete' | 'ai_response' | 'chat_title' | 'error';
+
+export interface AIBotIncomingMessage {
+  type: AIBotMessageType;
+  text: string;
+}
+
+// UI message stored in session history
+export interface AIBotUIMessage {
+  id: string;
+  text: string;
+  sender: 'user' | 'bot';
+  timestamp: Date;
+}
+
+// AI Bot chat session
+export interface AIBotSession {
+  id: string;
+  title: string;
+  messages: AIBotUIMessage[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ─── Organization / Workspace Types (Superuser only)
+
+export interface OrgAdmin {
+  id: number;
+  username: string;
+  email: string;
+}
+
+export interface OrgRecentUser {
+  id: number;
+  username: string;
+  email: string;
+  last_login: string;
+  role: string;
+}
+
+export interface OrgStats {
+  users: number;
+  projects: number;
+  tasks: number;
+  teams: number;
+  chat_rooms: number;
+  chat_messages: number;
+}
+
+export interface Tenant {
+  id: number;
+  name: string;
+  slug: string;
+  is_active: boolean;
+  created_at: string;
+  stats: OrgStats;
+  admins: OrgAdmin[];
+  recent_active_users: OrgRecentUser[];
+}
+
+export interface PlatformSummary {
+  total_organizations: number;
+  active_organizations: number;
+  inactive_organizations: number;
+  total_users: number;
+}
+
+export interface OrganizationsOverviewResponse {
+  platform_summary: PlatformSummary;
+  tenants: Tenant[];
+}
+
+export interface OrganizationDeleteResponse {
+  message: string;
+  summary: {
+    organization: string;
+    deleted: Record<string, number>;
+  };
+}
+
+export interface OrganizationToggleStatusResponse {
+  message: string;
+  is_active: boolean;
+}
+
+// ─── Quick Notes Types
+
+// Backend folder shape 
+export interface QuickNoteFolder {
+  id: number;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QuickNoteAttachment {
+  id: number;
+  note: number;
+  file: string;
+  filename: string;
+  created_at: string;
+}
+
+// Backend note shape 
+export interface QuickNote {
+  id: number;
+  user: number;
+  folder: number | null;
+  project?: number | null;
+  title: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+  attachments?: QuickNoteAttachment[];
+}
+
+// Paginated notes list response
+export interface PaginatedQuickNotesResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: QuickNote[];
+}
+
+// Payload for creating a folder
+export interface CreateQuickNoteFolderPayload {
+  name: string;
+}
+
+// Payload for renaming a folder
+export interface UpdateQuickNoteFolderPayload {
+  name: string;
+}
+
+// Payload for creating a note
+export interface CreateQuickNotePayload {
+  content: string;
+  folder?: number | null;
+  project?: number | null;
+}
+
+// Payload for updating a note
+export interface UpdateQuickNotePayload {
+  title?: string;
+  content?: string;
+  folder?: number | null;
+  project?: number | null;
+}
+
+// Calendar Daily Update Types
+
+// Single daily update entry (matches backend response)
+export interface DailyUpdate {
+  id: number;
+  user: number;
+  user_name: string;
+  date: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Payload for creating or updating a daily update
+export interface DailyUpdatePayload {
+  date: string; // 'YYYY-MM-DD'
+  content: string;
+}
+
+// Response when listing daily updates (admin / manager)
+export interface DailyUpdateListResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: DailyUpdate[];
 }

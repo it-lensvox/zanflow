@@ -1,19 +1,27 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  LayoutDashboard, FolderKanban, FileText, Settings, LogOut,
-  Users, ChevronDown, ChevronUp, Plus, CheckSquare, CheckCircle,
-  Clock, PlayCircle, Pause, Crown, TrendingUp, ListTodo, Calendar, Eye, MessageSquare, UserPlus
+  LayoutDashboard, FolderKanban, FileText, Settings, LogOut, Users, ChevronDown, ChevronUp, Plus, CheckSquare, CheckCircle, Clock, PlayCircle, Pause,
+  TrendingUp, ListTodo, Calendar, Eye, MessageSquare, UserPlus, NotebookPen, Building2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
-import { projectsApi, teamsApi } from '@/services/api';
+import { projectsApi, teamsApi, chatApi } from '@/services/api';
+import type { ChatRoomListItem } from '@/types';
 import type { Project } from '@/types';
 import { getProjectTypeColor } from '@/lib/utils';
-import { notificationsApi } from '@/services/api';
+import { useNotifications } from '@/hooks/useNotifications';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/common/diaog';
 
-const ADMIN_ROLES = ['admin', 'manager', 'annotator'];
+const ADMIN_ROLES = ['admin', 'manager', 'annotator', 'superuser'];
 
 // Favourite Projects within the accordion
 const FavouriteProjectsAccordion = ({ projects }: { projects: Project[] }) => {
@@ -68,18 +76,84 @@ export function Sidebar() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const { unreadCount } = useNotifications();
+  const [chatUnreadCount, setChatUnreadCount] = useState<number>(0);
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
   // Collapsible Logic
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [isHovered, setIsHovered] = useState(false);
   const isExpanded = !isCollapsed || isHovered;
 
-  // Accordion States 
-  const [isProjectsOpen, setIsProjectsOpen] = useState(location.pathname.startsWith('/projects'));
-  const [isTasksOpen, setIsTasksOpen] = useState(location.pathname.startsWith('/taskboard'));
-  const [isAdminOpen, setIsAdminOpen] = useState(location.pathname.startsWith('/admin'));
+  // Ref to track pending single-click timer
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleLogoClick = useCallback(() => {
+    if (clickTimerRef.current) {
+      // Second click arrived before timer fired → double-click → toggle sidebar
+      clearTimeout(clickTimerRef.current);
+      clickTimerRef.current = null;
+      setIsCollapsed(prev => !prev);
+    } else {
+      // First click → wait to see if a second click arrives
+      clickTimerRef.current = setTimeout(() => {
+        clickTimerRef.current = null;
+        // Single click → navigate to dashboard
+        navigate('/dashboard');
+      }, 250);
+    }
+  }, [navigate]);
+
+  // Accordion States
+  const getInitialAccordion = () => {
+    if (location.pathname.startsWith('/team-chat')) return 'chats';
+    if (location.pathname.startsWith('/admin')) return 'admin';
+    if (location.pathname.startsWith('/taskboard')) return 'tasks';
+    if (location.pathname.startsWith('/projects')) return 'projects';
+    return null;
+  };
+  const [activeAccordion, setActiveAccordion] = useState<string | null>(getInitialAccordion);
+  const toggleAccordion = (name: string) =>
+    setActiveAccordion(prev => (prev === name ? null : name));
+
+  const isProjectsOpen = activeAccordion === 'projects';
+  const isTasksOpen = activeAccordion === 'tasks';
+  const isAdminOpen = activeAccordion === 'admin';
+  const isChatsOpen = activeAccordion === 'chats';
+
+  // Teams sub-accordion
   const [isTeamsOpen, setIsTeamsOpen] = useState(location.pathname.startsWith('/admin/teams'));
+  const [activeSection, setActiveSection] = useState<'chats' | 'projects' | 'teams' | 'unread' | null>(null);
+  const toggleSection = (section: 'chats' | 'projects' | 'teams' | 'unread') =>
+    setActiveSection(prev => (prev === section ? null : section));
+
+  const { data: allRoomsData } = useQuery<ChatRoomListItem[]>({
+    queryKey: ['sidebar-all-chat-rooms'],
+    queryFn: () => chatApi.getAllRooms(),
+    staleTime: 0,             
+    refetchOnMount: true, 
+    enabled: isExpanded,
+  });
+
+  // Derive typed sub-lists from the single response
+  const sidebarPrivateRooms = useMemo<ChatRoomListItem[]>(() =>
+    (allRoomsData || []).filter(r => r.room_type === 'private'),
+    [allRoomsData]
+  );
+  const sidebarProjectRooms = useMemo<ChatRoomListItem[]>(() =>
+    (allRoomsData || []).filter(r => r.room_type === 'project'),
+    [allRoomsData]
+  );
+  const sidebarTeamRooms = useMemo<ChatRoomListItem[]>(() =>
+    (allRoomsData || []).filter(r => r.room_type === 'team'),
+    [allRoomsData]
+  );
+  const sidebarUnreadRooms = useMemo<ChatRoomListItem[]>(() =>
+    (allRoomsData || []).filter(r => r.unread_count > 0 && r.room_type !== 'thread'),
+    [allRoomsData]
+  );
   const showAdmin = user?.role && ADMIN_ROLES.includes(user.role);
+  const isSuperuser = !!user?.is_superuser;
   const { data: projectsData } = useQuery({
     queryKey: ['projects'],
     queryFn: () => projectsApi.list(),
@@ -88,13 +162,6 @@ export function Sidebar() {
   const { data: teamsData } = useQuery({
     queryKey: ['teams'],
     queryFn: () => teamsApi.list(),
-  });
-
-  // Fetching notification
-  const { data: notifySummary } = useQuery({
-    queryKey: ['notifications-summary'],
-    queryFn: () => notificationsApi.getSummary(),
-    refetchInterval: 30000,
   });
 
   const projects = useMemo(() => {
@@ -111,6 +178,40 @@ export function Sidebar() {
     return [];
   }, [teamsData]);
 
+  // Fetch initial chat unread count and subscribe to real-time updates
+  useEffect(() => {
+    const fetchInitialUnread = async () => {
+      try {
+        const { chatApi, notificationSocket } = await import('@/services/api');
+        const data = await chatApi.getUnreadCount();
+        setChatUnreadCount(data.total_unread);
+
+        // Connect notification socket if not already connected
+        if (!notificationSocket.isConnected()) {
+          notificationSocket.connect();
+        }
+
+        // Subscribe to chat unread updates
+        const unsubscribe = notificationSocket.onChatUnreadUpdate((updateData) => {
+          const activeRoomId = (window as any).__activeTeamChatRoomId as string | undefined;
+          const roomUnread = updateData.room_unread || 0;
+          const isActiveRoom = activeRoomId && updateData.room_id === activeRoomId;
+          const correctedTotal = isActiveRoom
+            ? Math.max(0, updateData.total_unread - roomUnread)
+            : updateData.total_unread;
+          setChatUnreadCount(correctedTotal);
+        });
+        return () => {
+          unsubscribe();
+        };
+      } catch (error) {
+        console.error('Failed to fetch chat unread count:', error);
+      }
+    };
+
+    fetchInitialUnread();
+  }, []);
+
 
   return (
     <div
@@ -121,10 +222,10 @@ export function Sidebar() {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* "Z" Toggle Button */}
+      {/* "D" Toggle Button */}
       <div className="flex h-16 items-center px-4 border-b">
         <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
+          onClick={handleLogoClick}
           className={cn(
             "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-all",
             !isCollapsed
@@ -132,11 +233,14 @@ export function Sidebar() {
               : "bg-primary text-primary-foreground hover:opacity-90"
           )}
         >
-          <span className="text-xl font-bold">Z</span>
+          <span className="text-xl font-bold">D</span>
         </button>
         {isExpanded && (
-          <span className="ml-3 text-xl font-bold text-primary animate-in fade-in duration-300">
-            ZanFlow
+          <span
+            className="ml-3 text-xl font-bold text-primary animate-in fade-in duration-300 cursor-pointer select-none"
+            onClick={handleLogoClick}
+          >
+            DYUKSA
           </span>
         )}
       </div>
@@ -144,7 +248,7 @@ export function Sidebar() {
       <nav className="flex-1 space-y-2 px-3 py-4 overflow-y-auto overflow-x-hidden">
         {/* Dashboard */}
         <NavLink
-          to="/"
+          to="/dashboard"
           className={({ isActive }) =>
             cn('flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
               isActive ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
@@ -163,7 +267,7 @@ export function Sidebar() {
               !isExpanded && "justify-center px-0")}
             onClick={() => {
               navigate('/projects');
-              setIsProjectsOpen(prev => !prev);
+              toggleAccordion('projects');
             }}
           >
             <div className={cn("flex items-center gap-3", isExpanded && "flex-1")}>
@@ -176,7 +280,7 @@ export function Sidebar() {
                 className="cursor-pointer p-0.5 hover:bg-primary/20 rounded"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setIsProjectsOpen(!isProjectsOpen);
+                  toggleAccordion('projects');
                 }}
               >
                 {isProjectsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -194,7 +298,7 @@ export function Sidebar() {
               !isExpanded && "justify-center px-0")}
             onClick={() => {
               navigate('/taskboard');
-              setIsTasksOpen(prev => !prev);
+              toggleAccordion('tasks');
             }}
           >
             <div className={cn("flex items-center gap-3", isExpanded && "flex-1")}>
@@ -206,7 +310,7 @@ export function Sidebar() {
                 className="cursor-pointer p-0.5 hover:bg-primary/20 rounded"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setIsTasksOpen(!isTasksOpen);
+                  toggleAccordion('tasks');
                 }}
               >
                 {isTasksOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -250,8 +354,7 @@ export function Sidebar() {
         {[
           { name: 'Documents', href: '/documents', icon: FileText },
           { name: 'Calendar', href: '/calendar', icon: Calendar },
-          // { name: 'Activity', href: '/notifications', icon: Bell },
-          // { name: 'Test Runs', href: '/test-runs', icon: TestTube2 },
+          { name: 'Quick Notes', href: '/quick-notes', icon: NotebookPen },
         ].map((item) => (
           <NavLink
             key={item.name}
@@ -270,13 +373,13 @@ export function Sidebar() {
         ))}
 
         {/* Team Management Accordion */}
-        {showAdmin && (
+        {(showAdmin || isSuperuser) && (
           <div className="space-y-1">
             <div
               className={cn('flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors cursor-pointer',
                 location.pathname.startsWith('/admin') ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-accent',
                 !isExpanded && "justify-center px-0")}
-              onClick={() => setIsAdminOpen(!isAdminOpen)}
+              onClick={() => toggleAccordion('admin')}
             >
               <Users className="h-5 w-5 shrink-0" />
               {isExpanded && (
@@ -331,32 +434,319 @@ export function Sidebar() {
                 >
                   <TrendingUp className="h-3.5 w-3.5" /> Performance
                 </NavLink>
+
+                {isSuperuser && (
+                  <NavLink
+                    to="/admin/workspace"
+                    className={({ isActive }) => cn("flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs transition-colors",
+                      isActive ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-primary")}
+                  >
+                    <Building2 className="h-3.5 w-3.5" /> Workspace
+                  </NavLink>
+                )}
               </div>
             )}
           </div>
         )}
-        {/* Team Chat */}
-        <NavLink
-          to="/team-chat"
-          className={({ isActive }) =>
-            cn('flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-              isActive ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-              !isExpanded && "justify-center px-0")
-          }
-        >
-          <MessageSquare className="h-5 w-5 shrink-0" />
-          {isExpanded && <span>Team Chat</span>}
-        </NavLink>
+        {/* ── Team Chat Accordion */}
+        <div className="space-y-1">
+          {/* Header row */}
+          <div
+            className={cn(
+              'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors cursor-pointer',
+              location.pathname.startsWith('/team-chat')
+                ? 'bg-primary/10 text-primary'
+                : 'text-muted-foreground hover:bg-accent',
+              !isExpanded && 'justify-center px-0'
+            )}
+            onClick={() => {
+              navigate('/team-chat');
+              if (isExpanded) toggleAccordion('chats');
+            }}
+          >
+            <div className="relative shrink-0">
+              <MessageSquare className="h-5 w-5" />
+              {chatUnreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                  {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
+                </span>
+              )}
+            </div>
+            {isExpanded && (
+              <>
+                <span className="flex-1">Chats</span>
+                <div
+                  className="p-0.5 hover:bg-primary/20 rounded"
+                  onClick={(e) => { e.stopPropagation(); toggleAccordion('chats'); }}
+                >
+                  {isChatsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Sub-sections */}
+          {isExpanded && isChatsOpen && (
+            <div className="ml-4 border-l pl-2 space-y-1 animate-in slide-in-from-left-2">
+
+              {/* ── 1. Chats */}
+              <div className="space-y-0.5">
+                <div
+                  className={cn(
+                    'flex items-center justify-between rounded-lg px-3 py-1.5 text-xs font-medium cursor-pointer hover:bg-accent',
+                    location.pathname === '/team-chat' || location.pathname === '/team-chat/chat'
+                      ? 'text-primary bg-primary/5'
+                      : 'text-muted-foreground'
+                  )}
+                  onClick={() => { navigate('/team-chat/chat'); toggleSection('chats'); }}
+                >
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    <span>Chats</span>
+                  </div>
+                  <div className="p-0.5 hover:bg-primary/20 rounded">
+                    {activeSection === 'chats' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                  </div>
+                </div>
+
+                {activeSection === 'chats' && (
+                  <div className="ml-2 space-y-0.5">
+                    {sidebarPrivateRooms.filter(r => r.is_favourite).length === 0 ? (
+                      <p className="px-3 py-2 text-[11px] text-muted-foreground italic">No favourite chats yet</p>
+                    ) : (
+                      sidebarPrivateRooms
+                        .filter(r => r.is_favourite)
+                        .map(room => {
+                          const displayName = room.name.startsWith('Chat: ')
+                            ? room.name.replace('Chat: ', '').split(' & ').find(n => n !== user?.username) ?? room.name
+                            : room.name;
+                          const initials = displayName.charAt(0).toUpperCase();
+                          return (
+                            <div
+                              key={room.id}
+                              onClick={() => navigate(`/team-chat/chat/${room.id}`)}
+                              className="flex items-center gap-2 rounded-lg px-3 py-1 text-[11px] text-muted-foreground hover:text-primary cursor-pointer group"
+                            >
+                              <div className="relative shrink-0">
+                                <div className="h-5 w-5 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-semibold text-blue-700">
+                                  {initials}
+                                </div>
+                              </div>
+                              <span className="truncate flex-1">{displayName}</span>
+                              {room.unread_count > 0 && (
+                                <span className="h-4 min-w-[16px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center shrink-0">
+                                  {room.unread_count > 9 ? '9+' : room.unread_count}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* ── 2. Projects ── */}
+              <div className="space-y-0.5">
+                <div
+                  className={cn(
+                    'flex items-center justify-between rounded-lg px-3 py-1.5 text-xs font-medium cursor-pointer hover:bg-accent',
+                    location.pathname === '/team-chat/project'
+                      ? 'text-primary bg-primary/5'
+                      : 'text-muted-foreground'
+                  )}
+                  onClick={() => { navigate('/team-chat/project'); toggleSection('projects'); }}
+                >
+                  <div className="flex items-center gap-2">
+                    <FolderKanban className="h-3.5 w-3.5" />
+                    <span>Projects</span>
+                  </div>
+                  <div className="p-0.5 hover:bg-primary/20 rounded">
+                    {activeSection === 'projects' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                  </div>
+                </div>
+
+                {activeSection === 'projects' && (
+                  <div className="ml-2 space-y-0.5">
+                    {sidebarProjectRooms.filter(r => r.is_favourite).length === 0 ? (
+                      <p className="px-3 py-2 text-[11px] text-muted-foreground italic">No favourite project chats yet</p>
+                    ) : (
+                      sidebarProjectRooms
+                        .filter(r => r.is_favourite)
+                        .map(room => (
+                          <div
+                            key={room.id}
+                            onClick={() => {
+                              if (room.project) {
+                                navigate(`/team-chat/${room.project}/${room.id}`);
+                              } else {
+                                navigate('/team-chat/project');
+                              }
+                            }}
+                            className="flex items-center gap-2 rounded-lg px-3 py-1 text-[11px] text-muted-foreground hover:text-primary cursor-pointer"
+                          >
+                            <div className="relative shrink-0">
+                              <div className="h-5 w-5 rounded bg-purple-100 flex items-center justify-center text-[10px] font-semibold text-purple-700">
+                                {room.name.charAt(0).toUpperCase()}
+                              </div>
+                            </div>
+                            <span className="truncate flex-1">{room.name}</span>
+                            {room.unread_count > 0 && (
+                              <span className="h-4 min-w-[16px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center shrink-0">
+                                {room.unread_count > 9 ? '9+' : room.unread_count}
+                              </span>
+                            )}
+                          </div>
+                        ))
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* ── 3. Teams ── */}
+              <div className="space-y-0.5">
+                <div
+                  className={cn(
+                    'flex items-center justify-between rounded-lg px-3 py-1.5 text-xs font-medium cursor-pointer hover:bg-accent',
+                    location.pathname === '/team-chat/teams'
+                      ? 'text-primary bg-primary/5'
+                      : 'text-muted-foreground'
+                  )}
+                  onClick={() => { navigate('/team-chat/teams'); toggleSection('teams'); }}
+                >
+                  <div className="flex items-center gap-2">
+                    <Users className="h-3.5 w-3.5" />
+                    <span>Teams</span>
+                  </div>
+                  <div className="p-0.5 hover:bg-primary/20 rounded">
+                    {activeSection === 'teams' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                  </div>
+                </div>
+
+                {activeSection === 'teams' && (
+                  <div className="ml-2 space-y-0.5">
+                    {sidebarTeamRooms.filter(r => r.is_favourite).length === 0 ? (
+                      <p className="px-3 py-2 text-[11px] text-muted-foreground italic">No favourite team chats yet</p>
+                    ) : (
+                      sidebarTeamRooms
+                        .filter(r => r.is_favourite)
+                        .map(room => (
+                          <div
+                            key={room.id}
+                            onClick={() => navigate(`/team-chat/teams/${room.id}`)}
+                            className="flex items-center gap-2 rounded-lg px-3 py-1 text-[11px] text-muted-foreground hover:text-primary cursor-pointer"
+                          >
+                            <div className="relative shrink-0">
+                              <div className="h-5 w-5 rounded bg-green-100 flex items-center justify-center text-[10px] font-semibold text-green-700">
+                                {room.name.charAt(0).toUpperCase()}
+                              </div>
+                            </div>
+                            <span className="truncate flex-1">{room.name}</span>
+                            {room.unread_count > 0 && (
+                              <span className="h-4 min-w-[16px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center shrink-0">
+                                {room.unread_count > 9 ? '9+' : room.unread_count}
+                              </span>
+                            )}
+                          </div>
+                        ))
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* ── 4. Unread ── */}
+              <div className="space-y-0.5">
+                <div
+                  className={cn(
+                    'flex items-center justify-between rounded-lg px-3 py-1.5 text-xs font-medium cursor-pointer hover:bg-accent',
+                    location.pathname === '/team-chat/unread'
+                      ? 'text-primary bg-primary/5'
+                      : 'text-muted-foreground'
+                  )}
+                  onClick={() => { navigate('/team-chat/unread'); toggleSection('unread'); }}
+                >
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    <span>Unread</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {chatUnreadCount > 0 && (
+                      <span className="h-4 min-w-[16px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                        {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
+                      </span>
+                    )}
+                    <div className="p-0.5 hover:bg-primary/20 rounded">
+                      {activeSection === 'unread' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                    </div>
+                  </div>
+                </div>
+
+                {activeSection === 'unread' && (
+                  <div className="ml-2 space-y-0.5">
+                    {sidebarUnreadRooms.length === 0 ? (
+                      <p className="px-3 py-2 text-[11px] text-muted-foreground italic">No unread messages</p>
+                    ) : (
+                      sidebarUnreadRooms.map(room => {
+                        const avatarColor =
+                          room.room_type === 'project' ? 'bg-purple-100 text-purple-700 rounded' :
+                            room.room_type === 'team' ? 'bg-green-100 text-green-700 rounded' :
+                              'bg-blue-100 text-blue-700 rounded-full';
+
+                        const handleUnreadClick = () => {
+                          if (room.room_type === 'project' && room.project) {
+                            navigate(`/team-chat/${room.project}/${room.id}`);
+                          } else if (room.room_type === 'team') {
+                            navigate(`/team-chat/teams/${room.id}`);
+                          } else {
+                            navigate(`/team-chat/chat/${room.id}`);
+                          }
+                        };
+
+                        return (
+                          <div
+                            key={room.id}
+                            onClick={handleUnreadClick}
+                            className="flex items-center gap-2 rounded-lg px-3 py-1 text-[11px] text-muted-foreground hover:text-primary cursor-pointer"
+                          >
+                            <div className={cn('h-5 w-5 flex items-center justify-center text-[10px] font-semibold shrink-0', avatarColor)}>
+                              {room.name.charAt(0).toUpperCase()}
+                            </div>
+                            <span className="truncate flex-1">
+                              {room.room_type === 'private'
+                                ? room.name.startsWith('Chat: ')
+                                  ? room.name.replace('Chat: ', '').split(' & ').find(n => n !== user?.username) ?? room.name
+                                  : room.name
+                                : room.name}
+                            </span>
+                            <span className="h-4 min-w-[16px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center shrink-0">
+                              {room.unread_count > 9 ? '9+' : room.unread_count}
+                            </span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+
+            </div>
+          )}
+        </div>
       </nav>
 
       {/* Profile & Footer */}
       <div className="border-t p-4">
         <div className={cn("flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-accent cursor-pointer", !isExpanded && "justify-center px-0")} onClick={() => navigate('/profile')}>
-          <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-primary-foreground font-bold",
-            !isCollapsed
-              ? "bg-indigo-300 text-white"
-              : "bg-primary text-primary-foreground hover:opacity-90")}>
-            {user?.username?.charAt(0).toUpperCase()}
+          <div className="relative shrink-0 h-9 w-9">
+            <div className={cn("flex h-9 w-9 items-center justify-center rounded-full text-primary-foreground font-bold",
+              !isCollapsed
+                ? "bg-indigo-300 text-white"
+                : "bg-primary text-primary-foreground hover:opacity-90")}>
+              {user?.username?.charAt(0).toUpperCase()}
+            </div>
+            {user?.is_active && (
+              <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-card" />
+            )}
           </div>
           {isExpanded && (
             <div className="min-w-0 flex-1">
@@ -371,12 +761,44 @@ export function Sidebar() {
             <button onClick={() => navigate('/settings')} className="flex flex-1 items-center justify-center gap-2 rounded-lg border p-2 text-muted-foreground hover:bg-accent">
               <Settings className="h-4 w-4" /> Settings
             </button>
-            <button onClick={logout} className="flex flex-1 items-center justify-center gap-2 rounded-lg border p-2 text-muted-foreground hover:bg-accent text-destructive">
+            <button
+              onClick={() => setShowLogoutDialog(true)}
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg border p-2 text-muted-foreground hover:bg-accent text-destructive"
+            >
               <LogOut className="h-4 w-4" /> Logout
             </button>
           </div>
         )}
       </div>
+
+      {/* Logout Confirmation Dialog */}
+      <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-destructive/10 mx-auto mb-2">
+              <LogOut className="h-6 w-6 text-destructive" />
+            </div>
+            <DialogTitle className="text-center text-lg">Log Out?</DialogTitle>
+            <DialogDescription className="text-center text-sm text-muted-foreground">
+              Are you sure you want to log out? You'll need to sign in again to access your workspace.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-row gap-2 sm:flex-row mt-2">
+            <button
+              onClick={() => setShowLogoutDialog(false)}
+              className="flex-1 rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-accent transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => { setShowLogoutDialog(false); logout(); }}
+              className="flex-1 rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-white hover:bg-destructive/90 transition-colors"
+            >
+              Yes, Log Out
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

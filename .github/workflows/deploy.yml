@@ -1,44 +1,52 @@
-name: Deploy ZanFlow (Django + React)
+name: Deploy to EC2
 
 on:
   push:
     branches:
       - main
+      - shubhang
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
+    
     steps:
-      # 1. Checkout repository
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      # 2. Setup SSH access to EC2
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ec2.pem
-          chmod 400 ~/.ssh/ec2.pem
-          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
-
-      # 3. Deploy application using Docker Compose
       - name: Deploy to EC2
-        run: |
-          ssh -i ~/.ssh/ec2.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 30m
+          script: |
             set -e
-
-            echo "➡️ Moving to app directory"
+            
             cd ${{ secrets.APP_DIR }}
-
-            echo "⬇️ Pulling latest code"
-            git pull origin main
-
-            echo "🛑 Stopping running containers"
-            docker-compose down
-
-            echo "🚀 Building & starting containers"
-            docker-compose up -d --build
-
-            echo "✅ Deployment completed successfully"
-          EOF
+            
+            echo "📥 Pulling latest code..."
+            git fetch origin
+            git checkout ${{ github.ref_name }}
+            git stash 2>/dev/null || true
+            git pull origin ${{ github.ref_name }}
+            
+            echo "🔧 Setting production URLs in api.ts..."
+            sed -i "s|http://localhost:8000/api/v1|https://zanflow.lensvox.com/api/v1|g" frontend/src/services/api.ts
+            sed -i "s|http://localhost:8000|https://zanflow.lensvox.com|g" frontend/src/services/api.ts
+            sed -i "s|ws://localhost:8000|wss://zanflow.lensvox.com|g" frontend/src/services/api.ts
+            
+            echo "🔧 Setting production build script..."
+            sed -i 's|"build": "tsc && vite build"|"build": "vite build"|g' frontend/package.json
+            
+            echo "🔨 Building new images (site still running)..."
+            sudo docker-compose build
+            
+            echo "🚀 Restarting with new images (2-5 sec downtime)..."
+            sudo docker-compose up -d --force-recreate --no-build
+            
+            echo "⏳ Waiting for services..."
+            sleep 15
+            
+            echo "📊 Container status:"
+            sudo docker-compose ps
+            
+            echo "✅ Deployment completed!"

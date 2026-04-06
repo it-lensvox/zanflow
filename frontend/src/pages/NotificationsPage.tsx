@@ -1,50 +1,139 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { BellOff, Search, X, Trash2 } from 'lucide-react';
-import { notificationsApi } from '@/services/api';
+import { fetchNotifications, deleteReadNotifications, api } from '@/services/api';
 import { cn } from '@/lib/utils';
+import type { NotificationData } from '@/types';
+import { useNotifications } from '@/hooks/useNotifications';
 
-export function NotificationsPage({ onClose }: { onClose?: () => void }) {
-  const queryClient = useQueryClient();
+export function NotificationsPage({ 
+  onClose,
+  defaultFilter = 'unread'
+}: { 
+  onClose?: () => void;
+  defaultFilter?: 'all' | 'unread';
+}) {
   const navigate = useNavigate();
-  const [filter, setFilter] = useState<'all' | 'unread'>('all');
-  const [localReadIds, setLocalReadIds] = useState<Set<number>>(new Set());
-
-  const deleteNotification = useMutation({
-    mutationFn: (id: number) => notificationsApi.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      queryClient.invalidateQueries({ queryKey: ['notifications-summary'] });
-    },
-  });
-  const handleClose = () => (onClose ? onClose() : navigate(-1));
+  const queryClient = useQueryClient();
+  const [filter, setFilter] = useState<'all' | 'unread'>(defaultFilter);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
+  // Get unread count from useNotifications hook
+  const { setNotifications: setGlobalNotifications } = useNotifications();
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['notifications'],
-    queryFn: () => notificationsApi.list(),
+  const handleClose = () => (onClose ? onClose() : navigate(-1));
+
+// Step A: Fetch notifications from REST API with pagination
+  const {
+    data: infiniteData,
+    isLoading: isFetchingInitial,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+  } = useInfiniteQuery({
+    queryKey: ['notifications-initial'],
+    queryFn: fetchNotifications,
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      if (!lastPage || !lastPage.notifications) return undefined;
+      const currentPage = lastPage.current_page ?? 1;
+      const totalPages = lastPage.total_pages ?? 1;
+      return currentPage < totalPages ? currentPage + 1 : undefined;
+    },
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
 
-  const markAsRead = useMutation({
-    mutationFn: (id: number) => notificationsApi.markAsRead(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      queryClient.invalidateQueries({ queryKey: ['notifications-summary'] });
+  const notifications = React.useMemo(() => {
+    if (!infiniteData?.pages) return [];
+    const seen = new Set<number>();
+    const merged: NotificationData[] = [];
+    for (const page of infiniteData.pages) {
+      for (const n of page?.notifications ?? []) {
+        if (!seen.has(n.id)) {
+          seen.add(n.id);
+          merged.push(n);
+        }
+      }
+    }
+    return merged;
+  }, [infiniteData]);
+
+ // Update global notifications when data changes
+  useEffect(() => {
+    if (notifications.length > 0) {
+      setGlobalNotifications(notifications);
+    }
+  }, [notifications, setGlobalNotifications]);
+
+  // Infinite scroll: fetch next page when user scrolls near bottom
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      if (scrollHeight - scrollTop - clientHeight < 150 && hasNextPage && !isFetchingNextPage) {
+        fetchNextPage();
+      }
+    };
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  // Reset to default filter when panel opens
+  useEffect(() => {
+    setFilter(defaultFilter);
+  }, [defaultFilter]);
+
+  // Mutation for clearing all notifications
+  const clearAllReadMutation = useMutation({
+    mutationFn: deleteReadNotifications,
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['notifications-initial'] });
+      const previous = queryClient.getQueryData(['notifications-initial']);
+      // Optimistic update: wipe all pages
+      queryClient.setQueryData(['notifications-initial'], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages?.map((page: any) => ({ ...page, notifications: [] })) ?? [],
+        };
+      });
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['notifications-initial'], context.previous);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications-initial'] });
     },
   });
 
-  // Check if notification is read (either from backend or local optimistic state)
-  const isNotificationRead = (n: any) => {
-    return localReadIds.has(n.id) || n.is_read;
+  // Mutation for deleting notifications
+  const deleteNotificationMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await api.delete(`/notification/${id}/`);
+    },
+    onSuccess: () => {
+      // Refetch notifications after delete
+      queryClient.invalidateQueries({ queryKey: ['notifications-initial'] });
+    },
+  });
+
+  // Check if notification is read
+  const isNotificationRead = (n: NotificationData) => {
+    return n.is_read || false;
   };
 
-  const notifications = data?.notifications || [];
   const filtered = notifications
-    .filter((n: any) => (filter === 'unread' ? !isNotificationRead(n) : true))
-    .filter((n: any) => {
+    .filter((n: NotificationData) => (filter === 'unread' ? !isNotificationRead(n) : true))
+    .filter((n: NotificationData) => {
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase();
       return (
@@ -58,10 +147,10 @@ export function NotificationsPage({ onClose }: { onClose?: () => void }) {
 
 
   // Determine the accent color for a notification based on its type and metadata
-  const getNotificationColor = (n: any): string => {
+  const getNotificationColor = (n: NotificationData): string => {
     const type = n.notification_type;
 
-    // For task-related notifications, use the new_status or old_status from metadata
+    // For task-related notifications
     if (type === 'task_status_updated' && n.metadata?.new_status) {
       return '#ef9fab';
     }
@@ -71,27 +160,34 @@ export function NotificationsPage({ onClose }: { onClose?: () => void }) {
     if (type === 'task_assigned') {
       return '#3b82f6';
     }
-    if (type === 'project_assigned') {
+    if (type === 'project_assigI want to lCaccccned') {
       return '#9c45ce';
     }
-    // Fallback
     return '#9170df';
   };
 
-  const handleNotificationClick = (n: any) => {
-    // Optimistic UI update - immediately mark as read locally
-    if (!isNotificationRead(n)) {
-      setLocalReadIds(prev => {
-        const next = new Set(prev);
-        next.add(n.id);
-        return next;
-      });
-      markAsRead.mutate(n.id);
+  const handleNotificationClick = async (n: NotificationData) => {
+    if (!n.is_read) {
+      try {
+        await api.post(`/notification/${n.id}/mark-read/`);
+        queryClient.invalidateQueries({ queryKey: ['notifications-initial'] });
+      } catch (error) {
+        console.error('Failed to mark notification as read:', error);
+      }
     }
-    if (n.metadata?.task_id) {
-      navigate(`/tasks/${n.metadata.task_id}`);
-    } else if (n.metadata?.project_id) {
-      navigate(`/projects/${n.metadata.project_id}`);
+
+  // Navigate based on related object or metadata
+    const relatedType = n.related_object?.type || n.related_object_info?.type;
+    const relatedId = n.related_object?.id || n.related_object_info?.id;
+
+    if (relatedType === 'document' && relatedId) {
+      navigate(`/documents`);
+    } else if (relatedType === 'task' || n.metadata?.task_id) {
+      const taskId = relatedId || n.metadata?.task_id;
+      navigate(`/tasks/${taskId}`);
+    } else if (relatedType === 'project' || n.metadata?.project_id) {
+      const projectId = relatedId || n.metadata?.project_id;
+      navigate(`/projects/${projectId}`);
     }
 
     if (onClose) onClose();
@@ -139,6 +235,14 @@ export function NotificationsPage({ onClose }: { onClose?: () => void }) {
                 </div>
               ) : (
                 <>
+                <button
+                    onClick={() => clearAllReadMutation.mutate()}
+                    disabled={clearAllReadMutation.isPending || notifications.length === 0}
+                    className="text-[10px] font-semibold text-gray-400 hover:text-red-500 transition-colors disabled:opacity-40 whitespace-nowrap"
+                    title="Clear all notifications"
+                  >
+                    Clear All
+                  </button>
                   <Search
                     className="h-4 w-4 opacity-60 hover:opacity-100 cursor-pointer"
                     onClick={() => setIsSearchOpen(true)}
@@ -172,14 +276,14 @@ export function NotificationsPage({ onClose }: { onClose?: () => void }) {
         </div>
 
         {/* Scrollable List with Padding */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar px-4 mb-10">
-          {isLoading ? (
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto custom-scrollbar px-4 mb-10">
+          {isFetchingInitial ? (
             <div className="py-20 text-center text-sm opacity-50 italic">
               Loading activity...
             </div>
           ) : filtered.length > 0 ? (
             <div className="pb-2">
-              {filtered.map((n: any) => {
+              {filtered.map((n: NotificationData) => {
                 const isRead = isNotificationRead(n);
                 return (
                   <div
@@ -200,41 +304,47 @@ export function NotificationsPage({ onClose }: { onClose?: () => void }) {
                       />
                     )}
 
-                {/* Delete Button - visible on hover */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    deleteNotification.mutate(n.id);
-                  }}
-                  className="absolute top-3 right-3 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-50 text-gray-400 hover:text-red-500 transition-all"
-                  title="Delete notification"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                    {/* Delete Button - visible on hover */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteNotificationMutation.mutate(n.id);
+                      }}
+                      className="absolute top-3 right-3 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-50 text-gray-400 hover:text-red-500 transition-all"
+                      title="Delete notification"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
 
-                {/* Meta */}
-                <div className="flex items-center justify-between mb-1 pr-6">
-                  <span
-                    className="text-[10px] font-semibold tracking-wide uppercase"
-                    style={{ color: getNotificationColor(n) }}
-                  >
-                    {n.notification_type.replaceAll('_', ' ')}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">
-                    {n.time_since}
-                  </span>
-                </div>
+                    {/* Meta */}
+                    <div className="flex items-center justify-between mb-1 pr-6">
+                      <span
+                        className="text-[10px] font-semibold tracking-wide uppercase"
+                        style={{ color: getNotificationColor(n) }}
+                      >
+                        {n.notification_type?.replace(/_/g, ' ') || 'Notification'}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {n.time_since}
+                      </span>
+                    </div>
 
-                {/* Content */}
-                <p className="text-sm font-medium leading-snug pr-6">
-                  {n.metadata?.task_heading || n.metadata?.project_name || n.title}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                  {n.message}
-                </p>
-              </div>
+                    {/* Content */}
+                    <p className="text-sm font-medium leading-snug pr-6">
+                      {n.metadata?.task_heading || n.metadata?.project_name || n.title}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                      {n.message ? n.message.replace(/<[^>]*>?/gm, '').trim() : ''}
+                    </p>
+                  </div>
                 );
               })}
+            {/* Load more indicator */}
+            {isFetchingNextPage && (
+              <div className="py-4 text-center text-xs text-muted-foreground opacity-50 italic">
+                Loading more...
+              </div>
+            )}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground">

@@ -4,31 +4,24 @@ import { QueryClient, QueryClientProvider, focusManager, onlineManager } from '@
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import './index.css';
-import { pdfjs } from 'react-pdf';
-
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url
-).toString();
-
 // Disable automatic refetch on window focus globally
 focusManager.setEventListener(() => {
-  return () => {};
+  return () => { };
 });
 
 // Disable online/offline tracking to prevent reconnect refetches
 onlineManager.setEventListener(() => {
-  return () => {};
+  return () => { };
 });
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: Infinity,
-      gcTime: Infinity,               // Prevent cache garbage collection from triggering mass re-fetches
-      refetchOnWindowFocus: false,   
-      refetchOnMount: false, 
-      refetchOnReconnect: false,     
+      staleTime: 1000 * 30,
+      gcTime: 1000 * 60 * 5,
+      refetchOnWindowFocus: false,
+      refetchOnMount: true,
+      refetchOnReconnect: true,
       retry: 1,
     },
   },

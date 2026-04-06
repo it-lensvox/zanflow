@@ -2,13 +2,16 @@ import React from 'react';
 import { useState } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useSearchParams, useNavigate, useOutletContext } from 'react-router-dom';
-import { FileText, Search, Filter, ChevronDown, Bell, ChevronLeft, ChevronRight } from 'lucide-react';
+import { FileText, Search, Filter, ChevronDown, Bell, ChevronLeft, ChevronRight, Info, X, Calendar, User, HardDrive, Tag, Hash } from 'lucide-react';
 import { Button, Card, CardContent, Input } from '@/components/common';
-import { documentsApi, notificationsApi, projectsApi } from '@/services/api';
+import { documentsApi, projectsApi } from '@/services/api';
 import type { Document, Project } from '@/types';
 import { ViewToggle, DualView, useViewMode, } from '@/components/layout/DualView';
 import { createDocumentsTableColumns, DocumentGridCard } from '@/components/layout/DualView/documentsConfig';
-
+import { useNotifications } from '@/hooks/useNotifications';
+import { NotificationsPage } from '../NotificationsPage';
+import { DocumentPreview } from '@/components/common/DocumentPreview';
+import { DocumentShareModal } from '@/pages/Documents/DocumentShareModal';
 
 const FILE_TYPE_OPTIONS = [
   { value: '', label: 'All Types' },
@@ -23,6 +26,117 @@ interface ConfirmationModalProps {
   onClose: () => void;
   onConfirm: () => void;
   title: string;
+}
+
+function DocumentInfoPanel({ doc, onClose }: { doc: Document | null; onClose: () => void }) {
+  if (!doc) return null;
+
+  const formatBytes = (bytes?: number) => {
+    if (!bytes) return 'N/A';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  };
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return 'N/A';
+    return new Date(dateStr).toLocaleString(undefined, {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
+  };
+
+  const statusColors: Record<string, string> = {
+    draft: 'bg-yellow-50 text-yellow-700 border border-yellow-200',
+    in_review: 'bg-blue-50 text-blue-700 border border-blue-200',
+    approved: 'bg-green-50 text-green-700 border border-green-200',
+    archived: 'bg-gray-100 text-gray-700 border border-gray-200',
+  };
+
+  const rows: { icon: React.ReactNode; label: string; value: React.ReactNode }[] = [
+    {
+      icon: <FileText className="w-4 h-4 text-blue-500" />,
+      label: 'File Name',
+      value: <span className="text-gray-600 font-semibold break-all">{doc.original_file_name || doc.name}</span>,
+    },
+    {
+      icon: <User className="w-4 h-4 text-blue-500" />,
+      label: 'Uploaded By',
+      value: doc.created_by?.full_name || 'System',
+    },
+    {
+      icon: <Calendar className="w-4 h-4 text-rose-500" />,
+      label: 'Created At',
+      value: formatDate(doc.created_at),
+    },
+    {
+      icon: <Calendar className="w-4 h-4 text-amber-500" />,
+      label: 'Updated At',
+      value: formatDate(doc.updated_at),
+    },
+  ];
+
+  if (doc.description) {
+    rows.splice(1, 0, {
+      icon: <FileText className="w-4 h-4 text-gray-400" />,
+      label: 'Description',
+      value: <span className="text-gray-600 break-words">{doc.description}</span>,
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end pointer-events-none">
+      <div className="pointer-events-auto w-[340px] h-full bg-white border-l border-gray-200 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+        {/* Panel Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-50">
+          <div className="flex items-center gap-2">
+            <Info className="w-4 h-4 text-blue-600" />
+            <span className="text-sm font-semibold text-gray-800">Document Info</span>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded hover:bg-gray-200 transition-colors"
+          >
+            <X className="w-4 h-4 text-gray-500" />
+          </button>
+        </div>
+
+        {/* Metadata Rows */}
+        <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
+          {rows.map((row, i) => (
+            <div key={i} className="flex items-start gap-3 py-1.5 border-b border-gray-50 last:border-0">
+              <div className="mt-0.5 flex-shrink-0">{row.icon}</div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">{row.label}</div>
+                <div className="text-[12px] text-gray-700">{row.value}</div>
+              </div>
+            </div>
+          ))}
+
+          {/* Labels */}
+          {doc.labels && doc.labels.length > 0 && (
+            <div className="flex items-start gap-3 py-1.5">
+              <Tag className="w-3.5 h-3.5 text-pink-500 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Labels</div>
+                <div className="flex flex-wrap gap-1">
+                  {doc.labels.map((label) => (
+                    <span
+                      key={label.id}
+                      className="px-2 py-0.5 rounded-full text-[10px] font-medium text-white"
+                      style={{ backgroundColor: label.color }}
+                    >
+                      {label.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function ConfirmationModal({
@@ -76,6 +190,7 @@ function ConfirmationModal({
 
 export function Documents() {
   const queryClient = useQueryClient();
+  const { unreadCount } = useNotifications();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -83,7 +198,14 @@ export function Documents() {
     id: string;
     name: string;
   } | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<{
+    url: string;
+    fileName: string;
+    fileType: string;
+  } | null>(null);
   const navigate = useNavigate();
+  const [infoDoc, setInfoDoc] = useState<Document | null>(null);
+  const [shareDoc, setShareDoc] = useState<Document | null>(null);
   const { viewMode, setViewMode } = useViewMode({
     defaultMode: 'table',
   });
@@ -93,6 +215,7 @@ export function Documents() {
   const fileTypeFilter = searchParams.get('file_type') || '';
 
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, setSortBy] = useState<'updated_at' | 'created_at'>('updated_at');
 
   // Reset to page 1 when filters change
   React.useEffect(() => {
@@ -101,7 +224,7 @@ export function Documents() {
 
   React.useEffect(() => {
     queryClient.invalidateQueries({ queryKey: ['documents'] });
-  }, [queryClient]);
+  }, []);
 
   const { data: projectsData } = useQuery({
     queryKey: ['projects'],
@@ -119,6 +242,8 @@ export function Documents() {
     enabled: true,
     placeholderData: keepPreviousData,
     refetchOnWindowFocus: true,
+    refetchOnMount: 'always',
+    staleTime: 0,
   });
   const rawProjects = projectsData?.results || projectsData || [];
   const projects = (Array.isArray(rawProjects) ? rawProjects : []) as Project[];
@@ -131,14 +256,45 @@ export function Documents() {
     acc[project.id] = project.name;
     return acc;
   }, {});
-  const displayedDocuments = allDocs.map((doc: Document) => ({
-    ...doc,
-    project_name: projectLookup[doc.project] || doc.project_name || 'General'
-  })).filter((doc: Document) => {
-    if (statusFilter && doc.status !== statusFilter) return false;
-    if (searchTerm && !doc.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-    return true;
-  });
+  const displayedDocuments = (() => {
+    const nameCount: Record<string, number> = {};
+    const nameIndex: Record<string, number> = {};
+
+    // Count how many times each name appears
+    allDocs.forEach((doc: Document) => {
+      const baseName = (doc as any).file_name || doc.original_file_name || doc.name || '';
+      nameCount[baseName] = (nameCount[baseName] || 0) + 1;
+    });
+
+    return allDocs.map((doc: Document) => {
+      const baseName = (doc as any).file_name || doc.original_file_name || doc.name || '';
+      let displayName = baseName;
+
+      if (nameCount[baseName] > 1) {
+        if (nameIndex[baseName] === undefined) nameIndex[baseName] = 0;
+        else nameIndex[baseName] += 1;
+
+        if (nameIndex[baseName] > 0) {
+          const dotIndex = baseName.lastIndexOf('.');
+          displayName = dotIndex !== -1
+            ? `${baseName.slice(0, dotIndex)} (${nameIndex[baseName]})${baseName.slice(dotIndex)}`
+            : `${baseName} (${nameIndex[baseName]})`;
+        }
+      }
+
+      return {
+        ...doc,
+        name: displayName,
+        project_name: projectLookup[doc.project] || doc.project_name || 'General'
+      };
+    }).filter((doc: Document) => {
+      if (statusFilter && doc.status !== statusFilter) return false;
+      if (searchTerm && !doc.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+      return true;
+    }).sort((a: Document, b: Document) => {
+      return new Date(b[sortBy]).getTime() - new Date(a[sortBy]).getTime();
+    });
+  })();
 
   const updateFilter = (key: string, value: string) => {
     const newParams = new URLSearchParams(searchParams);
@@ -163,11 +319,21 @@ export function Documents() {
     e.stopPropagation();
     setDeleteConfirm({ id: doc.id, name: doc.name });
   };
-  const { data: summary } = useQuery({
-    queryKey: ['notifications-summary'],
-    queryFn: () => notificationsApi.getSummary(),
-    refetchInterval: 30000,
-  });
+
+  const handleDocumentClick = async (doc: Document) => {
+    try {
+      // Fetch download URL
+      const response = await documentsApi.getDownloadUrl(doc.project, { document_id: doc.id });
+      setPreviewDoc({
+        url: response.url,
+        fileName: doc.original_file_name || doc.name,
+        fileType: doc.file_type,
+      });
+    } catch (error) {
+      console.error('Failed to get download URL:', error);
+      navigate(`/documents/${doc.id}`);
+    }
+  };
 
   const { isActivityOpen, setIsActivityOpen } = useOutletContext<{
     isActivityOpen: boolean;
@@ -232,7 +398,7 @@ export function Documents() {
             <div>
               <h1 className="text-3xl font-bold">Documents</h1>
               <p className="text-muted-foreground">
-                Manage all ground truth documents across projects
+                Manage all documents across projects
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -242,9 +408,9 @@ export function Documents() {
                 onClick={() => setIsActivityOpen(!isActivityOpen)}
               >
                 <Bell className="h-5 w-5" />
-                {(summary?.unread ?? 0) > 0 && (
+                {unreadCount > 0 && (
                   <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                    {summary?.unread}
+                    {unreadCount}
                   </span>
                 )}
               </Button>
@@ -254,69 +420,50 @@ export function Documents() {
           {/* Search and Filters */}
           <div className="px-8 shrink-0"><Card>
             <CardContent className="p-4">
-              <div className="flex flex-col gap-4">
-                <div className="flex gap-4">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search documents..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowFilters(!showFilters)}
-                  >
-                    <Filter className="h-4 w-4 mr-2" />
-                    Filters
-                    <ChevronDown
-                      className={`h-4 w-4 ml-2 transition-transform ${showFilters ? 'rotate-180' : ''}`}
-                    />
-                  </Button>
-                  {hasActiveFilters && (
-                    <Button variant="ghost" onClick={clearFilters}>
-                      Clear
-                    </Button>
-                  )}
+            <div className="flex flex-wrap items-center gap-4">
+                <div className="relative flex-1 min-w-[250px]">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search documents..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
                 </div>
 
-                {showFilters && (
-                  <div className="flex flex-wrap gap-4 pt-4 border-t">
-                    <div className="space-y-1">
-                      <label className="text-sm font-medium">Project</label>
-                      <select
-                        value={projectFilter}
-                        onChange={(e) => updateFilter('project', e.target.value)}
-                        className="flex h-10 w-48 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      >
-                        <option value="">All Projects</option>
-                        {projects.map((project: Project) => (
-                          <option key={project.id} value={project.id}>
-                            {project.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={projectFilter}
+                    onChange={(e) => updateFilter('project', e.target.value)}
+                    className="flex h-10 w-64 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    <option value="">All Projects</option>
+                    {projects.map((project: Project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-                    {/* Status Filter */}
+                <div className="flex items-center gap-2">
+                  <select
+                    value={fileTypeFilter}
+                    onChange={(e) => updateFilter('file_type', e.target.value)}
+                    className="flex h-10 w-40 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    {FILE_TYPE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-                    <div className="space-y-1">
-                      <label className="text-sm font-medium">File Type</label>
-                      <select
-                        value={fileTypeFilter}
-                        onChange={(e) => updateFilter('file_type', e.target.value)}
-                        className="flex h-10 w-40 rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      >
-                        {FILE_TYPE_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
+                {hasActiveFilters && (
+                  <Button variant="ghost" onClick={clearFilters} className="px-3">
+                    Clear
+                  </Button>
                 )}
               </div>
             </CardContent>
@@ -331,20 +478,38 @@ export function Documents() {
                 gridProps={{
                   data: displayedDocuments,
                   renderCard: (doc) => (
-                    <DocumentGridCard
-                      key={doc.id}
-                      document={doc}
-                      onDeleteClick={handleDeleteClick}
-                    />
+                    <div
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleDocumentClick(doc);
+                      }}
+                      className="cursor-pointer"
+                      style={{ pointerEvents: 'auto' }}
+                    >
+                      <div style={{ pointerEvents: 'none' }}>
+                        <DocumentGridCard
+                          key={doc.id}
+                          document={doc}
+                          onDeleteClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteClick(e, doc);
+                          }}
+                          onShareClick={(doc) => {
+                            setShareDoc(doc);
+                          }}
+                        />
+                      </div>
+                    </div>
                   ),
                   emptyState,
                   gridClassName: 'grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4',
                 }}
                 tableProps={{
                   data: displayedDocuments,
-                  columns: createDocumentsTableColumns({ onDeleteClick: handleDeleteClick }),
+                  columns: createDocumentsTableColumns({ onDeleteClick: handleDeleteClick, onInfoClick: (doc) => setInfoDoc(doc), onShareClick: (doc) => setShareDoc(doc) }),
                   rowKey: (doc) => doc.id,
-                  onRowClick: (doc) => navigate(`/documents/${doc.id}`),
+                  onRowClick: (doc) => handleDocumentClick(doc),
                   emptyState,
                   rowClassName: () => 'group',
                 }}
@@ -370,6 +535,26 @@ export function Documents() {
             }
           }
         }}
+      />
+      {isActivityOpen && (
+        <NotificationsPage
+          onClose={() => setIsActivityOpen(false)}
+          defaultFilter="unread"
+        />
+      )}
+      <DocumentInfoPanel doc={infoDoc} onClose={() => setInfoDoc(null)} />
+      {previewDoc && (
+        <DocumentPreview
+          url={previewDoc.url}
+          fileName={previewDoc.fileName}
+          fileType={previewDoc.fileType}
+          onClose={() => setPreviewDoc(null)}
+        />
+      )}
+      <DocumentShareModal
+        isOpen={!!shareDoc}
+        onClose={() => setShareDoc(null)}
+        document={shareDoc}
       />
     </div>
   );

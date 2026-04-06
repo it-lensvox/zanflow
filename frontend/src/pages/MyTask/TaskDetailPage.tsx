@@ -1,15 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
-    ArrowLeft, Trash2, Save, Edit3, Loader2, ChevronDown, FileText, Send,
+    ArrowLeft, Trash2, Save, Edit3, Loader2, ChevronDown, Send,
     Clock, ListTodo, PlayCircle, CheckCircle, CheckSquare, Pause, Plus, Link as LinkIcon,
 } from 'lucide-react';
-import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { taskApi, usersApi, documentsApi } from '@/services/api';
+import { useMutation, useQueryClient, useQuery, useInfiniteQuery } from '@tanstack/react-query';
+import { taskApi, usersApi, documentsApi, projectsApi } from '@/services/api';
 import { useAuth } from '@/hooks/useAuth';
 import { getStatusConfig } from '@/components/layout/DualView/taskConfig';
 import { Task, TaskAttachment, TaskLink } from '@/types';
 import { RichTextEditor } from '@/components/common/RichTextEditor';
+import { DocumentPreview, useDocumentPreviewKeyboard, DocumentThumbnail } from '@/components/common/DocumentPreview';
 
 const getInitialLinks = (taskLinks: TaskLink[] | undefined): string[] => {
     if (!taskLinks) return [];
@@ -38,6 +39,22 @@ export function TaskDetailPage() {
 
     const task: Task | undefined = taskData?.task || taskData;
 
+    const resolvedTaskId = useMemo(() => {
+        const num = Number(id);
+        const isSafe = Number.isFinite(num) && num > 0 && num < 1_000_000_000_000;
+        if (!isSafe) {
+            console.error(
+                '[TaskDetailPage] ❌ Invalid id from URL params:',
+                id,
+                '(raw type:', typeof id, ')',
+                '| task.heading:', task?.heading,
+                '| This will block the API call until a valid id is available.'
+            );
+            return 0;
+        }
+        return num;
+    }, [id, task?.heading]);
+
     // State management
     const [selectedStatus, setSelectedStatus] = useState<Task['status']>('pending');
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -49,12 +66,24 @@ export function TaskDetailPage() {
     const [showStatusDropdown, setShowStatusDropdown] = useState(false);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const [showAddUsersDropdown, setShowAddUsersDropdown] = useState(false);
+    const [projectMembers, setProjectMembers] = useState<{ user: { id: number; username: string; full_name: string } }[]>([]);
     const [isEditingDescription, setIsEditingDescription] = useState(false);
     const [editableDescription, setEditableDescription] = useState('');
+    const [isEditingTitle, setIsEditingTitle] = useState(false);
+    const [editableTitle, setEditableTitle] = useState('');
     const [links, setLinks] = useState<string[]>([]);
     const [linkInput, setLinkInput] = useState('');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
+    const [attachmentPage, setAttachmentPage] = useState(1);
+    const [loadingMoreAttachments, setLoadingMoreAttachments] = useState(false);
+    const [hasMoreAttachments, setHasMoreAttachments] = useState(true);
+    const attachmentContainerRef = React.useRef<HTMLDivElement>(null);
+    const [previewDocument, setPreviewDocument] = useState<{
+        url: string;
+        fileName: string;
+        fileType?: string;
+    } | null>(null);
     const [deleteAttachmentConfirm, setDeleteAttachmentConfirm] = useState<{
         id: string;
         name: string;
@@ -67,43 +96,66 @@ export function TaskDetailPage() {
         if (task) {
             setSelectedStatus(task.status);
             setEditableDescription(task.description || '');
+            setEditableTitle(task.heading || '');
             setStartDate(task.start_date?.split('T')[0] || '');
             setEndDate(task.end_date?.split('T')[0] || '');
             setLinks(getInitialLinks(task.links));
         }
     }, [task]);
 
-    // Fetch task documents
-    const { data: taskDocuments } = useQuery({
+    // Fetch task documents with pagination
+    const { data: taskDocumentsData, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
         queryKey: ['task-documents', id],
-        queryFn: async () => {
+        queryFn: async ({ pageParam = 1 }) => {
             try {
                 const projectId = task?.project || (task as any)?.project_details?.id;
-                if (!projectId) return [];
+                if (!projectId) return { results: [], count: 0, next: null, previous: null };
 
-                const response = await documentsApi.list({ project: projectId });
+                const response = await documentsApi.list({ project: projectId, page: pageParam });
                 const allDocs = response.results || response.documents || [];
                 const taskDocs = allDocs.filter((doc: any) =>
                     doc.metadata?.task_id === Number(id) ||
                     doc.task_id === Number(id)
                 );
-                return taskDocs;
+
+                return {
+                    results: taskDocs,
+                    count: taskDocs.length,
+                    next: response.next,
+                    previous: response.previous,
+                };
             } catch (error) {
                 console.error('Failed to fetch task documents:', error);
-                return [];
+                return { results: [], count: 0, next: null, previous: null };
+            }
+        },
+        getNextPageParam: (lastPage) => {
+            if (!lastPage || !lastPage.next) return undefined;
+            try {
+                const url = new URL(lastPage.next);
+                const pageParam = url.searchParams.get('page');
+                return pageParam ? parseInt(pageParam) : undefined;
+            } catch {
+                return undefined;
             }
         },
         enabled: !!task?.id,
+        initialPageParam: 1,
     });
+
+    // Flatten paginated documents
+    const taskDocuments = React.useMemo(() => {
+        if (!taskDocumentsData?.pages) return [];
+        return taskDocumentsData.pages.flatMap(page => page?.results ?? []);
+    }, [taskDocumentsData]);
 
     // Fetch comments
     const { data: commentsData } = useQuery({
         queryKey: ['task-comments', id],
         queryFn: () => taskApi.getComments(Number(id)),
         enabled: !!id,
-        refetchInterval: 10000,
+        staleTime: Infinity,
     });
-
     const comments = React.useMemo(() => {
         if (!commentsData) return [];
         if (Array.isArray(commentsData)) return commentsData;
@@ -112,15 +164,18 @@ export function TaskDetailPage() {
     }, [commentsData]);
 
     // Display attachments
+    const resolvedApiAttachments = React.useMemo(() => {
+        return task?.attachments || [];
+    }, [task?.attachments]);
+
     const displayAttachments = React.useMemo(() => {
-        const apiAttachments = task?.attachments || [];
         const documentAttachments = (taskDocuments || []).map((doc: any) => ({
             id: doc.id,
             file_name: doc.name || doc.original_file_name || doc.file_name,
             file_url: doc.source_file_url || doc.file_url,
             uploaded_at: doc.created_at
         }));
-        const combined = [...apiAttachments, ...documentAttachments];
+        const combined = [...resolvedApiAttachments, ...documentAttachments];
         const uniqueMap = new Map();
 
         combined.forEach(item => {
@@ -130,21 +185,31 @@ export function TaskDetailPage() {
         });
 
         return Array.from(uniqueMap.values());
-    }, [task?.attachments, taskDocuments]);
+    }, [resolvedApiAttachments, taskDocuments]);
 
-    // Fetch available users
+    // Fetch available users and project members
     useEffect(() => {
-        const fetchUsers = async () => {
+        const fetchUsersAndProjectMembers = async () => {
             try {
+                // Fetch all users
                 const userResponse = await usersApi.list();
                 const users = userResponse.results || userResponse;
                 setAvailableUsers(users);
+
+                // Fetch project members if task has a project
+                if (task) {
+                    const projectId = task.project || (task as any)?.project_details?.id;
+                    if (projectId) {
+                        const projectDetails = await projectsApi.get(projectId);
+                        setProjectMembers(projectDetails.members || []);
+                    }
+                }
             } catch (error) {
-                console.error('Failed to fetch users:', error);
+                console.error('Failed to fetch users or project members:', error);
             }
         };
-        fetchUsers();
-    }, []);
+        fetchUsersAndProjectMembers();
+    }, [task?.project, (task as any)?.project_details?.id]);
 
     // Track unsaved changes
     useEffect(() => {
@@ -159,22 +224,78 @@ export function TaskDetailPage() {
         const originalLinks = getInitialLinks(task.links);
         const linksChanged = JSON.stringify(links) !== JSON.stringify(originalLinks);
 
-        setHasUnsavedChanges(statusChanged || usersChanged || descriptionChanged || datesChanged || linksChanged);
-    }, [selectedStatus, task, newUsers.length, editableDescription, startDate, endDate, links]);
+        const titleChanged = editableTitle !== (task.heading || '');
+        setHasUnsavedChanges(statusChanged || usersChanged || descriptionChanged || datesChanged || linksChanged || titleChanged);
+    }, [selectedStatus, task, newUsers.length, editableDescription, startDate, endDate, links, editableTitle]);
 
     // Mutations
+    // Mutations
     const updateTaskMutation = useMutation({
-        mutationFn: (updates: any) => taskApi.update(Number(id), updates),
+        mutationFn: (updates: any) => {
+            if (!resolvedTaskId || resolvedTaskId <= 0) {
+                const errMsg = `[TaskDetailPage] ❌ Blocked API call — resolvedTaskId is invalid: ${resolvedTaskId}`;
+                console.error(errMsg);
+                return Promise.reject(new Error(errMsg));
+            }
+            return taskApi.update(resolvedTaskId, updates);
+        },
         onSuccess: (data) => {
-            queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            const updatedTask: Task = (data as any)?.task ?? data;
+            queryClient.setQueryData(['tasks'], (old: any) => {
+                if (!old) return old;
+                if (old.pages) {
+                    const pagesWithout = old.pages.map((page: any) => ({
+                        ...page,
+                        results: page.results.filter((t: Task) => t.id !== updatedTask.id),
+                    }));
+                    return {
+                        ...old,
+                        pages: [
+                            { ...pagesWithout[0], results: [updatedTask, ...(pagesWithout[0]?.results ?? [])] },
+                            ...pagesWithout.slice(1),
+                        ],
+                    };
+                }
+                if (Array.isArray(old)) return [updatedTask, ...old.filter((t: Task) => t.id !== updatedTask.id)];
+                if (old.tasks) return { ...old, tasks: [updatedTask, ...old.tasks.filter((t: Task) => t.id !== updatedTask.id)] };
+                if (old.results) return { ...old, results: [updatedTask, ...old.results.filter((t: Task) => t.id !== updatedTask.id)] };
+                return old;
+            });
+
+            // Update all project-specific ['tasks-list', projectId] caches
+            const allTaskListQueries = queryClient.getQueryCache().findAll({ queryKey: ['tasks-list'], exact: false });
+            allTaskListQueries.forEach((query) => {
+                queryClient.setQueryData(query.queryKey, (old: any) => {
+                    if (!old) return old;
+                    if (Array.isArray(old)) return [updatedTask, ...old.filter((t: Task) => t.id !== updatedTask.id)];
+                    if (old.tasks) return { ...old, tasks: [updatedTask, ...old.tasks.filter((t: Task) => t.id !== updatedTask.id)] };
+                    if (old.results) return { ...old, results: [updatedTask, ...old.results.filter((t: Task) => t.id !== updatedTask.id)] };
+                    return old;
+                });
+            });
+
             queryClient.invalidateQueries({ queryKey: ['task', id] });
+            queryClient.invalidateQueries({ queryKey: ['task-detail', resolvedTaskId] });
             setHasUnsavedChanges(false);
             setNewUsers([]);
             setIsEditingDescription(false);
+            setIsEditingTitle(false);
         },
-        onError: (error) => {
-            console.error('Failed to update task:', error);
-            alert('Failed to update task. Check console for details.');
+        onError: (error: any) => {
+            const status = error?.response?.status;
+            console.error(
+                '[TaskDetailPage] ❌ Update failed:',
+                '| resolvedTaskId:', resolvedTaskId,
+                '| HTTP status:', status,
+                '| error:', error?.message ?? error
+            );
+            if (error?.message?.includes('invalid')) {
+                alert(`Cannot save: task ID is invalid (got "${id}"). Please refresh the page.`);
+            } else if (status === 404) {
+                alert(`Task not found on server (404). Task ID: ${resolvedTaskId}. Please refresh the page.`);
+            } else {
+                alert('Failed to save changes. Please try again.');
+            }
         },
     });
 
@@ -208,11 +329,20 @@ export function TaskDetailPage() {
 
     const handleSaveStatus = async () => {
         if (!task) return;
+        if (!resolvedTaskId || resolvedTaskId <= 0) {
+            console.error('[TaskDetailPage] ❌ Save blocked — resolvedTaskId is 0 or invalid. id was:', id);
+            alert(`Cannot save: task ID is invalid (got "${id}"). Please refresh the page.`);
+            return;
+        }
 
         try {
             const updates: any = {};
+            if (editableTitle !== (task.heading || '')) updates.heading = editableTitle;
             if (selectedStatus !== task.status) updates.status = selectedStatus;
-            if (newUsers.length > 0) updates.assigned_to = [...task.assigned_to, ...newUsers];
+            if (newUsers.length > 0) {
+                const existing = (task.assigned_to || []).map(Number);
+                updates.assigned_to = [...new Set([...existing, ...newUsers])];
+            }
             if (editableDescription !== task.description) updates.description = editableDescription;
 
             const originalStart = task.start_date?.split('T')[0] || '';
@@ -229,7 +359,7 @@ export function TaskDetailPage() {
             if (Object.keys(updates).length === 0) return;
             updateTaskMutation.mutate(updates);
         } catch (error) {
-            console.error('Error saving task:', error);
+            console.error('[TaskDetailPage] Error in handleSaveStatus:', error);
         }
     };
 
@@ -242,41 +372,18 @@ export function TaskDetailPage() {
         setUploadingDocs(true);
 
         try {
-            for (const file of fileArray) {
-                const projectIdNum = task.project || (task as any).project_details?.id;
+            await taskApi.uploadFiles(task.id, fileArray);
 
-                if (!projectIdNum) {
-                    console.error("Project ID missing");
-                    continue;
-                }
+            const projectId = task.project || (task as any).project_details?.id;
 
-                const uploadUrlResponse = await documentsApi.getUploadUrl(projectIdNum, {
-                    file_name: file.name,
-                    file_type: file.type || 'application/octet-stream',
-                });
-
-                const { url: s3Url, fields: s3Fields, file_key } = uploadUrlResponse;
-
-                await documentsApi.uploadFileToS3(s3Url, s3Fields, file);
-                const ext = file.name.split('.').pop()?.toLowerCase() || '';
-                let mappedType = 'other';
-                if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'].includes(ext)) mappedType = 'image';
-                else if (ext === 'pdf') mappedType = 'pdf';
-                else if (ext === 'json') mappedType = 'json';
-                else if (['doc', 'docx', 'txt', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) mappedType = 'document';
-
-                await documentsApi.confirmUpload(projectIdNum, {
-                    file_key: file_key,
-                    file_name: file.name,
-                    file_type: mappedType,
-                    metadata: {
-                        task_id: task.id
-                    }
-                });
-            }
             await queryClient.invalidateQueries({ queryKey: ['task-documents', id] });
             await queryClient.invalidateQueries({ queryKey: ['tasks'] });
             await queryClient.invalidateQueries({ queryKey: ['task', id] });
+            await queryClient.invalidateQueries({ queryKey: ['task-detail', resolvedTaskId] });
+
+            if (projectId) {
+                await queryClient.invalidateQueries({ queryKey: ['all-documents', projectId.toString()] });
+            }
 
         } catch (err: any) {
             console.error('Upload failed:', err);
@@ -290,25 +397,34 @@ export function TaskDetailPage() {
     const handleAttachmentClick = async (attachment: TaskAttachment) => {
         if (!task) return;
         try {
-            if (attachment.file_url) {
-                window.open(attachment.file_url, '_blank');
-                return;
-            }
-            const projectIdNum = task.project || (task as any).project_details?.id;
-            if (!projectIdNum) {
-                alert('Unable to open attachment: Project information missing.');
-                return;
+            let fileUrl = attachment.file_url;
+
+            // If file_url is not available, fetch it from the API
+            if (!fileUrl) {
+                const projectIdNum = task.project || (task as any).project_details?.id;
+                if (!projectIdNum) {
+                    alert('Unable to open attachment: Project information missing.');
+                    return;
+                }
+
+                const downloadResponse = await documentsApi.getDownloadUrl(projectIdNum, {
+                    document_id: attachment.id.toString()
+                });
+
+                if (downloadResponse?.url) {
+                    fileUrl = downloadResponse.url;
+                } else {
+                    alert('Unable to open attachment: Download URL not available.');
+                    return;
+                }
             }
 
-            const downloadResponse = await documentsApi.getDownloadUrl(projectIdNum, {
-                document_id: attachment.id.toString()
+            // Open in-app preview
+            setPreviewDocument({
+                url: fileUrl,
+                fileName: attachment.file_name,
+                fileType: attachment.file_url?.split('.').pop() || ''
             });
-
-            if (downloadResponse?.url) {
-                window.open(downloadResponse.url, '_blank');
-            } else {
-                alert('Unable to open attachment: Download URL not available.');
-            }
         } catch (error) {
             console.error('Failed to open attachment:', error);
             alert('Failed to open attachment. Please try again.');
@@ -317,11 +433,26 @@ export function TaskDetailPage() {
 
     const handleDeleteAttachment = async (attachmentId: string) => {
         try {
-            await documentsApi.delete(attachmentId);
-            queryClient.setQueryData(['task-documents', id], (oldDocs: any[] | undefined) => {
-                return (oldDocs || []).filter((doc) => doc.id.toString() !== attachmentId);
+            await taskApi.deleteAttachment(attachmentId);
+            queryClient.setQueryData(['task-documents', id], (oldData: any) => {
+                if (!oldData?.pages) return oldData;
+
+                return {
+                    ...oldData,
+                    pages: oldData.pages.map((page: any) => ({
+                        ...page,
+                        results: page.results.filter((doc: any) => doc.id.toString() !== attachmentId),
+                        count: page.count - 1,
+                    })),
+                };
             });
+
+            // Invalidate related queries
+            queryClient.invalidateQueries({ queryKey: ['task-documents', id] });
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            queryClient.invalidateQueries({ queryKey: ['task', id] });
+            queryClient.invalidateQueries({ queryKey: ['documents'] });
+
             setDeleteAttachmentConfirm(null);
         } catch (error) {
             console.error('Failed to delete attachment:', error);
@@ -329,6 +460,33 @@ export function TaskDetailPage() {
             setDeleteAttachmentConfirm(null);
         }
     };
+
+    // Handle scroll for lazy loading attachments
+    const handleAttachmentScroll = React.useCallback(() => {
+        if (!attachmentContainerRef.current || isFetchingNextPage || !hasNextPage) return;
+
+        const container = attachmentContainerRef.current;
+        const scrollTop = container.scrollTop;
+        const scrollHeight = container.scrollHeight;
+        const clientHeight = container.clientHeight;
+
+        // Trigger load when user scrolls to 80% of container
+        if (scrollTop + clientHeight >= scrollHeight * 0.8) {
+            fetchNextPage();
+        }
+    }, [isFetchingNextPage, hasNextPage, fetchNextPage]);
+
+    // Attach scroll listener
+    React.useEffect(() => {
+        const container = attachmentContainerRef.current;
+        if (!container) return;
+
+        container.addEventListener('scroll', handleAttachmentScroll);
+        return () => container.removeEventListener('scroll', handleAttachmentScroll);
+    }, [handleAttachmentScroll]);
+
+    // Enable keyboard shortcuts for document preview
+    useDocumentPreviewKeyboard(() => setPreviewDocument(null));
 
     const statusOptions: Array<{ status: Task['status'], icon: React.ElementType, label: string }> = [
         { status: 'pending', icon: Clock, label: 'Pending' },
@@ -380,7 +538,27 @@ export function TaskDetailPage() {
                                 <Edit3 className="w-5 h-5 text-purple-600" />
                             </div>
                             <div>
-                                <h1 className="text-2xl font-bold">{task.heading || 'Untitled Task'}</h1>
+                                <div className="flex items-center gap-1">
+                                    {isEditingTitle ? (
+                                        <input
+                                            autoFocus
+                                            value={editableTitle}
+                                            onChange={(e) => setEditableTitle(e.target.value)}
+                                            onBlur={() => setIsEditingTitle(false)}
+                                            onKeyDown={(e) => e.key === 'Enter' && setIsEditingTitle(false)}
+                                            className="text-2xl font-bold border-b-2 border-purple-400 outline-none bg-transparent w-full"
+                                        />
+                                    ) : (
+                                        <h1 className="text-2xl font-bold">{editableTitle || 'Untitled Task'}</h1>
+                                    )}
+                                    <button
+                                        onClick={() => setIsEditingTitle(true)}
+                                        className="p-1 text-gray-400 hover:text-purple-600 rounded transition-colors flex-shrink-0"
+                                        title="Edit title"
+                                    >
+                                        <Edit3 className="w-4 h-4" />
+                                    </button>
+                                </div>
                                 <p className="text-sm text-muted-foreground">
                                     {task.project_details?.name || task.project_name || 'No Project'}
                                 </p>
@@ -549,6 +727,13 @@ export function TaskDetailPage() {
                 <div className="project-assignees bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
                     <div className="flex items-center justify-between mb-3 cursor-pointer" onClick={() => setAssignedMembersOpen(!assignedMembersOpen)}>
                         <label className="text-sm font-semibold text-gray-700 block mb-4">Assignees</label>
+                        {task.assigned_by_user_details && (
+                            <span className="text-xs text-gray-500">
+                                Created by {task.assigned_by_user_details.first_name && task.assigned_by_user_details.last_name
+                                    ? `${task.assigned_by_user_details.first_name} ${task.assigned_by_user_details.last_name}`.trim()
+                                    : task.assigned_by_user_details.username}
+                            </span>
+                        )}
                     </div>
 
                     {assignedMembersOpen && (
@@ -593,55 +778,101 @@ export function TaskDetailPage() {
                                 })}
 
                                 {/* Add Assignee Dropdown */}
-                                <div className="relative">
-                                    <div
-                                        className="w-full p-2 rounded border border-gray-300 hover:border-gray-400 cursor-pointer bg-white flex items-center justify-between min-h-[38px] transition-colors"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setShowAddUsersDropdown(!showAddUsersDropdown);
-                                        }}
-                                    >
-                                        <div className="flex items-center gap-2">
-                                            <Plus className="w-3.5 h-3.5 text-gray-500" />
-                                            <span className="text-sm text-gray-700 font-medium">Add Assignee</span>
-                                        </div>
-                                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                        </svg>
-                                    </div>
+                                {(() => {
+                                    // Calculate available unassigned users
+                                    let availableUnassignedUsers = availableUsers;
 
-                                    {/* Dropdown List */}
-                                    {showAddUsersDropdown && (
-                                        <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                                            {availableUsers
-                                                .filter(u => !task.assigned_to_user_details?.some(a => a.id === u.id) && !newUsers.includes(u.id))
-                                                .map((user) => (
-                                                    <div
-                                                        key={user.id}
-                                                        className="px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm flex items-center justify-between"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setNewUsers([...newUsers, user.id]);
-                                                            setHasUnsavedChanges(true);
-                                                            setShowAddUsersDropdown(false);
-                                                        }}
-                                                    >
-                                                        <div className="flex items-center gap-2.5">
-                                                            <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-600">
-                                                                {user.first_name[0]}{user.last_name?.[0] || ''}
+                                    // Filter to project members only
+                                    if (projectMembers.length > 0) {
+                                        const projectMemberIds = projectMembers.map(member => member.user.id);
+                                        availableUnassignedUsers = availableUsers.filter(u => projectMemberIds.includes(u.id));
+                                    }
+
+                                    // Remove already assigned users
+                                    availableUnassignedUsers = availableUnassignedUsers.filter(u =>
+                                        !task.assigned_to_user_details?.some(a => a.id === u.id) &&
+                                        !newUsers.includes(u.id)
+                                    );
+
+                                    // Only render if there are users available to assign
+                                    return availableUnassignedUsers.length > 0 && (
+                                        <div className="relative">
+                                            <div
+                                                className="w-full p-2 rounded border border-gray-300 hover:border-gray-400 cursor-pointer bg-white flex items-center justify-between min-h-[38px] transition-colors"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setShowAddUsersDropdown(!showAddUsersDropdown);
+                                                }}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <Plus className="w-3.5 h-3.5 text-gray-500" />
+                                                    <span className="text-sm text-gray-700 font-medium">Add Assignee</span>
+                                                </div>
+                                                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                </svg>
+                                            </div>
+
+                                            {/* Dropdown List */}
+                                            {showAddUsersDropdown && (
+                                                <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                                                    {(() => {
+                                                        // Filter users based on project membership
+                                                        let filteredUsers = availableUsers;
+
+                                                        // If project members are available
+                                                        if (projectMembers.length > 0) {
+                                                            const projectMemberIds = projectMembers.map(member => member.user.id);
+                                                            filteredUsers = availableUsers.filter(u => projectMemberIds.includes(u.id));
+                                                        }
+
+                                                        // Remove already assigned users
+                                                        filteredUsers = filteredUsers.filter(u =>
+                                                            !task.assigned_to_user_details?.some(a => a.id === u.id) &&
+                                                            !newUsers.includes(u.id)
+                                                        );
+
+                                                        return filteredUsers.map((user) => (
+                                                            <div
+                                                                key={user.id}
+                                                                className="px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm flex items-center justify-between"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setNewUsers([...newUsers, user.id]);
+                                                                    setHasUnsavedChanges(true);
+                                                                    setShowAddUsersDropdown(false);
+                                                                }}
+                                                            >
+                                                                <div className="flex items-center gap-2.5">
+                                                                    <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-600">
+                                                                        {user.first_name[0]}{user.last_name?.[0] || ''}
+                                                                    </div>
+                                                                    <span className="text-sm">{user.first_name} {user.last_name}</span>
+                                                                </div>
                                                             </div>
-                                                            <span className="text-sm">{user.first_name} {user.last_name}</span>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            {availableUsers.filter(u => !task.assigned_to_user_details?.some(a => a.id === u.id) && !newUsers.includes(u.id)).length === 0 && (
-                                                <div className="px-3 py-2 text-sm text-gray-500 text-center">
-                                                    No more users to add
+                                                        ));
+                                                    })()}
+                                                    {(() => {
+                                                        let filteredUsers = availableUsers;
+                                                        if (projectMembers.length > 0) {
+                                                            const projectMemberIds = projectMembers.map(member => member.user.id);
+                                                            filteredUsers = availableUsers.filter(u => projectMemberIds.includes(u.id));
+                                                        }
+                                                        filteredUsers = filteredUsers.filter(u =>
+                                                            !task.assigned_to_user_details?.some(a => a.id === u.id) &&
+                                                            !newUsers.includes(u.id)
+                                                        );
+                                                        return filteredUsers.length === 0 && (
+                                                            <div className="px-3 py-2 text-sm text-gray-500 text-center">
+                                                                No more users to add
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </div>
                                             )}
                                         </div>
-                                    )}
-                                </div>
+                                    );
+                                })()}
                             </div>
                         </div>
                     )}
@@ -731,18 +962,25 @@ export function TaskDetailPage() {
                         </div>
                     </div>
 
-                    {/* Attachment Grid */}
+                    {/* Attachment Grid with Scroll Container */}
                     {displayAttachments && displayAttachments.length > 0 && (
-                        <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {displayAttachments.map((doc: TaskAttachment) => (
-                                <div
-                                    key={doc.id}
-                                    className="flex flex-col bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow group h-full cursor-pointer"
-                                    onClick={() => handleAttachmentClick(doc)}
-                                >
-                                    <div className="h-32 bg-gray-100 flex items-center justify-center border-b border-gray-100 relative">
-                                        <FileText className="w-10 h-10 text-gray-400" />
-                                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div
+                            ref={attachmentContainerRef}
+                            className="mt-6 max-h-[500px] overflow-y-auto pr-2"
+                        >
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {displayAttachments.map((doc: TaskAttachment) => (
+                                    <div key={doc.id} className="relative group">
+                                        <DocumentThumbnail
+                                            url={doc.file_url}
+                                            fileName={doc.file_name}
+                                            fileType={doc.file_url?.split('.').pop() || ''}
+                                            onClick={() => handleAttachmentClick(doc)}
+                                            showFileName={false}
+                                            className="h-full"
+                                        />
+                                        {/* Delete Button Overlay */}
+                                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                                             <button
                                                 className="p-1.5 bg-white/90 rounded-md shadow-sm text-gray-600 hover:text-red-600"
                                                 onClick={(e) => {
@@ -756,15 +994,31 @@ export function TaskDetailPage() {
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
                                         </div>
+                                        {/* File Info Below Thumbnail */}
+                                        <div className="p-3">
+                                            <p className="text-xs font-bold text-gray-900 truncate" title={doc.file_name}>{doc.file_name}</p>
+                                            <p className="text-[10px] text-gray-500 mt-1 font-medium italic">
+                                                {new Date(doc.uploaded_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toLowerCase()}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div className="p-3">
-                                        <p className="text-xs font-bold text-gray-900 truncate" title={doc.file_name}>{doc.file_name}</p>
-                                        <p className="text-[10px] text-gray-500 mt-1 font-medium italic">
-                                            {new Date(doc.uploaded_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toLowerCase()}
-                                        </p>
-                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Loading Indicator */}
+                            {isFetchingNextPage && (
+                                <div className="flex justify-center items-center py-6">
+                                    <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+                                    <span className="ml-2 text-sm text-gray-600">Loading more attachments...</span>
                                 </div>
-                            ))}
+                            )}
+
+                            {/* No More Attachments Indicator */}
+                            {!hasNextPage && displayAttachments.length > 20 && (
+                                <div className="flex justify-center py-4">
+                                    <span className="text-xs text-gray-500">All attachments loaded</span>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -841,6 +1095,15 @@ export function TaskDetailPage() {
                         </div>
                     </div>
                 </div>
+            )}
+            {/* DOCUMENT PREVIEW */}
+            {previewDocument && (
+                <DocumentPreview
+                    url={previewDocument.url}
+                    fileName={previewDocument.fileName}
+                    fileType={previewDocument.fileType}
+                    onClose={() => setPreviewDocument(null)}
+                />
             )}
         </div>
     );

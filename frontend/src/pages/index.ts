@@ -2,14 +2,12 @@ export { Dashboard } from './Dashboard';
 export { Login } from './Login';
 export { Projects } from './Project/Projects';
 export { DocumentCreate } from './Documents/DocumentCreate';
-export { DocumentDetail } from './Documents/DocumentDetail';
 export { MyTask } from './MyTask/MyTask';
 export { CreateTask } from './MyTask/CreateTask'
 export { Teams } from './TeamManagement/Teams';
 export { UserManagement } from './TeamManagement/UserManagement'
 export { TeamPerformance } from './TeamManagement/TeamPerformance';
 export { TaskDetails } from './TaskType/TaskDetails'
-export { ContentCreation } from './TaskType/ContentCreation';
 export { Documents } from './Documents/Documents';
 export { ProjectSettings } from './Project/ProjectSettings';
 export { Sidebar } from '../components/layout/Sidebar';
@@ -18,3 +16,4 @@ export { NotificationsPage } from './NotificationsPage';
 export { Profile } from  './Profile'
 export { ResetPassword } from './ResetPassword'
 export { TeamChatModern } from './TeamsChat/TeamChatModern'
+export { Settings } from './Settings'

@@ -86,6 +86,7 @@ export function CreateTeamModal({ isOpen, onClose, onSuccess }: CreateTeamModalP
     const [leaderId, setLeaderId] = useState<number | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const memberDropdownRef = useRef<HTMLDivElement>(null);
 
     const { user } = useAuth();
 
@@ -214,6 +215,26 @@ export function CreateTeamModal({ isOpen, onClose, onSuccess }: CreateTeamModalP
         };
     }, [isOpen, isSubmitting, onClose]);
 
+    // Handle click outside for member dropdown
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (
+                memberDropdownRef.current &&
+                !memberDropdownRef.current.contains(event.target as Node)
+            ) {
+                setMemberDropdownOpen(false);
+            }
+        };
+
+        if (memberDropdownOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [memberDropdownOpen]);
+
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {
             if (e.key === 'Escape' && !isSubmitting) {
@@ -246,7 +267,7 @@ export function CreateTeamModal({ isOpen, onClose, onSuccess }: CreateTeamModalP
             />
 
             {/* Modal */}
-            <div className="relative bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
+           <div className="relative bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-visible">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b">
                     <h2 className="text-2xl font-bold">Create New Team</h2>
@@ -260,7 +281,7 @@ export function CreateTeamModal({ isOpen, onClose, onSuccess }: CreateTeamModalP
                 </div>
 
                 {/* Content */}
-                <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+                <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)] relative">
                     {error && (
                         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
                             <p className="text-sm text-red-600">{error}</p>
@@ -295,7 +316,7 @@ export function CreateTeamModal({ isOpen, onClose, onSuccess }: CreateTeamModalP
                             />
                         </div>
 
-                        {/* Description */}
+                        {/* Description
                         <div>
                             <label className={labelClass}>Description</label>
                             <RichTextEditor
@@ -318,7 +339,7 @@ export function CreateTeamModal({ isOpen, onClose, onSuccess }: CreateTeamModalP
                                     heading: false,
                                 }}
                             />
-                        </div>
+                        </div> */}
 
                         {/* Add Members */}
                         <div>
@@ -404,7 +425,7 @@ export function CreateTeamModal({ isOpen, onClose, onSuccess }: CreateTeamModalP
 
                                 {/* Dropdown */}
                                 {memberDropdownOpen && !usersLoading && filteredMemberOptions.length > 0 && (
-                                    <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                                   <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
                                         {filteredMemberOptions.map((user, index) => (
                                             <div
                                                 key={user.id}

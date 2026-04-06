@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
-    X, Trash2, Save, Edit3, Loader2, ChevronDown, FileText, Download, Send, Maximize2, Minimize2,
-    Clock, ListTodo, PlayCircle, CheckCircle, CheckSquare, Pause, Calendar, Plus, Link, ExternalLink,
+    X, Trash2, Save, Edit3, Loader2, ChevronDown, Send, Maximize2,
+    Clock, ListTodo, PlayCircle, CheckCircle, CheckSquare, Pause, Plus, Link,
 } from 'lucide-react';
-import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { taskApi, usersApi, documentsApi } from '@/services/api';
+import { taskApi, usersApi, documentsApi, projectsApi } from '@/services/api';
 import { useAuth } from '@/hooks/useAuth';
-import { Sidebar } from '@/components/layout/Sidebar';
 import { getStatusConfig } from '@/components/layout/DualView/taskConfig';
 import { Task, TaskAttachment, TaskLink } from '@/types';
 import { RichTextEditor } from '@/components/common/RichTextEditor';
+import { DocumentPreview, useDocumentPreviewKeyboard, DocumentThumbnail } from '@/components/common/DocumentPreview';
 
 const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A';
@@ -44,6 +44,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
     const [selectedStatus, setSelectedStatus] = useState<Task['status']>(task.status);
     const [isEditingStatus, setIsEditingStatus] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [showNotAdminPopup, setShowNotAdminPopup] = useState(false);
     const [assignedMembersOpen, setAssignedMembersOpen] = useState(true);
     const [showAddDocuments, setShowAddDocuments] = useState(false);
     const [uploadingDocs, setUploadingDocs] = useState(false);
@@ -56,8 +57,20 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const [isMaximized, setIsMaximized] = useState(false);
     const [showAddUsersDropdown, setShowAddUsersDropdown] = useState(false);
+    const [projectMembers, setProjectMembers] = useState<{ user: { id: number; username: string; full_name: string } }[]>([]);
     const [isEditingDescription, setIsEditingDescription] = useState(false);
     const [editableDescription, setEditableDescription] = useState(task.description);
+    const [isEditingTitle, setIsEditingTitle] = useState(false);
+    const [editableTitle, setEditableTitle] = useState(task.heading || '');
+    const [attachmentPage, setAttachmentPage] = useState(1);
+    const [loadingMoreAttachments, setLoadingMoreAttachments] = useState(false);
+    const [hasMoreAttachments, setHasMoreAttachments] = useState(true);
+    const attachmentContainerRef = React.useRef<HTMLDivElement>(null);
+    const [previewDocument, setPreviewDocument] = useState<{
+        url: string;
+        fileName: string;
+        fileType?: string;
+    } | null>(null);
     const [deleteAttachmentConfirm, setDeleteAttachmentConfirm] = useState<{
         id: string;
         name: string;
@@ -68,34 +81,76 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
             return typeof link === 'object' && link.url ? link.url : String(link);
         });
     };
-    const { data: fullTaskDetails, refetch: refetchTaskDetails } = useQuery({
-        queryKey: ['task-detail', task.id],
-        queryFn: () => taskApi.get(task.id),
-        enabled: !!task.id,
+    // Resolve to a clean numeric task ID before any hooks that depend on it.
+    const resolvedTaskId = useMemo(() => {
+        const num = Number(task.id);
+        const isSafe = Number.isFinite(num) && num > 0 && num < 1_000_000_000_000;
+        if (!isSafe) {
+            console.error(
+                '[TaskDetailModal] ❌ Invalid task.id received:',
+                task.id,
+                '(raw type:', typeof task.id, ')',
+                '| task.heading:', task.heading,
+                '| This will block the API call until a valid id is available.'
+            );
+            return 0;
+        }
+        return num;
+    }, [task.id, task.heading]);
+
+    const { data: fullTaskDetails, refetch: refetchTaskDetails } = useQuery<any>({
+        queryKey: ['task-detail', resolvedTaskId],
+        queryFn: () => {
+            return taskApi.get(resolvedTaskId);
+        },
+        enabled: resolvedTaskId > 0,
     });
 
-    // Query to fetch documents associated with this task
-    const { data: taskDocuments } = useQuery({
+    // Query to fetch documents associated with this task with pagination
+    const { data: taskDocumentsData, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
         queryKey: ['task-documents', task.id],
-        queryFn: async () => {
+        queryFn: async ({ pageParam = 1 }) => {
             try {
                 const projectId = task.project || (task as any).project_details?.id;
-                if (!projectId) return [];
+                if (!projectId) return { results: [], count: 0, next: null, previous: null };
 
-                const response = await documentsApi.list({ project: projectId });
+                const response = await documentsApi.list({ project: projectId, page: pageParam });
                 const allDocs = response.results || response.documents || [];
                 const taskDocs = allDocs.filter((doc: any) =>
                     doc.metadata?.task_id === task.id ||
                     doc.task_id === task.id
                 );
-                return taskDocs;
+
+                return {
+                    results: taskDocs,
+                    count: taskDocs.length,
+                    next: response.next,
+                    previous: response.previous,
+                };
             } catch (error) {
                 console.error('Failed to fetch task documents:', error);
-                return [];
+                return { results: [], count: 0, next: null, previous: null };
+            }
+        },
+        getNextPageParam: (lastPage) => {
+            if (!lastPage || !lastPage.next) return undefined;
+            try {
+                const url = new URL(lastPage.next);
+                const pageParam = url.searchParams.get('page');
+                return pageParam ? parseInt(pageParam) : undefined;
+            } catch {
+                return undefined;
             }
         },
         enabled: !!task.id,
+        initialPageParam: 1,
     });
+
+    // Flatten paginated documents
+    const taskDocuments = React.useMemo(() => {
+        if (!taskDocumentsData?.pages) return [];
+        return taskDocumentsData.pages.flatMap(page => page?.results ?? []);
+    }, [taskDocumentsData]);
 
     // Sync links when full details arrive
     useEffect(() => {
@@ -113,16 +168,74 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
     const queryClient = useQueryClient();
 
     const updateTaskMutation = useMutation({
-        mutationFn: (updates: any) => taskApi.update(task.id, updates),
-        onSuccess: (data) => {
-            queryClient.invalidateQueries({ queryKey: ['tasks'] });
-            onTaskUpdated(data);
-            setIsEditingStatus(false);
-            onClose();
+        mutationFn: (updates: any) => {
+            if (!resolvedTaskId || resolvedTaskId <= 0) {
+                const errMsg = `[TaskDetailModal] ❌ Blocked API call — resolvedTaskId is invalid: ${resolvedTaskId}`;
+                console.error(errMsg);
+                return Promise.reject(new Error(errMsg));
+            }
+            return taskApi.update(resolvedTaskId, updates);
         },
-        onError: (error) => {
-            console.error('Failed to update task status:', error);
-            alert('Failed to update task status. Check console for details.');
+        onSuccess: (data) => {
+            // Normalize: API returns either Task directly or { task: Task }
+            const updatedTask: Task = (data as any)?.task ?? data;
+
+            // Update all relevant caches immediately (same pattern as taskConfig)
+            queryClient.setQueryData(['tasks'], (old: any) => {
+                if (!old) return old;
+                if (old.pages) {
+                    const pagesWithout = old.pages.map((page: any) => ({
+                        ...page,
+                        results: page.results.filter((t: Task) => t.id !== updatedTask.id),
+                    }));
+                    return {
+                        ...old,
+                        pages: [
+                            { ...pagesWithout[0], results: [updatedTask, ...(pagesWithout[0]?.results ?? [])] },
+                            ...pagesWithout.slice(1),
+                        ],
+                    };
+                }
+                if (Array.isArray(old)) return [updatedTask, ...old.filter((t: Task) => t.id !== updatedTask.id)];
+                if (old.tasks) return { ...old, tasks: [updatedTask, ...old.tasks.filter((t: Task) => t.id !== updatedTask.id)] };
+                if (old.results) return { ...old, results: [updatedTask, ...old.results.filter((t: Task) => t.id !== updatedTask.id)] };
+                return old;
+            });
+
+            // Update all project-specific ['tasks-list', projectId] caches
+            const allTaskListQueries = queryClient.getQueryCache().findAll({ queryKey: ['tasks-list'], exact: false });
+            allTaskListQueries.forEach((query) => {
+                queryClient.setQueryData(query.queryKey, (old: any) => {
+                    if (!old) return old;
+                    if (Array.isArray(old)) return [updatedTask, ...old.filter((t: Task) => t.id !== updatedTask.id)];
+                    if (old.tasks) return { ...old, tasks: [updatedTask, ...old.tasks.filter((t: Task) => t.id !== updatedTask.id)] };
+                    if (old.results) return { ...old, results: [updatedTask, ...old.results.filter((t: Task) => t.id !== updatedTask.id)] };
+                    return old;
+                });
+            });
+
+            queryClient.invalidateQueries({ queryKey: ['task-detail', resolvedTaskId] });
+
+            onTaskUpdated(updatedTask);
+            setIsEditingStatus(false);
+            setNewUsers([]);
+            setHasUnsavedChanges(false);
+        },
+        onError: (error: any) => {
+            const status = error?.response?.status;
+            console.error(
+                '[TaskDetailModal] ❌ Update failed:',
+                '| resolvedTaskId:', resolvedTaskId,
+                '| HTTP status:', status,
+                '| error:', error?.message ?? error
+            );
+            if (error?.message?.includes('invalid')) {
+                alert(`Cannot save: task ID is invalid (got "${task.id}"). Please close and reopen the task.`);
+            } else if (status === 404) {
+                alert(`Task not found on server (404). Task ID: ${resolvedTaskId}. Please close and reopen the task.`);
+            } else {
+                alert('Failed to save changes. Please try again.');
+            }
         },
     });
 
@@ -130,7 +243,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
         queryKey: ['task-comments', task.id],
         queryFn: () => taskApi.getComments(task.id),
         enabled: !!task.id,
-        refetchInterval: 10000,
+        staleTime: Infinity,
     });
 
     const comments = React.useMemo(() => {
@@ -140,16 +253,21 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
         return [];
     }, [commentsData]);
 
-    const displayAttachments = React.useMemo(() => {
+    // Stabilize the attachments reference so fullTaskDetails and task.attachments
+    // don't cause two separate recomputes when both update after an invalidation
+    const resolvedApiAttachments = React.useMemo(() => {
         const remoteTask = fullTaskDetails?.task || fullTaskDetails;
-        const apiAttachments = remoteTask?.attachments || task.attachments || [];
+        return remoteTask?.attachments || task.attachments || [];
+    }, [fullTaskDetails, task.attachments]);
+
+    const displayAttachments = React.useMemo(() => {
         const documentAttachments = (taskDocuments || []).map((doc: any) => ({
             id: doc.id,
             file_name: doc.name || doc.original_file_name || doc.file_name,
             file_url: doc.source_file_url || doc.file_url,
             uploaded_at: doc.created_at
         }));
-        const combined = [...apiAttachments, ...documentAttachments];
+        const combined = [...resolvedApiAttachments, ...documentAttachments];
         const uniqueMap = new Map();
 
         combined.forEach(item => {
@@ -159,7 +277,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
         });
 
         return Array.from(uniqueMap.values());
-    }, [fullTaskDetails, task.attachments, taskDocuments]);
+    }, [resolvedApiAttachments, taskDocuments]);
 
     useEffect(() => {
         document.body.style.overflow = 'hidden';
@@ -172,17 +290,27 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
     }, [task.status]);
 
     useEffect(() => {
-        const fetchUsers = async () => {
+        const fetchUsersAndProjectMembers = async () => {
             try {
+                // Fetch all users
                 const userResponse = await usersApi.list();
                 const users = userResponse.results || userResponse;
                 setAvailableUsers(users);
+
+                // Fetch project members if task has a project
+                if (task) {
+                    const projectId = task.project || (task as any)?.project_details?.id;
+                    if (projectId) {
+                        const projectDetails = await projectsApi.get(projectId);
+                        setProjectMembers(projectDetails.members || []);
+                    }
+                }
             } catch (error) {
-                console.error('Failed to fetch users:', error);
+                console.error('Failed to fetch users or project members:', error);
             }
         };
-        fetchUsers();
-    }, []);
+        fetchUsersAndProjectMembers();
+    }, [task?.project, (task as any)?.project_details?.id]);
 
     useEffect(() => {
         const statusChanged = selectedStatus !== task.status;
@@ -197,8 +325,9 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
         const originalLinks = getInitialLinks(baselineLinks);
         const linksChanged = JSON.stringify(links) !== JSON.stringify(originalLinks);
 
-        setHasUnsavedChanges(statusChanged || usersChanged || docsChanged || descriptionChanged || datesChanged || linksChanged);
-    }, [selectedStatus, task.status, newUsers.length, newDocuments.length, editableDescription, task.description, startDate, endDate, task.start_date, task.end_date, links, task.links]);
+        const titleChanged = editableTitle !== (task.heading || '');
+        setHasUnsavedChanges(statusChanged || usersChanged || docsChanged || descriptionChanged || datesChanged || linksChanged || titleChanged);
+    }, [selectedStatus, task.status, newUsers.length, newDocuments.length, editableDescription, task.description, startDate, endDate, task.start_date, task.end_date, links, task.links, editableTitle, task.heading]);
 
     const handleAddLink = () => {
         if (linkInput.trim()) {
@@ -215,10 +344,19 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
     };
 
     const handleSaveStatus = async () => {
+        if (!resolvedTaskId || resolvedTaskId <= 0) {
+            console.error('[TaskDetailModal] ❌ Save blocked — resolvedTaskId is 0 or invalid. task.id was:', task.id);
+            alert(`Cannot save: task ID is invalid (got "${task.id}"). Please close and reopen the task.`);
+            return;
+        }
         try {
             const updates: any = {};
+            if (editableTitle !== (task.heading || '')) updates.heading = editableTitle;
             if (selectedStatus !== task.status) updates.status = selectedStatus;
-            if (newUsers.length > 0) updates.assigned_to = [...task.assigned_to, ...newUsers];
+            if (newUsers.length > 0) {
+                const existing = (task.assigned_to || []).map(Number);
+                updates.assigned_to = [...new Set([...existing, ...newUsers])];
+            }
             if (editableDescription !== task.description) updates.description = editableDescription;
             const originalStart = task.start_date?.split('T')[0] || '';
             const originalEnd = task.end_date?.split('T')[0] || '';
@@ -257,48 +395,17 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
         setUploadingDocs(true);
 
         try {
-            for (const file of fileArray) {
-                const projectIdNum = task.project || (task as any).project_details?.id;
+            await taskApi.uploadFiles(task.id, fileArray);
 
-                if (!projectIdNum) {
-                    console.error("Project ID missing");
-                    continue;
-                }
+            const projectId = task.project;
 
-                // Step 1: Get upload URL
-                const uploadUrlResponse = await documentsApi.getUploadUrl(projectIdNum, {
-                    file_name: file.name,
-                    file_type: file.type || 'application/octet-stream',
-                });
-
-                const { url: s3Url, fields: s3Fields, file_key } = uploadUrlResponse;
-
-                // Step 2: Upload to S3
-                await documentsApi.uploadFileToS3(s3Url, s3Fields, file);
-                const ext = file.name.split('.').pop()?.toLowerCase() || '';
-                let mappedType = 'other';
-                if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'].includes(ext)) mappedType = 'image';
-                else if (ext === 'pdf') mappedType = 'pdf';
-                else if (ext === 'json') mappedType = 'json';
-                else if (['doc', 'docx', 'txt', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) mappedType = 'document';
-
-                // Step 3: Confirm upload
-                await documentsApi.confirmUpload(projectIdNum, {
-                    file_key: file_key,
-                    file_name: file.name,
-                    file_type: mappedType,
-                    metadata: {
-                        task_id: task.id
-                    }
-                });
-            }
             await queryClient.invalidateQueries({ queryKey: ['task-documents', task.id] });
             await queryClient.invalidateQueries({ queryKey: ['tasks'] });
             await queryClient.invalidateQueries({ queryKey: ['task-detail', task.id] });
-            await queryClient.refetchQueries({
-                queryKey: ['documents'],
-                type: 'active'
-            });
+
+            if (projectId) {
+                await queryClient.invalidateQueries({ queryKey: ['all-documents', projectId.toString()] });
+            }
 
         } catch (err: any) {
             console.error('Upload failed:', err);
@@ -312,25 +419,34 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
 
     const handleAttachmentClick = async (attachment: TaskAttachment) => {
         try {
-            if (attachment.file_url) {
-                window.open(attachment.file_url, '_blank');
-                return;
-            }
-            const projectIdNum = task.project || (task as any).project_details?.id;
-            if (!projectIdNum) {
-                alert('Unable to open attachment: Project information missing.');
-                return;
+            let fileUrl = attachment.file_url;
+
+            // If file_url is not available, fetch it from the API
+            if (!fileUrl) {
+                const projectIdNum = task.project || (task as any).project_details?.id;
+                if (!projectIdNum) {
+                    alert('Unable to open attachment: Project information missing.');
+                    return;
+                }
+
+                const downloadResponse = await documentsApi.getDownloadUrl(projectIdNum, {
+                    document_id: attachment.id.toString()
+                });
+
+                if (downloadResponse?.url) {
+                    fileUrl = downloadResponse.url;
+                } else {
+                    alert('Unable to open attachment: Download URL not available.');
+                    return;
+                }
             }
 
-            const downloadResponse = await documentsApi.getDownloadUrl(projectIdNum, {
-                document_id: attachment.id.toString()
+            // Open in-app preview
+            setPreviewDocument({
+                url: fileUrl,
+                fileName: attachment.file_name,
+                fileType: attachment.file_url?.split('.').pop() || ''
             });
-
-            if (downloadResponse?.url) {
-                window.open(downloadResponse.url, '_blank');
-            } else {
-                alert('Unable to open attachment: Download URL not available.');
-            }
         } catch (error) {
             console.error('Failed to open attachment:', error);
             alert('Failed to open attachment. Please try again.');
@@ -339,11 +455,25 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
 
     const handleDeleteAttachment = async (attachmentId: string) => {
         try {
-            await documentsApi.delete(attachmentId);
-            queryClient.setQueryData(['task-documents', task.id], (oldDocs: any[] | undefined) => {
-                return (oldDocs || []).filter((doc) => doc.id.toString() !== attachmentId);
+            await taskApi.deleteAttachment(attachmentId);
+            queryClient.setQueryData(['task-documents', task.id], (oldData: any) => {
+                if (!oldData?.pages) return oldData;
+
+                return {
+                    ...oldData,
+                    pages: oldData.pages.map((page: any) => ({
+                        ...page,
+                        results: page.results.filter((doc: any) => doc.id.toString() !== attachmentId),
+                        count: page.count - 1,
+                    })),
+                };
             });
+
+            // Invalidate related queries
+            queryClient.invalidateQueries({ queryKey: ['task-documents', task.id] });
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            queryClient.invalidateQueries({ queryKey: ['task-detail', task.id] });
+            queryClient.invalidateQueries({ queryKey: ['documents'] });
 
             setDeleteAttachmentConfirm(null);
         } catch (error) {
@@ -352,6 +482,33 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
             setDeleteAttachmentConfirm(null);
         }
     };
+
+    // Handle scroll for lazy loading attachments
+    const handleAttachmentScroll = React.useCallback(() => {
+        if (!attachmentContainerRef.current || isFetchingNextPage || !hasNextPage) return;
+
+        const container = attachmentContainerRef.current;
+        const scrollTop = container.scrollTop;
+        const scrollHeight = container.scrollHeight;
+        const clientHeight = container.clientHeight;
+
+        // Trigger load when user scrolls to 80% of container
+        if (scrollTop + clientHeight >= scrollHeight * 0.8) {
+            fetchNextPage();
+        }
+    }, [isFetchingNextPage, hasNextPage, fetchNextPage]);
+
+    // Attach scroll listener
+    React.useEffect(() => {
+        const container = attachmentContainerRef.current;
+        if (!container) return;
+
+        container.addEventListener('scroll', handleAttachmentScroll);
+        return () => container.removeEventListener('scroll', handleAttachmentScroll);
+    }, [handleAttachmentScroll]);
+
+    // Enable keyboard shortcuts for document preview
+    useDocumentPreviewKeyboard(() => setPreviewDocument(null));
 
     const addCommentMutation = useMutation({
         mutationFn: (content: string) => taskApi.addComment(task.id, { content }),
@@ -388,11 +545,31 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
                 {/* Header */}
                 <div className={`${isMaximized ? 'px-4 max-w-4xl mx-auto w-full' : 'px-'} py-5 border-b bg-white flex items-center justify-between sticky top-0 z-20`}>
                     <div className="flex items-center gap-4">
-                        <div className="p-2 bg-purple-50 rounded-lg"><Edit3 className="w-5 h-5 text-purple-600" /></div>
+                        <div className="p-2 bg-purple-50 rounded-lg"></div>
                         <div className="pr-2 flex flex-col">
-                            <span className="text-sm font-bold text-gray-900 line-clamp-1 mb-0.5">
-                                {task.heading || 'No Task'}
-                            </span>
+                            <div className="flex items-center gap-1 mb-0.5">
+                                {isEditingTitle ? (
+                                    <input
+                                        autoFocus
+                                        value={editableTitle}
+                                        onChange={(e) => setEditableTitle(e.target.value)}
+                                        onBlur={() => setIsEditingTitle(false)}
+                                        onKeyDown={(e) => e.key === 'Enter' && setIsEditingTitle(false)}
+                                        className="text-sm font-bold text-gray-900 border-b border-purple-400 outline-none bg-transparent w-full"
+                                    />
+                                ) : (
+                                    <span className="text-sm font-bold text-gray-900 line-clamp-1">
+                                        {editableTitle || 'No Task'}
+                                    </span>
+                                )}
+                                <button
+                                    onClick={() => setIsEditingTitle(true)}
+                                    className="p-0.5 text-gray-400 hover:text-purple-600 rounded transition-colors flex-shrink-0"
+                                    title="Edit title"
+                                >
+                                    <Edit3 className="w-3 h-3" />
+                                </button>
+                            </div>
                             <span className="text-xs font-medium text-gray-600 line-clamp-2">
                                 {task.project_details?.name || task.project_name || 'No Project'}
                             </span>
@@ -421,11 +598,19 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
                         >
                             <Maximize2 className="w-5 h-5" />
                         </button>
-                        {(user?.role === 'admin' || task.assigned_by === user?.id) && (
-                            <button onClick={() => setShowDeleteConfirm(true)} className="p-2 text-gray-400 hover:text-red-600 rounded-lg">
-                                <Trash2 className="w-5 h-5" />
-                            </button>
-                        )}
+                        <button
+                            onClick={() => {
+                                if (user?.id === task.assigned_by) {
+                                    setShowDeleteConfirm(true);
+                                } else {
+                                    setShowNotAdminPopup(true);
+                                }
+                            }}
+                            className="p-2 text-gray-400 hover:text-red-600 rounded-lg"
+                            title="Delete Task"
+                        >
+                            <Trash2 className="w-5 h-5" />
+                        </button>
                         <button onClick={onClose} className="p-2 text-gray-400 hover:text-black rounded-lg"><X className="w-5 h-5" /></button>
                     </div>
                 </div>
@@ -566,6 +751,13 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
                         <div className="project-assignees bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
                             <div className="flex items-center justify-between mb-3 cursor-pointer" onClick={() => setAssignedMembersOpen(!assignedMembersOpen)}>
                                 <label className="text-sm font-semibold text-gray-700 block mb-4">Assignees</label>
+                                {task.assigned_by_user_details && (
+                                    <span className="text-xs text-gray-500">
+                                        Created by {task.assigned_by_user_details.first_name && task.assigned_by_user_details.last_name
+                                            ? `${task.assigned_by_user_details.first_name} ${task.assigned_by_user_details.last_name}`.trim()
+                                            : task.assigned_by_user_details.username}
+                                    </span>
+                                )}
                             </div>
 
                             {assignedMembersOpen && (
@@ -609,56 +801,90 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
                                             );
                                         })}
 
-                                        {/* Add Assignee Dropdown */}
-                                        <div className="relative">
-                                            <div
-                                                className="w-full p-2 rounded border border-gray-300 hover:border-gray-400 cursor-pointer bg-white flex items-center justify-between min-h-[38px] transition-colors"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setShowAddUsersDropdown(!showAddUsersDropdown);
-                                                }}
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <Plus className="w-3.5 h-3.5 text-gray-500" />
-                                                    <span className="text-sm text-gray-700 font-medium">Add Assignee</span>
-                                                </div>
-                                                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                                </svg>
-                                            </div>
+                                        {/* Add Assignee */}
+                                        {(() => {
+                                            let availableUnassignedUsers = availableUsers;
+                                            if (projectMembers.length > 0) {
+                                                const projectMemberIds = projectMembers.map(member => member.user.id);
+                                                availableUnassignedUsers = availableUsers.filter(u => projectMemberIds.includes(u.id));
+                                            }
+                                            availableUnassignedUsers = availableUnassignedUsers.filter(u =>
+                                                !task.assigned_to_user_details.some(a => a.id === u.id) &&
+                                                !newUsers.includes(u.id)
+                                            );
+                                            return availableUnassignedUsers.length > 0 && (
+                                                <div className="relative">
+                                                    <div
+                                                        className="w-full p-2 rounded border border-gray-300 hover:border-gray-400 cursor-pointer bg-white flex items-center justify-between min-h-[38px] transition-colors"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setShowAddUsersDropdown(!showAddUsersDropdown);
+                                                        }}
+                                                    >
+                                                        <div className="flex items-center gap-2">
+                                                            <Plus className="w-3.5 h-3.5 text-gray-500" />
+                                                            <span className="text-sm text-gray-700 font-medium">Add Assignee</span>
+                                                        </div>
+                                                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                        </svg>
+                                                    </div>
 
-                                            {/* Dropdown List */}
-                                            {showAddUsersDropdown && (
-                                                <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                                                    {availableUsers
-                                                        .filter(u => !task.assigned_to_user_details.some(a => a.id === u.id) && !newUsers.includes(u.id))
-                                                        .map((user) => (
-                                                            <div
-                                                                key={user.id}
-                                                                className="px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm flex items-center justify-between"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setNewUsers([...newUsers, user.id]);
-                                                                    setHasUnsavedChanges(true);
-                                                                    setShowAddUsersDropdown(false);
-                                                                }}
-                                                            >
-                                                                <div className="flex items-center gap-2.5">
-                                                                    <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-600">
-                                                                        {user.first_name[0]}{user.last_name?.[0] || ''}
+                                                    {/* Dropdown List */}
+                                                    {showAddUsersDropdown && (
+                                                        <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                                                            {(() => {
+                                                                let filteredUsers = availableUsers;
+                                                                if (projectMembers.length > 0) {
+                                                                    const projectMemberIds = projectMembers.map(member => member.user.id);
+                                                                    filteredUsers = availableUsers.filter(u => projectMemberIds.includes(u.id));
+                                                                }
+                                                                filteredUsers = filteredUsers.filter(u =>
+                                                                    !task.assigned_to_user_details.some(a => a.id === u.id) &&
+                                                                    !newUsers.includes(u.id)
+                                                                );
+
+                                                                return filteredUsers.map((user) => (
+                                                                    <div
+                                                                        key={user.id}
+                                                                        className="px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm flex items-center justify-between"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setNewUsers([...newUsers, user.id]);
+                                                                            setHasUnsavedChanges(true);
+                                                                            setShowAddUsersDropdown(false);
+                                                                        }}
+                                                                    >
+                                                                        <div className="flex items-center gap-2.5">
+                                                                            <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-600">
+                                                                                {user.first_name[0]}{user.last_name?.[0] || ''}
+                                                                            </div>
+                                                                            <span className="text-sm">{user.first_name} {user.last_name}</span>
+                                                                        </div>
                                                                     </div>
-                                                                    <span className="text-sm">{user.first_name} {user.last_name}</span>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    {availableUsers.filter(u => !task.assigned_to_user_details.some(a => a.id === u.id) && !newUsers.includes(u.id)).length === 0 && (
-                                                        <div className="px-3 py-2 text-sm text-gray-500 text-center">
-                                                            No more users to add
+                                                                ));
+                                                            })()}
+                                                            {(() => {
+                                                                let filteredUsers = availableUsers;
+                                                                if (projectMembers.length > 0) {
+                                                                    const projectMemberIds = projectMembers.map(member => member.user.id);
+                                                                    filteredUsers = availableUsers.filter(u => projectMemberIds.includes(u.id));
+                                                                }
+                                                                filteredUsers = filteredUsers.filter(u =>
+                                                                    !task.assigned_to_user_details.some(a => a.id === u.id) &&
+                                                                    !newUsers.includes(u.id)
+                                                                );
+                                                                return filteredUsers.length === 0 && (
+                                                                    <div className="px-3 py-2 text-sm text-gray-500 text-center">
+                                                                        No more users to add
+                                                                    </div>
+                                                                );
+                                                            })()}
                                                         </div>
                                                     )}
                                                 </div>
-                                            )}
-                                        </div>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                             )}
@@ -748,18 +974,25 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
                                 </div>
                             </div>
 
-                            {/* Attachment Grid */}
+                            {/* Attachment Grid with Scroll Container */}
                             {displayAttachments && displayAttachments.length > 0 && (
-                                <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {displayAttachments.map((doc: TaskAttachment) => (
-                                        <div
-                                            key={doc.id}
-                                            className="flex flex-col bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow group h-full cursor-pointer"
-                                            onClick={() => handleAttachmentClick(doc)}
-                                        >
-                                            <div className="h-32 bg-gray-100 flex items-center justify-center border-b border-gray-100 relative">
-                                                <FileText className="w-10 h-10 text-gray-400" />
-                                                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div
+                                    ref={attachmentContainerRef}
+                                    className="mt-6 max-h-[500px] overflow-y-auto pr-2"
+                                >
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {displayAttachments.map((doc: TaskAttachment) => (
+                                            <div key={doc.id} className="relative group">
+                                                <DocumentThumbnail
+                                                    url={doc.file_url}
+                                                    fileName={doc.file_name}
+                                                    fileType={doc.file_url?.split('.').pop() || ''}
+                                                    onClick={() => handleAttachmentClick(doc)}
+                                                    showFileName={false}
+                                                    className="h-full"
+                                                />
+                                                {/* Delete Button Overlay */}
+                                                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                                                     <button
                                                         className="p-1.5 bg-white/90 rounded-md shadow-sm text-gray-600 hover:text-red-600"
                                                         onClick={(e) => {
@@ -773,15 +1006,31 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
                                                         <Trash2 className="w-4 h-4" />
                                                     </button>
                                                 </div>
+                                                {/* File Info Below Thumbnail */}
+                                                <div className="p-3">
+                                                    <p className="text-xs font-bold text-gray-900 truncate" title={doc.file_name}>{doc.file_name}</p>
+                                                    <p className="text-[10px] text-gray-500 mt-1 font-medium italic">
+                                                        {new Date(doc.uploaded_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toLowerCase()}
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <div className="p-3">
-                                                <p className="text-xs font-bold text-gray-900 truncate" title={doc.file_name}>{doc.file_name}</p>
-                                                <p className="text-[10px] text-gray-500 mt-1 font-medium italic">
-                                                    {new Date(doc.uploaded_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toLowerCase()}
-                                                </p>
-                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Loading Indicator */}
+                                    {isFetchingNextPage && (
+                                        <div className="flex justify-center items-center py-6">
+                                            <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+                                            <span className="ml-2 text-sm text-gray-600">Loading more attachments...</span>
                                         </div>
-                                    ))}
+                                    )}
+
+                                    {/* No More Attachments Indicator */}
+                                    {!hasNextPage && displayAttachments.length > 20 && (
+                                        <div className="flex justify-center py-4">
+                                            <span className="text-xs text-gray-500">All attachments loaded</span>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -837,6 +1086,29 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
                 </div>
             )}
 
+            {/* NOT ADMIN POPUP */}
+            {showNotAdminPopup && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 flex flex-col items-center text-center">
+                        <div className="flex items-center justify-center w-14 h-14 rounded-full bg-yellow-100 mb-4">
+                            <svg className="w-7 h-7 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                            </svg>
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Permission Denied</h3>
+                        <p className="text-sm text-gray-500 mb-6">
+                            You can't delete this task.<br />Only the <span className="font-semibold text-gray-700">person who created it</span> can delete it.
+                        </p>
+                        <button
+                            onClick={() => setShowNotAdminPopup(false)}
+                            className="w-full px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-700 transition-colors"
+                        >
+                            OK, Got it
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* ATTACHMENT DELETE CONFIRMATION */}
             {deleteAttachmentConfirm && (
                 <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60">
@@ -861,6 +1133,15 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
                         </div>
                     </div>
                 </div>
+            )}
+            {/* DOCUMENT PREVIEW */}
+            {previewDocument && (
+                <DocumentPreview
+                    url={previewDocument.url}
+                    fileName={previewDocument.fileName}
+                    fileType={previewDocument.fileType}
+                    onClose={() => setPreviewDocument(null)}
+                />
             )}
         </div>
     );

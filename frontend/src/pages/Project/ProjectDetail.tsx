@@ -1,17 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft, FileText, CheckCircle, Clock, AlertCircle, Plus, Settings, Sparkles,
 } from 'lucide-react';
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Badge,
-} from '@/components/common';
+import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/common';
+import { DocumentPreview, useDocumentPreviewKeyboard } from '@/components/common/DocumentPreview';
 import { projectsApi, documentsApi } from '@/services/api';
 import { formatDate, getStatusColor } from '@/lib/utils';
 import type { Project, Document } from '@/types';
@@ -21,6 +15,11 @@ import { AITask } from '@/pages/MyTask/AITask';
 export function ProjectDetail() {
   const navigate = useNavigate();
   const [showAIModal, setShowAIModal] = useState(false);
+  const [previewDocument, setPreviewDocument] = useState<{
+    url: string;
+    fileName: string;
+    fileType?: string;
+  } | null>(null);
 
   const { id } = useParams<{ id: string }>();
 
@@ -30,13 +29,73 @@ export function ProjectDetail() {
     enabled: !!id,
   });
 
-  const { data: documentsData, isLoading: docsLoading } = useQuery({
-    queryKey: ['documents', { project: id }],
-    queryFn: () => documentsApi.list({ project: Number(id) }),
-    enabled: !!id,
+  const [documentPage, setDocumentPage] = useState(1);
+  const [allDocuments, setAllDocuments] = useState<any[]>([]);
+  const [hasMoreDocs, setHasMoreDocs] = useState(true);
+  const documentScrollRef = useRef<HTMLDivElement>(null);
+
+  const { data: documentsData, isLoading: docsLoading, isFetching: isDocsFetching } = useQuery({
+    queryKey: ['documents', { project: id, page: documentPage }],
+    queryFn: () => documentsApi.list({ project: Number(id), page: documentPage }),
+    enabled: !!id && hasMoreDocs,
+    staleTime: 1000 * 60 * 5,
   });
 
-  const documents = documentsData?.results || documentsData || [];
+  // Update documents when new data arrives
+  useEffect(() => {
+    if (documentsData) {
+      const newDocs = documentsData?.results || documentsData || [];
+
+      if (documentPage === 1) {
+        setAllDocuments(newDocs);
+      } else {
+        setAllDocuments(prev => [...prev, ...newDocs]);
+      }
+
+      // Check if there are more pages
+      if (documentsData?.next === null || newDocs.length === 0) {
+        setHasMoreDocs(false);
+      }
+    }
+  }, [documentsData, documentPage]);
+
+  // Infinite scroll handler for documents
+  const handleDocumentScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    const scrollPercentage = (target.scrollTop + target.clientHeight) / target.scrollHeight;
+
+    if (scrollPercentage > 0.8 && !isDocsFetching && hasMoreDocs) {
+      setDocumentPage(prev => prev + 1);
+    }
+  }, [isDocsFetching, hasMoreDocs]);
+
+  // Handle document preview
+  const handleDocumentPreview = async (doc: any) => {
+    try {
+      const projectIdNum = Number(id);
+      const downloadResponse = await documentsApi.getDownloadUrl(projectIdNum, {
+        document_id: doc.id
+      });
+
+      if (downloadResponse?.url) {
+        setPreviewDocument({
+          url: downloadResponse.url,
+          fileName: doc.original_file_name || doc.name,
+          fileType: doc.file_type
+        });
+      } else {
+        alert('Unable to open document: Download URL not available.');
+      }
+    } catch (error) {
+      console.error('Failed to open document:', error);
+      alert('Failed to open document. Please try again.');
+    }
+  };
+
+  // Enable keyboard shortcuts for document preview
+  useDocumentPreviewKeyboard(() => setPreviewDocument(null));
+
+  const documents = allDocuments;
 
   if (projectLoading) {
     return (
@@ -168,14 +227,18 @@ export function ProjectDetail() {
           </Link>
         </CardHeader>
         <CardContent>
-          {docsLoading ? (
+          {docsLoading && documentPage === 1 ? (
             <div className="flex items-center justify-center h-32">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
             </div>
           ) : documents.length > 0 ? (
-            <div className="overflow-x-auto">
+            <div
+              className="overflow-x-auto max-h-[600px] overflow-y-auto"
+              onScroll={handleDocumentScroll}
+              ref={documentScrollRef}
+            >
               <table className="w-full">
-                <thead>
+                <thead className="sticky top-0 bg-white z-10">
                   <tr className="border-b">
                     <th className="text-left py-3 px-4 font-medium">Name</th>
                     <th className="text-left py-3 px-4 font-medium">Type</th>
@@ -189,7 +252,13 @@ export function ProjectDetail() {
                     <tr
                       key={doc.id}
                       className="border-b hover:bg-muted/50 cursor-pointer"
-                      onClick={() => navigate(`/documents/${doc.id}`)}
+                      onClick={(e) => {
+                        if (e.ctrlKey || e.metaKey) {
+                          navigate(`/documents/${doc.id}`);
+                        } else {
+                          handleDocumentPreview(doc);
+                        }
+                      }}
                     >
                       <td className="py-3 px-4">
                         <div className="font-medium">
@@ -224,6 +293,16 @@ export function ProjectDetail() {
                   ))}
                 </tbody>
               </table>
+              {isDocsFetching && documentPage > 1 && (
+                <div className="flex justify-center py-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+                </div>
+              )}
+              {!hasMoreDocs && documents.length > 20 && (
+                <div className="text-center py-4 text-muted-foreground text-sm">
+                  All documents loaded
+                </div>
+              )}
             </div>
           ) : (
             <div className="text-center py-12">
@@ -247,6 +326,14 @@ export function ProjectDetail() {
         <AITask
           onClose={() => setShowAIModal(false)}
           fixedProjectId={Number(id)}
+        />
+      )}
+      {previewDocument && (
+        <DocumentPreview
+          url={previewDocument.url}
+          fileName={previewDocument.fileName}
+          fileType={previewDocument.fileType}
+          onClose={() => setPreviewDocument(null)}
         />
       )}
     </div>

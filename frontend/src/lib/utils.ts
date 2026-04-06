@@ -93,7 +93,7 @@ export function truncate(str: string, length: number): string {
 export const PROJECT_TYPE_COLORS: Record<string, string> = {
   client: "bg-blue-500",
   internal: "bg-green-500",
-  content_creation: "bg-emerald-500",
+  content_creation: "bg-pink-500",
   ideas: "bg-yellow-500",
   default: "bg-gray-400",
 };

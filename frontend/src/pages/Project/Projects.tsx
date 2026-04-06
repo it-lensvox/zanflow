@@ -1,12 +1,11 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { FolderKanban, Bell } from 'lucide-react';
-
 import { Button, Card, CardContent } from '@/components/common';
-import { notificationsApi, projectsApi } from '@/services/api';
+import { projectsApi, notificationSocket, gatewaySocket } from '@/services/api';
 import type { Project } from '@/types';
+import { cn } from '@/lib/utils';
 import { ViewToggle, DualView, useViewMode, } from '@/components/layout/DualView';
 import {
   getProjectsTableColumns, ProjectGridCard,
@@ -15,6 +14,16 @@ import { useTableFilters, ColumnFilterConfig } from '@/hooks/useTableFilters';
 import { SearchFilter, FilterHeaderWrapper } from '@/components/layout/DualView/FilterComponents';
 import { useOutletContext } from 'react-router-dom';
 import { CreateProjectModal } from './CreateProjectModal';
+import { useNotifications } from '@/hooks/useNotifications';
+
+
+// Project type filter definitions 
+const PROJECT_TYPE_FILTERS = [
+  { label: 'Client', value: 'client', dot: 'bg-blue-500' },
+  { label: 'Internal', value: 'internal', dot: 'bg-green-500' },
+  { label: 'Content Creation', value: 'content_creation', dot: 'bg-pink-500' },
+  { label: 'Ideas', value: 'ideas', dot: 'bg-yellow-500' },
+] as const;
 
 export function Projects() {
   const queryClient = useQueryClient();
@@ -26,26 +35,40 @@ export function Projects() {
     storageKey: 'projects-view-mode',
   });
 
-  const toggleFavorite = async (e: React.MouseEvent, project: Project) => {
+  const toggleFavorite = (e: React.MouseEvent, project: Project) => {
     e.preventDefault();
     e.stopPropagation();
 
-    try {
-      await projectsApi.update(project.id, {
-        is_favourite: !project.is_favourite,
+    // Optimistically update all matching cache keys immediately
+    const updateCache = (old: any): any => {
+      if (!old) return old;
+      const list: Project[] = Array.isArray(old) ? old : (old.results ?? []);
+      const updated = list.map((p) =>
+        p.id === project.id ? { ...p, is_favourite: !project.is_favourite } : p
+      );
+      return Array.isArray(old) ? updated : { ...old, results: updated };
+    };
+
+    queryClient.setQueriesData<any>({ queryKey: ['projects'] }, updateCache);
+   projectsApi
+      .update(project.id, { is_favourite: !project.is_favourite })
+      .then((response) => {
+      })
+      .catch((error) => {
+        console.error('[Favorite Toggle] API failed — rolling back. Error:', error);
+        const revertCache = (old: any): any => {
+          if (!old) return old;
+          const list: Project[] = Array.isArray(old) ? old : (old.results ?? []);
+          const reverted = list.map((p) =>
+            p.id === project.id ? { ...p, is_favourite: project.is_favourite } : p
+          );
+          return Array.isArray(old) ? reverted : { ...old, results: reverted };
+        };
+        queryClient.setQueriesData<any>({ queryKey: ['projects'] }, revertCache);
       });
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-    } catch (error) {
-      console.error('Failed to toggle favorite:', error);
-    }
   };
   const columns = getProjectsTableColumns(toggleFavorite);
-
-  const { data: summary } = useQuery({
-    queryKey: ['notifications-summary'],
-    queryFn: () => notificationsApi.getSummary(),
-    refetchInterval: 30000,
-  });
+  const { unreadCount } = useNotifications();
 
   const { isActivityOpen, setIsActivityOpen } = useOutletContext<{
     isActivityOpen: boolean;
@@ -74,7 +97,43 @@ export function Projects() {
     return [];
   })() as Project[];
 
-  // Filter configuration - only for Project column
+  // ─── Real-time project sync via WebSocket notification 
+  useEffect(() => {
+    const processedIds = new Set<string>();
+
+    const handleProjectNotification = (relatedObject: { type: string; id: string | number }) => {
+      if (relatedObject.type !== 'project') return;
+
+      const dedupeKey = `${relatedObject.id}-${Math.floor(Date.now() / 2000)}`;
+      if (processedIds.has(dedupeKey)) return;
+      processedIds.add(dedupeKey);
+
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+    };
+
+    const unsubNotification = notificationSocket.onNotification((data) => {
+      if (data.related_object?.type === 'project') {
+        handleProjectNotification(data.related_object);
+      }
+    });
+
+    const unsubGateway = gatewaySocket.onMessage((msg: any) => {
+      if (msg.type === 'SIGNAL' && msg.event === 'NEW_NOTIFICATION') {
+        const related = msg.data?.related_object;
+        if (related?.type === 'project') {
+          handleProjectNotification(related);
+        }
+      }
+    });
+
+    return () => {
+      unsubNotification();
+      unsubGateway();
+      processedIds.clear();
+    };
+  }, [queryClient]);
+
+  // Filter configuration
   const filterConfig: ColumnFilterConfig[] = [
     { key: 'name', type: 'search' },
   ];
@@ -130,7 +189,7 @@ export function Projects() {
         <div>
           <h1 className="text-3xl font-bold">Projects</h1>
           <p className="text-muted-foreground">
-            Manage your ground truth and testing projects
+            Manage Your Projects
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -143,13 +202,44 @@ export function Projects() {
             onClick={() => setIsActivityOpen(!isActivityOpen)}
           >
             <Bell className="h-5 w-5" />
-            {(summary?.unread ?? 0) > 0 && (
+            {unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                {summary?.unread}
+                {unreadCount}
               </span>
             )}
           </Button>
         </div>
+      </div>
+
+      {/* ── Project-type filter pills ── */}
+      <div className="flex items-center gap-2 -mt-4">
+        <span className="text-xs text-muted-foreground font-medium mr-1">Filter:</span>
+        {PROJECT_TYPE_FILTERS.map(({ label, value, dot }) => {
+          const isActive = filter === value;
+          return (
+            <button
+              key={value}
+              onClick={() => setFilter(isActive ? '' : value)}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-150',
+                isActive
+                  ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                  : 'bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground',
+              )}
+            >
+              <span className={`h-2 w-2 rounded-full shrink-0 ${dot}`} />
+              {label}
+            </button>
+          );
+        })}
+        {filter && (
+          <button
+            onClick={() => setFilter('')}
+            className="ml-1 text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+          >
+            Clear
+          </button>
+        )}
       </div>
 
       <DualView
