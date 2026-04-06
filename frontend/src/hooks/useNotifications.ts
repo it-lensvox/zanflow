@@ -4,6 +4,31 @@ import { notificationSocket, api } from '@/services/api';
 import type { NotificationData } from '@/types';
 import notificationSoundFile from '../public/assets/notification-sound.mp3';
 
+function showBrowserNotification(notification: {
+  title?: string;
+  message?: string;
+  id?: number;
+  related_object?: { type?: string; id?: string | number } | null;
+}) {
+  if (!('Notification' in window)) return;
+  if (Notification.permission !== 'granted') return;
+
+  const browserNotif = new Notification(notification.title || 'New Notification', {
+    body: notification.message || '',
+    icon: '/favicon.ico', // your app icon path
+    tag: `dyuksa-notif-${notification.id || Date.now()}`, // prevents duplicate popups
+    silent: true, // we already play our own sound
+  });
+
+  browserNotif.onclick = () => {
+    window.focus();
+    browserNotif.close();
+  };
+
+  // Auto-close after 5 seconds
+  setTimeout(() => browserNotif.close(), 5000);
+}
+
 export function useNotifications() {
   const [notifications, setNotifications] = useState<NotificationData[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -15,6 +40,13 @@ export function useNotifications() {
   // 3. Initialize the audio object on mount using the imported file
   useEffect(() => {
     audioRef.current = new Audio(notificationSoundFile);
+  }, []);
+
+  // Trigger notification refetch
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
   }, []);
 
   // Trigger notification refetch
@@ -34,6 +66,9 @@ export function useNotifications() {
           console.warn('Browser prevented audio playback:', error);
         });
       }
+
+      // Show Chrome browser push notification
+      showBrowserNotification(notification);
 
       // Update unread count: increment locally for every new unread notification,
       if (notification.unread_count !== undefined) {
