@@ -35,7 +35,10 @@ def sync_daily_update_to_quick_notes(sender, instance, created, **kwargs):
         # ==========================================
         # 2. TEAM MEMBER UPDATES FOR ADMINS & MANAGERS
         # ==========================================
-        all_updates_today = sender.objects.filter(date=instance.date).select_related('user').order_by('created_at')
+        all_updates_today = sender.objects.filter(
+            date=instance.date,
+            user__organization=instance.user.organization 
+        ).select_related('user').order_by('created_at')
         
         team_content = f"Team Updates for {instance.date}\n"
         team_content += "=" * 40 + "\n\n"
@@ -48,8 +51,10 @@ def sync_daily_update_to_quick_notes(sender, instance, created, **kwargs):
             team_content += f"{update.content}\n"
             team_content += "-" * 40 + "\n\n"
 
+        # FIXED: Only fetch leaders from the same organization
         leadership_users = User.objects.filter(
-            Q(role__in=['admin', 'manager']) | Q(is_superuser=True)
+            Q(role__in=['admin', 'manager']) | Q(is_superuser=True),
+            organization=instance.user.organization 
         ).distinct()
 
         for leader in leadership_users:

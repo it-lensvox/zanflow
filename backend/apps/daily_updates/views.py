@@ -18,16 +18,14 @@ class DailyUpdateViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         
-        # Check if user is a manager/admin. 
-        # Adjust 'role' check based on how it's defined in your users.User model
         is_manager = user.is_staff or user.is_superuser or getattr(user, 'role', '') in ['admin', 'manager']
 
         if is_manager:
-            queryset = DailyUpdate.objects.all()
+            # FIXED: Using user__organization instead of user__workspace
+            queryset = DailyUpdate.objects.filter(user__organization=user.organization)
         else:
             queryset = DailyUpdate.objects.filter(user=user)
             
-        # Allow the React frontend to filter by date range for the calendar view
         start_date = self.request.query_params.get('start_date')
         end_date = self.request.query_params.get('end_date')
         
