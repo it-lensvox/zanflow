@@ -19,6 +19,7 @@ class Folder(models.Model):
 
 class Note(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notes')
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='updated_notes')
     folder = models.ForeignKey(Folder, on_delete=models.CASCADE, null=True, blank=True, related_name='notes')
     title = models.CharField(max_length=255, blank=True)
     content = models.TextField(blank=True)
