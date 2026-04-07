@@ -13,6 +13,15 @@ class IsOwnerOrReadOnly(permissions.BasePermission):
             return True
         return obj.user == request.user
 
+class IsOrganizerOrReadOnly(permissions.BasePermission):
+    """
+    Custom permission to only allow the organizer of the event to edit it.
+    """
+    def has_object_permission(self, request, view, obj):
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        return obj.organizer == request.user
+
 class DailyUpdateViewSet(viewsets.ModelViewSet):
     serializer_class = DailyUpdateSerializer
     permission_classes = [permissions.IsAuthenticated, IsOwnerOrReadOnly]
@@ -57,7 +66,8 @@ class DailyUpdateViewSet(viewsets.ModelViewSet):
 
 class EventViewSet(viewsets.ModelViewSet):
     serializer_class = EventSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    # Apply the new permission class here
+    permission_classes = [permissions.IsAuthenticated, IsOrganizerOrReadOnly]
 
     def get_queryset(self):
         user = self.request.user
