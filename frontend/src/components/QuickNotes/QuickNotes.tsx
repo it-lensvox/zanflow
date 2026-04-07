@@ -4,7 +4,7 @@ import {
   NotebookPen, Plus, FolderPlus, Maximize2, X, Folder, FileText, MoreVertical, Paperclip, Loader2, Trash2,
 } from 'lucide-react';
 import { cn, formatRelativeTime } from '@/lib/utils';
-import { quickNotesApi, projectsApi, authApi } from '@/services/api';
+import { quickNotesApi, projectsApi, authApi, usersApi } from '@/services/api';
 import type { QuickNote, QuickNoteFolder } from '@/types';
 import DeleteModal from '@/components/common/Deletemodal';
 import { DocumentPreview } from '@/components/common/DocumentPreview'; 
@@ -19,6 +19,7 @@ export interface QuickNotesState {
   isLoading: boolean;
   pendingNote: { folderId: number | null } | null;
   currentUserId: number | null;
+  users: import('@/types').User[];
 }
 
 function getDefaultState(): QuickNotesState {
@@ -30,6 +31,7 @@ function getDefaultState(): QuickNotesState {
     isLoading: true,
     pendingNote: null,
     currentUserId: null,
+    users: [],
   };
 }
 
@@ -41,10 +43,11 @@ useEffect(() => {
   let cancelled = false;
   async function load() {
     try {
-      const [folders, notesResp, currentUser] = await Promise.all([
+      const [folders, notesResp, currentUser, usersData] = await Promise.all([
         quickNotesApi.getFolders(),
         quickNotesApi.getNotes(),
         authApi.getMe(),
+        usersApi.listAll().catch(() => [])
       ]);
       if (cancelled) return;
       setState((prev) => ({
@@ -53,6 +56,7 @@ useEffect(() => {
         notes: notesResp.results,
         isLoading: false,
         currentUserId: currentUser.id,
+        users: usersData,
       }));
       } catch {
         if (!cancelled) setState((prev) => ({ ...prev, isLoading: false }));
@@ -733,9 +737,19 @@ export function NotesList({
                       ) : (
                         <p className="text-sm font-medium text-foreground truncate leading-tight">{title}</p>
                       )}
-                      <p className="text-[10px] text-muted-foreground mt-0.5">
-                        {formatRelativeTime(note.updated_at)}
-                      </p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <p className="text-[10px] text-muted-foreground">
+                          {formatRelativeTime(note.updated_at)}
+                        </p>
+                        {note.updated_by && (
+                          <span className="text-[9px] bg-muted px-1 rounded-sm text-muted-foreground whitespace-nowrap">
+                            ✎ {(() => {
+                              const u = state.users.find((user) => user.id === note.updated_by);
+                              return u?.first_name ? `${u.first_name} ${u.last_name || ''}`.trim() : (u?.username || 'User');
+                            })()}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {/* Ellipsis trigger */}
@@ -829,6 +843,7 @@ interface NoteEditorProps {
   onAddAttachment: (noteId: number, attachment: import('@/types').QuickNoteAttachment) => void;
   onRemoveAttachment: (noteId: number, attachmentId: number) => void;
   editorRef?: React.RefObject<HTMLTextAreaElement>;
+  users: import('@/types').User[];
 }
 
 export function NoteEditor({
@@ -839,6 +854,7 @@ export function NoteEditor({
   onAddAttachment,
   onRemoveAttachment,
   editorRef,
+  users,
 }: NoteEditorProps) {
   const [localContent, setLocalContent] = useState(selectedNote?.content ?? '');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -932,9 +948,20 @@ export function NoteEditor({
           <p className="text-lg font-semibold text-foreground truncate">
             {selectedNote ? getNoteTitle(selectedNote) : 'New Note'}
           </p>
-          <p className="text-[10px] text-muted-foreground mt-1">
-            {selectedNote ? formatRelativeTime(selectedNote.updated_at) : 'Start typing to save…'}
-          </p>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-[10px] text-muted-foreground">
+              {selectedNote ? formatRelativeTime(selectedNote.updated_at) : 'Start typing to save…'}
+            </p>
+            {selectedNote && selectedNote.updated_by && (
+              <span className="text-[10px] flex items-center gap-1 bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                <NotebookPen className="w-3 h-3" />
+                Last edited by {(() => {
+                  const u = users.find((user) => user.id === selectedNote.updated_by);
+                  return u?.first_name ? `${u.first_name} ${u.last_name || ''}`.trim() : (u?.username || 'User');
+                })()}
+              </span>
+            )}
+          </div>
         </div>
         {selectedNote && !isPending && (
           <div className="shrink-0 ml-4 flex items-center">
@@ -1111,6 +1138,7 @@ export function QuickNotesContent({
         onAddAttachment={onAddAttachment}
         onRemoveAttachment={onRemoveAttachment}
         editorRef={editorRef}
+        users={state.users}
       />
     </div>
   );

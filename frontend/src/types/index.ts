@@ -1270,6 +1270,8 @@ export interface QuickNoteAttachment {
 export interface QuickNote {
   id: number;
   user: number;
+  user_details?: Pick<User, 'id' | 'username' | 'first_name' | 'last_name' | 'avatar'>;
+  updated_by?: number;
   folder: number | null;
   project?: number | null;
   title: string;

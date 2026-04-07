@@ -3,11 +3,11 @@ import ReactDOM from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
-import { projectsApi, taskApi, documentsApi, chatApi, usersApi, notificationSocket, gatewaySocket } from '@/services/api';
+import { projectsApi, taskApi, documentsApi, chatApi, usersApi, notificationSocket, gatewaySocket, quickNotesApi } from '@/services/api';
 import { useViewMode } from '@/components/layout/DualView/useViewMode';
 import { useTableFilters, ColumnFilterConfig } from '@/hooks/useTableFilters';
 import { statusOptions, priorityOptions } from '@/components/layout/DualView/taskConfig';
-import type { Task, TaskOption, FilteredDocument, AllDocumentsResponse, TaskAttachment } from '@/types';
+import type { Task, TaskOption, FilteredDocument, AllDocumentsResponse, TaskAttachment, QuickNote } from '@/types';
 
 export type TabType = 'tasks' | 'add_documents';
 export type ProjectMode = 'media' | 'documents';
@@ -36,8 +36,20 @@ export function useProjectDetails() {
     const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [isInlineCreating, setIsInlineCreating] = useState(false);
+    const [showNotesPanel, setShowNotesPanel] = useState(false);
+    
+    // Quick Note Edit & Create State
+    const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
+    const [editNoteContent, setEditNoteContent] = useState<string>('');
+    const [isSavingNote, setIsSavingNote] = useState(false);
+
+    const [isCreatingNote, setIsCreatingNote] = useState(false);
+    const [newNoteContent, setNewNoteContent] = useState('');
+    const [isSavingNewNote, setIsSavingNewNote] = useState(false);
 
     // ─── Upload State ─────────────────────────────────────────────────────────────
+
+   // ─── Upload State ─────────────────────────────────────────────────────────────
     const [isUploading, setIsUploading] = useState(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
     const [isDragging, setIsDragging] = useState(false);
@@ -92,6 +104,17 @@ export function useProjectDetails() {
         queryFn: () => chatApi.getProjectRooms(),
         staleTime: 5 * 60 * 1000,
     });
+
+    const { data: notesData, isLoading: notesLoading } = useQuery({
+        queryKey: ['quickNotes', 'project', id],
+        queryFn: () => quickNotesApi.getNotes({ project: Number(id) }),
+        enabled: showNotesPanel && !!id,
+    });
+    
+    // Explicitly filter to only show notes that are shared/attached to this specific project
+    const projectNotes = (notesData?.results || []).filter(
+        (note: QuickNote) => note.project === Number(id)
+    );
 
     const { data: tasksData, isLoading: isLoadingTasks } = useQuery({
         queryKey: ['tasks-list', id],
@@ -681,6 +704,66 @@ export function useProjectDetails() {
         setActiveFilterKey(null);
     };
 
+    const handleEditNoteStart = (note: QuickNote) => {
+        setEditingNoteId(note.id);
+        setEditNoteContent(note.content);
+    };
+
+    const handleEditNoteCancel = () => {
+        setEditingNoteId(null);
+        setEditNoteContent('');
+    };
+
+    const handleEditNoteSave = async () => {
+        if (!editingNoteId) return;
+        try {
+            setIsSavingNote(true);
+            await quickNotesApi.updateNote(editingNoteId, { content: editNoteContent });
+            queryClient.invalidateQueries({ queryKey: ['quickNotes', 'project', id] });
+            setEditingNoteId(null);
+            setEditNoteContent('');
+        } catch (error) {
+            console.error('Failed to update note:', error);
+        } finally {
+            setIsSavingNote(false);
+        }
+    };
+
+    const handleCreateNoteStart = () => {
+        setIsCreatingNote(true);
+        setNewNoteContent('');
+    };
+
+    const handleCreateNoteCancel = () => {
+        setIsCreatingNote(false);
+        setNewNoteContent('');
+    };
+
+    const handleCreateNoteSave = async () => {
+        if (!newNoteContent.trim() || !id) return;
+        try {
+            setIsSavingNewNote(true);
+            // This associates the newly created note specifically with the active project
+            await quickNotesApi.createNote({ content: newNoteContent, project: Number(id) });
+            queryClient.invalidateQueries({ queryKey: ['quickNotes', 'project', id] });
+            setIsCreatingNote(false);
+            setNewNoteContent('');
+        } catch (error) {
+            console.error('Failed to create note:', error);
+        } finally {
+            setIsSavingNewNote(false);
+        }
+    };
+
+    const handleDeleteNote = async (noteId: number) => {
+        try {
+            // Instantly delete without the browser confirmation popup
+            await quickNotesApi.deleteNote(noteId);
+            queryClient.invalidateQueries({ queryKey: ['quickNotes', 'project', id] });
+        } catch (error) {
+            console.error('Failed to delete note:', error);
+        }
+    };
     return {
         // IDs & navigation
         id,
@@ -715,13 +798,32 @@ export function useProjectDetails() {
         docViewMode,
         setDocViewMode,
 
-     // Modals
+        // Modals
         isCreateTaskModalOpen,
         setIsCreateTaskModalOpen,
         isInlineCreating,
         setIsInlineCreating,
         selectedTask,
         setSelectedTask,
+        showNotesPanel,
+        setShowNotesPanel,
+        projectNotes,
+        notesLoading,
+        editingNoteId,
+        editNoteContent,
+        setEditNoteContent,
+        isSavingNote,
+        handleEditNoteStart,
+        handleEditNoteCancel,
+        handleEditNoteSave,
+        isCreatingNote,
+        newNoteContent,
+        setNewNoteContent,
+        isSavingNewNote,
+        handleCreateNoteStart,
+        handleCreateNoteCancel,
+        handleCreateNoteSave,
+        handleDeleteNote,
         previewDocument,
         setPreviewDocument,
         deleteConfirm,

@@ -1374,8 +1374,8 @@ export const quickNotesApi = {
   },
 
   // Notes
-  getNotes: async (): Promise<import('@/types').PaginatedQuickNotesResponse> => {
-    const response = await api.get('/quicknotes/notes/');
+  getNotes: async (params?: { project?: number }): Promise<import('@/types').PaginatedQuickNotesResponse> => {
+    const response = await api.get('/quicknotes/notes/', { params });
     return response.data;
   },
 
