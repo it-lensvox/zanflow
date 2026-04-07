@@ -197,7 +197,7 @@ class DocumentComment(TenantModel, UserStampedModel):
 
 class DocumentShare(TenantModel, UserStampedModel):
     """
-    Tracks which users have been directly granted access to a document.
+    Tracks which users OR projects have been directly granted access to a document.
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     
@@ -207,16 +207,33 @@ class DocumentShare(TenantModel, UserStampedModel):
         related_name="shares"
     )
     
+    # Made null=True to allow project sharing instead
     shared_with = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="shared_documents"
+        related_name="shared_documents",
+        null=True, 
+        blank=True
+    )
+    
+    # NEW: Link to a target Project
+    shared_project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="shared_in_documents",
+        null=True, 
+        blank=True
     )
 
     class Meta:
         db_table = "document_shares"
-        unique_together = ["document", "shared_with"] # Prevents duplicate sharing records
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(fields=['document', 'shared_with'], name='unique_document_user_share'),
+            models.UniqueConstraint(fields=['document', 'shared_project'], name='unique_document_project_share'),
+        ]
 
     def __str__(self):
+        if self.shared_project:
+            return f"{self.document.name} shared with Project: {self.shared_project.name}"
         return f"{self.document.name} shared with {self.shared_with}"

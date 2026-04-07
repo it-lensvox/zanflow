@@ -311,12 +311,15 @@ class ProjectViewSet(viewsets.ModelViewSet):
         """
         project = self.get_object()
         
-        # Get document stats
+        # Get document stats (Including Shared Documents)
         from apps.groundtruth.models import Document
-        doc_stats = Document.objects.filter(project=project).aggregate(
-            total=Count("id"),
-            approved=Count("id", filter=Q(status=Document.Status.APPROVED)),
-            pending=Count("id", filter=Q(status__in=[Document.Status.DRAFT, Document.Status.IN_REVIEW])),
+        doc_stats = Document.objects.filter(
+            Q(project=project) | Q(shares__shared_project=project)
+        ).aggregate(
+            # Using distinct=True prevents duplicate counting from the SQL join
+            total=Count("id", distinct=True),
+            approved=Count("id", filter=Q(status=Document.Status.APPROVED), distinct=True),
+            pending=Count("id", filter=Q(status__in=[Document.Status.DRAFT, Document.Status.IN_REVIEW]), distinct=True),
         )
         
         # Get test run stats
@@ -400,6 +403,20 @@ class ProjectViewSet(viewsets.ModelViewSet):
         Remove a member from the project.
         """
         project = self.get_object()
+        
+        # --- SECURITY CHECK: Only allow owners/creators to remove members ---
+        is_creator = project.created_by == request.user
+        is_owner_member = project.members.through.objects.filter(
+            project=project, 
+            user=request.user, 
+            role='owner'
+        ).exists()
+
+        if not (is_creator or is_owner_member):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("You do not have permission to remove members. Only the project owner can do this.")
+        # --- END SECURITY CHECK ---
+
         try:
             membership = ProjectMembership.objects.get(project=project, user_id=user_id)
             membership.delete()

@@ -222,4 +222,12 @@ class DocumentShareSerializer(serializers.Serializer):
     """
     Validates the incoming request to share a document.
     """
-    user_id = serializers.IntegerField(required=True)
+    user_id = serializers.IntegerField(required=False, allow_null=True)
+    project_id = serializers.IntegerField(required=False, allow_null=True)
+
+    def validate(self, data):
+        if not data.get('user_id') and not data.get('project_id'):
+            raise serializers.ValidationError("Must provide either user_id or project_id.")
+        if data.get('user_id') and data.get('project_id'):
+            raise serializers.ValidationError("Provide either user_id or project_id, not both.")
+        return data

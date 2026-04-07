@@ -3,6 +3,7 @@ from django.db import models
 from django.conf import settings
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
+from apps.projects.models import Project
 class Folder(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='note_folders')
     name = models.CharField(max_length=255)
@@ -18,12 +19,13 @@ class Folder(models.Model):
 
 class Note(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notes')
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='updated_notes')
     folder = models.ForeignKey(Folder, on_delete=models.CASCADE, null=True, blank=True, related_name='notes')
     title = models.CharField(max_length=255, blank=True)
     content = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
+    project = models.ForeignKey(Project, on_delete=models.SET_NULL, null=True, blank=True, related_name='project_notes')
     class Meta:
         ordering = ['-updated_at'] # Shows most recently edited notes first
 

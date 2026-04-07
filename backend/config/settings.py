@@ -54,7 +54,7 @@ LOCAL_APPS = [
     "apps.teams",
     "apps.organizations",
     "apps.quicknotes",
-    "apps.daily_updates",
+    "apps.daily_updates.apps.DailyUpdatesConfig",
     # "apps.ai_ops",
     
 ]
@@ -94,9 +94,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
-#REDIS_URL = config("REDIS_URL", default="redis://localhost:6379/0")
-REDIS_URL = config("REDIS_URL", default="redis://redis:6379/0")
-
+REDIS_URL = config("REDIS_URL", default="redis://localhost:6379/0")
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",

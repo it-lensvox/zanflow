@@ -24,6 +24,8 @@ from apps.audit.services import log_action
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from .serializers import DocumentShareSerializer
+from apps.projects.models import Project
+from django.utils import timezone
 from .serializers import (
     DocumentBulkImportSerializer,
     DocumentCommentSerializer,
@@ -42,8 +44,15 @@ class DocumentFilter(filters.FilterSet):
     """
     Filter for documents.
     """
-    project = filters.NumberFilter(field_name="project_id")
+    # 1. Make sure this uses the custom method
+    project = filters.NumberFilter(method="filter_by_project_or_share")
     status = filters.ChoiceFilter(choices=Document.Status.choices)
+
+    # 2. Make sure this exact method exists inside the class
+    def filter_by_project_or_share(self, queryset, name, value):
+        return queryset.filter(
+            Q(project_id=value) | Q(shares__shared_project_id=value)
+        ).distinct()
     file_type = filters.ChoiceFilter(choices=Document.FileType.choices)
     created_after = filters.DateTimeFilter(field_name="created_at", lookup_expr="gte")
     created_before = filters.DateTimeFilter(field_name="created_at", lookup_expr="lte")
@@ -69,7 +78,9 @@ class DocumentViewSet(viewsets.ModelViewSet):
         return queryset.filter(
             Q(project__created_by=user) | 
             Q(project__members=user) | 
-            Q(shares__shared_with=user)
+            Q(shares__shared_with=user) |
+            Q(shares__shared_project__members=user) |
+            Q(shares__shared_project__created_by=user)
         ).distinct()
 
     # 2. Re-add the serializer logic to fix the AssertionError
@@ -410,7 +421,9 @@ class ProjectAllDocumentsView(APIView):
         )
 
         # 2. Fetch Project-Level Documents
-        project_docs = Document.objects.filter(project_id=project_id)
+        project_docs = Document.objects.filter(
+            Q(project_id=project_id) | Q(shares__shared_project_id=project_id)
+        ).distinct()
         project_data = [] 
         for doc in project_docs:
             # Fallback to doc.name if source_file doesn't exist
@@ -437,6 +450,7 @@ class ProjectAllDocumentsView(APIView):
                 "file_name": doc.name, 
                 "file_url": file_url, 
                 "uploaded_at": doc.created_at,
+                "updated_at": doc.updated_at,
                 "source": "Project",
                 "task_id": None,
                 "task_heading": None
@@ -474,6 +488,7 @@ class ProjectAllDocumentsView(APIView):
                 "file_name": clean_filename,
                 "file_url": file_url,
                 "uploaded_at": attachment.uploaded_at, # Adjust if your field is named differently
+                "updated_at": attachment.uploaded_at,
                 "source": "Task",
                 "task_id": attachment.task.id,
                 "task_heading": attachment.task.heading
@@ -511,7 +526,7 @@ class ProjectAllDocumentsView(APIView):
     
 class DocumentShareView(APIView):
     """
-    Explicit endpoint to handle sharing a document with another user.
+    Explicit endpoint to handle sharing a document with a user OR a project.
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -523,7 +538,9 @@ class DocumentShareView(APIView):
             Document.objects.filter(
                 Q(project__created_by=user) | 
                 Q(project__members=user) | 
-                Q(shares__shared_with=user)
+                Q(shares__shared_with=user) |
+                Q(shares__shared_project__members=user) |
+                Q(shares__shared_project__created_by=user)
             ).distinct(),
             id=document_id
         )
@@ -531,71 +548,137 @@ class DocumentShareView(APIView):
         # 2. Validate request
         serializer = DocumentShareSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        target_user_id = serializer.validated_data["user_id"]
+        
+        target_user_id = serializer.validated_data.get("user_id")
+        target_project_id = serializer.validated_data.get("project_id")
+        
         User = get_user_model()
+        channel_layer = get_channel_layer()
 
-        # 3. Check target user
-        try:
-            target_user = User.objects.get(id=target_user_id)
-        except User.DoesNotExist:
-            return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+        # ==========================================
+        # PATH A: SHARE WITH SPECIFIC USER
+        # ==========================================
+        if target_user_id:
+            try:
+                target_user = User.objects.get(id=target_user_id)
+            except User.DoesNotExist:
+                return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        if target_user == user:
-            return Response(
-                {"detail": "You cannot share a document with yourself."}, 
-                status=status.HTTP_400_BAD_REQUEST
+            if target_user == user:
+                return Response({"detail": "You cannot share a document with yourself."}, status=status.HTTP_400_BAD_REQUEST)
+
+            if document.project:
+                if document.project.created_by == target_user or document.project.members.filter(id=target_user.id).exists():
+                    return Response(
+                        {"detail": f"{target_user.username} already has access to this document through the project."}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+            share_record, created = DocumentShare.objects.get_or_create(
+                document=document, shared_with=target_user,
+                defaults={'created_by': user, 'updated_by': user}
             )
 
-        # 4. Create or get share record
-        share_record, created = DocumentShare.objects.get_or_create(
-            document=document,
-            shared_with=target_user,
-            defaults={'created_by': user, 'updated_by': user}
-        )
+            if not created:
+                share_record.updated_by = user
+                share_record.save(update_fields=['updated_by', 'updated_at'])
 
-        # If it already existed, update the timestamp/updated_by to reflect the fresh share action
-        if not created:
-            share_record.updated_by = user
-            share_record.save(update_fields=['updated_by', 'updated_at'])
+            log_action(document, "shared", change_summary=f"Document shared with {target_user.username}", user=user)
 
-        # --- NEW CODE: "Touch" the document so its updated_at changes ---
-        document.updated_by = user
-        # This forces the document's updated_at timestamp to become "Just now"
-        document.save(update_fields=['updated_by', 'updated_at']) 
-        # ----------------------------------------------------------------
-        
-        # 5. Log the audit trail (always log it so there is a record of the re-share)
-        log_action(
-            document, 
-            "shared", 
-            change_summary=f"Document shared with {target_user.username}",
-            user=user
-        )
+            # Update the document's timestamp so the frontend shows it was updated "just now"
+            document.updated_by = user
+            document.updated_at = timezone.now()
+            document.save()
 
-        # 6. Trigger notification (always ping the user, even if re-shared)
-        notification = Notification.objects.create(
-            recipient=target_user,
-            actor=user,
-            title="Shared Document",
-            message=f"{user.first_name or user.username} shared the document '{document.name}' with you.",
-            notification_type=Notification.NotificationType.DOCUMENT_SHARED,
-            content_type=ContentType.objects.get_for_model(Document),
-            object_id=str(document.id),  # <-- Added str() here to fix the UUID serialization error
-        )
+            notification = Notification.objects.create(
+                recipient=target_user,
+                actor=user,
+                title="Shared Document",
+                message=f"{user.first_name or user.username} shared the document '{document.name}' with you.",
+                notification_type=Notification.NotificationType.DOCUMENT_SHARED,
+                content_type=ContentType.objects.get_for_model(Document),
+                object_id=str(document.id),
+            )
+            
+            notification_data = NotificationSerializer(notification).data
+            unread_count = Notification.objects.filter(recipient=target_user, is_read=False).count()
+            notification_data['unread_count'] = unread_count
 
-        # 7. Broadcast to WebSocket Gateway
-        channel_layer = get_channel_layer()
-        async_to_sync(channel_layer.group_send)(
-            f"user_{target_user.id}",
-            {
-                "type": "gateway_signal", # <-- Changed to match your consumer function!
-                "event": "NEW_NOTIFICATION",
-                "data": NotificationSerializer(notification).data
-            }
-        )
-        
-        # Return success regardless of whether it was newly created or just re-shared
-        return Response(
-            {"detail": f"Document successfully shared with {target_user.username}."}, 
-            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
-        )
+            async_to_sync(channel_layer.group_send)(
+                f"user_{target_user.id}",
+                {
+                    "type": "gateway_signal", 
+                    "event": "NEW_NOTIFICATION",
+                    "data": notification_data
+                }
+            )
+            
+            return Response(
+                {"detail": f"Document successfully shared with {target_user.username}."}, 
+                status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
+            )
+
+        # ==========================================
+        # PATH B: SHARE WITH ENTIRE PROJECT
+        # ==========================================
+        elif target_project_id:
+            try:
+                target_project = Project.objects.get(id=target_project_id)
+            except Project.DoesNotExist:
+                return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+
+            if document.project == target_project:
+                return Response({"detail": "Document already belongs to this project."}, status=status.HTTP_400_BAD_REQUEST)
+
+            share_record, created = DocumentShare.objects.get_or_create(
+                document=document, shared_project=target_project,
+                defaults={'created_by': user, 'updated_by': user}
+            )
+
+            if not created:
+                share_record.updated_by = user
+                share_record.save(update_fields=['updated_by', 'updated_at'])
+
+            log_action(document, "shared", change_summary=f"Document shared with project {target_project.name}", user=user)
+
+            # Update the document's timestamp so the frontend shows it was updated "just now"
+            document.updated_by = user
+            document.updated_at = timezone.now()
+            document.save()
+
+            # Get all project members + creator (excluding the user who is sending it)
+
+            # Get all project members + creator (excluding the user who is sending it)
+            target_users = list(target_project.members.exclude(id=user.id))
+            if target_project.created_by != user and target_project.created_by not in target_users:
+                target_users.append(target_project.created_by)
+
+            # Broadcast to everyone in that project
+            for member in target_users:
+                notification = Notification.objects.create(
+                    recipient=member,
+                    actor=user,
+                    title="Shared Document via Project",
+                    message=f"{user.first_name or user.username} shared '{document.name}' with your project '{target_project.name}'.",
+                    notification_type=Notification.NotificationType.DOCUMENT_SHARED,
+                    content_type=ContentType.objects.get_for_model(Document),
+                    object_id=str(document.id),
+                )
+                
+                notification_data = NotificationSerializer(notification).data
+                unread_count = Notification.objects.filter(recipient=member, is_read=False).count()
+                notification_data['unread_count'] = unread_count
+                
+                async_to_sync(channel_layer.group_send)(
+                    f"user_{member.id}",
+                    {
+                        "type": "gateway_signal", 
+                        "event": "NEW_NOTIFICATION",
+                        "data": notification_data
+                    }
+                )
+
+            return Response(
+                {"detail": f"Document successfully shared with project {target_project.name}."}, 
+                status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
+            )

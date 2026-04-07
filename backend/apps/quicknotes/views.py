@@ -4,7 +4,7 @@ from rest_framework.parsers import MultiPartParser, FormParser # <-- Import pars
 from .models import Folder, Note, NoteAttachment
 from .serializers import FolderSerializer, NoteSerializer, NoteAttachmentSerializer
 from .utils import generate_title_from_content
-
+from django.db.models import Q
 class FolderViewSet(viewsets.ModelViewSet):
     serializer_class = FolderSerializer
     permission_classes = [IsAuthenticated]
@@ -22,7 +22,10 @@ class NoteViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        queryset = Note.objects.filter(user=self.request.user)
+        user = self.request.user
+        queryset = Note.objects.filter(
+            Q(user=user) | Q(project__members=user)
+        ).distinct()
         folder_id = self.request.query_params.get('folder')
         if folder_id is not None:
             queryset = queryset.filter(folder_id=folder_id)
@@ -48,9 +51,11 @@ class NoteViewSet(viewsets.ModelViewSet):
         # Check if 'title' is in the request but is empty
         if 'title' in self.request.data and not title and content:
              title = generate_title_from_content(content)
-             serializer.save(title=title)
+             # Save the new title AND track who made the update
+             serializer.save(title=title, updated_by=self.request.user)
         else:
-             serializer.save()
+             # Just track who made the update
+             serializer.save(updated_by=self.request.user)
 
 class NoteAttachmentViewSet(viewsets.ModelViewSet):
     serializer_class = NoteAttachmentSerializer

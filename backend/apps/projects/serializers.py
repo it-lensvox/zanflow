@@ -7,7 +7,7 @@ from rest_framework import serializers
 from apps.users.serializers import UserMinimalSerializer
 
 from .models import Label, Project, ProjectMembership
-
+from apps.quicknotes.serializers import NoteSerializer
 User = get_user_model()
 
 
@@ -78,7 +78,11 @@ class ProjectSerializer(serializers.ModelSerializer):
         return obj.members.count()
     
     def get_document_count(self, obj):
-        return obj.documents.count() if hasattr(obj, "documents") else 0
+        from apps.groundtruth.models import Document
+        from django.db.models import Q
+        return Document.objects.filter(
+            Q(project=obj) | Q(shares__shared_project=obj)
+        ).distinct().count()
     
     def get_is_favourite(self, obj):
         request = self.context.get('request')
@@ -108,12 +112,22 @@ class ProjectDetailSerializer(ProjectSerializer):
     members = serializers.SerializerMethodField()
     default_assignees = UserMinimalSerializer(many=True, read_only=True)
     
+    # ADD THIS: Field to hold the attached quick notes
+    quick_notes = serializers.SerializerMethodField() 
+    
     class Meta(ProjectSerializer.Meta):
-        fields = ProjectSerializer.Meta.fields + ["members", "default_assignees"]
+        # ADD 'quick_notes' to the fields list
+        fields = ProjectSerializer.Meta.fields + ["members", "default_assignees", "quick_notes"]
     
     def get_members(self, obj):
         memberships = ProjectMembership.objects.filter(project=obj).select_related("user")
         return ProjectMembershipSerializer(memberships, many=True).data
+        
+    # ADD THIS: Method to retrieve the notes
+    def get_quick_notes(self, obj):
+        # This relies on the 'related_name' we set in the Note model below
+        notes = obj.project_notes.all().order_by('-updated_at')
+        return NoteSerializer(notes, many=True).data
     
 class MemberAssignmentSerializer(serializers.Serializer):
     """Helper serializer for inputting user + role pairs"""
