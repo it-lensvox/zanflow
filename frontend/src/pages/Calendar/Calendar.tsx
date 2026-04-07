@@ -9,14 +9,19 @@ import {
     ClipboardList,
     Send,
     Loader2,
-    CalendarPlus,
+    CheckSquare,
+    Clock,
+    MapPin,
+    Video,
+    X,
+    CalendarPlus
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { taskApi, dailyUpdateApi } from '@/services/api';
+import { taskApi, dailyUpdateApi, eventApi, usersApi } from '@/services/api';
 import { useAuth } from '@/hooks/useAuth';
 import { TaskDetailModal } from '../MyTask/TaskDetailModal';
-import type { Task, DailyUpdate, DailyUpdatePayload } from '@/types';
+import type { Task, DailyUpdate, DailyUpdatePayload, Event as CalendarEventType } from '@/types';
 import { getStatusConfig } from '@/components/layout/DualView/taskConfig';
 
 // --- Types & Constants ---
@@ -42,9 +47,38 @@ interface CalendarDay {
     isCurrentMonth: boolean;
     isToday: boolean;
     tasks: Task[];
+    events: CalendarEventType[];
 }
 
 // --- Components ---
+
+interface CalendarEventUIProps {
+    event: CalendarEventType;
+    onClick: (event: CalendarEventType) => void;
+    compact?: boolean;
+}
+
+const CalendarEventUI: React.FC<CalendarEventUIProps> = ({ event, onClick, compact = false }) => {
+    return (
+        <div
+            className={`
+                group relative flex items-center gap-2 rounded-md cursor-pointer transition-all duration-200 border border-transparent hover:shadow-sm hover:z-10 bg-indigo-50 text-indigo-700
+                ${compact ? 'py-0.5 px-1.5' : 'py-1 px-2'}
+            `}
+            onClick={(e) => {
+                e.stopPropagation();
+                onClick(event);
+            }}
+            title={event.title}
+        >
+            <div className="w-1 h-full absolute left-0 top-0 bottom-0 rounded-l-md bg-indigo-500" />
+            <CalendarIcon size={compact ? 12 : 14} className="flex-shrink-0 text-indigo-500" />
+            <span className={`font-medium truncate ${compact ? 'text-[10px]' : 'text-xs'}`}>
+                {event.title}
+            </span>
+        </div>
+    );
+};
 
 interface TaskEventProps {
     task: Task;
@@ -90,13 +124,17 @@ const TaskEvent: React.FC<TaskEventProps> = ({ task, onClick, compact = false })
 interface DayCellProps {
     day: CalendarDay;
     onTaskClick: (task: Task) => void;
+    onEventClick?: (event: CalendarEventType) => void;
     onDateClick: (date: Date) => void;
 }
 
-const DayCell: React.FC<DayCellProps> = ({ day, onTaskClick, onDateClick }) => {
-    const maxVisibleTasks = 3;
-    const visibleTasks = day.tasks.slice(0, maxVisibleTasks);
-    const remainingCount = day.tasks.length - maxVisibleTasks;
+const DayCell: React.FC<DayCellProps> = ({ day, onTaskClick, onEventClick, onDateClick }) => {
+    const maxVisibleItems = 3;
+    const totalItems = day.tasks.length + day.events.length;
+    
+    const visibleEvents = day.events.slice(0, maxVisibleItems);
+    const visibleTasks = day.tasks.slice(0, maxVisibleItems - visibleEvents.length);
+    const remainingCount = totalItems - (visibleEvents.length + visibleTasks.length);
 
     return (
         <div
@@ -123,12 +161,20 @@ const DayCell: React.FC<DayCellProps> = ({ day, onTaskClick, onDateClick }) => {
             </div>
             
             <div className="flex flex-col gap-1.5 overflow-hidden">
+                {visibleEvents.map((event) => (
+                    <CalendarEventUI
+                        key={`event-${event.id}`}
+                        event={event}
+                        onClick={onEventClick || (() => {})}
+                        compact={totalItems > 2}
+                    />
+                ))}
                 {visibleTasks.map((task) => (
                     <TaskEvent
-                        key={task.id}
+                        key={`task-${task.id}`}
                         task={task}
                         onClick={onTaskClick}
-                        compact={day.tasks.length > 2}
+                        compact={totalItems > 2}
                     />
                 ))}
                 {remainingCount > 0 && (
@@ -144,13 +190,15 @@ const DayCell: React.FC<DayCellProps> = ({ day, onTaskClick, onDateClick }) => {
 interface DaysViewProps {
     currentDate: Date;
     tasks: Task[];
+    events: CalendarEventType[];
     selectedDate: Date | null;
     onTaskClick: (task: Task) => void;
+    onEventClick?: (event: CalendarEventType) => void;
     onDateClick: (date: Date) => void;
     viewMode: 'day' | 'work_week' | 'week';
 }
 
-const DaysView: React.FC<DaysViewProps> = ({ currentDate, tasks, selectedDate, onTaskClick, onDateClick, viewMode }) => {
+const DaysView: React.FC<DaysViewProps> = ({ currentDate, tasks, events, selectedDate, onTaskClick, onEventClick, onDateClick, viewMode }) => {
     const getDays = () => {
         const days: Date[] = [];
         if (viewMode === 'day') {
@@ -192,6 +240,17 @@ const DaysView: React.FC<DaysViewProps> = ({ currentDate, tasks, selectedDate, o
                 endDate === dateStr;
         });
     };
+
+    const getEventsForDate = (date: Date) => {
+        const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        return events.filter((event) => {
+            const startDate = event.start_time?.split('T')[0];
+            const endDate = event.end_time?.split('T')[0];
+            return (startDate && startDate <= dateStr && endDate && endDate >= dateStr) ||
+                startDate === dateStr ||
+                endDate === dateStr;
+        });
+    };
     
     // Explicit tailwind strings for JIT compiler
     const gridColsClass = displayDays.length === 1 ? 'grid-cols-1' : displayDays.length === 5 ? 'grid-cols-5' : 'grid-cols-7';
@@ -214,6 +273,7 @@ const DaysView: React.FC<DaysViewProps> = ({ currentDate, tasks, selectedDate, o
             <div className={`grid ${gridColsClass} flex-1 min-h-[500px] divide-x divide-gray-200`}>
                 {displayDays.map((day, index) => {
                     const dayTasks = getTasksForDate(day);
+                    const dayEvents = getEventsForDate(day);
                     const isToday = day.toDateString() === today.toDateString();
                     const isSelected = selectedDate?.toDateString() === day.toDateString();
                     
@@ -227,11 +287,14 @@ const DaysView: React.FC<DaysViewProps> = ({ currentDate, tasks, selectedDate, o
                             `}
                             onClick={() => onDateClick(day)}
                         >
-                            {dayTasks.map((task) => (
-                                <TaskEvent key={task.id} task={task} onClick={onTaskClick} />
+                            {dayEvents.map((event) => (
+                                <CalendarEventUI key={`event-${event.id}`} event={event} onClick={onEventClick || (() => {})} />
                             ))}
-                            {dayTasks.length === 0 && (
-                                <div className="text-center py-8 text-xs text-gray-400 italic">No tasks</div>
+                            {dayTasks.map((task) => (
+                                <TaskEvent key={`task-${task.id}`} task={task} onClick={onTaskClick} />
+                            ))}
+                            {(dayTasks.length === 0 && dayEvents.length === 0) && (
+                                <div className="text-center py-8 text-xs text-gray-400 italic">No items</div>
                             )}
                         </div>
                     );
@@ -243,11 +306,16 @@ const DaysView: React.FC<DaysViewProps> = ({ currentDate, tasks, selectedDate, o
 
 interface TaskListSidebarProps {
     tasks: Task[];
+    events: CalendarEventType[];
     selectedDate: Date | null;
     onTaskClick: (task: Task) => void;
+    onEventClick: (event: CalendarEventType) => void;
     onClose: () => void;
     currentUser: { id: number; role: string } | null;
+    onOpenEventModal: () => void;
 }
+
+// Helper: format date as "2 March 2026"
 
 // Helper: format date as "2 March 2026"
 const formatDateForUpdate = (date: Date): string => {
@@ -285,7 +353,7 @@ const serializeContent = (fields: UpdateFormFields, dateLabel: string): string =
 const parseContent = (content: string): UpdateFormFields => {
     const extract = (label: string, nextLabel?: string): string => {
         const start = content.indexOf(label);
-        if (start === -1) return '';
+        if (start === -1) return ''
         const valueStart = start + label.length;
         const end = nextLabel ? content.indexOf(nextLabel) : content.length;
         return (end === -1 ? content.slice(valueStart) : content.slice(valueStart, end)).trim();
@@ -298,12 +366,250 @@ const parseContent = (content: string): UpdateFormFields => {
     };
 };
 
+interface EventModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    selectedDate: Date | null;
+    event?: CalendarEventType | null;
+    currentUser: { id: number; role: string } | null;
+}
+
+const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, selectedDate, event, currentUser }) => {
+    // If the event exists and the current user is NOT the organizer, it is Read-Only
+    const isReadOnly = Boolean(event && currentUser && event.organizer !== currentUser.id);
+    const queryClient = useQueryClient();
+    const [title, setTitle] = useState('');
+    const [startTime, setStartTime] = useState('');
+    const [endTime, setEndTime] = useState('');
+    const [location, setLocation] = useState('');
+    const [isOnline, setIsOnline] = useState(false);
+    const [description, setDescription] = useState('');
+    
+    // New states for Attendees Search & Select
+    const [attendees, setAttendees] = useState<number[]>([]);
+    const [userSearch, setUserSearch] = useState('');
+    const [showUserDropdown, setShowUserDropdown] = useState(false);
+
+    // Fetch available team members
+    const { data: availableUsers = [] } = useQuery({
+        queryKey: ['users-list-events'],
+        queryFn: usersApi.listAll,
+        enabled: isOpen,
+    });
+
+    React.useEffect(() => {
+        if (event && isOpen) {
+            setTitle(event.title || '');
+            const formatDt = (iso: string) => {
+                if (!iso) return '';
+                const d = new Date(iso);
+                d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+                return d.toISOString().slice(0, 16);
+            };
+            setStartTime(formatDt(event.start_time));
+            setEndTime(formatDt(event.end_time));
+            setLocation(event.location || '');
+            setIsOnline(event.is_online_meeting || false);
+            setDescription(event.description || '');
+            setAttendees(event.attendees || []);
+            setUserSearch('');
+            setShowUserDropdown(false);
+        } else if (selectedDate && isOpen) {
+            const dateStr = selectedDate.toISOString().split('T')[0];
+            setStartTime(`${dateStr}T13:00`);
+            setEndTime(`${dateStr}T13:30`);
+            setTitle('');
+            setLocation('');
+            setIsOnline(false);
+            setDescription('');
+            setAttendees([]);
+            setUserSearch('');
+            setShowUserDropdown(false);
+        }
+    }, [selectedDate, isOpen, event]);
+
+    const { mutate: createEvent, isPending: isCreating } = useMutation({
+        mutationFn: (data: Partial<CalendarEventType>) => eventApi.create(data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['events-calendar'] });
+            onClose();
+        }
+    });
+
+    const { mutate: updateEvent, isPending: isUpdating } = useMutation({
+        mutationFn: (data: Partial<CalendarEventType>) => eventApi.update(event!.id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['events-calendar'] });
+            onClose();
+        }
+    });
+
+    const isPending = isCreating || isUpdating;
+
+    const handleSave = () => {
+        const payload = {
+            title,
+            start_time: new Date(startTime).toISOString(),
+            end_time: new Date(endTime).toISOString(),
+            location,
+            is_online_meeting: isOnline,
+            description,
+            attendees
+        };
+        if (event) {
+            updateEvent(payload);
+        } else {
+            createEvent(payload);
+        }
+    };
+
+    if (!isOpen) return null;
+
+    const filteredUsers = availableUsers.filter((u: any) => {
+        const name = `${u.first_name || ''} ${u.last_name || ''}`.trim().toLowerCase();
+        const userSearchLower = userSearch.toLowerCase();
+        return name.includes(userSearchLower) || 
+               u.username?.toLowerCase().includes(userSearchLower) ||
+               u.email?.toLowerCase().includes(userSearchLower);
+    }).filter((u: any) => !attendees.includes(u.id));
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+            <div className="bg-white text-gray-900 w-full max-w-[800px] rounded-xl shadow-2xl flex flex-col overflow-hidden border border-gray-200" onClick={() => setShowUserDropdown(false)}>
+                <div className="flex items-center justify-between p-5 border-b border-gray-100 bg-gray-50">
+                    <h2 className="text-base font-semibold text-gray-900">
+                        {event ? (isReadOnly ? 'View event' : 'Edit event') : 'New event'}
+                    </h2>
+                    <button onClick={onClose} className="p-1.5 rounded-md text-gray-400 hover:bg-gray-200 hover:text-gray-700 transition-colors">
+                        <X size={20} />
+                    </button>
+                </div>
+                <div className="p-6 space-y-6 flex-1 overflow-y-auto max-h-[75vh]">
+                    <div>
+                        <input 
+                            type="text" 
+                            placeholder="Add title" 
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            disabled={isReadOnly}
+                            className={`w-full bg-transparent border-b border-gray-200 text-2xl text-gray-900 py-2 focus:outline-none focus:border-blue-500 transition-colors placeholder:text-gray-400 ${isReadOnly ? 'opacity-90 cursor-not-allowed border-transparent' : ''}`}
+                        />
+                    </div>
+                    
+                    <div className="flex items-start gap-4 text-gray-500 relative">
+                        <Users size={20} className="mt-2 text-gray-400" />
+                        <div className={`flex-1 border-b pb-2 relative ${isReadOnly ? 'border-transparent' : 'border-gray-200'}`} onClick={(e) => e.stopPropagation()}>
+                            <div className="flex flex-wrap gap-2 mb-2">
+                                {attendees.map(id => {
+                                    const user = availableUsers.find((u: any) => u.id === id);
+                                    return (
+                                        <span key={id} className={`bg-indigo-50 text-indigo-700 border border-indigo-100 text-xs px-2 py-1 rounded-md flex items-center gap-1 font-medium ${isReadOnly ? 'opacity-90' : ''}`}>
+                                            {user ? (user.first_name || user.username) : 'User'}
+                                            {!isReadOnly && (
+                                                <button type="button" onClick={() => setAttendees(prev => prev.filter(a => a !== id))} className="hover:text-indigo-900 ml-1">
+                                                    <X size={12} />
+                                                </button>
+                                            )}
+                                        </span>
+                                    );
+                                })}
+                            </div>
+                            {!isReadOnly && (
+                                <input 
+                                    type="text" 
+                                    placeholder="Invite required attendees (Search by name or email)" 
+                                    value={userSearch}
+                                    onChange={e => {
+                                        setUserSearch(e.target.value);
+                                        setShowUserDropdown(true);
+                                    }}
+                                    onFocus={() => setShowUserDropdown(true)}
+                                    className="bg-transparent w-full focus:outline-none text-sm text-gray-900 placeholder:text-gray-400" 
+                                />
+                            )}
+                            {showUserDropdown && filteredUsers.length > 0 && !isReadOnly && (
+                                <div className="absolute top-full left-0 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-20 max-h-48 overflow-y-auto">
+                                    {filteredUsers.map((u: any) => (
+                                        <div 
+                                            key={u.id}
+                                            className="px-4 py-2 hover:bg-gray-50 cursor-pointer flex items-center justify-between transition-colors"
+                                            onClick={() => {
+                                                setAttendees(prev => [...prev, u.id]);
+                                                setUserSearch('');
+                                                setShowUserDropdown(false);
+                                            }}
+                                        >
+                                            <div>
+                                                <div className="text-sm font-medium text-gray-900">{u.first_name} {u.last_name}</div>
+                                                <div className="text-xs text-gray-500">{u.email}</div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-4 text-gray-500">
+                        <Clock size={20} className="text-gray-400" />
+                        <div className={`flex items-center gap-2 border-b pb-2 flex-1 ${isReadOnly ? 'border-transparent' : 'border-gray-200'}`}>
+                            <input type="datetime-local" disabled={isReadOnly} value={startTime} onChange={e => setStartTime(e.target.value)} className={`bg-transparent focus:outline-none text-sm text-gray-900 ${isReadOnly ? 'cursor-not-allowed opacity-90' : ''}`} />
+                            <span className="text-gray-400">-</span>
+                            <input type="datetime-local" disabled={isReadOnly} value={endTime} onChange={e => setEndTime(e.target.value)} className={`bg-transparent focus:outline-none text-sm text-gray-900 ${isReadOnly ? 'cursor-not-allowed opacity-90' : ''}`} />
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-4 text-gray-500">
+                        <MapPin size={20} className="text-gray-400" />
+                        <input type="text" disabled={isReadOnly} placeholder={isReadOnly && !location ? "No location specified" : "Add a room or location"} value={location} onChange={e => setLocation(e.target.value)} className={`bg-transparent flex-1 focus:outline-none text-sm text-gray-900 border-b pb-2 placeholder:text-gray-400 ${isReadOnly ? 'cursor-not-allowed opacity-90 border-transparent' : 'border-gray-200'}`} />
+                    </div>
+                    <div className="flex items-center gap-4 text-gray-500">
+                        <Video size={20} className="text-gray-400" />
+                        <label className={`flex items-center gap-3 ${isReadOnly ? 'cursor-not-allowed opacity-90' : 'cursor-pointer'}`}>
+                            <div className={`w-10 h-5 rounded-full relative transition-colors shadow-inner ${isOnline ? 'bg-blue-600' : 'bg-gray-200'}`}>
+                                <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform shadow-sm ${isOnline ? 'translate-x-5' : ''}`} />
+                            </div>
+                            <span className="text-sm font-medium text-gray-700">Teams meeting</span>
+                            <input type="checkbox" disabled={isReadOnly} className="hidden" checked={isOnline} onChange={(e) => setIsOnline(e.target.checked)} />
+                        </label>
+                    </div>
+                    <div className="mt-6 border border-gray-200 rounded-lg overflow-hidden bg-gray-50 min-h-[250px] flex flex-col shadow-inner">
+                        <textarea 
+                            placeholder={isReadOnly && !description ? "No description provided." : "Add an agenda or description"} 
+                            value={description}
+                            disabled={isReadOnly}
+                            onChange={e => setDescription(e.target.value)}
+                            className={`w-full flex-1 bg-transparent resize-none p-4 focus:outline-none text-sm text-gray-900 placeholder:text-gray-400 ${isReadOnly ? 'cursor-not-allowed opacity-90' : ''}`}
+                        />
+                    </div>
+                </div>
+                <div className="p-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
+                    <button onClick={onClose} className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors border ${isReadOnly ? 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-100'}`}>
+                        {isReadOnly ? 'Close' : 'Cancel'}
+                    </button>
+                    {!isReadOnly && (
+                        <button 
+                            onClick={handleSave}
+                            disabled={!title || isPending}
+                            className="bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+                        >
+                            {isPending ? 'Saving...' : 'Save'}
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const TaskListSidebar: React.FC<TaskListSidebarProps> = ({
     tasks,
+    events,
     selectedDate,
     onTaskClick,
+    onEventClick,
     onClose,
     currentUser,
+    onOpenEventModal,
 }) => {
     const queryClient = useQueryClient();
     const navigate = useNavigate();
@@ -413,12 +719,12 @@ const TaskListSidebar: React.FC<TaskListSidebarProps> = ({
         <div className="w-80 flex-shrink-0 bg-white border border-gray-200 rounded-xl shadow-lg flex flex-col overflow-hidden animate-in slide-in-from-right-4 duration-200">
             {/* Sidebar Header */}
             <div className="flex items-center justify-between p-4 bg-gray-50 border-b border-gray-200">
-                <h3 className="text-sm font-semibold text-gray-900">{formatDateLong(selectedDate)}</h3>
+            <h3 className="text-sm font-semibold text-gray-900">{formatDateLong(selectedDate)}</h3>
                 <div className="flex items-center gap-1">
                     <button
-                        onClick={handleCreateTask}
-                        className="p-1.5 rounded-md text-blue-600 hover:bg-blue-100 transition-colors flex items-center justify-center"
-                        title="Create new task for this date"
+                        onClick={onOpenEventModal}
+                        className="p-1.5 rounded-md text-[#6366f1] hover:bg-indigo-100 transition-colors flex items-center justify-center"
+                        title="Create Event"
                     >
                         <CalendarPlus size={18} />
                     </button>
@@ -435,19 +741,39 @@ const TaskListSidebar: React.FC<TaskListSidebarProps> = ({
             <div className="flex-1 overflow-y-auto">
                 {/* ── Task List Section ── */}
                 <div className="p-4">
-                {tasks.length === 0 ? (
+                {(tasks.length === 0 && events.length === 0) ? (
                         <div className="flex flex-col items-center justify-center text-center py-6">
                             <CalendarIcon className="w-10 h-10 text-gray-300 mb-2" />
-                            <p className="text-sm text-gray-500">No tasks scheduled for this day</p>
+                            <p className="text-sm text-gray-500">No tasks or events scheduled for this day</p>
                             <button 
                                 onClick={handleCreateTask}
                                 className="mt-3 flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors"
                             >
-                                <CalendarPlus size={14} /> Create Task
+                                <CheckSquare size={14} /> Create Task
                             </button>
                         </div>
                     ) : (
                         <div className="space-y-3">
+                            {events.map((event) => (
+                                <div
+                                    key={`sidebar-event-${event.id}`}
+                                    onClick={() => onEventClick(event)}
+                                    className="group flex gap-3 p-3 rounded-lg border border-transparent bg-indigo-50 hover:bg-white hover:border-indigo-200 hover:shadow-sm cursor-pointer transition-all"
+                                >
+                                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-white shadow-sm bg-indigo-500">
+                                        <CalendarIcon size={14} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <h4 className="text-sm font-medium text-gray-900 truncate mb-1">{event.title}</h4>
+                                        <div className="flex items-center gap-3 text-xs text-gray-500">
+                                            <span className="font-medium text-indigo-600 flex items-center gap-1">
+                                                <Clock size={12} />
+                                                {new Date(event.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
                             {tasks.map((task) => {
                                 const statusConfig = getStatusConfig(task.status);
                                 const StatusIcon = statusConfig.icon;
@@ -632,6 +958,17 @@ const TaskListSidebar: React.FC<TaskListSidebarProps> = ({
                     )}
                 </div>
             </div>
+
+            {/* Sidebar Footer: Action Buttons */}
+            <div className="p-4 border-t border-gray-200 bg-white">
+                <button
+                    onClick={handleCreateTask}
+                    className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+                >
+                    <CheckSquare size={16} />
+                    Create Task
+                </button>
+            </div>
         </div>
     );
 };
@@ -644,7 +981,27 @@ export const Calendar: React.FC = () => {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<ViewMode>('month');
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+    const [selectedEvent, setSelectedEvent] = useState<CalendarEventType | null>(null);
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+    const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+    
+    const { data: eventsData } = useQuery({
+        queryKey: ['events-calendar', currentDate.getFullYear(), currentDate.getMonth()],
+        queryFn: async () => {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const firstDay = new Date(year, month, -7).toISOString().split('T')[0]; 
+            const lastDay = new Date(year, month + 1, 7).toISOString().split('T')[0];
+            return eventApi.list({ start_date: firstDay, end_date: lastDay });
+        },
+        enabled: !!user,
+    });
+
+    const events = useMemo(() => {
+        if (!eventsData) return [];
+        return Array.isArray(eventsData) ? eventsData : eventsData.results || [];
+    }, [eventsData]);
+
     const { data: tasksData, isLoading } = useQuery({
         // Add year and month to the queryKey so it refetches when you change months
         queryKey: ['tasks-calendar', currentDate.getFullYear(), currentDate.getMonth()],
@@ -713,17 +1070,27 @@ export const Calendar: React.FC = () => {
                 return startDateStr === dateStr || endDateStr === dateStr;
             });
 
+            const dayEvents = events.filter((event: CalendarEventType) => {
+                const startDateStr = event.start_time?.split('T')[0];
+                const endDateStr = event.end_time?.split('T')[0];
+                if (startDateStr && endDateStr) {
+                    return dateStr >= startDateStr && dateStr <= endDateStr;
+                }
+                return startDateStr === dateStr || endDateStr === dateStr;
+            });
+
             days.push({
                 date: new Date(currentDateIter),
                 isCurrentMonth: currentDateIter.getMonth() === month,
                 isToday: currentDateIter.toDateString() === today.toDateString(),
                 tasks: dayTasks,
+                events: dayEvents,
             });
 
             currentDateIter.setDate(currentDateIter.getDate() + 1);
         }
         return days;
-    }, [currentDate, tasks]);
+    }, [currentDate, tasks, events]);
 
     const calendarDays = useMemo(() => getCalendarDays(), [getCalendarDays]);
 
@@ -749,6 +1116,10 @@ export const Calendar: React.FC = () => {
         setSelectedTask(task);
     }, []);
 
+    const handleEventClick = useCallback((event: CalendarEventType) => {
+        setSelectedEvent(event);
+    }, []);
+
     const handleDateClick = useCallback((date: Date) => {
         setSelectedDate(date);
     }, []);
@@ -766,6 +1137,19 @@ export const Calendar: React.FC = () => {
             return startDateStr === dateStr || endDateStr === dateStr;
         });
     }, [selectedDate, tasks]);
+
+    const selectedDateEvents = useMemo(() => {
+        if (!selectedDate) return [];
+        const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
+        return events.filter((event: CalendarEventType) => {
+            const startDateStr = event.start_time?.split('T')[0];
+            const endDateStr = event.end_time?.split('T')[0];
+            if (startDateStr && endDateStr) {
+                return dateStr >= startDateStr && dateStr <= endDateStr;
+            }
+            return startDateStr === dateStr || endDateStr === dateStr;
+        });
+    }, [selectedDate, events]);
 
     const getHeaderTitle = () => {
         if (viewMode === 'month') {
@@ -918,26 +1302,30 @@ export const Calendar: React.FC = () => {
                         </>
                     ) : (
                         <DaysView
-                            currentDate={currentDate}
-                            tasks={tasks}
-                            selectedDate={selectedDate}
-                            onTaskClick={handleTaskClick}
-                            onDateClick={handleDateClick}
-                            viewMode={viewMode as 'day' | 'work_week' | 'week'}
-                        />
-                    )}
+                        currentDate={currentDate}
+                        tasks={tasks}
+                        events={events}
+                        selectedDate={selectedDate}
+                        onTaskClick={handleTaskClick}
+                        onDateClick={handleDateClick}
+                        viewMode={viewMode as 'day' | 'work_week' | 'week'}
+                    />
+                )}
                 </div>
-
+    
                 {selectedDate && (
                     <TaskListSidebar
                         tasks={selectedDateTasks}
+                        events={selectedDateEvents}
                         selectedDate={selectedDate}
                         onTaskClick={handleTaskClick}
+                        onEventClick={handleEventClick}
                         onClose={() => setSelectedDate(null)}
                         currentUser={user ? { id: user.id, role: user.role } : null}
+                        onOpenEventModal={() => setIsEventModalOpen(true)}
                     />
                 )}
-            </div>
+            </div> {/* <-- THIS IS THE MISSING DIV THAT CLOSES THE FLEX CONTAINER */}
 
             {/* Status Legend Footer */}
             <div className="flex flex-wrap items-center gap-4 px-6 py-4 bg-white rounded-xl border border-gray-200 shadow-sm">
@@ -961,6 +1349,17 @@ export const Calendar: React.FC = () => {
                     })}
                 </div>
             </div>
+
+            <EventModal 
+                isOpen={isEventModalOpen || !!selectedEvent} 
+                onClose={() => {
+                    setIsEventModalOpen(false);
+                    setSelectedEvent(null);
+                }} 
+                selectedDate={selectedDate} 
+                event={selectedEvent}
+                currentUser={user ? { id: user.id, role: user.role } : null}
+            />
 
             {selectedTask && (
                 <TaskDetailModal

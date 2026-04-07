@@ -5,7 +5,7 @@ import type {
   GatewaySendMessagePayload, GatewayIncomingMessage, RefineTextPayload, RefineTextResponse, TaskResponse, TeamTypeChoicesResponse, PinTaskResponse,
   CreateTeamPayload, ProjectChatRoom, TeamChatRoom, ChatUnreadResponse, NotificationData, NotificationCallback, Team, ThreadRoom, ThreadSession, ThreadStorage, ThreadUIMessage, CreateThreadRoomPayload, WSJoinRoomCommand, WSSendMessageCommand, WSIncomingThreadMessage, WSUnreadUpdateSignal, ThreadMessagesResponse,
   InviteUserPayload, InviteUserResponse, InviteVerifyResponse, InviteAcceptPayload, InviteAcceptResponse, AIBotSendPayload, AIBotIncomingMessage, OrganizationSignupPayload, OrganizationSignupResponse,
-  DailyUpdate, DailyUpdatePayload, DailyUpdateListResponse, TaskFilterParams,
+  DailyUpdate, DailyUpdatePayload, DailyUpdateListResponse, TaskFilterParams, Event as CalendarEventType,
 } from '@/types';
 
 export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.164:8000/api/v1';
@@ -1455,6 +1455,27 @@ export const dailyUpdateApi = {
     }
     return all;
   },
+};
+export const eventApi = {
+  list: async (params?: any) => {
+      const { data } = await api.get('/daily-updates/events/', { params });
+      return data;
+  },
+  create: async (payload: Partial<CalendarEventType>) => {
+      const { data } = await api.post('/daily-updates/events/', payload);
+      return data;
+  },
+  retrieve: async (id: number) => {
+      const { data } = await api.get(`/daily-updates/events/${id}/`);
+      return data;
+  },
+  update: async (id: number, payload: Partial<CalendarEventType>) => {
+      const { data } = await api.patch(`/daily-updates/events/${id}/`, payload);
+      return data;
+  },
+  delete: async (id: number) => {
+      await api.delete(`/daily-updates/events/${id}/`);
+  }
 };
 
 
