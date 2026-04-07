@@ -51,9 +51,11 @@ class NoteViewSet(viewsets.ModelViewSet):
         # Check if 'title' is in the request but is empty
         if 'title' in self.request.data and not title and content:
              title = generate_title_from_content(content)
-             serializer.save(title=title)
+             # Save the new title AND track who made the update
+             serializer.save(title=title, updated_by=self.request.user)
         else:
-             serializer.save()
+             # Just track who made the update
+             serializer.save(updated_by=self.request.user)
 
 class NoteAttachmentViewSet(viewsets.ModelViewSet):
     serializer_class = NoteAttachmentSerializer
