@@ -18,32 +18,46 @@ def sync_daily_update_to_quick_notes(sender, instance, created, **kwargs):
             user=instance.user 
         )
         
-        personal_title = f"Personal Update - {instance.date}"
+        # Fetch ALL personal updates for this user to rebuild the master file
+        all_personal_updates = sender.objects.filter(user=instance.user).order_by('-date', '-created_at')
+        personal_content = ""
+        
+        for upd in all_personal_updates:
+            personal_content += f"## {upd.date}\n\n{upd.content}\n\n---\n\n"
+        
+        personal_title = "Personal Update"
         personal_note = Note.objects.filter(user=instance.user, folder=personal_folder, title=personal_title).first()
         
         if personal_note:
-            personal_note.content = instance.content
+            personal_note.content = personal_content.strip()
             personal_note.save()
         else:
             Note.objects.create(
                 user=instance.user,
                 folder=personal_folder,
                 title=personal_title,
-                content=instance.content
+                content=personal_content.strip()
             )
 
         # ==========================================
         # 2. TEAM MEMBER UPDATES FOR ADMINS & MANAGERS
         # ==========================================
-        all_updates_today = sender.objects.filter(
-            date=instance.date,
+        
+        # Fetch ALL team updates for the organization to rebuild the master file
+        all_team_updates = sender.objects.filter(
             user__organization=instance.user.organization 
-        ).select_related('user').order_by('created_at')
+        ).select_related('user').order_by('-date', '-created_at')
         
-        team_content = f"Team Updates for {instance.date}\n"
-        team_content += "=" * 40 + "\n\n"
+        team_content = ""
+        current_date = None
         
-        for update in all_updates_today:
+        for update in all_team_updates:
+            # Add date heading only when the date changes in our loop
+            if update.date != current_date:
+                team_content += f"## {update.date}\n"
+                team_content += "=" * 40 + "\n\n"
+                current_date = update.date
+            
             post_time = localtime(update.created_at).strftime('%I:%M %p')
             user_name = update.user.get_full_name() or update.user.username
             
@@ -51,7 +65,7 @@ def sync_daily_update_to_quick_notes(sender, instance, created, **kwargs):
             team_content += f"{update.content}\n"
             team_content += "-" * 40 + "\n\n"
 
-        # FIXED: Only fetch leaders from the same organization
+        # Only fetch leaders from the same organization
         leadership_users = User.objects.filter(
             Q(role__in=['admin', 'manager']) | Q(is_superuser=True),
             organization=instance.user.organization 
@@ -63,18 +77,18 @@ def sync_daily_update_to_quick_notes(sender, instance, created, **kwargs):
                 user=leader
             )
             
-            team_title = f"Team Member Updates - {instance.date}"
+            team_title = "Team Member Updates"
             team_note = Note.objects.filter(user=leader, folder=leader_folder, title=team_title).first()
             
             if team_note:
-                team_note.content = team_content
+                team_note.content = team_content.strip()
                 team_note.save()
             else:
                 Note.objects.create(
                     user=leader,
                     folder=leader_folder,
                     title=team_title,
-                    content=team_content
+                    content=team_content.strip()
                 )
 
     except Exception as e:
