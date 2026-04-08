@@ -17,7 +17,7 @@ import {
     CalendarPlus
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { taskApi, dailyUpdateApi, eventApi, usersApi } from '@/services/api';
 import { useAuth } from '@/hooks/useAuth';
 import { TaskDetailModal } from '../MyTask/TaskDetailModal';
@@ -978,6 +978,7 @@ const TaskListSidebar: React.FC<TaskListSidebarProps> = ({
 export const Calendar: React.FC = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [currentDate, setCurrentDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<ViewMode>('month');
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -1021,6 +1022,22 @@ export const Calendar: React.FC = () => {
         if (!eventsData) return [];
         return eventsData.pages.flatMap((page: any) => page.results || page);
     }, [eventsData]);
+
+    // Automatically open event from URL parameters (e.g., from notifications)
+    React.useEffect(() => {
+        const eventId = searchParams.get('eventId');
+        if (eventId && events.length > 0) {
+            const eventToOpen = events.find((e: CalendarEventType) => String(e.id) === eventId);
+            if (eventToOpen) {
+                setSelectedEvent(eventToOpen);
+                
+                // Clean up URL to prevent reopening on refresh
+                const newParams = new URLSearchParams(searchParams);
+                newParams.delete('eventId');
+                setSearchParams(newParams, { replace: true });
+            }
+        }
+    }, [searchParams, events, setSearchParams]);
 
     const { 
         data: tasksData, 
