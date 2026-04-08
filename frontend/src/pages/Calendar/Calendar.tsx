@@ -16,7 +16,7 @@ import {
     X,
     CalendarPlus
 } from 'lucide-react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { taskApi, dailyUpdateApi, eventApi, usersApi } from '@/services/api';
 import { useAuth } from '@/hooks/useAuth';
@@ -985,54 +985,84 @@ export const Calendar: React.FC = () => {
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [isEventModalOpen, setIsEventModalOpen] = useState(false);
     
-    const { data: eventsData } = useQuery({
+    const { 
+        data: eventsData, 
+        fetchNextPage: fetchNextEventsPage, 
+        hasNextPage: hasNextEventsPage,
+        isFetchingNextPage: isFetchingNextEventsPage
+    } = useInfiniteQuery({
         queryKey: ['events-calendar', currentDate.getFullYear(), currentDate.getMonth()],
-        queryFn: async () => {
+        queryFn: async ({ pageParam = 1 }) => {
             const year = currentDate.getFullYear();
             const month = currentDate.getMonth();
             const firstDay = new Date(year, month, -7).toISOString().split('T')[0]; 
             const lastDay = new Date(year, month + 1, 7).toISOString().split('T')[0];
-            return eventApi.list({ start_date: firstDay, end_date: lastDay });
+            return eventApi.list({ start_date: firstDay, end_date: lastDay, page: pageParam });
         },
+        getNextPageParam: (lastPage: any) => {
+            if (lastPage?.next) {
+                const url = new URL(lastPage.next);
+                const pageString = url.searchParams.get('page');
+                return pageString ? Number(pageString) : undefined;
+            }
+            return undefined;
+        },
+        initialPageParam: 1,
         enabled: !!user,
     });
+
+    React.useEffect(() => {
+        if (hasNextEventsPage && !isFetchingNextEventsPage) {
+            fetchNextEventsPage();
+        }
+    }, [hasNextEventsPage, isFetchingNextEventsPage, fetchNextEventsPage]);
 
     const events = useMemo(() => {
         if (!eventsData) return [];
-        return Array.isArray(eventsData) ? eventsData : eventsData.results || [];
+        return eventsData.pages.flatMap((page: any) => page.results || page);
     }, [eventsData]);
 
-    const { data: tasksData, isLoading } = useQuery({
-        // Add year and month to the queryKey so it refetches when you change months
+    const { 
+        data: tasksData, 
+        isLoading, 
+        fetchNextPage: fetchNextTasksPage, 
+        hasNextPage: hasNextTasksPage,
+        isFetchingNextPage: isFetchingNextTasksPage
+    } = useInfiniteQuery({
         queryKey: ['tasks-calendar', currentDate.getFullYear(), currentDate.getMonth()],
-        queryFn: async () => {
-            // Calculate the boundaries of the currently viewed month
+        queryFn: async ({ pageParam = 1 }) => {
             const year = currentDate.getFullYear();
             const month = currentDate.getMonth();
-            
-            // Pad the start and end by a few days to cover the visible days from previous/next months in the grid
             const firstDay = new Date(year, month, -7).toISOString().split('T')[0]; 
             const lastDay = new Date(year, month + 1, 7).toISOString().split('T')[0];
-
-            console.log('%c[Calendar:tasks-calendar] 📦 Fetching tasks for date range', 'color:#8b5cf6;font-weight:bold', firstDay, 'to', lastDay);
             
-            // Send the date filters AND disable_pagination to get all tasks in this range
-            const result = await taskApi.list({
+            return taskApi.list({
                 start_date__gte: firstDay,
                 end_date__lte: lastDay,
-                disable_pagination: true
+                page: pageParam
             });
-            
-            const count = Array.isArray(result) ? result.length : result?.results?.length ?? result?.tasks?.length ?? '?';
-            console.log('%c[Calendar:tasks-calendar] ✅ Tasks loaded', 'color:#22c55e;font-weight:bold', `| count: ${count}`);
-            return result;
         },
+        getNextPageParam: (lastPage: any) => {
+            if (lastPage?.next) {
+                const url = new URL(lastPage.next);
+                const pageString = url.searchParams.get('page');
+                return pageString ? Number(pageString) : undefined;
+            }
+            return undefined;
+        },
+        initialPageParam: 1,
         enabled: !!user,
     });
 
+    React.useEffect(() => {
+        if (hasNextTasksPage && !isFetchingNextTasksPage) {
+            fetchNextTasksPage();
+        }
+    }, [hasNextTasksPage, isFetchingNextTasksPage, fetchNextTasksPage]);
+
     const tasks = useMemo(() => {
         if (!tasksData || !user) return [];
-        const allTasks = Array.isArray(tasksData) ? tasksData : tasksData.tasks || tasksData.results || [];
+        const allTasks = tasksData.pages.flatMap((page: any) => page.results || page.tasks || page);
         if (user.role === 'admin') return allTasks;
         if (user.role === 'manager') {
             return allTasks.filter((task: Task) =>
