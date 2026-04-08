@@ -14,7 +14,8 @@ import {
     MapPin,
     Video,
     X,
-    CalendarPlus
+    CalendarPlus,
+    Trash2
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -444,7 +445,19 @@ const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, selectedDate, 
         }
     });
 
-    const isPending = isCreating || isUpdating;
+    const { mutate: deleteEvent, isPending: isDeleting } = useMutation({
+        mutationFn: () => eventApi.delete(event!.id),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['events-calendar'] });
+            onClose();
+        }
+    });
+
+    const isPending = isCreating || isUpdating || isDeleting;
+
+    const handleDelete = () => {
+        deleteEvent();
+    };
 
     const handleSave = () => {
         const payload = {
@@ -582,7 +595,19 @@ const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, selectedDate, 
                         />
                     </div>
                 </div>
-                <div className="p-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
+                <div className="p-4 border-t border-gray-100 flex justify-between items-center bg-gray-50">
+                <div>
+                    {event && !isReadOnly && (
+                        <button 
+                            onClick={handleDelete}
+                            disabled={isPending}
+                            className="text-red-600 hover:bg-red-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
+                        >
+                            <Trash2 size={16} /> Delete
+                        </button>
+                    )}
+                </div>
+                <div className="flex gap-3">
                     <button onClick={onClose} className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors border ${isReadOnly ? 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-100'}`}>
                         {isReadOnly ? 'Close' : 'Cancel'}
                     </button>
@@ -596,6 +621,7 @@ const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, selectedDate, 
                         </button>
                     )}
                 </div>
+            </div>
             </div>
         </div>
     );
