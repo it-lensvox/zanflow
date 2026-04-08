@@ -38,7 +38,8 @@ class Notification(TenantModel):
         REMINDER = 'reminder', 'Reminder'
         SYSTEM = 'system', 'System Notification'
         NEW_MESSAGE = 'new_message', 'New Message'
-    
+        # Event related (ADD THIS)
+        EVENT_CREATED = 'event_created', 'Event Created'
     class Priority(models.TextChoices):
         LOW = 'low', 'Low'
         MEDIUM = 'medium', 'Medium'

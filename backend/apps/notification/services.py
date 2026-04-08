@@ -40,6 +40,8 @@ def should_notify(user: User, notification_type: str) -> bool:
         'system': 'system_notifications',
         'reminder': 'system_notifications',
         'new_message': 'system_notifications',
+        'project_updated': 'project_notifications',
+        'event_created': 'system_notifications',
     }
     
     preference_field = type_to_preference.get(notification_type, 'system_notifications')
@@ -618,5 +620,33 @@ def notify_new_chat_message(room, message, actor: User, recipients: List[User]) 
             'room_name': room.name,
             'message_id': str(message.id),
             'related_type': 'message'
+        }
+    )
+
+# ============================================================================
+# EVENT-SPECIFIC NOTIFICATION FUNCTIONS
+# ============================================================================
+
+def notify_event_created(event, actor: User, attendees: List[User]) -> List[Notification]:
+    """
+    Send notifications when users are invited to a calendar event.
+    """
+    if not attendees:
+        return []
+    
+    # Assuming your event model has a 'title' or 'name' attribute. Adjust if needed.
+    event_title = getattr(event, 'title', 'a new event')
+    
+    return notify(
+        recipients=attendees,
+        title="Event Invitation",
+        message=f"You have been invited to '{event_title}'",
+        notification_type=Notification.NotificationType.EVENT_CREATED,
+        actor=actor,
+        priority=Notification.Priority.MEDIUM,
+        related_object=event,
+        metadata={
+            'event_id': str(event.id),
+            'event_title': event_title,
         }
     )

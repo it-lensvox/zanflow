@@ -1,10 +1,11 @@
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, m2m_changed
 from django.dispatch import receiver
 from django.contrib.auth import get_user_model
 from django.utils.timezone import localtime
 from django.db.models import Q
 from apps.quicknotes.models import Folder, Note
-
+from apps.notification.services import notify_event_created
+from .models import Event
 User = get_user_model()
 
 @receiver(post_save, sender='daily_updates.DailyUpdate')
@@ -93,3 +94,25 @@ def sync_daily_update_to_quick_notes(sender, instance, created, **kwargs):
 
     except Exception as e:
         print(f"Error in QuickNotes Signal: {e}")
+
+@receiver(m2m_changed, sender=Event.attendees.through)
+def event_attendees_changed(sender, instance, action, pk_set, **kwargs):
+    """
+    Trigger notifications when users are assigned to an Event.
+    """
+    # We only want to trigger notifications AFTER users are successfully added
+    if action == "post_add" and pk_set:
+        
+        # Get the actual user objects that were just added
+        added_users = list(User.objects.filter(pk__in=pk_set))
+        
+        # Determine the actor (who created the event)
+        # Change 'created_by' if your Event model uses a different field for the owner/creator
+        actor = getattr(instance, 'created_by', None)
+        
+        # Trigger the real-time notification
+        notify_event_created(
+            event=instance,
+            actor=actor,
+            attendees=added_users
+        )
