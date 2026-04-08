@@ -9,7 +9,7 @@ import {
   Grid3X3,
   Settings,
   MessageCircle,
-  Search, FileText, Info, X, Calendar, User
+  Search, FileText , Info, X, Calendar, User, NotebookPen , Pencil, Plus, Trash2
 } from 'lucide-react';
 import { DualView, ViewToggle } from '@/components/layout/DualView';
 import { createDocumentsTableColumns, DocumentGridCard } from '@/components/layout/DualView/documentsConfig';
@@ -23,7 +23,7 @@ import { DocumentShareModal } from '@/pages/Documents/DocumentShareModal';
 import DeleteModal from '@/components/common/Deletemodal';
 import Threads from '../Project/Thread';
 import { useProjectDetails, TabType } from '@/hooks/useTaskDetails';
-import type { Task, FilteredDocument } from '@/types';
+import type { Task, FilteredDocument, QuickNote } from '@/types';
 
 //Date Field Dropdown
 function DateFieldDropdown({
@@ -290,6 +290,15 @@ export function TaskDetails() {
               onClick={() => ctx.setIsCreateTaskModalOpen(true)}
             >
               Create Task
+            </button>
+
+            {/* Quick Notes */}
+            <button
+              onClick={() => ctx.setShowNotesPanel(true)}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors flex items-center gap-2 text-gray-600 hover:text-black"
+              title="Project Notes"
+            >
+              <NotebookPen className="h-4 w-4" />
             </button>
 
             {/* Chat */}
@@ -714,7 +723,7 @@ export function TaskDetails() {
         <Threads projectId={ctx.project.id} projectName={ctx.project.name} />
       )}
 
-      <DeleteModal
+<DeleteModal
         isOpen={!!ctx.deleteConfirm}
         type="confirm"
         itemType="document"
@@ -724,6 +733,196 @@ export function TaskDetails() {
         isDeleting={ctx.isDeleting}
       />
 
+      {/* Quick Notes Slide-Out Panel */}
+      {ctx.showNotesPanel && (
+        <div 
+          className="fixed inset-0 z-50 flex justify-end bg-black/20" 
+          onClick={() => ctx.setShowNotesPanel(false)}
+        >
+          <div
+            className="w-96 bg-white h-full shadow-2xl flex flex-col transform transition-transform animate-in slide-in-from-right"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-5 border-b border-gray-100 bg-gray-50">
+              <div className="flex items-center gap-2">
+                <NotebookPen className="w-5 h-5 text-purple-600" />
+                <h2 className="text-[1.1rem] font-bold text-gray-800">Quick Notes</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                {!ctx.isCreatingNote && (
+                  <button 
+                    onClick={ctx.handleCreateNoteStart}
+                    className="p-1.5 rounded-full bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors"
+                    title="Create Shared Note"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                )}
+                <button className="p-1.5 rounded-full hover:bg-gray-200 transition-colors" onClick={() => ctx.setShowNotesPanel(false)}>
+                  <X className="h-5 w-5 text-gray-500" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-[#f8fafc]">
+              
+              {/* New Note Creation Form */}
+              {ctx.isCreatingNote && (
+                <div className="bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.08)] border border-purple-200 p-4">
+                  <textarea
+                    value={ctx.newNoteContent}
+                    onChange={(e) => ctx.setNewNoteContent(e.target.value)}
+                    className="w-full min-h-[120px] p-3 text-[14px] text-gray-700 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white resize-y"
+                    placeholder="Type a new shared note for this project..."
+                    autoFocus
+                  />
+                  <div className="flex justify-end gap-2 mt-3">
+                    <button 
+                      onClick={ctx.handleCreateNoteCancel} 
+                      className="px-4 py-1.5 text-[13px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                      disabled={ctx.isSavingNewNote}
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      onClick={ctx.handleCreateNoteSave} 
+                      className="px-4 py-1.5 text-[13px] font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-md transition-colors flex items-center gap-2"
+                      disabled={ctx.isSavingNewNote || !ctx.newNoteContent.trim()}
+                    >
+                      {ctx.isSavingNewNote ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                      Create Note
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {ctx.notesLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="animate-spin h-6 w-6 text-purple-600" />
+                </div>
+              ) : ctx.projectNotes.length > 0 ? (
+                ctx.projectNotes.map((note: QuickNote) => {
+                  // Cross-reference the note's creator
+                  const noteUser = ctx.usersData?.find((u: any) => u.id === note.user) || (ctx.user?.id === note.user ? ctx.user : null);
+                  const displayName = noteUser?.first_name 
+                    ? `${noteUser.first_name} ${noteUser.last_name || ''}`.trim() 
+                    : noteUser?.username || 'User';
+                  const initial = displayName.charAt(0).toUpperCase();
+
+                  // Cross-reference the last editor (if available and different from creator)
+                  const editorUser = note.updated_by ? (ctx.usersData?.find((u: any) => u.id === note.updated_by) || (ctx.user?.id === note.updated_by ? ctx.user : null)) : null;
+                  const editorName = editorUser?.first_name
+                    ? `${editorUser.first_name} ${editorUser.last_name || ''}`.trim()
+                    : editorUser?.username;
+
+                  return (
+                    <div key={note.id} className="group bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 p-4 hover:shadow-md transition-all">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="h-8 w-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-sm font-bold uppercase">
+                              {initial}
+                            </div>
+                            <span className="text-sm font-bold text-gray-800">
+                              {displayName}
+                            </span>
+                          </div>
+                        
+                        {/* Show Edit to everyone, but Delete ONLY to the original author */}
+                        {ctx.editingNoteId !== note.id && (
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            <button 
+                              onClick={() => ctx.handleEditNoteStart(note)}
+                              className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-md transition-colors"
+                              title="Edit Note"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            
+                            {note.user === ctx.user?.id && (
+                              <button 
+                                onClick={() => ctx.handleDeleteNote(note.id)}
+                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                title="Delete Note"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      
+                      {ctx.editingNoteId === note.id ? (
+                        <div className="mt-2">
+                          <textarea
+                            value={ctx.editNoteContent}
+                            onChange={(e) => ctx.setEditNoteContent(e.target.value)}
+                            className="w-full min-h-[120px] p-3 text-[14px] text-gray-700 border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white resize-y"
+                            placeholder="Type your note here..."
+                            autoFocus
+                          />
+                          <div className="flex justify-end gap-2 mt-3">
+                            <button 
+                              onClick={ctx.handleEditNoteCancel} 
+                              className="px-4 py-1.5 text-[13px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                              disabled={ctx.isSavingNote}
+                            >
+                              Cancel
+                            </button>
+                            <button 
+                              onClick={ctx.handleEditNoteSave} 
+                              className="px-4 py-1.5 text-[13px] font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-md transition-colors flex items-center gap-2"
+                              disabled={ctx.isSavingNote}
+                            >
+                              {ctx.isSavingNote && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                              Save
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-[14px] text-gray-600 leading-relaxed whitespace-pre-wrap">
+                          {note.content}
+                        </div>
+                      )}
+
+                      {/* Display the Last Edited badge when anyone edits it, including the owner */}
+                      {note.updated_by && editorName && ctx.editingNoteId !== note.id && (
+                        <div className="mt-2.5 flex items-center gap-1.5 text-[11px] font-medium text-gray-400 bg-gray-50/80 w-fit px-2 py-1 rounded-md border border-gray-100">
+                           <Pencil className="w-3 h-3 text-gray-400" />
+                           Last edited by {editorName}
+                        </div>
+                      )}
+                      
+                      {note.attachments && note.attachments.length > 0 && (
+                        <div className="mt-4 flex flex-wrap gap-2 pt-3 border-t border-gray-50">
+                          {note.attachments.map((att) => (
+                            <button 
+                              key={att.id} 
+                              onClick={() => ctx.setPreviewDocument({
+                                url: att.file,
+                                fileName: att.filename,
+                                fileType: att.filename.split('.').pop()?.toLowerCase() || ''
+                              })}
+                              className="px-2.5 py-1 bg-gray-50 hover:bg-gray-100 hover:text-purple-600 hover:border-purple-200 text-gray-600 rounded-md text-[11px] font-semibold border border-gray-200 transition-colors cursor-pointer text-left"
+                              title="Click to preview document"
+                            >
+                              {att.filename}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-center py-12 flex flex-col items-center">
+                  <NotebookPen className="h-12 w-12 text-gray-300 mb-3" />
+                  <p className="text-gray-500 font-medium text-sm">No quick notes attached to this project.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      
       <DateFieldDropdown
         show={ctx.showDateFieldDropdown}
         dropdownPos={ctx.dropdownPos}

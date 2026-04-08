@@ -85,6 +85,13 @@ export const InlineCreateRow: React.FC<InlineCreateRowProps> = ({ columns, onCan
     staleTime: Infinity,
   });
 
+  // Fetch selected project details to get its members
+  const { data: projectDetailsData } = useQuery({
+    queryKey: ['project', form.selectedProjectId],
+    queryFn: () => projectsApi.get(form.selectedProjectId!),
+    enabled: !!form.selectedProjectId,
+  });
+
   const allUsers = React.useMemo(() => {
     if (!usersData) return [];
     const data = (usersData as any).results || usersData;
@@ -97,10 +104,17 @@ export const InlineCreateRow: React.FC<InlineCreateRowProps> = ({ columns, onCan
   }, [usersData]);
 
   const filteredUsers = React.useMemo(() => {
-    const available = allUsers.filter(u => !form.assignedTo.includes(u.id));
+    let available = allUsers.filter(u => !form.assignedTo.includes(u.id));
+    
+    // If a project is selected, restrict assignees to project members
+    if (form.selectedProjectId && projectDetailsData?.members) {
+      const memberIds = projectDetailsData.members.map((m: any) => m.user.id);
+      available = available.filter(u => memberIds.includes(u.id));
+    }
+
     if (!assigneeSearch.trim()) return available;
     return available.filter(u => u.label.toLowerCase().includes(assigneeSearch.toLowerCase()));
-  }, [allUsers, form.assignedTo, assigneeSearch]);
+  }, [allUsers, form.assignedTo, assigneeSearch, form.selectedProjectId, projectDetailsData]);
 
   // Auto-focus first active field on mount
   useEffect(() => {
@@ -380,7 +394,12 @@ export const InlineCreateRow: React.FC<InlineCreateRowProps> = ({ columns, onCan
                             key={project.id}
                             className={`px-3 py-2 text-[12px] cursor-pointer hover:bg-blue-50 transition-colors ${form.selectedProjectId === project.id ? 'bg-blue-50 font-semibold text-blue-700' : 'text-gray-700'}`}
                             onClick={() => {
-                              setForm(prev => ({ ...prev, selectedProjectId: project.id }));
+                              setForm(prev => ({ 
+                                ...prev, 
+                                selectedProjectId: project.id,
+                                // Clear assigned users if the project changes
+                                assignedTo: prev.selectedProjectId !== project.id ? [] : prev.assignedTo 
+                              }));
                               setProjectSearch('');
                               setProjectDropdownOpen(false);
                               goToNextField('project');

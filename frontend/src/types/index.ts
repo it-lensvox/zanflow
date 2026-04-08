@@ -1270,6 +1270,8 @@ export interface QuickNoteAttachment {
 export interface QuickNote {
   id: number;
   user: number;
+  user_details?: Pick<User, 'id' | 'username' | 'first_name' | 'last_name' | 'avatar'>;
+  updated_by?: number;
   folder: number | null;
   project?: number | null;
   title: string;
@@ -1337,4 +1339,19 @@ export interface DailyUpdateListResponse {
   next: string | null;
   previous: string | null;
   results: DailyUpdate[];
+}
+
+export interface Event {
+    id: number;
+    organizer: number;
+    organizer_name: string;
+    title: string;
+    attendees: number[];
+    start_time: string;
+    end_time: string;
+    location?: string;
+    is_online_meeting: boolean;
+    description?: string;
+    created_at: string;
+    updated_at: string;
 }

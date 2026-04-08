@@ -160,8 +160,11 @@ export function NotificationsPage({
     if (type === 'task_assigned') {
       return '#3b82f6';
     }
-    if (type === 'project_assigI want to lCaccccned') {
+    if (type === 'project_assigned' || type === 'project_assigI want to lCaccccned') {
       return '#9c45ce';
+    }
+    if (type === 'event_created') {
+      return '#f97316'; // Orange accent for events
     }
     return '#9170df';
   };
@@ -177,10 +180,10 @@ export function NotificationsPage({
     }
 
   // Navigate based on related object or metadata
-    const relatedType = n.related_object?.type || n.related_object_info?.type;
-    const relatedId = n.related_object?.id || n.related_object_info?.id;
+  const relatedType = (n.related_object?.type || n.related_object_info?.type) as string | undefined;
+  const relatedId = n.related_object?.id || n.related_object_info?.id;
 
-    if (relatedType === 'document' && relatedId) {
+  if (relatedType === 'document' && relatedId) {
       navigate(`/documents`);
     } else if (relatedType === 'task' || n.metadata?.task_id) {
       const taskId = relatedId || n.metadata?.task_id;
@@ -188,6 +191,10 @@ export function NotificationsPage({
     } else if (relatedType === 'project' || n.metadata?.project_id) {
       const projectId = relatedId || n.metadata?.project_id;
       navigate(`/projects/${projectId}`);
+    } else if (relatedType === 'event' || n.metadata?.event_id) {
+      const eventId = relatedId || n.metadata?.event_id;
+      // Pass the event ID as a query parameter
+      navigate(`/calendar?eventId=${eventId}`);
     }
 
     if (onClose) onClose();

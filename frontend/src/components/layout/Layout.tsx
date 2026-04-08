@@ -6,7 +6,7 @@ import { QuickNotes } from '@/components/QuickNotes';
 import { AIBot } from '@/pages/AI BOT/AI BOT';
 import { useNotifications } from '@/hooks/useNotifications';
 import { TaskDraftBar } from '@/pages/MyTask/Taskdrafts';
-
+import logoImage from '../../public/assets/logo.png';
 function PageSkeleton() {
   return (
     <div className="h-full flex flex-col animate-pulse p-6 gap-4">
@@ -83,10 +83,16 @@ export function Layout() {
       drawFavicon(faviconImgRef.current);
     } else {
       const img = new Image();
-      img.src = './src/public/assets/logo.png';
+      img.crossOrigin = 'anonymous'; // Fixes production CORS issues
+      img.src = logoImage; // Uses the bundled import
+      
       img.onload = () => {
         faviconImgRef.current = img;
         drawFavicon(img);
+      };
+      
+      img.onerror = () => {
+        console.error("Favicon Error: Could not load the logo image");
       };
     }
   }, [unreadCount]);

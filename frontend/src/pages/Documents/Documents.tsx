@@ -472,9 +472,17 @@ export function Documents() {
           {/* Documents View */}
           <div className="flex-1 overflow-hidden px-8 pb-8 pt-6 min-h-0 flex flex-col">
             <div className="flex-1 overflow-hidden">
-              <DualView
-                viewMode={viewMode}
-                isLoading={isLoading}
+              {isLoading ? (
+                <div className="flex flex-col items-center justify-center min-h-[50vh] w-full">
+                  <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary/20 border-t-primary mb-4"></div>
+                  <p className="text-sm font-medium text-muted-foreground animate-pulse">
+                    Loading documents...
+                  </p>
+                </div>
+              ) : (
+                <DualView
+                  viewMode={viewMode}
+                  isLoading={isLoading}
                 gridProps={{
                   data: displayedDocuments,
                   renderCard: (doc) => (
@@ -514,6 +522,7 @@ export function Documents() {
                   rowClassName: () => 'group',
                 }}
               />
+              )}
             </div>
             {paginationControls}
           </div>

@@ -240,11 +240,19 @@ export function Projects() {
             Clear
           </button>
         )}
-      </div>
-
-      <DualView
-        viewMode={viewMode}
-        isLoading={isLoading}
+        </div>
+  
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center min-h-[50vh] w-full">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary/20 border-t-primary mb-4"></div>
+            <p className="text-sm font-medium text-muted-foreground animate-pulse">
+              Loading projects...
+            </p>
+          </div>
+        ) : (
+          <DualView
+            viewMode={viewMode}
+            isLoading={isLoading}
         gridProps={{
           data: filteredProjects,
           renderCard: (project: any) => (
@@ -295,6 +303,7 @@ export function Projects() {
           },
         }}
       />
+      )}
       <CreateProjectModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
