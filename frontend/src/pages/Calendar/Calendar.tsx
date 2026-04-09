@@ -200,6 +200,15 @@ interface DaysViewProps {
 }
 
 const DaysView: React.FC<DaysViewProps> = ({ currentDate, tasks, events, selectedDate, onTaskClick, onEventClick, onDateClick, viewMode }) => {
+    const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+
+    React.useEffect(() => {
+        if (scrollContainerRef.current) {
+            // Scroll to 9 AM (9 hours * 64px per hour)
+            scrollContainerRef.current.scrollTop = 9 * 64;
+        }
+    }, [viewMode, currentDate]);
+
     const getDays = () => {
         const days: Date[] = [];
         if (viewMode === 'day') {
@@ -263,24 +272,25 @@ const DaysView: React.FC<DaysViewProps> = ({ currentDate, tasks, events, selecte
     const hours = Array.from({ length: 24 }, (_, i) => i);
 
     return (
-        <div className="flex flex-col h-full bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-            {/* Header Row */}
-            <div className="flex border-b border-gray-200 bg-gray-50">
-                <div className="w-16 flex-shrink-0 border-r border-gray-200 bg-gray-50"></div>
-                <div className={`grid ${gridColsClass} flex-1`}>
-                    {displayDays.map((day, index) => {
-                        const isToday = day.toDateString() === today.toDateString();
-                        return (
-                            <div key={index} className={`flex flex-col items-center justify-center py-3 px-2 border-r border-gray-200 last:border-r-0 ${isToday ? 'bg-blue-50/50' : ''}`}>
-                                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{DAYS_OF_WEEK[day.getDay()]}</span>
-                                <span className={`text-lg font-bold ${isToday ? 'text-blue-600 bg-blue-100 w-8 h-8 flex items-center justify-center rounded-full' : 'text-gray-900'}`}>
-                                    {day.getDate()}
-                                </span>
-                            </div>
-                        );
-                    })}
+        <div className="flex flex-col h-full bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden relative">
+            <div className="sticky top-[160px] sm:top-[76px] z-20 flex flex-col bg-white"></div>
+                {/* Header Row */}
+                <div className="flex border-b border-gray-200 bg-gray-50">
+                    <div className="w-16 flex-shrink-0 border-r border-gray-200 bg-gray-50"></div>
+                    <div className={`grid ${gridColsClass} flex-1`}>
+                        {displayDays.map((day, index) => {
+                            const isToday = day.toDateString() === today.toDateString();
+                            return (
+                                <div key={index} className={`flex flex-col items-center justify-center py-3 px-2 border-r border-gray-200 last:border-r-0 ${isToday ? 'bg-blue-50/50' : ''}`}>
+                                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{DAYS_OF_WEEK[day.getDay()]}</span>
+                                    <span className={`text-lg font-bold ${isToday ? 'text-blue-600 bg-blue-100 w-8 h-8 flex items-center justify-center rounded-full' : 'text-gray-900'}`}>
+                                        {day.getDate()}
+                                    </span>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
-            </div>
 
             {/* All Day / Tasks Row */}
             <div className="flex border-b border-gray-300 bg-gray-50/30 max-h-32 overflow-y-auto">
@@ -314,7 +324,8 @@ const DaysView: React.FC<DaysViewProps> = ({ currentDate, tasks, events, selecte
             </div>
 
             {/* Hourly Timeline Grid */}
-            <div className="flex-1 overflow-y-auto bg-white relative min-h-[400px]">
+            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto bg-white relative min-h-[400px]">
+                <div className="flex min-w-full"></div>
                 <div className="flex min-w-full">
                     {/* Time Axis */}
                     <div className="w-16 flex-shrink-0 flex flex-col border-r border-gray-200 bg-white">
@@ -1807,7 +1818,7 @@ export const Calendar: React.FC = () => {
             </div>
 
             {/* Controls Bar */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm sticky top-0 z-30">
                 <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
                     <button 
                         onClick={goToToday}
