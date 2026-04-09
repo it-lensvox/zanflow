@@ -230,11 +230,18 @@ const DaysView: React.FC<DaysViewProps> = ({ currentDate, tasks, events, selecte
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    const toLocalDateStr = (iso: string | undefined) => {
+        if (!iso) return '';
+        if (!iso.includes('T')) return iso.split('T')[0];
+        const d = new Date(iso);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+
     const getTasksForDate = (date: Date) => {
         const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
         return tasks.filter((task) => {
-            const startDate = task.start_date?.split('T')[0];
-            const endDate = task.end_date?.split('T')[0];
+            const startDate = toLocalDateStr(task.start_date);
+            const endDate = toLocalDateStr(task.end_date);
             return (startDate && startDate <= dateStr && endDate && endDate >= dateStr) ||
                 startDate === dateStr ||
                 endDate === dateStr;
@@ -244,8 +251,8 @@ const DaysView: React.FC<DaysViewProps> = ({ currentDate, tasks, events, selecte
     const getEventsForDate = (date: Date) => {
         const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
         return events.filter((event) => {
-            const startDate = event.start_time?.split('T')[0];
-            const endDate = event.end_time?.split('T')[0];
+            const startDate = toLocalDateStr(event.start_time);
+            const endDate = toLocalDateStr(event.end_time);
             return (startDate && startDate <= dateStr && endDate && endDate >= dateStr) ||
                 startDate === dateStr ||
                 endDate === dateStr;
@@ -302,12 +309,12 @@ const DaysView: React.FC<DaysViewProps> = ({ currentDate, tasks, events, selecte
                     <div className="w-16 flex-shrink-0 flex flex-col border-r border-gray-200 bg-white">
                         {hours.map(hour => (
                             <div key={hour} className="h-16 relative border-b border-transparent">
-                                {hour !== 0 && (
-                                    <span className="absolute -top-2.5 right-2 text-xs font-medium text-gray-400">
-                                        {hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
-                                    </span>
-                                )}
-                            </div>
+                            {hour !== 0 && (
+                                <span className="absolute -top-2.5 right-2 text-xs font-medium text-gray-400">
+                                    {hour.toString().padStart(2, '0')}:00
+                                </span>
+                            )}
+                        </div>
                         ))}
                     </div>
 
@@ -400,13 +407,13 @@ const DaysView: React.FC<DaysViewProps> = ({ currentDate, tasks, events, selecte
                                             >
                                                 <div
                                                     className="h-full w-full bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md overflow-hidden p-1.5 text-xs leading-tight cursor-pointer shadow-sm group-hover:bg-indigo-100 group-hover:shadow-md transition-all flex flex-col relative"
-                                                    title={`${event.title}\n${start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`}
+                                                    title={`${event.title}\n${start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false})} - ${end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false})}`}
                                                 >
                                                     <div className="w-1 h-full absolute left-0 top-0 bottom-0 bg-indigo-500 rounded-l-md" />
                                                     <div className="font-semibold truncate ml-1">{event.title}</div>
                                                     {eventHeight >= 40 && (
                                                         <div className="text-[10px] truncate ml-1 opacity-80 mt-0.5">
-                                                            {start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                                            {start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false})} - {end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false})}
                                                         </div>
                                                     )}
                                                 </div>
@@ -508,6 +515,8 @@ const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, selectedDate, 
     const [attendees, setAttendees] = useState<number[]>([]);
     const [userSearch, setUserSearch] = useState('');
     const [showUserDropdown, setShowUserDropdown] = useState(false);
+    const [showStartTimeDropdown, setShowStartTimeDropdown] = useState(false);
+    const [showEndTimeDropdown, setShowEndTimeDropdown] = useState(false);
 
     // Fetch available team members
     const { data: availableUsers = [] } = useQuery({
@@ -681,12 +690,146 @@ const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, selectedDate, 
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-4 text-gray-500">
-                        <Clock size={20} className="text-gray-400" />
-                        <div className={`flex items-center gap-2 border-b pb-2 flex-1 ${isReadOnly ? 'border-transparent' : 'border-gray-200'}`}>
-                            <input type="datetime-local" disabled={isReadOnly} value={startTime} onChange={e => setStartTime(e.target.value)} className={`bg-transparent focus:outline-none text-sm text-gray-900 ${isReadOnly ? 'cursor-not-allowed opacity-90' : ''}`} />
-                            <span className="text-gray-400">-</span>
-                            <input type="datetime-local" disabled={isReadOnly} value={endTime} onChange={e => setEndTime(e.target.value)} className={`bg-transparent focus:outline-none text-sm text-gray-900 ${isReadOnly ? 'cursor-not-allowed opacity-90' : ''}`} />
+                    <div className="flex items-start gap-4 text-gray-500">
+                        <Clock size={20} className="mt-2 text-gray-400" />
+                        <div className={`flex items-center gap-4 border-b pb-3 pt-1 flex-1 ${isReadOnly ? 'border-transparent' : 'border-gray-200'}`}>
+                            {/* Start Date */}
+                            <div className="flex flex-col">
+                                <label className="text-[11px] font-medium text-gray-500 mb-1">Start date</label>
+                                <input 
+                                    type="date" 
+                                    disabled={isReadOnly} 
+                                    value={startTime.split('T')[0] || ''} 
+                                    onChange={e => {
+                                        const newDate = e.target.value;
+                                        setStartTime(`${newDate}T${startTime.split('T')[1] || '00:00'}`);
+                                        setEndTime(`${newDate}T${endTime.split('T')[1] || '00:00'}`);
+                                    }} 
+                                    className={`bg-transparent focus:outline-none text-sm text-gray-900 ${isReadOnly ? 'cursor-not-allowed opacity-90' : ''}`} 
+                                />
+                            </div>
+                            
+                            {/* Start Time */}
+                            <div className="flex flex-col border-l border-gray-200 pl-4 relative">
+                                <label className="text-[11px] font-medium text-gray-500 mb-1">Start time</label>
+                                <button 
+                                    type="button"
+                                    disabled={isReadOnly}
+                                    onClick={() => {
+                                        setShowStartTimeDropdown(!showStartTimeDropdown);
+                                        setShowEndTimeDropdown(false);
+                                    }}
+                                    className={`bg-transparent focus:outline-none text-sm text-gray-900 w-20 flex justify-between items-center ${isReadOnly ? 'cursor-not-allowed opacity-90' : ''}`}
+                                >
+                                    {startTime.split('T')[1]?.slice(0,5) || '00:00'}
+                                    {!isReadOnly && <ChevronRight size={14} className="text-gray-400 rotate-90" />}
+                                </button>
+                                {showStartTimeDropdown && !isReadOnly && (
+                                    <>
+                                        <div className="fixed inset-0 z-10" onClick={() => setShowStartTimeDropdown(false)} />
+                                        <div className="absolute top-full left-4 mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-xl z-20 max-h-60 overflow-y-auto py-1">
+                                            {Array.from({ length: 48 }).map((_, i) => {
+                                                const hour = Math.floor(i / 2).toString().padStart(2, '0');
+                                                const min = (i % 2 === 0) ? '00' : '30';
+                                                const time = `${hour}:${min}`;
+                                                const isSelected = (startTime.split('T')[1]?.slice(0,5) || '00:00') === time;
+                                                
+                                                return (
+                                                    <div 
+                                                        key={`start-${time}`} 
+                                                        className={`px-3 py-1.5 cursor-pointer text-sm transition-colors ${isSelected ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-900 hover:bg-gray-50'}`}
+                                                        onClick={() => {
+                                                            const date = startTime.split('T')[0];
+                                                            setStartTime(`${date}T${time}`);
+                                                            
+                                                            // Always adjust end time to be exactly +30 minutes
+                                                            const startDt = new Date(`${date}T${time}`);
+                                                            const newEndDt = new Date(startDt.getTime() + 30 * 60000); // Add 30 mins
+                                                            
+                                                            // Safely format the date using local timezone properties
+                                                            const endY = newEndDt.getFullYear();
+                                                            const endM = String(newEndDt.getMonth() + 1).padStart(2, '0');
+                                                            const endD = String(newEndDt.getDate()).padStart(2, '0');
+                                                            const endH = String(newEndDt.getHours()).padStart(2, '0');
+                                                            const endMin = String(newEndDt.getMinutes()).padStart(2, '0');
+                                                            
+                                                            setEndTime(`${endY}-${endM}-${endD}T${endH}:${endMin}`);
+                                                            setShowStartTimeDropdown(false);
+                                                        }}
+                                                    >
+                                                        {time}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+
+                            {/* End Time */}
+                            <div className="flex flex-col border-l border-gray-200 pl-4 relative">
+                                <label className="text-[11px] font-medium text-gray-500 mb-1">End time</label>
+                                <button 
+                                    type="button"
+                                    disabled={isReadOnly}
+                                    onClick={() => {
+                                        setShowEndTimeDropdown(!showEndTimeDropdown);
+                                        setShowStartTimeDropdown(false);
+                                    }}
+                                    className={`bg-transparent focus:outline-none text-sm text-gray-900 w-24 flex justify-between items-center whitespace-nowrap ${isReadOnly ? 'cursor-not-allowed opacity-90' : ''}`}
+                                >
+                                    {endTime.split('T')[1]?.slice(0,5) || '00:00'}
+                                    {!isReadOnly && <ChevronRight size={14} className="text-gray-400 rotate-90 ml-1" />}
+                                </button>
+                                {showEndTimeDropdown && !isReadOnly && (
+                                    <>
+                                        <div className="fixed inset-0 z-10" onClick={() => setShowEndTimeDropdown(false)} />
+                                        <div className="absolute top-full left-4 mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-xl z-20 max-h-60 overflow-y-auto py-1">
+                                            {Array.from({ length: 48 }).map((_, i) => {
+                                                const hour = Math.floor(i / 2).toString().padStart(2, '0');
+                                                const min = (i % 2 === 0) ? '00' : '30';
+                                                const time = `${hour}:${min}`;
+                                                const isSelected = (endTime.split('T')[1]?.slice(0,5) || '00:00') === time;
+                                                
+                                                // Calculate duration dynamically based on selected start time
+                                                let durationStr = '';
+                                                const startT = startTime.split('T')[1]?.slice(0,5) || '00:00';
+                                                const startMins = parseInt(startT.split(':')[0]) * 60 + parseInt(startT.split(':')[1]);
+                                                let endMins = parseInt(hour) * 60 + parseInt(min);
+                                                
+                                                if (endMins < startMins) endMins += 24 * 60; // Next day
+                                                const diffHrs = (endMins - startMins) / 60;
+                                                
+                                                if (diffHrs > 0) {
+                                                    durationStr = ` (${diffHrs} hour${diffHrs !== 1 ? 's' : ''})`;
+                                                }
+
+                                                return (
+                                                    <div 
+                                                        key={`end-${time}`} 
+                                                        className={`px-3 py-1.5 cursor-pointer text-sm transition-colors flex justify-between ${isSelected ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-900 hover:bg-gray-50'}`}
+                                                        onClick={() => {
+                                                            let endDateStr = startTime.split('T')[0];
+                                                            
+                                                            // If end time is earlier than start time, assume it rolls over to next day
+                                                            if (time < (startTime.split('T')[1]?.slice(0,5) || '00:00')) {
+                                                                const nextDay = new Date(startTime.split('T')[0]);
+                                                                nextDay.setDate(nextDay.getDate() + 1);
+                                                                endDateStr = nextDay.toISOString().split('T')[0];
+                                                            }
+                                                            setEndTime(`${endDateStr}T${time}`);
+                                                            setShowEndTimeDropdown(false);
+                                                        }}
+                                                    >
+                                                        <span>{time}</span>
+                                                        <span className="text-gray-500 text-xs">{durationStr}</span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </div>
                     <div className="flex items-center gap-4 text-gray-500">
@@ -912,7 +1055,7 @@ const TaskListSidebar: React.FC<TaskListSidebarProps> = ({
                                         <div className="flex items-center gap-3 text-xs text-gray-500">
                                             <span className="font-medium text-indigo-600 flex items-center gap-1">
                                                 <Clock size={12} />
-                                                {new Date(event.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                {new Date(event.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
                                             </span>
                                         </div>
                                     </div>
@@ -1248,13 +1391,20 @@ export const Calendar: React.FC = () => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
+        const toLocalDateStr = (iso: string | undefined) => {
+            if (!iso) return '';
+            if (!iso.includes('T')) return iso.split('T')[0];
+            const d = new Date(iso);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        };
+
         const currentDateIter = new Date(startDate);
         while (currentDateIter <= endDate) {
             // Use local timezone formatting instead of UTC to prevent day-shifting
             const dateStr = `${currentDateIter.getFullYear()}-${String(currentDateIter.getMonth() + 1).padStart(2, '0')}-${String(currentDateIter.getDate()).padStart(2, '0')}`;
             const dayTasks = tasks.filter((task: Task) => {
-                const startDateStr = task.start_date?.split('T')[0];
-                const endDateStr = task.end_date?.split('T')[0];
+                const startDateStr = toLocalDateStr(task.start_date);
+                const endDateStr = toLocalDateStr(task.end_date);
                 if (startDateStr && endDateStr) {
                     return dateStr >= startDateStr && dateStr <= endDateStr;
                 }
@@ -1262,8 +1412,8 @@ export const Calendar: React.FC = () => {
             });
 
             const dayEvents = events.filter((event: CalendarEventType) => {
-                const startDateStr = event.start_time?.split('T')[0];
-                const endDateStr = event.end_time?.split('T')[0];
+                const startDateStr = toLocalDateStr(event.start_time);
+                const endDateStr = toLocalDateStr(event.end_time);
                 if (startDateStr && endDateStr) {
                     return dateStr >= startDateStr && dateStr <= endDateStr;
                 }
@@ -1319,9 +1469,15 @@ export const Calendar: React.FC = () => {
         if (!selectedDate) return [];
         // Use local timezone formatting instead of UTC to prevent day-shifting
         const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
+        const toLocalDateStr = (iso: string | undefined) => {
+            if (!iso) return '';
+            if (!iso.includes('T')) return iso.split('T')[0];
+            const d = new Date(iso);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        };
         return tasks.filter((task: Task) => {
-            const startDateStr = task.start_date?.split('T')[0];
-            const endDateStr = task.end_date?.split('T')[0];
+            const startDateStr = toLocalDateStr(task.start_date);
+            const endDateStr = toLocalDateStr(task.end_date);
             if (startDateStr && endDateStr) {
                 return dateStr >= startDateStr && dateStr <= endDateStr;
             }
@@ -1332,9 +1488,15 @@ export const Calendar: React.FC = () => {
     const selectedDateEvents = useMemo(() => {
         if (!selectedDate) return [];
         const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
+        const toLocalDateStr = (iso: string | undefined) => {
+            if (!iso) return '';
+            if (!iso.includes('T')) return iso.split('T')[0];
+            const d = new Date(iso);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        };
         return events.filter((event: CalendarEventType) => {
-            const startDateStr = event.start_time?.split('T')[0];
-            const endDateStr = event.end_time?.split('T')[0];
+            const startDateStr = toLocalDateStr(event.start_time);
+            const endDateStr = toLocalDateStr(event.end_time);
             if (startDateStr && endDateStr) {
                 return dateStr >= startDateStr && dateStr <= endDateStr;
             }
