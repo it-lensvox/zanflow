@@ -665,19 +665,55 @@ const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, selectedDate, 
     };
 
     const handleSave = () => {
-        const payload = {
+        const basePayload = {
             title,
-            start_time: new Date(startTime).toISOString(),
-            end_time: new Date(endTime).toISOString(),
             location,
             is_online_meeting: isOnline,
             description,
             attendees
         };
-        if (event) {
-            updateEvent(payload);
+
+        const startDt = new Date(startTime);
+        const endDt = new Date(endTime);
+
+        if (!event && allDayPreset === 'work_week' && startDt.toDateString() !== endDt.toDateString()) {
+            let current = new Date(startDt);
+            current.setHours(0, 0, 0, 0);
+            
+            const endLimit = new Date(endDt);
+            endLimit.setHours(23, 59, 59, 999);
+
+            while (current <= endLimit) {
+                if (current.getDay() !== 0 && current.getDay() !== 6) {
+                    const dayStart = new Date(current);
+                    dayStart.setHours(startDt.getHours(), startDt.getMinutes(), 0, 0);
+                    
+                    const dayEnd = new Date(current);
+                    dayEnd.setHours(endDt.getHours(), endDt.getMinutes(), 0, 0);
+                    
+                    if (dayEnd < dayStart) {
+                        dayEnd.setDate(dayEnd.getDate() + 1);
+                    }
+
+                    createEvent({
+                        ...basePayload,
+                        start_time: dayStart.toISOString(),
+                        end_time: dayEnd.toISOString()
+                    });
+                }
+                current.setDate(current.getDate() + 1);
+            }
         } else {
-            createEvent(payload);
+            const finalPayload = {
+                ...basePayload,
+                start_time: startDt.toISOString(),
+                end_time: endDt.toISOString()
+            };
+            if (event) {
+                updateEvent(finalPayload);
+            } else {
+                createEvent(finalPayload);
+            }
         }
     };
 
@@ -808,7 +844,15 @@ const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, selectedDate, 
                                             const startDt = new Date(newDate);
                                             let endDt = new Date(startDt);
                                             
-                                            if (allDayPreset === 'work_week') endDt.setDate(startDt.getDate() + 4);
+                                            if (allDayPreset === 'work_week') {
+                                                let added = 0;
+                                                while (added < 4) {
+                                                    endDt.setDate(endDt.getDate() + 1);
+                                                    if (endDt.getDay() !== 0 && endDt.getDay() !== 6) {
+                                                        added++;
+                                                    }
+                                                }
+                                            }
                                             else if (allDayPreset === 'full_week') endDt.setDate(startDt.getDate() + 6);
                                             else if (allDayPreset === 'custom') {
                                                 endDt = new Date(endTime.split('T')[0]);
@@ -902,7 +946,15 @@ const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, selectedDate, 
                                             const startDt = new Date(startTime.split('T')[0]);
                                             let endDt = new Date(startDt);
                                             
-                                            if (preset === 'work_week') endDt.setDate(startDt.getDate() + 4);
+                                            if (preset === 'work_week') {
+                                                let added = 0;
+                                                while (added < 4) {
+                                                    endDt.setDate(endDt.getDate() + 1);
+                                                    if (endDt.getDay() !== 0 && endDt.getDay() !== 6) {
+                                                        added++;
+                                                    }
+                                                }
+                                            }
                                             else if (preset === 'full_week') endDt.setDate(startDt.getDate() + 6);
                                             
                                             if (preset !== 'custom') {
@@ -923,18 +975,19 @@ const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, selectedDate, 
                                 </div>
 
                                 {/* End Date */}
+                                {/* End Date */}
                                 <div className="flex flex-col border-l border-gray-200 pl-4 relative">
                                     <label className="text-[11px] font-medium text-gray-500 mb-1">End date</label>
                                     <input 
                                         type="date" 
-                                        disabled={isReadOnly || allDayPreset !== 'custom'} 
+                                        disabled={isReadOnly} 
                                         value={endTime.split('T')[0] || ''} 
                                         onChange={e => {
                                             const newDate = e.target.value;
                                             const timePart = endTime.split('T')[1] || '00:00';
                                             setEndTime(`${newDate}T${timePart}`);
                                         }} 
-                                        className={`bg-transparent focus:outline-none text-sm text-gray-900 ${(isReadOnly || allDayPreset !== 'custom') ? 'cursor-not-allowed opacity-70' : ''}`} 
+                                        className={`bg-transparent focus:outline-none text-sm text-gray-900 ${isReadOnly ? 'cursor-not-allowed opacity-70' : ''}`} 
                                     />
                                 </div>
 
