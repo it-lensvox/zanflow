@@ -231,7 +231,6 @@ const DaysView: React.FC<DaysViewProps> = ({ currentDate, tasks, events, selecte
     today.setHours(0, 0, 0, 0);
 
     const getTasksForDate = (date: Date) => {
-        // Use local timezone formatting instead of UTC to prevent day-shifting
         const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
         return tasks.filter((task) => {
             const startDate = task.start_date?.split('T')[0];
@@ -253,53 +252,172 @@ const DaysView: React.FC<DaysViewProps> = ({ currentDate, tasks, events, selecte
         });
     };
     
-    // Explicit tailwind strings for JIT compiler
     const gridColsClass = displayDays.length === 1 ? 'grid-cols-1' : displayDays.length === 5 ? 'grid-cols-5' : 'grid-cols-7';
+    const hours = Array.from({ length: 24 }, (_, i) => i);
 
     return (
         <div className="flex flex-col h-full bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-            <div className={`grid ${gridColsClass} border-b border-gray-200 bg-gray-50`}>
-                {displayDays.map((day, index) => {
-                    const isToday = day.toDateString() === today.toDateString();
-                    return (
-                        <div key={index} className={`flex flex-col items-center justify-center py-3 px-2 border-r border-gray-200 last:border-r-0 ${isToday ? 'bg-blue-50/50' : ''}`}>
-                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{DAYS_OF_WEEK[day.getDay()]}</span>
-                            <span className={`text-lg font-bold ${isToday ? 'text-blue-600 bg-blue-100 w-8 h-8 flex items-center justify-center rounded-full' : 'text-gray-900'}`}>
-                                {day.getDate()}
-                            </span>
-                        </div>
-                    );
-                })}
+            {/* Header Row */}
+            <div className="flex border-b border-gray-200 bg-gray-50">
+                <div className="w-16 flex-shrink-0 border-r border-gray-200 bg-gray-50"></div>
+                <div className={`grid ${gridColsClass} flex-1`}>
+                    {displayDays.map((day, index) => {
+                        const isToday = day.toDateString() === today.toDateString();
+                        return (
+                            <div key={index} className={`flex flex-col items-center justify-center py-3 px-2 border-r border-gray-200 last:border-r-0 ${isToday ? 'bg-blue-50/50' : ''}`}>
+                                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{DAYS_OF_WEEK[day.getDay()]}</span>
+                                <span className={`text-lg font-bold ${isToday ? 'text-blue-600 bg-blue-100 w-8 h-8 flex items-center justify-center rounded-full' : 'text-gray-900'}`}>
+                                    {day.getDate()}
+                                </span>
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
-            <div className={`grid ${gridColsClass} flex-1 min-h-[500px] divide-x divide-gray-200`}>
-                {displayDays.map((day, index) => {
-                    const dayTasks = getTasksForDate(day);
-                    const dayEvents = getEventsForDate(day);
-                    const isToday = day.toDateString() === today.toDateString();
-                    const isSelected = selectedDate?.toDateString() === day.toDateString();
-                    
-                    return (
-                        <div 
-                            key={index} 
-                            className={`
-                                p-2 flex flex-col gap-2 cursor-pointer transition-colors hover:bg-gray-50
-                                ${isToday ? 'bg-blue-50/10' : ''}
-                                ${isSelected ? 'ring-2 ring-inset ring-blue-400 bg-blue-50/20' : ''}
-                            `}
-                            onClick={() => onDateClick(day)}
-                        >
-                            {dayEvents.map((event) => (
-                                <CalendarEventUI key={`event-${event.id}`} event={event} onClick={onEventClick || (() => {})} />
+
+            {/* All Day / Tasks Row */}
+            <div className="flex border-b border-gray-300 bg-gray-50/30 max-h-32 overflow-y-auto">
+                <div className="w-16 flex-shrink-0 border-r border-gray-200 flex items-center justify-center text-[11px] font-medium text-gray-500 p-2 text-center bg-gray-50">
+                    All Day / Tasks
+                </div>
+                <div className={`grid ${gridColsClass} flex-1 divide-x divide-gray-200`}>
+                    {displayDays.map((day, index) => {
+                        const dayTasks = getTasksForDate(day);
+                        return (
+                            <div key={index} className="p-1 flex flex-col gap-1 min-h-[40px] relative">
+                                {dayTasks.map((task) => (
+                                    <TaskEvent key={`task-${task.id}`} task={task} onClick={onTaskClick} compact />
+                                ))}
+                                {dayTasks.length === 0 && <div className="hidden sm:flex absolute inset-0 text-[10px] text-gray-300 items-center justify-center pointer-events-none">No tasks</div>}
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* Hourly Timeline Grid */}
+            <div className="flex-1 overflow-y-auto bg-white relative min-h-[400px]">
+                <div className="flex min-w-full">
+                    {/* Time Axis */}
+                    <div className="w-16 flex-shrink-0 flex flex-col border-r border-gray-200 bg-white">
+                        {hours.map(hour => (
+                            <div key={hour} className="h-16 relative border-b border-transparent">
+                                {hour !== 0 && (
+                                    <span className="absolute -top-2.5 right-2 text-xs font-medium text-gray-400">
+                                        {hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
+                                    </span>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Day Columns */}
+                    <div className={`grid ${gridColsClass} flex-1 divide-x divide-gray-200 relative`}>
+                        {/* Horizontal Grid Lines */}
+                        <div className="absolute inset-0 pointer-events-none flex flex-col">
+                            {hours.map(hour => (
+                                <div key={hour} className="h-16 border-b border-gray-100 w-full" />
                             ))}
-                            {dayTasks.map((task) => (
-                                <TaskEvent key={`task-${task.id}`} task={task} onClick={onTaskClick} />
-                            ))}
-                            {(dayTasks.length === 0 && dayEvents.length === 0) && (
-                                <div className="text-center py-8 text-xs text-gray-400 italic">No items</div>
-                            )}
                         </div>
-                    );
-                })}
+
+                        {/* Column Content */}
+                        {/* Column Content */}
+                        {displayDays.map((day, index) => {
+                            const dayEvents = getEventsForDate(day);
+                            const isToday = day.toDateString() === today.toDateString();
+                            const isSelected = selectedDate?.toDateString() === day.toDateString();
+
+                            // Calculate overlapping events to place them side-by-side
+                            const positionedEvents = dayEvents.map((event, _, array) => {
+                                const start = new Date(event.start_time).getTime();
+                                const end = new Date(event.end_time).getTime();
+                                
+                                const overlaps = array.filter(e => {
+                                    const eStart = new Date(e.start_time).getTime();
+                                    const eEnd = new Date(e.end_time).getTime();
+                                    return start < eEnd && end > eStart;
+                                });
+                                
+                                overlaps.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+                                const orderIndex = overlaps.findIndex(e => e.id === event.id);
+                                return { event, orderIndex, totalOverlaps: overlaps.length };
+                            });
+
+                            return (
+                                <div
+                                    key={index}
+                                    className={`relative h-[1536px] cursor-pointer transition-colors hover:bg-gray-50/50
+                                        ${isToday ? 'bg-blue-50/10' : ''}
+                                        ${isSelected ? 'ring-2 ring-inset ring-blue-400 bg-blue-50/20' : ''}
+                                    `}
+                                    onClick={() => onDateClick(day)}
+                                >
+                                    {positionedEvents.map(({ event, orderIndex, totalOverlaps }) => {
+                                        const start = new Date(event.start_time);
+                                        const end = new Date(event.end_time);
+
+                                        // Ensure event bounding handles cross-day events gracefully visually
+                                        const isSameDay = (d1: Date, d2: Date) => d1.toDateString() === d2.toDateString();
+                                        let effectiveStart = start;
+                                        let effectiveEnd = end;
+
+                                        if (!isSameDay(start, day)) {
+                                            effectiveStart = new Date(day);
+                                            effectiveStart.setHours(0, 0, 0, 0);
+                                        }
+                                        if (!isSameDay(end, day)) {
+                                            effectiveEnd = new Date(day);
+                                            effectiveEnd.setHours(23, 59, 59, 999);
+                                        }
+
+                                        const startMinutes = (effectiveStart.getHours() * 60) + effectiveStart.getMinutes();
+                                        const endMinutes = (effectiveEnd.getHours() * 60) + effectiveEnd.getMinutes();
+                                        const durationMinutes = endMinutes - startMinutes;
+
+                                        // 64px per hour -> 64/60 px per minute
+                                        const topOffset = startMinutes * (64 / 60); 
+                                        const eventHeight = Math.max(durationMinutes * (64 / 60), 24); 
+
+                                        // Side-by-side splitting (prevents overlap hiding the text)
+                                        const widthPercent = 100 / totalOverlaps;
+                                        const leftPercent = orderIndex * widthPercent;
+
+                                        return (
+                                            <div
+                                                key={`event-${event.id}`}
+                                                className="absolute transition-all duration-200 p-0.5 group hover:!z-50 hover:!w-[calc(100%-8px)] hover:!left-1"
+                                                style={{ 
+                                                    top: `${topOffset}px`, 
+                                                    height: `${eventHeight}px`,
+                                                    left: `${leftPercent}%`,
+                                                    width: `${widthPercent}%`,
+                                                    zIndex: 10 + orderIndex
+                                                }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (onEventClick) onEventClick(event);
+                                                }}
+                                            >
+                                                <div
+                                                    className="h-full w-full bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md overflow-hidden p-1.5 text-xs leading-tight cursor-pointer shadow-sm group-hover:bg-indigo-100 group-hover:shadow-md transition-all flex flex-col relative"
+                                                    title={`${event.title}\n${start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`}
+                                                >
+                                                    <div className="w-1 h-full absolute left-0 top-0 bottom-0 bg-indigo-500 rounded-l-md" />
+                                                    <div className="font-semibold truncate ml-1">{event.title}</div>
+                                                    {eventHeight >= 40 && (
+                                                        <div className="text-[10px] truncate ml-1 opacity-80 mt-0.5">
+                                                            {start.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {end.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
             </div>
         </div>
     );
@@ -1006,7 +1124,7 @@ export const Calendar: React.FC = () => {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const [currentDate, setCurrentDate] = useState(new Date());
-    const [viewMode, setViewMode] = useState<ViewMode>('month');
+    const [viewMode, setViewMode] = useState<ViewMode>('work_week');
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [selectedEvent, setSelectedEvent] = useState<CalendarEventType | null>(null);
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
