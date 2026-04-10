@@ -457,7 +457,12 @@ class ChatMessageService:
             # >>> NEW CODE: Trigger the persistent/offline notification <<<
             # This runs in the background for users who aren't on the WebSocket
             ChatMessageService._send_notification(message)
-
+            if content and '@dyuksa' in content.lower() and message_type == 'text' and sender and not is_ai_generated:
+                import threading
+                threading.Thread(
+                    target=ChatMessageService.process_zanflow_ai,
+                    args=(room.id, content, sender.id)
+                ).start()
             return message
 
         except Exception as e:
@@ -607,7 +612,32 @@ class ChatMessageService:
                     if not assignee_ids:
                         assignee_ids = [user_id] # Default to the person who asked if AI fails
                     new_task.assigned_to.add(*assignee_ids)
-                    
+                    # ==========================================================
+                    # >>> NEW: BROADCAST TASK CREATION TO USERS <<<
+                    # ==========================================================
+                    try:
+                        from channels.layers import get_channel_layer
+                        from asgiref.sync import async_to_sync
+                        channel_layer = get_channel_layer()
+                        
+                        # Notify everyone in the project (or just the assignees)
+                        members_to_notify = room.project.members.all() if room.project else User.objects.filter(id__in=assignee_ids)
+                        
+                        for member in members_to_notify:
+                            async_to_sync(channel_layer.group_send)(
+                                f"user_{member.id}_global",
+                                {
+                                    "type": "gateway_signal",
+                                    "event": "TASK_CREATED", # Custom event name
+                                    "data": {
+                                        "task_id": new_task.id,
+                                        "project_id": str(room.project.id) if room.project else None
+                                    }
+                                }
+                            )
+                    except Exception as ws_err:
+                        logger.error(f"Failed to broadcast task creation: {ws_err}")
+                    # ==========================================================
                     # Format a nice success message to show in the chat
                     assignees = new_task.assigned_to.all()
                     assignee_names = ", ".join([u.username for u in assignees])

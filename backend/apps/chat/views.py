@@ -208,7 +208,7 @@ class SendMessageView(APIView):
                 reply_to_id=serializer.validated_data.get('reply_to')
             )
             
-            # # ---> NEW: Auto-trigger AI if this is the global AI Bot room <---
+            # # # ---> NEW: Auto-trigger AI if this is the global AI Bot room <---
             # if room.room_type == ChatRoom.RoomType.AI_BOT and message_type == 'text':
             #     # Run asynchronously using threading (or Celery if you have it set up)
             #     import threading
@@ -218,12 +218,12 @@ class SendMessageView(APIView):
             #     ).start()
             
             # # ---> Optional: Keep your existing @zanflow trigger for other rooms <---
-            # elif '@dyuksa' in content.lower() and message_type == 'text':
-            #     import threading
-            #     threading.Thread(
-            #         target=ChatMessageService.process_zanflow_ai,
-            #         args=(room.id, content, request.user.id)
-            #     ).start()
+            if '@dyuksa' in content.lower() and message_type == 'text':
+                import threading
+                threading.Thread(
+                    target=ChatMessageService.process_zanflow_ai,
+                    args=(room.id, content, request.user.id)
+                ).start()
 
             response_serializer = ChatMessageSerializer(message, context={'request': request})
             return Response(response_serializer.data, status=status.HTTP_201_CREATED)
