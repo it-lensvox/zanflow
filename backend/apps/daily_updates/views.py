@@ -1,8 +1,10 @@
 from rest_framework import viewsets, permissions, status
+from rest_framework.response import Response
 from django.db.models import Q
+from datetime import datetime, timedelta
+from dateutil.parser import parse
 from .models import DailyUpdate, Event
 from .serializers import DailyUpdateSerializer, EventSerializer
-from rest_framework.response import Response
 
 class IsOwnerOrReadOnly(permissions.BasePermission):
     """
@@ -90,6 +92,79 @@ class EventViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(start_time__date__gte=start_date)
             
         return queryset
+
+    def create(self, request, *args, **kwargs):
+        is_recurring = request.data.get('is_recurring', False)
+        
+        # 1. STANDARD EVENT: If it's not recurring, use the normal creation process
+        if not is_recurring:
+            return super().create(request, *args, **kwargs)
+
+        # 2. RECURRING EVENT: Extract recurrence data
+        recurring_days = request.data.get('recurring_days', []) # e.g., [0, 3]
+        recurrence_end_date_str = request.data.get('recurrence_end_date')
+        
+        if not recurring_days or not recurrence_end_date_str:
+            return Response(
+                {"error": "recurring_days and recurrence_end_date are required for recurring events."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        recurrence_end_date = parse(recurrence_end_date_str).date()
+        
+        # Parse the initial start and end times
+        current_start_time = parse(request.data.get('start_time'))
+        current_end_time = parse(request.data.get('end_time'))
+        
+        # We will store all generated events to return them
+        created_events = []
+        errors = []
+
+        # 3. GENERATE OCCURRENCES
+        # Loop day by day until we hit the end date
+        current_date = current_start_time.date()
+        
+        while current_date <= recurrence_end_date:
+            # Check if the current day of the week is in our target days (0=Mon, 3=Thu)
+            if current_date.weekday() in recurring_days:
+                
+                # Create a copy of the request data for this specific occurrence
+                event_data = request.data.copy()
+                
+                # Update the times for this specific date
+                event_data['start_time'] = datetime.combine(current_date, current_start_time.time())
+                event_data['end_time'] = datetime.combine(current_date, current_end_time.time())
+                
+                # Pass data to serializer (this automatically triggers the validation rules 
+                # we wrote earlier for limits and overlaps!)
+                serializer = self.get_serializer(data=event_data)
+                
+                if serializer.is_valid():
+                    # Save the event and assign the organizer
+                    self.perform_create(serializer)
+                    created_events.append(serializer.data)
+                else:
+                    # If it fails validation (e.g., overlap on a specific Thursday), record the error
+                    errors.append({
+                        "date": str(current_date),
+                        "errors": serializer.errors
+                    })
+            
+            # Move to the next day
+            current_date += timedelta(days=1)
+
+        # 4. RETURN RESPONSE
+        # If some dates failed, we let the user know, but still return the successful ones
+        response_data = {
+            "message": f"Successfully created {len(created_events)} events.",
+            "created_events": created_events,
+            "conflicts_skipped": errors
+        }
+        
+        # Return 207 Multi-Status if there were partial failures, otherwise 201 Created
+        response_status = status.HTTP_207_MULTI_STATUS if errors else status.HTTP_201_CREATED
+        
+        return Response(response_data, status=response_status)
 
     def perform_create(self, serializer):
         # Automatically set the organizer to the logged-in user
