@@ -163,12 +163,12 @@ const DayCell: React.FC<DayCellProps> = ({ day, onTaskClick, onEventClick, onDat
             
             <div className="flex flex-col gap-1.5 overflow-hidden">
                 {visibleEvents.map((event) => (
-                    <CalendarEventUI
-                        key={`event-${event.id}`}
-                        event={event}
-                        onClick={onEventClick || (() => {})}
-                        compact={totalItems > 2}
-                    />
+                    <CalendarEventUI 
+                    key={`event-${event.id}`} 
+                    event={event} 
+                    onClick={(ev) => onEventClick && onEventClick(ev)} 
+                    compact 
+                />
                 ))}
                 {visibleTasks.map((task) => (
                     <TaskEvent
@@ -200,6 +200,23 @@ interface DaysViewProps {
 }
 
 const DaysView: React.FC<DaysViewProps> = ({ currentDate, tasks, events, selectedDate, onTaskClick, onEventClick, onDateClick, viewMode }) => {
+    const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+
+    React.useEffect(() => {
+        const scrollToDefault = () => {
+            if (scrollContainerRef.current) {
+                // Calculate position for 9:00 AM (9 hours * 64px)
+                // We subtract 10px to give a little padding above the 09:00 label
+                const scrollPos = (9 * 64) - 10;
+                scrollContainerRef.current.scrollTop = scrollPos;
+            }
+        };
+
+        // Execute after a short delay to ensure DOM is painted
+        const timeoutId = setTimeout(scrollToDefault, 100);
+        return () => clearTimeout(timeoutId);
+    }, [viewMode, currentDate]);
+
     const getDays = () => {
         const days: Date[] = [];
         if (viewMode === 'day') {
@@ -230,12 +247,18 @@ const DaysView: React.FC<DaysViewProps> = ({ currentDate, tasks, events, selecte
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    const toLocalDateStr = (iso: string | undefined) => {
+        if (!iso) return '';
+        if (!iso.includes('T')) return iso.split('T')[0];
+        const d = new Date(iso);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+
     const getTasksForDate = (date: Date) => {
-        // Use local timezone formatting instead of UTC to prevent day-shifting
         const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
         return tasks.filter((task) => {
-            const startDate = task.start_date?.split('T')[0];
-            const endDate = task.end_date?.split('T')[0];
+            const startDate = toLocalDateStr(task.start_date);
+            const endDate = toLocalDateStr(task.end_date);
             return (startDate && startDate <= dateStr && endDate && endDate >= dateStr) ||
                 startDate === dateStr ||
                 endDate === dateStr;
@@ -245,61 +268,230 @@ const DaysView: React.FC<DaysViewProps> = ({ currentDate, tasks, events, selecte
     const getEventsForDate = (date: Date) => {
         const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
         return events.filter((event) => {
-            const startDate = event.start_time?.split('T')[0];
-            const endDate = event.end_time?.split('T')[0];
+            const startDate = toLocalDateStr(event.start_time);
+            const endDate = toLocalDateStr(event.end_time);
             return (startDate && startDate <= dateStr && endDate && endDate >= dateStr) ||
                 startDate === dateStr ||
                 endDate === dateStr;
         });
     };
     
-    // Explicit tailwind strings for JIT compiler
     const gridColsClass = displayDays.length === 1 ? 'grid-cols-1' : displayDays.length === 5 ? 'grid-cols-5' : 'grid-cols-7';
+    const hours = Array.from({ length: 24 }, (_, i) => i);
 
     return (
-        <div className="flex flex-col h-full bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-            <div className={`grid ${gridColsClass} border-b border-gray-200 bg-gray-50`}>
-                {displayDays.map((day, index) => {
-                    const isToday = day.toDateString() === today.toDateString();
-                    return (
-                        <div key={index} className={`flex flex-col items-center justify-center py-3 px-2 border-r border-gray-200 last:border-r-0 ${isToday ? 'bg-blue-50/50' : ''}`}>
-                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{DAYS_OF_WEEK[day.getDay()]}</span>
-                            <span className={`text-lg font-bold ${isToday ? 'text-blue-600 bg-blue-100 w-8 h-8 flex items-center justify-center rounded-full' : 'text-gray-900'}`}>
-                                {day.getDate()}
-                            </span>
-                        </div>
-                    );
-                })}
+        <div className="flex flex-col h-full bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden relative">
+            <div className="sticky top-[160px] sm:top-[76px] z-20 flex flex-col bg-white"></div>
+                {/* Header Row */}
+                <div className="flex border-b border-gray-200 bg-gray-50">
+                    <div className="w-16 flex-shrink-0 border-r border-gray-200 bg-gray-50"></div>
+                    <div className={`grid ${gridColsClass} flex-1`}>
+                        {displayDays.map((day, index) => {
+                            const isToday = day.toDateString() === today.toDateString();
+                            return (
+                                <div key={index} className={`flex flex-col items-center justify-center py-3 px-2 border-r border-gray-200 last:border-r-0 ${isToday ? 'bg-blue-50/50' : ''}`}>
+                                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{DAYS_OF_WEEK[day.getDay()]}</span>
+                                    <span className={`text-lg font-bold ${isToday ? 'text-blue-600 bg-blue-100 w-8 h-8 flex items-center justify-center rounded-full' : 'text-gray-900'}`}>
+                                        {day.getDate()}
+                                    </span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+            {/* All Day / Tasks Row */}
+            <div className="flex border-b border-gray-300 bg-gray-50/30 max-h-32 overflow-y-auto">
+                <div className="w-16 flex-shrink-0 border-r border-gray-200 flex items-center justify-center text-[11px] font-medium text-gray-500 p-2 text-center bg-gray-50">
+                    All Day / Tasks
+                </div>
+                <div className={`grid ${gridColsClass} flex-1 divide-x divide-gray-200`}>
+                    {displayDays.map((day, index) => {
+                        const dayTasks = getTasksForDate(day);
+                        const dayEvents = getEventsForDate(day);
+                        // Filter strictly for true All-Day events (00:00 to 23:59) to display at the top
+                        const allDayEvents = dayEvents.filter(e => {
+                            const s = new Date(e.start_time);
+                            const end = new Date(e.end_time);
+                            return s.getHours() === 0 && s.getMinutes() === 0 && end.getHours() === 23 && end.getMinutes() === 59;
+                        });
+
+                        return (
+                            <div key={index} className="p-1 flex flex-col gap-1 min-h-[40px] relative">
+                                {allDayEvents.map((event) => (
+                                    <CalendarEventUI key={`event-${event.id}`} event={event} onClick={(ev) => onEventClick && onEventClick(ev)} compact />
+                                ))}
+                                {dayTasks.map((task) => (
+                                    <TaskEvent key={`task-${task.id}`} task={task} onClick={onTaskClick} compact />
+                                ))}
+                                {(dayTasks.length === 0 && allDayEvents.length === 0) && <div className="hidden sm:flex absolute inset-0 text-[10px] text-gray-300 items-center justify-center pointer-events-none">No tasks</div>}
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
-            <div className={`grid ${gridColsClass} flex-1 min-h-[500px] divide-x divide-gray-200`}>
-                {displayDays.map((day, index) => {
-                    const dayTasks = getTasksForDate(day);
-                    const dayEvents = getEventsForDate(day);
-                    const isToday = day.toDateString() === today.toDateString();
-                    const isSelected = selectedDate?.toDateString() === day.toDateString();
-                    
-                    return (
-                        <div 
-                            key={index} 
-                            className={`
-                                p-2 flex flex-col gap-2 cursor-pointer transition-colors hover:bg-gray-50
-                                ${isToday ? 'bg-blue-50/10' : ''}
-                                ${isSelected ? 'ring-2 ring-inset ring-blue-400 bg-blue-50/20' : ''}
-                            `}
-                            onClick={() => onDateClick(day)}
-                        >
-                            {dayEvents.map((event) => (
-                                <CalendarEventUI key={`event-${event.id}`} event={event} onClick={onEventClick || (() => {})} />
-                            ))}
-                            {dayTasks.map((task) => (
-                                <TaskEvent key={`task-${task.id}`} task={task} onClick={onTaskClick} />
-                            ))}
-                            {(dayTasks.length === 0 && dayEvents.length === 0) && (
-                                <div className="text-center py-8 text-xs text-gray-400 italic">No items</div>
+
+            {/* Hourly Timeline Grid */}
+            <div 
+                ref={scrollContainerRef} 
+                className="flex-1 overflow-y-auto overflow-x-hidden bg-white relative border-t border-gray-200" 
+                style={{ height: '550px', maxHeight: 'calc(100vh - 450px)' }}
+            >
+                <div className="flex min-w-full relative bg-white">
+                    {/* Time Axis - Sticky left ensures it stays visible */}
+                    <div className="w-16 flex-shrink-0 flex flex-col border-r border-gray-200 bg-white sticky left-0 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
+                        {hours.map(hour => (
+                            <div key={hour} className="h-16 relative border-b border-transparent">
+                            {hour !== 0 && (
+                                <span className="absolute -top-2.5 right-2 text-xs font-medium text-gray-400">
+                                    {hour.toString().padStart(2, '0')}:00
+                                </span>
                             )}
                         </div>
-                    );
-                })}
+                        ))}
+                    </div>
+
+                    {/* Day Columns */}
+                    <div className={`grid ${gridColsClass} flex-1 divide-x divide-gray-200 relative bg-white`}>
+                        {/* Horizontal Grid Lines */}
+                        <div className="absolute inset-0 pointer-events-none flex flex-col">
+                            {hours.map(hour => (
+                                <div key={hour} className="h-16 border-b border-gray-100 w-full flex-shrink-0" />
+                            ))}
+                        </div>
+
+                        {/* Column Content */}
+                        {/* Column Content */}
+                        {displayDays.map((day, index) => {
+                            const dayEvents = getEventsForDate(day);
+                            
+                            // Remove true All-Day events from the hourly grid (they are shown in top row)
+                            const hourlyEvents = dayEvents.filter(e => {
+                                const s = new Date(e.start_time);
+                                const end = new Date(e.end_time);
+                                return !(s.getHours() === 0 && s.getMinutes() === 0 && end.getHours() === 23 && end.getMinutes() === 59);
+                            });
+
+                            const isToday = day.toDateString() === today.toDateString();
+                            const isSelected = selectedDate?.toDateString() === day.toDateString();
+
+                            // Pre-calculate effective start/end for THIS DAY to properly handle daily recurrence visually
+                            const dailyPositionedEvents = hourlyEvents.map(event => {
+                                const start = new Date(event.start_time);
+                                const end = new Date(event.end_time);
+                                const durationHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+                                
+                                let effectiveStart = new Date(start);
+                                let effectiveEnd = new Date(end);
+                                const isSameDay = (d1: Date, d2: Date) => d1.toDateString() === d2.toDateString();
+
+                                if (durationHours > 24) {
+                                    // FAKE DAILY RECURRENCE (e.g. Work Week from 13:00 to 13:30)
+                                    effectiveStart = new Date(day);
+                                    effectiveStart.setHours(start.getHours(), start.getMinutes(), 0, 0);
+
+                                    effectiveEnd = new Date(day);
+                                    let eHours = end.getHours();
+                                    let eMins = end.getMinutes();
+                                    
+                                    // If it crosses midnight, cap at 23:59 for visual grid simplicity
+                                    if (eHours < start.getHours() || (eHours === start.getHours() && eMins < start.getMinutes())) {
+                                        effectiveEnd.setHours(23, 59, 59, 999);
+                                    } else {
+                                        effectiveEnd.setHours(eHours, eMins, 0, 0);
+                                    }
+                                } else {
+                                    // NORMAL SINGLE DAY OR OVERNIGHT EVENT
+                                    if (!isSameDay(start, day)) {
+                                        effectiveStart = new Date(day);
+                                        effectiveStart.setHours(0, 0, 0, 0);
+                                    }
+                                    if (!isSameDay(end, day)) {
+                                        effectiveEnd = new Date(day);
+                                        effectiveEnd.setHours(23, 59, 59, 999);
+                                    }
+                                }
+                                
+                                return { event, effectiveStart, effectiveEnd };
+                            });
+
+                            // Calculate overlapping events based strictly on their DAILY effective times
+                            const positionedEvents = dailyPositionedEvents.map((item, _, array) => {
+                                const start = item.effectiveStart.getTime();
+                                const end = item.effectiveEnd.getTime();
+                                
+                                const overlaps = array.filter(e => {
+                                    return start < e.effectiveEnd.getTime() && end > e.effectiveStart.getTime();
+                                });
+                                
+                                overlaps.sort((a, b) => a.effectiveStart.getTime() - b.effectiveStart.getTime());
+                                const orderIndex = overlaps.findIndex(e => e.event.id === item.event.id);
+                                return { ...item, orderIndex, totalOverlaps: overlaps.length };
+                            });
+
+                            return (
+                                <div
+                                    key={index}
+                                    className={`relative h-[1536px] cursor-pointer transition-colors hover:bg-gray-50/50
+                                        ${isToday ? 'bg-blue-50/10' : ''}
+                                        ${isSelected ? 'ring-2 ring-inset ring-blue-400 bg-blue-50/20' : ''}
+                                    `}
+                                    onClick={(e) => {
+                                        // Open sidebar only if clicking empty space
+                                        if (e.target === e.currentTarget) {
+                                            onDateClick(day);
+                                        }
+                                    }}
+                                >
+                                    {positionedEvents.map(({ event, effectiveStart, effectiveEnd, orderIndex, totalOverlaps }) => {
+                                        const startMinutes = (effectiveStart.getHours() * 60) + effectiveStart.getMinutes();
+                                        const endMinutes = (effectiveEnd.getHours() * 60) + effectiveEnd.getMinutes();
+                                        const durationMinutes = endMinutes - startMinutes;
+
+                                        // 64px per hour -> 64/60 px per minute
+                                        const topOffset = startMinutes * (64 / 60); 
+                                        const eventHeight = Math.max(durationMinutes * (64 / 60), 24); 
+
+                                        // Side-by-side splitting (prevents overlap hiding the text)
+                                        const widthPercent = 100 / totalOverlaps;
+                                        const leftPercent = orderIndex * widthPercent;
+
+                                        return (
+                                            <div
+                                                key={`event-${event.id}`}
+                                                className="absolute transition-all duration-200 p-0.5 group hover:!z-50 hover:!w-[calc(100%-8px)] hover:!left-1"
+                                                style={{ 
+                                                    top: `${topOffset}px`, 
+                                                    height: `${eventHeight}px`,
+                                                    left: `${leftPercent}%`,
+                                                    width: `${widthPercent}%`,
+                                                    zIndex: 10 + orderIndex
+                                                }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (onEventClick) onEventClick(event);
+                                                }}
+                                            >
+                                                <div
+                                                    className="h-full w-full bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md overflow-hidden p-1.5 text-xs leading-tight cursor-pointer shadow-sm group-hover:bg-indigo-100 group-hover:shadow-md transition-all flex flex-col relative"
+                                                    title={`${event.title}\n${effectiveStart.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false})} - ${effectiveEnd.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false})}`}
+                                                >
+                                                    <div className="w-1 h-full absolute left-0 top-0 bottom-0 bg-indigo-500 rounded-l-md" />
+                                                    <div className="font-semibold truncate ml-1">{event.title}</div>
+                                                    {eventHeight >= 40 && (
+                                                        <div className="text-[10px] truncate ml-1 opacity-80 mt-0.5">
+                                                            {effectiveStart.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false})} - {effectiveEnd.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false})}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
             </div>
         </div>
     );
@@ -373,13 +565,15 @@ interface EventModalProps {
     selectedDate: Date | null;
     event?: CalendarEventType | null;
     currentUser: { id: number; role: string } | null;
+    allEvents: CalendarEventType[];
 }
 
-const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, selectedDate, event, currentUser }) => {
+const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, selectedDate, event, currentUser, allEvents }) => {
     // If the event exists and the current user is NOT the organizer, it is Read-Only
     const isReadOnly = Boolean(event && currentUser && event.organizer !== currentUser.id);
     const queryClient = useQueryClient();
     const [title, setTitle] = useState('');
+    const [error, setError] = useState<string | null>(null);
     const [startTime, setStartTime] = useState('');
     const [endTime, setEndTime] = useState('');
     const [location, setLocation] = useState('');
@@ -390,6 +584,12 @@ const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, selectedDate, 
     const [attendees, setAttendees] = useState<number[]>([]);
     const [userSearch, setUserSearch] = useState('');
     const [showUserDropdown, setShowUserDropdown] = useState(false);
+    const [showStartTimeDropdown, setShowStartTimeDropdown] = useState(false);
+    const [showEndTimeDropdown, setShowEndTimeDropdown] = useState(false);
+    
+    // Multi-day states
+    const [isAllDay, setIsAllDay] = useState(false);
+    const [allDayPreset, setAllDayPreset] = useState('1_day');
 
     // Fetch available team members
     const { data: availableUsers = [] } = useQuery({
@@ -407,43 +607,92 @@ const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, selectedDate, 
                 d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
                 return d.toISOString().slice(0, 16);
             };
-            setStartTime(formatDt(event.start_time));
-            setEndTime(formatDt(event.end_time));
+            
+            const sTime = formatDt(event.start_time);
+            const eTime = formatDt(event.end_time);
+            setStartTime(sTime);
+            setEndTime(eTime);
+            
+            // Detect multi-day / all day events (>23 hours duration)
+            const s = new Date(event.start_time);
+                const e = new Date(event.end_time);
+                
+                // Strict check for true "All Day" events (00:00 to 23:59)
+                if (s.getHours() === 0 && s.getMinutes() === 0 && e.getHours() === 23 && e.getMinutes() === 59) {
+                    setIsAllDay(true);
+                    const diffDays = Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24));
+                    if (diffDays <= 1) setAllDayPreset('1_day');
+                    else if (diffDays === 5) setAllDayPreset('work_week');
+                    else if (diffDays === 7) setAllDayPreset('full_week');
+                    else setAllDayPreset('custom');
+                } else {
+                    setIsAllDay(false);
+                    // Detect if a specific-time event was saved with a multi-day duration preset
+                    const diffDays = Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24));
+                    if (diffDays === 0) setAllDayPreset('1_day');
+                    else if (diffDays === 4) setAllDayPreset('work_week');
+                    else if (diffDays === 6) setAllDayPreset('full_week');
+                    else setAllDayPreset('custom');
+                }
+
             setLocation(event.location || '');
             setIsOnline(event.is_online_meeting || false);
             setDescription(event.description || '');
             setAttendees(event.attendees || []);
             setUserSearch('');
             setShowUserDropdown(false);
-        } else if (selectedDate && isOpen) {
-            const dateStr = selectedDate.toISOString().split('T')[0];
+        } else if (isOpen) {
+            setError(null);
+            // Safely fallback to today's date if no specific selectedDate is provided or if the selectedDate is in the past
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+            
+            let targetDate = selectedDate || new Date();
+            if (targetDate < now) {
+                targetDate = new Date(); // Reset to today if selected date is in the past
+            }
+            const y = targetDate.getFullYear();
+            const m = String(targetDate.getMonth() + 1).padStart(2, '0');
+            const d = String(targetDate.getDate()).padStart(2, '0');
+            const dateStr = `${y}-${m}-${d}`;
+            
             setStartTime(`${dateStr}T13:00`);
-            setEndTime(`${dateStr}T13:30`);
-            setTitle('');
-            setLocation('');
-            setIsOnline(false);
-            setDescription('');
-            setAttendees([]);
-            setUserSearch('');
-            setShowUserDropdown(false);
-        }
-    }, [selectedDate, isOpen, event]);
+                setEndTime(`${dateStr}T13:30`);
+                setTitle('');
+                setLocation('');
+                setIsOnline(false);
+                setDescription('');
+                setAttendees([]);
+                setUserSearch('');
+                setShowUserDropdown(false);
+                setIsAllDay(false);
+                setAllDayPreset('1_day');
+            }
+        }, [selectedDate, isOpen, event]);
 
-    const { mutate: createEvent, isPending: isCreating } = useMutation({
-        mutationFn: (data: Partial<CalendarEventType>) => eventApi.create(data),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['events-calendar'] });
-            onClose();
-        }
-    });
-
-    const { mutate: updateEvent, isPending: isUpdating } = useMutation({
-        mutationFn: (data: Partial<CalendarEventType>) => eventApi.update(event!.id, data),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['events-calendar'] });
-            onClose();
-        }
-    });
+        const { mutate: createEvent, isPending: isCreating } = useMutation({
+            mutationFn: (data: Partial<CalendarEventType>) => eventApi.create(data),
+            onSuccess: () => {
+                queryClient.invalidateQueries({ queryKey: ['events-calendar'] });
+                onClose();
+            },
+            onError: (err: any) => {
+                const conflictMsg = err.response?.data?.attendees?.[0] || err.response?.data?.detail || "Could not create event. Please check for schedule conflicts.";
+                setError(conflictMsg);
+            }
+        });
+    
+        const { mutate: updateEvent, isPending: isUpdating } = useMutation({
+            mutationFn: (data: Partial<CalendarEventType>) => eventApi.update(event!.id, data),
+            onSuccess: () => {
+                queryClient.invalidateQueries({ queryKey: ['events-calendar'] });
+                onClose();
+            },
+            onError: (err: any) => {
+                const conflictMsg = err.response?.data?.attendees?.[0] || err.response?.data?.detail || "Could not update event. Please check for schedule conflicts.";
+                setError(conflictMsg);
+            }
+        });
 
     const { mutate: deleteEvent, isPending: isDeleting } = useMutation({
         mutationFn: () => eventApi.delete(event!.id),
@@ -460,19 +709,69 @@ const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, selectedDate, 
     };
 
     const handleSave = () => {
-        const payload = {
+        // Logic to check 5 events per day limit
+        if (!event && selectedDate) {
+            const dateStr = selectedDate.toISOString().split('T')[0];
+            const eventsOnThisDay = allEvents.filter(e => {
+                const eventDate = new Date(e.start_time).toISOString().split('T')[0];
+                return eventDate === dateStr && e.organizer === currentUser?.id;
+            });
+
+            if (eventsOnThisDay.length >= 5) {
+                setError("You have reached the limit of 5 events for this day. Please choose another date.");
+                return;
+            }
+        }
+
+        const basePayload = {
             title,
-            start_time: new Date(startTime).toISOString(),
-            end_time: new Date(endTime).toISOString(),
             location,
             is_online_meeting: isOnline,
             description,
             attendees
         };
-        if (event) {
-            updateEvent(payload);
+
+        const startDt = new Date(startTime);
+        const endDt = new Date(endTime);
+
+        if (!event && allDayPreset === 'work_week' && startDt.toDateString() !== endDt.toDateString()) {
+            let current = new Date(startDt);
+            current.setHours(0, 0, 0, 0);
+            
+            const endLimit = new Date(endDt);
+            endLimit.setHours(23, 59, 59, 999);
+
+            while (current <= endLimit) {
+                if (current.getDay() !== 0 && current.getDay() !== 6) {
+                    const dayStart = new Date(current);
+                    dayStart.setHours(startDt.getHours(), startDt.getMinutes(), 0, 0);
+                    
+                    const dayEnd = new Date(current);
+                    dayEnd.setHours(endDt.getHours(), endDt.getMinutes(), 0, 0);
+                    
+                    if (dayEnd < dayStart) {
+                        dayEnd.setDate(dayEnd.getDate() + 1);
+                    }
+
+                    createEvent({
+                        ...basePayload,
+                        start_time: dayStart.toISOString(),
+                        end_time: dayEnd.toISOString()
+                    });
+                }
+                current.setDate(current.getDate() + 1);
+            }
         } else {
-            createEvent(payload);
+            const finalPayload = {
+                ...basePayload,
+                start_time: startDt.toISOString(),
+                end_time: endDt.toISOString()
+            };
+            if (event) {
+                updateEvent(finalPayload);
+            } else {
+                createEvent(finalPayload);
+            }
         }
     };
 
@@ -563,12 +862,277 @@ const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, selectedDate, 
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-4 text-gray-500">
-                        <Clock size={20} className="text-gray-400" />
-                        <div className={`flex items-center gap-2 border-b pb-2 flex-1 ${isReadOnly ? 'border-transparent' : 'border-gray-200'}`}>
-                            <input type="datetime-local" disabled={isReadOnly} value={startTime} onChange={e => setStartTime(e.target.value)} className={`bg-transparent focus:outline-none text-sm text-gray-900 ${isReadOnly ? 'cursor-not-allowed opacity-90' : ''}`} />
-                            <span className="text-gray-400">-</span>
-                            <input type="datetime-local" disabled={isReadOnly} value={endTime} onChange={e => setEndTime(e.target.value)} className={`bg-transparent focus:outline-none text-sm text-gray-900 ${isReadOnly ? 'cursor-not-allowed opacity-90' : ''}`} />
+                    <div className="flex items-start gap-4 text-gray-500">
+                        <Clock size={20} className="mt-2 text-gray-400" />
+                        <div className={`flex flex-col gap-3 border-b pb-3 pt-1 flex-1 ${isReadOnly ? 'border-transparent' : 'border-gray-200'}`}>
+                            
+                            {/* All Day Toggle */}
+                            <label className={`flex items-center gap-2 w-fit ${isReadOnly ? 'cursor-not-allowed opacity-90' : 'cursor-pointer'}`}>
+                                <input 
+                                    type="checkbox" 
+                                    disabled={isReadOnly}
+                                    checked={isAllDay} 
+                                    onChange={(e) => {
+                                        const checked = e.target.checked;
+                                        setIsAllDay(checked);
+                                        if (checked) {
+                                            setAllDayPreset('1_day');
+                                            setStartTime(`${startTime.split('T')[0]}T00:00`);
+                                            setEndTime(`${startTime.split('T')[0]}T23:59`);
+                                        } else {
+                                            setStartTime(`${startTime.split('T')[0]}T13:00`);
+                                            setEndTime(`${startTime.split('T')[0]}T13:30`);
+                                        }
+                                    }}
+                                    className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 border-gray-300"
+                                />
+                                <span className="text-sm font-medium text-gray-700">All day</span>
+                            </label>
+
+                            <div className="flex flex-wrap items-center gap-4">
+                                {/* Start Date */}
+                                <div className="flex flex-col">
+                                    <label className="text-[11px] font-medium text-gray-500 mb-1">Start date</label>
+                                    <div className="relative flex items-center h-5">
+                                        <input 
+                                            type="date" 
+                                            disabled={isReadOnly} 
+                                            min={new Date().toISOString().split('T')[0]}
+                                            value={startTime.split('T')[0] || ''} 
+                                            className={`absolute inset-0 opacity-0 z-10 cursor-pointer disabled:cursor-not-allowed w-full`}
+                                            onChange={e => {
+                                                const newDate = e.target.value;
+                                                const startDt = new Date(newDate);
+                                                let endDt = new Date(startDt);
+                                                
+                                                if (allDayPreset === 'work_week') {
+                                                    let added = 0;
+                                                    while (added < 4) {
+                                                        endDt.setDate(endDt.getDate() + 1);
+                                                        if (endDt.getDay() !== 0 && endDt.getDay() !== 6) {
+                                                            added++;
+                                                        }
+                                                    }
+                                                }
+                                                else if (allDayPreset === 'full_week') endDt.setDate(startDt.getDate() + 6);
+                                                else if (allDayPreset === 'custom') {
+                                                    endDt = new Date(endTime.split('T')[0]);
+                                                    if (endDt < startDt) endDt = new Date(startDt);
+                                                }
+
+                                                const endY = endDt.getFullYear();
+                                                const endM = String(endDt.getMonth() + 1).padStart(2, '0');
+                                                const endD = String(endDt.getDate()).padStart(2, '0');
+                                                
+                                                setStartTime(`${newDate}T${startTime.split('T')[1] || '00:00'}`);
+                                                setEndTime(`${endY}-${endM}-${endD}T${endTime.split('T')[1] || '00:00'}`);
+                                            }} 
+                                        />
+                                        <div className={`text-sm text-gray-900 pointer-events-none ${isReadOnly ? 'opacity-90' : ''}`}>
+                                            {startTime ? (() => {
+                                                const [y, m, d] = startTime.split('T')[0].split('-');
+                                                return `${d}/${m}/${y}`;
+                                            })() : 'DD/MM/YYYY'}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Start Time */}
+                                <div className="flex flex-col border-l border-gray-200 pl-4 relative">
+                                    <label className="text-[11px] font-medium text-gray-500 mb-1">Start time</label>
+                                    <button 
+                                        type="button"
+                                        disabled={isReadOnly}
+                                        onClick={() => {
+                                            setShowStartTimeDropdown(!showStartTimeDropdown);
+                                            setShowEndTimeDropdown(false);
+                                        }}
+                                        className={`bg-transparent focus:outline-none text-sm text-gray-900 w-20 flex justify-between items-center ${isReadOnly ? 'cursor-not-allowed opacity-70' : ''}`}
+                                    >
+                                        {startTime.split('T')[1]?.slice(0,5) || '00:00'}
+                                        {!isReadOnly && <ChevronRight size={14} className="text-gray-400 rotate-90" />}
+                                    </button>
+                                    {showStartTimeDropdown && !isReadOnly && (
+                                        <>
+                                            <div className="fixed inset-0 z-10" onClick={() => setShowStartTimeDropdown(false)} />
+                                            <div className="absolute top-full left-4 mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-xl z-20 max-h-60 overflow-y-auto py-1">
+                                                {Array.from({ length: 48 }).map((_, i) => {
+                                                    const hour = Math.floor(i / 2).toString().padStart(2, '0');
+                                                    const min = (i % 2 === 0) ? '00' : '30';
+                                                    const time = `${hour}:${min}`;
+                                                    const isSelected = (startTime.split('T')[1]?.slice(0,5) || '00:00') === time;
+                                                    
+                                                    return (
+                                                        <div 
+                                                            key={`start-${time}`} 
+                                                            className={`px-3 py-1.5 cursor-pointer text-sm transition-colors ${isSelected ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-900 hover:bg-gray-50'}`}
+                                                            onClick={() => {
+                                                                const date = startTime.split('T')[0];
+                                                                setStartTime(`${date}T${time}`);
+                                                                
+                                                                // Always adjust end time to be exactly +30 minutes
+                                                                const startDt = new Date(`${date}T${time}`);
+                                                                const newEndDt = new Date(startDt.getTime() + 30 * 60000); 
+                                                                
+                                                                const endY = newEndDt.getFullYear();
+                                                                const endM = String(newEndDt.getMonth() + 1).padStart(2, '0');
+                                                                const endD = String(newEndDt.getDate()).padStart(2, '0');
+                                                                const endH = String(newEndDt.getHours()).padStart(2, '0');
+                                                                const endMin = String(newEndDt.getMinutes()).padStart(2, '0');
+                                                                
+                                                                // If "1 Day" is selected, force it to be same day or next day if overflow
+                                                                if (allDayPreset === '1_day') {
+                                                                    setEndTime(`${endY}-${endM}-${endD}T${endH}:${endMin}`);
+                                                                } else {
+                                                                    // For multi-day, keep the existing end date, just update the time
+                                                                    setEndTime(`${endTime.split('T')[0]}T${endH}:${endMin}`);
+                                                                }
+                                                                
+                                                                setShowStartTimeDropdown(false);
+                                                            }}
+                                                        >
+                                                            {time}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+
+                                {/* Duration Shortcut */}
+                                <div className="flex flex-col border-l border-gray-200 pl-4 relative">
+                                    <label className="text-[11px] font-medium text-gray-500 mb-1">Duration</label>
+                                    <select 
+                                        disabled={isReadOnly}
+                                        value={allDayPreset}
+                                        onChange={(e) => {
+                                            const preset = e.target.value;
+                                            setAllDayPreset(preset);
+                                            const startDt = new Date(startTime.split('T')[0]);
+                                            let endDt = new Date(startDt);
+                                            
+                                            if (preset === 'work_week') {
+                                                let added = 0;
+                                                while (added < 4) {
+                                                    endDt.setDate(endDt.getDate() + 1);
+                                                    if (endDt.getDay() !== 0 && endDt.getDay() !== 6) {
+                                                        added++;
+                                                    }
+                                                }
+                                            }
+                                            else if (preset === 'full_week') endDt.setDate(startDt.getDate() + 6);
+                                            
+                                            if (preset !== 'custom') {
+                                                const endY = endDt.getFullYear();
+                                                const endM = String(endDt.getMonth() + 1).padStart(2, '0');
+                                                const endD = String(endDt.getDate()).padStart(2, '0');
+                                                const timePart = endTime.split('T')[1] || '00:00';
+                                                setEndTime(`${endY}-${endM}-${endD}T${timePart}`);
+                                            }
+                                        }}
+                                        className={`bg-transparent focus:outline-none text-sm text-gray-900 cursor-pointer ${isReadOnly ? 'cursor-not-allowed opacity-90 appearance-none' : ''}`}
+                                    >
+                                        <option value="1_day">1 Day</option>
+                                        <option value="work_week">Work Week (5 Days)</option>
+                                        <option value="full_week">Full Week (7 Days)</option>
+                                        <option value="custom">Custom</option>
+                                    </select>
+                                </div>
+
+                                {/* End Date */}
+                                <div className="relative flex items-center h-5">
+                                        <input 
+                                            type="date" 
+                                            disabled={isReadOnly} 
+                                            min={startTime.split('T')[0] || new Date().toISOString().split('T')[0]}
+                                            value={endTime.split('T')[0] || ''} 
+                                            className="absolute inset-0 opacity-0 z-10 cursor-pointer disabled:cursor-not-allowed w-full"
+                                            onChange={e => {
+                                                const newDate = e.target.value;
+                                                const timePart = endTime.split('T')[1] || '00:00';
+                                                setEndTime(`${newDate}T${timePart}`);
+                                            }} 
+                                        />
+                                        <div className={`text-sm text-gray-900 pointer-events-none ${isReadOnly ? 'opacity-90' : ''}`}>
+                                            {endTime ? (() => {
+                                                const [y, m, d] = endTime.split('T')[0].split('-');
+                                                return `${d}/${m}/${y}`;
+                                            })() : 'DD/MM/YYYY'}
+                                        </div>
+                                    </div>
+
+                                {/* End Time */}
+                                <div className="flex flex-col border-l border-gray-200 pl-4 relative">
+                                    <label className="text-[11px] font-medium text-gray-500 mb-1">End time</label>
+                                    <button 
+                                        type="button"
+                                        disabled={isReadOnly}
+                                        onClick={() => {
+                                            setShowEndTimeDropdown(!showEndTimeDropdown);
+                                            setShowStartTimeDropdown(false);
+                                        }}
+                                        className={`bg-transparent focus:outline-none text-sm text-gray-900 w-24 flex justify-between items-center whitespace-nowrap ${isReadOnly ? 'cursor-not-allowed opacity-70' : ''}`}
+                                    >
+                                        {endTime.split('T')[1]?.slice(0,5) || '00:00'}
+                                        {!isReadOnly && <ChevronRight size={14} className="text-gray-400 rotate-90 ml-1" />}
+                                    </button>
+                                    {showEndTimeDropdown && !isReadOnly && (
+                                        <>
+                                            <div className="fixed inset-0 z-10" onClick={() => setShowEndTimeDropdown(false)} />
+                                            <div className="absolute top-full left-4 mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-xl z-20 max-h-60 overflow-y-auto py-1">
+                                                {Array.from({ length: 48 }).map((_, i) => {
+                                                    const hour = Math.floor(i / 2).toString().padStart(2, '0');
+                                                    const min = (i % 2 === 0) ? '00' : '30';
+                                                    const time = `${hour}:${min}`;
+                                                    const isSelected = (endTime.split('T')[1]?.slice(0,5) || '00:00') === time;
+                                                    
+                                                    // Duration logic
+                                                    let durationStr = '';
+                                                    const startT = startTime.split('T')[1]?.slice(0,5) || '00:00';
+                                                    const startMins = parseInt(startT.split(':')[0]) * 60 + parseInt(startT.split(':')[1]);
+                                                    let endMins = parseInt(hour) * 60 + parseInt(min);
+                                                    
+                                                    if (endMins < startMins) endMins += 24 * 60; // Next day
+                                                    const diffHrs = (endMins - startMins) / 60;
+                                                    
+                                                    if (diffHrs > 0 && allDayPreset === '1_day') {
+                                                        durationStr = ` (${diffHrs} hour${diffHrs !== 1 ? 's' : ''})`;
+                                                    }
+
+                                                    return (
+                                                        <div 
+                                                            key={`end-${time}`} 
+                                                            className={`px-3 py-1.5 cursor-pointer text-sm transition-colors flex justify-between ${isSelected ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-900 hover:bg-gray-50'}`}
+                                                            onClick={() => {
+                                                                const sDate = startTime.split('T')[0];
+                                                                let eDate = endTime.split('T')[0]; 
+                                                                
+                                                                // If "1 Day" preset, roll over the End Date automatically if time is earlier
+                                                                if (allDayPreset === '1_day') {
+                                                                    if (time < (startTime.split('T')[1]?.slice(0,5) || '00:00')) {
+                                                                        const nextDay = new Date(sDate);
+                                                                        nextDay.setDate(nextDay.getDate() + 1);
+                                                                        eDate = nextDay.toISOString().split('T')[0];
+                                                                    } else {
+                                                                        eDate = sDate;
+                                                                    }
+                                                                }
+                                                                
+                                                                setEndTime(`${eDate}T${time}`);
+                                                                setShowEndTimeDropdown(false);
+                                                            }}
+                                                        >
+                                                            <span>{time}</span>
+                                                            <span className="text-gray-500 text-xs">{durationStr}</span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div className="flex items-center gap-4 text-gray-500">
@@ -595,6 +1159,15 @@ const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, selectedDate, 
                         />
                     </div>
                 </div>
+                {/* Conflict Error Message Alert */}
+                {error && (
+                    <div className="px-6 py-2">
+                        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-xs font-semibold flex items-center gap-2 animate-in slide-in-from-bottom-2">
+                            <span className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-red-500" />
+                            {error}
+                        </div>
+                    </div>
+                )}
                 <div className="p-4 border-t border-gray-100 flex justify-between items-center bg-gray-50">
                 <div>
                     {event && !isReadOnly && (
@@ -709,13 +1282,13 @@ const TaskListSidebar: React.FC<TaskListSidebarProps> = ({
         setForm((prev) => ({ ...prev, [field]: value }));
     };
 
-    const formatDateLong = (date: Date) =>
-        date.toLocaleDateString('en-US', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-        });
+    const formatDateLong = (date: Date) => {
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
+        return `${weekday}, ${day}/${month}/${year}`;
+    };
 
     // Parse a stored content string for display in admin/manager view
     const renderUpdateCard = (upd: DailyUpdate) => {
@@ -794,7 +1367,7 @@ const TaskListSidebar: React.FC<TaskListSidebarProps> = ({
                                         <div className="flex items-center gap-3 text-xs text-gray-500">
                                             <span className="font-medium text-indigo-600 flex items-center gap-1">
                                                 <Clock size={12} />
-                                                {new Date(event.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                {new Date(event.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
                                             </span>
                                         </div>
                                     </div>
@@ -1006,7 +1579,7 @@ export const Calendar: React.FC = () => {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const [currentDate, setCurrentDate] = useState(new Date());
-    const [viewMode, setViewMode] = useState<ViewMode>('month');
+    const [viewMode, setViewMode] = useState<ViewMode>('work_week');
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [selectedEvent, setSelectedEvent] = useState<CalendarEventType | null>(null);
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -1130,13 +1703,20 @@ export const Calendar: React.FC = () => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
+        const toLocalDateStr = (iso: string | undefined) => {
+            if (!iso) return '';
+            if (!iso.includes('T')) return iso.split('T')[0];
+            const d = new Date(iso);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        };
+
         const currentDateIter = new Date(startDate);
         while (currentDateIter <= endDate) {
             // Use local timezone formatting instead of UTC to prevent day-shifting
             const dateStr = `${currentDateIter.getFullYear()}-${String(currentDateIter.getMonth() + 1).padStart(2, '0')}-${String(currentDateIter.getDate()).padStart(2, '0')}`;
             const dayTasks = tasks.filter((task: Task) => {
-                const startDateStr = task.start_date?.split('T')[0];
-                const endDateStr = task.end_date?.split('T')[0];
+                const startDateStr = toLocalDateStr(task.start_date);
+                const endDateStr = toLocalDateStr(task.end_date);
                 if (startDateStr && endDateStr) {
                     return dateStr >= startDateStr && dateStr <= endDateStr;
                 }
@@ -1144,8 +1724,8 @@ export const Calendar: React.FC = () => {
             });
 
             const dayEvents = events.filter((event: CalendarEventType) => {
-                const startDateStr = event.start_time?.split('T')[0];
-                const endDateStr = event.end_time?.split('T')[0];
+                const startDateStr = toLocalDateStr(event.start_time);
+                const endDateStr = toLocalDateStr(event.end_time);
                 if (startDateStr && endDateStr) {
                     return dateStr >= startDateStr && dateStr <= endDateStr;
                 }
@@ -1191,6 +1771,7 @@ export const Calendar: React.FC = () => {
 
     const handleEventClick = useCallback((event: CalendarEventType) => {
         setSelectedEvent(event);
+        setIsEventModalOpen(true);
     }, []);
 
     const handleDateClick = useCallback((date: Date) => {
@@ -1201,9 +1782,15 @@ export const Calendar: React.FC = () => {
         if (!selectedDate) return [];
         // Use local timezone formatting instead of UTC to prevent day-shifting
         const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
+        const toLocalDateStr = (iso: string | undefined) => {
+            if (!iso) return '';
+            if (!iso.includes('T')) return iso.split('T')[0];
+            const d = new Date(iso);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        };
         return tasks.filter((task: Task) => {
-            const startDateStr = task.start_date?.split('T')[0];
-            const endDateStr = task.end_date?.split('T')[0];
+            const startDateStr = toLocalDateStr(task.start_date);
+            const endDateStr = toLocalDateStr(task.end_date);
             if (startDateStr && endDateStr) {
                 return dateStr >= startDateStr && dateStr <= endDateStr;
             }
@@ -1214,9 +1801,15 @@ export const Calendar: React.FC = () => {
     const selectedDateEvents = useMemo(() => {
         if (!selectedDate) return [];
         const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
+        const toLocalDateStr = (iso: string | undefined) => {
+            if (!iso) return '';
+            if (!iso.includes('T')) return iso.split('T')[0];
+            const d = new Date(iso);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        };
         return events.filter((event: CalendarEventType) => {
-            const startDateStr = event.start_time?.split('T')[0];
-            const endDateStr = event.end_time?.split('T')[0];
+            const startDateStr = toLocalDateStr(event.start_time);
+            const endDateStr = toLocalDateStr(event.end_time);
             if (startDateStr && endDateStr) {
                 return dateStr >= startDateStr && dateStr <= endDateStr;
             }
@@ -1295,7 +1888,7 @@ export const Calendar: React.FC = () => {
             </div>
 
             {/* Controls Bar */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm sticky top-0 z-30">
                 <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
                     <button 
                         onClick={goToToday}
@@ -1328,22 +1921,35 @@ export const Calendar: React.FC = () => {
                     {getHeaderTitle()}
                 </h2>
 
-                <div className="flex flex-wrap bg-gray-100 p-1 rounded-lg border border-gray-200 w-full sm:w-auto">
-                    {(['day', 'work_week', 'week', 'month'] as ViewMode[]).map((mode) => (
-                        <button
-                            key={mode}
-                            onClick={() => setViewMode(mode)}
-                            className={`
-                                flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all flex-1 sm:flex-none whitespace-nowrap
-                                ${viewMode === mode 
-                                    ? 'bg-white text-blue-600 shadow-sm' 
-                                    : 'text-gray-500 hover:text-gray-900'}
-                            `}
-                        >
-                            {mode === 'month' ? <Grid3X3 size={16} /> : mode === 'day' ? <CalendarIcon size={16} /> : <List size={16} />}
-                            <span className="capitalize">{mode.replace('_', ' ')}</span>
-                        </button>
-                    ))}
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <div className="flex flex-wrap bg-gray-100 p-1 rounded-lg border border-gray-200 w-full sm:w-auto">
+                        {(['day', 'work_week', 'week', 'month'] as ViewMode[]).map((mode) => (
+                            <button
+                                key={mode}
+                                onClick={() => setViewMode(mode)}
+                                className={`
+                                    flex items-center justify-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all flex-1 sm:flex-none whitespace-nowrap
+                                    ${viewMode === mode 
+                                        ? 'bg-white text-blue-600 shadow-sm' 
+                                        : 'text-gray-500 hover:text-gray-900'}
+                                `}
+                            >
+                                {mode === 'month' ? <Grid3X3 size={16} /> : mode === 'day' ? <CalendarIcon size={16} /> : <List size={16} />}
+                                <span className="capitalize">{mode.replace('_', ' ')}</span>
+                            </button>
+                        ))}
+                    </div>
+                    <button
+                        onClick={() => {
+                            setSelectedDate(null);
+                            setIsEventModalOpen(true);
+                        }}
+                        className="flex items-center justify-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 hover:text-indigo-700 rounded-lg border border-indigo-200 transition-colors shadow-sm"
+                        title="New event"
+                    >
+                        <CalendarPlus size={18} />
+                        <span className="text-sm font-medium">New event</span>
+                    </button>
                 </div>
             </div>
 
@@ -1380,6 +1986,7 @@ export const Calendar: React.FC = () => {
                         events={events}
                         selectedDate={selectedDate}
                         onTaskClick={handleTaskClick}
+                        onEventClick={handleEventClick} 
                         onDateClick={handleDateClick}
                         viewMode={viewMode as 'day' | 'work_week' | 'week'}
                     />
@@ -1432,6 +2039,7 @@ export const Calendar: React.FC = () => {
                 selectedDate={selectedDate} 
                 event={selectedEvent}
                 currentUser={user ? { id: user.id, role: user.role } : null}
+                allEvents={events} // Passing the events array here
             />
 
             {selectedTask && (
