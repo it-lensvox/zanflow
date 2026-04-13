@@ -3,6 +3,7 @@ Views for Ground Truth app.
 """
 import os
 import re
+import mimetypes
 from django.shortcuts import get_object_or_404
 from django.conf import settings  # Import settings for AWS URL construction
 from django_filters import rest_framework as filters
@@ -426,17 +427,23 @@ class ProjectAllDocumentsView(APIView):
         ).distinct()
         project_data = [] 
         for doc in project_docs:
-            # Fallback to doc.name if source_file doesn't exist
             filename = doc.source_file.name.split('/')[-1] if doc.source_file else doc.name
             
             file_url = None
             if doc.source_file:
                 try:
+                    # --- NEW FIX: Dynamically determine Content-Type ---
+                    content_type, _ = mimetypes.guess_type(filename)
+                    if not content_type:
+                        content_type = 'application/octet-stream'
+
                     file_url = s3_client.generate_presigned_url(
                         'get_object',
                         Params={
                             'Bucket': settings.AWS_STORAGE_BUCKET_NAME,
-                            'Key': doc.source_file.name
+                            'Key': doc.source_file.name,
+                            'ResponseContentType': content_type, # Forces Microsoft Viewer to recognize it as PPTX
+                            'ResponseContentDisposition': f'inline; filename="{filename}"' # Forces inline viewing
                         },
                         ExpiresIn=3600 
                     )
@@ -457,26 +464,27 @@ class ProjectAllDocumentsView(APIView):
             })
 
         # 3. Fetch Task-Level Attachments
-        # Uses the double underscore to filter tasks by project_id
         task_attachments = TaskAttachment.objects.filter(task__project_id=project_id)
         task_data = []
         for attachment in task_attachments:
-            # Get the raw S3 filename
             raw_filename = attachment.file.name.split('/')[-1] if attachment.file else "Unknown"
-            
-            # --- NEW FIX: Clean the Django random string ---
-            # This looks for an underscore followed by exactly 7 letters/numbers before the extension
-            # Example: "api_10_qW94evv.ts" becomes "api_10.ts"
             clean_filename = re.sub(r'_[a-zA-Z0-9]{7}(\.[^.]+)$', r'\1', raw_filename)
             
             file_url = None
             if attachment.file:
                 try:
+                    # --- NEW FIX: Dynamically determine Content-Type ---
+                    content_type, _ = mimetypes.guess_type(clean_filename)
+                    if not content_type:
+                        content_type = 'application/octet-stream'
+
                     file_url = s3_client.generate_presigned_url(
                         'get_object',
                         Params={
                             'Bucket': settings.AWS_STORAGE_BUCKET_NAME,
-                            'Key': attachment.file.name
+                            'Key': attachment.file.name,
+                            'ResponseContentType': content_type, # Forces Microsoft Viewer to recognize it as PPTX
+                            'ResponseContentDisposition': f'inline; filename="{clean_filename}"' # Forces inline viewing
                         },
                         ExpiresIn=3600
                     )

@@ -21,3 +21,60 @@ class EventSerializer(serializers.ModelSerializer):
             'description', 'created_at', 'updated_at'
         ]
         read_only_fields = ['organizer', 'created_at', 'updated_at']
+
+    def validate(self, data):
+        # 1. Safely extract start_time, end_time, and attendees
+        # Fallback to the existing instance values if this is a partial update (PATCH)
+        start_time = data.get('start_time', getattr(self.instance, 'start_time', None))
+        end_time = data.get('end_time', getattr(self.instance, 'end_time', None))
+        attendees = data.get('attendees', [])
+
+        # Basic sanity check
+        if start_time and end_time and start_time >= end_time:
+            raise serializers.ValidationError({
+                "end_time": "End time must be after the start time."
+            })
+
+        # If no attendees are being added, we can skip the attendee validation
+        if not attendees:
+            return data
+
+        event_date = start_time.date()
+        
+        # 2. Base QuerySet: All events
+        # If we are updating an existing event, exclude it from the checks 
+        # so it doesn't conflict with itself.
+        existing_events = Event.objects.all()
+        if self.instance:
+            existing_events = existing_events.exclude(id=self.instance.id)
+
+        # 3. Check rules for each proposed attendee
+        for attendee in attendees:
+            username = attendee.get_full_name() or attendee.username
+
+            # --- Rule A: Maximum 5 events per day ---
+            daily_event_count = existing_events.filter(
+                attendees=attendee,
+                start_time__date=event_date
+            ).count()
+
+            if daily_event_count >= 5:
+                raise serializers.ValidationError({
+                    "attendees": f"Cannot add {username}: They have already reached the maximum limit of 5 events on {event_date}."
+                })
+
+            # --- Rule B: Time Overlap Check ---
+            # Logic: Two events overlap if Event A starts before Event B ends, 
+            # AND Event A ends after Event B starts.
+            overlapping_events = existing_events.filter(
+                attendees=attendee,
+                start_time__lt=end_time,
+                end_time__gt=start_time
+            )
+
+            if overlapping_events.exists():
+                raise serializers.ValidationError({
+                    "attendees": f"Cannot add {username}: They already have a conflicting event scheduled during this time."
+                })
+
+        return data

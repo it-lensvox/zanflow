@@ -42,6 +42,7 @@ def should_notify(user: User, notification_type: str) -> bool:
         'new_message': 'system_notifications',
         'project_updated': 'project_notifications',
         'event_created': 'system_notifications',
+        'event_reminder': 'system_notifications',
     }
     
     preference_field = type_to_preference.get(notification_type, 'system_notifications')
@@ -644,6 +645,34 @@ def notify_event_created(event, actor: User, attendees: List[User]) -> List[Noti
         notification_type=Notification.NotificationType.EVENT_CREATED,
         actor=actor,
         priority=Notification.Priority.MEDIUM,
+        related_object=event,
+        metadata={
+            'event_id': str(event.id),
+            'event_title': event_title,
+        }
+    )
+
+def notify_event_reminder(event) -> List[Notification]:
+    """
+    Send a reminder to the organizer and all attendees that the event is starting soon.
+    """
+    # Combine attendees and organizer into one unique list
+    recipients = list(event.attendees.all())
+    if getattr(event, 'organizer', None) and event.organizer not in recipients:
+        recipients.append(event.organizer)
+    
+    if not recipients:
+        return []
+    
+    event_title = getattr(event, 'title', 'Upcoming event')
+    
+    return notify(
+        recipients=recipients,
+        title="Event Starting Soon",
+        message=f"'{event_title}' is starting in 10 minutes!",
+        notification_type=Notification.NotificationType.EVENT_REMINDER,
+        actor=None, # System generated
+        priority=Notification.Priority.HIGH,
         related_object=event,
         metadata={
             'event_id': str(event.id),
