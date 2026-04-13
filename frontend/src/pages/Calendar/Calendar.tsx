@@ -122,6 +122,92 @@ const TaskEvent: React.FC<TaskEventProps> = ({ task, onClick, compact = false })
     );
 };
 
+interface MiniCalendarProps {
+    currentDate: Date;
+    onDateSelect: (date: Date) => void;
+}
+
+const MiniCalendar: React.FC<MiniCalendarProps> = ({ currentDate, onDateSelect }) => {
+    // Internal state to track which month the mini calendar is currently viewing
+    const [navDate, setNavDate] = useState(new Date(currentDate.getFullYear(), currentDate.getMonth(), 1));
+    const month = navDate.getMonth();
+    const year = navDate.getFullYear();
+
+    const changeMonth = (offset: number) => {
+        setNavDate(new Date(year, month + offset, 1));
+    };
+
+    const days = useMemo(() => {
+        const firstDay = new Date(year, month, 1);
+        const start = new Date(firstDay);
+        start.setDate(firstDay.getDate() - firstDay.getDay());
+        
+        const result = [];
+        const iter = new Date(start);
+        while (result.length < 42) {
+            result.push(new Date(iter));
+            iter.setDate(iter.getDate() + 1);
+        }
+        return result;
+    }, [month, year]);
+
+    return (
+        <div className="w-full select-none">
+            {/* Mini Calendar Header with Month/Year Navigation */}
+            <div className="flex items-center justify-between mb-4 px-1">
+                <span className="text-sm font-bold text-gray-900">
+                    {MONTHS[month]} {year}
+                </span>
+                <div className="flex gap-1">
+                    <button 
+                        type="button"
+                        onClick={() => changeMonth(-1)} 
+                        className="p-1 hover:bg-gray-100 rounded-md text-gray-600 transition-colors"
+                    >
+                        <ChevronLeft size={14} />
+                    </button>
+                    <button 
+                        type="button"
+                        onClick={() => changeMonth(1)} 
+                        className="p-1 hover:bg-gray-100 rounded-md text-gray-600 transition-colors"
+                    >
+                        <ChevronRight size={14} />
+                    </button>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-7 mb-2">
+                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => (
+                    <div key={d} className="text-[10px] font-bold text-gray-400 text-center py-1">{d}</div>
+                ))}
+            </div>
+            <div className="grid grid-cols-7 gap-y-1">
+                {days.map((date, i) => {
+                    const isCurrentMonth = date.getMonth() === month;
+                    const isSelected = date.toDateString() === currentDate.toDateString();
+                    const isToday = date.toDateString() === new Date().toDateString();
+
+                    return (
+                        <button
+                            key={i}
+                            type="button"
+                            onClick={() => onDateSelect(date)}
+                            className={`
+                                text-[11px] h-7 w-7 flex items-center justify-center rounded-full mx-auto transition-all
+                                ${isSelected ? 'bg-blue-600 text-white font-bold shadow-sm' : 
+                                  isToday ? 'text-blue-600 font-bold border border-blue-200' :
+                                  isCurrentMonth ? 'text-gray-700 hover:bg-gray-100' : 'text-gray-300'}
+                            `}
+                        >
+                            {date.getDate()}
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
 interface DayCellProps {
     day: CalendarDay;
     onTaskClick: (task: Task) => void;
@@ -1867,7 +1953,7 @@ export const Calendar: React.FC = () => {
                     <p className="text-lg text-gray-600 mt-1">View and manage your task schedules</p>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full xl:w-auto">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full xl:w-auto">
                     {[
                         // CHANGE "/task-board" BELOW TO WHATEVER YOUR ACTUAL URL PATH IS
                         { label: 'Total', value: taskStats.total, color: 'text-gray-900', filterUrl: '/taskboard' },
@@ -1955,6 +2041,17 @@ export const Calendar: React.FC = () => {
 
             {/* Calendar Content Area */}
             <div className="flex gap-6 min-h-[600px]">
+                {/* Left Sidebar: Mini Calendar (Teams Style) */}
+                <div className="hidden lg:flex flex-col w-56 flex-shrink-0 space-y-6">
+                <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                        <MiniCalendar 
+                            currentDate={currentDate} 
+                            onDateSelect={(date) => setCurrentDate(date)} 
+                        />
+                    </div>
+
+                </div>
+
                 <div className={`flex-1 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col ${selectedDate ? 'hidden md:flex' : 'flex'}`}>
                     {viewMode === 'month' ? (
                         <>
