@@ -341,7 +341,7 @@ export function TaskDetails() {
                   title="Upload JSON to create multiple tasks"
                 >
                   {isBulkUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                  Bulk Upload
+                  Add Multiple Tasks
                 </button>
               </div>
             )}
