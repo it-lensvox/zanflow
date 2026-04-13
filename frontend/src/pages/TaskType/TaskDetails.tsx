@@ -24,6 +24,7 @@ import DeleteModal from '@/components/common/Deletemodal';
 import Threads from '../Project/Thread';
 import { useProjectDetails, TabType } from '@/hooks/useTaskDetails';
 import type { Task, FilteredDocument, QuickNote } from '@/types';
+import { taskApi } from '@/services/api';
 
 //Date Field Dropdown
 function DateFieldDropdown({
@@ -180,6 +181,36 @@ export function TaskDetails() {
   const ctx = useProjectDetails();
   useDocumentPreviewKeyboard(() => ctx.setPreviewDocument(null));
 
+  // Bulk Upload State & Refs
+  const bulkFileInputRef = React.useRef<HTMLInputElement>(null);
+  const [isBulkUploading, setIsBulkUploading] = React.useState(false);
+  const [uploadResultModal, setUploadResultModal] = React.useState<{ type: 'success' | 'error', message: string } | null>(null);
+
+  const handleBulkUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !ctx.id) return;
+
+    setIsBulkUploading(true);
+    try {
+      await taskApi.bulkUpload(ctx.id, file);
+      // Invalidate the tasks cache to force a refetch from the backend
+      if (ctx.queryClient) {
+        ctx.queryClient.invalidateQueries(); 
+      }
+      setUploadResultModal({ type: 'success', message: 'Tasks successfully created from JSON!' });
+    } catch (error: any) {
+      console.error('Bulk upload error:', error);
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || 'Failed to upload tasks.';
+      setUploadResultModal({ type: 'error', message: errorMessage });
+    } finally {
+      setIsBulkUploading(false);
+      // Reset the input so the same file can be selected again if needed
+      if (bulkFileInputRef.current) bulkFileInputRef.current.value = '';
+    }
+  };
+
+  // DateFieldLabel
+
   // DateFieldLabel 
   const DateFieldLabel = useMemo(
     () => (
@@ -291,6 +322,29 @@ export function TaskDetails() {
             >
               Create Task
             </button>
+
+            {/* Bulk Upload JSON */}
+            {ctx.activeTab === 'tasks' && (
+              <div className="flex items-center">
+                <input
+                  type="file"
+                  accept=".json"
+                  ref={bulkFileInputRef}
+                  className="hidden"
+                  onChange={handleBulkUpload}
+                  disabled={isBulkUploading}
+                />
+                <button
+                  onClick={() => bulkFileInputRef.current?.click()}
+                  disabled={isBulkUploading}
+                  className="flex items-center gap-2 px-6 py-3.5 border-b-[3px] border-transparent text-slate-500 font-semibold text-[0.95rem] cursor-pointer transition-all duration-200 hover:bg-gradient-to-r hover:from-[#5568d3] hover:to-[#65408b] hover:text-white rounded-t-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Upload JSON to create multiple tasks"
+                >
+                  {isBulkUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                  Bulk Upload
+                </button>
+              </div>
+            )}
 
             {/* Quick Notes */}
             <button
@@ -923,6 +977,43 @@ export function TaskDetails() {
         </div>
       )}
       
+      {/* ── Bulk Upload Result Modal ── */}
+      {uploadResultModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all animate-in zoom-in-95 duration-200">
+            <div className={`p-6 text-center border-t-4 ${uploadResultModal.type === 'success' ? 'border-green-500' : 'border-red-500'}`}>
+              <div className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full mb-4 ${uploadResultModal.type === 'success' ? 'bg-green-100' : 'bg-red-100'}`}>
+                {uploadResultModal.type === 'success' ? (
+                  <svg className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <svg className="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                )}
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">
+                {uploadResultModal.type === 'success' ? 'Success!' : 'Upload Failed'}
+              </h3>
+              <p className="text-gray-500 text-sm mb-6 px-2 break-words">
+                {uploadResultModal.message}
+              </p>
+              <button
+                onClick={() => setUploadResultModal(null)}
+                className={`w-full py-2.5 px-4 rounded-lg font-bold text-white transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                  uploadResultModal.type === 'success' 
+                    ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500 hover:shadow-lg hover:-translate-y-0.5' 
+                    : 'bg-red-600 hover:bg-red-700 focus:ring-red-500 hover:shadow-lg hover:-translate-y-0.5'
+                }`}
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <DateFieldDropdown
         show={ctx.showDateFieldDropdown}
         dropdownPos={ctx.dropdownPos}

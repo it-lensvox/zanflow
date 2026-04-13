@@ -202,6 +202,18 @@ export interface TaskResponse {
   task: Task;
 }
 
+export interface BulkTaskUploadDetail {
+  row: number;
+  heading: string;
+  errors: Record<string, string[]>;
+}
+
+export interface BulkTaskUploadResponse {
+  message: string;
+  details?: BulkTaskUploadDetail[];
+  error?: string;
+}
+
 // Task API Query Parameters for filtering (resolves Calendar performance overhead)
 export interface TaskFilterParams {
   project_id?: number;

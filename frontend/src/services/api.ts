@@ -439,6 +439,23 @@ export const taskApi = {
     return response.data;
   },
 
+  // Bulk upload tasks via JSON
+  bulkUpload: async (projectId: number | string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await api.post<import('@/types').BulkTaskUploadResponse>(
+      `/tasksite/project/${projectId}/bulk-upload/`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+    return response.data;
+  },
+
   update: async (taskId: number, data: Partial<{ status: string; priority: string; duration_time: string; labels: number[]; start_date: string; end_date: string; description: string; assigned_to: number[]; links: string[]; }>) => {
     const response = await api.patch(`/tasksite/${taskId}/`, data);
     return response.data;
