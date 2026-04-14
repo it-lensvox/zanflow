@@ -62,6 +62,9 @@ interface CalendarEventUIProps {
 const CalendarEventUI: React.FC<CalendarEventUIProps> = ({ event, onClick, compact = false }) => {
     return (
         <div
+        onDragStart={(e) => {
+            e.dataTransfer.setData("eventId", String(event.id));
+        }}
             className={`
                 group relative flex items-center gap-2 rounded-md cursor-pointer transition-all duration-200 border border-transparent hover:shadow-sm hover:z-10 bg-indigo-50 text-indigo-700
                 ${compact ? 'py-0.5 px-1.5' : 'py-1 px-2'}
@@ -283,6 +286,8 @@ interface DaysViewProps {
     onEventClick?: (event: CalendarEventType) => void;
     onDateClick: (date: Date) => void;
     viewMode: 'day' | 'work_week' | 'week';
+    updateEvent: (data: Partial<CalendarEventType>) => void; 
+    currentUser: { id: number; role: string } | null; 
 }
 
 const DaysView: React.FC<DaysViewProps> = ({ currentDate, tasks, events, selectedDate, onTaskClick, onEventClick, onDateClick, viewMode }) => {
@@ -392,28 +397,166 @@ const DaysView: React.FC<DaysViewProps> = ({ currentDate, tasks, events, selecte
                     All Day / Tasks
                 </div>
                 <div className={`grid ${gridColsClass} flex-1 divide-x divide-gray-200`}>
-                    {displayDays.map((day, index) => {
-                        const dayTasks = getTasksForDate(day);
-                        const dayEvents = getEventsForDate(day);
-                        // Filter strictly for true All-Day events (00:00 to 23:59) to display at the top
-                        const allDayEvents = dayEvents.filter(e => {
-                            const s = new Date(e.start_time);
-                            const end = new Date(e.end_time);
-                            return s.getHours() === 0 && s.getMinutes() === 0 && end.getHours() === 23 && end.getMinutes() === 59;
-                        });
+                {displayDays.map((day, index) => {
+    const dayEvents = getEventsForDate(day);
+    
+    // Remove true All-Day events from the hourly grid (they are shown in top row)
+    const hourlyEvents = dayEvents.filter(e => {
+        const s = new Date(e.start_time);
+        const end = new Date(e.end_time);
+        return !(s.getHours() === 0 && s.getMinutes() === 0 && end.getHours() === 23 && end.getMinutes() === 59);
+    });
 
-                        return (
-                            <div key={index} className="p-1 flex flex-col gap-1 min-h-[40px] relative">
-                                {allDayEvents.map((event) => (
-                                    <CalendarEventUI key={`event-${event.id}`} event={event} onClick={(ev) => onEventClick && onEventClick(ev)} compact />
-                                ))}
-                                {dayTasks.map((task) => (
-                                    <TaskEvent key={`task-${task.id}`} task={task} onClick={onTaskClick} compact />
-                                ))}
-                                {(dayTasks.length === 0 && allDayEvents.length === 0) && <div className="hidden sm:flex absolute inset-0 text-[10px] text-gray-300 items-center justify-center pointer-events-none">No tasks</div>}
-                            </div>
-                        );
-                    })}
+    const isToday = day.toDateString() === today.toDateString();
+    const isSelected = selectedDate?.toDateString() === day.toDateString();
+
+    const dailyPositionedEvents = hourlyEvents.map(event => {
+        const start = new Date(event.start_time);
+        const end = new Date(event.end_time);
+        const durationHours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+        
+        let effectiveStart = new Date(start);
+        let effectiveEnd = new Date(end);
+        const isSameDay = (d1: Date, d2: Date) => d1.toDateString() === d2.toDateString();
+
+        if (durationHours > 24) {
+            effectiveStart = new Date(day);
+            effectiveStart.setHours(start.getHours(), start.getMinutes(), 0, 0);
+            effectiveEnd = new Date(day);
+            let eHours = end.getHours();
+            let eMins = end.getMinutes();
+            if (eHours < start.getHours() || (eHours === start.getHours() && eMins < start.getMinutes())) {
+                effectiveEnd.setHours(23, 59, 59, 999);
+            } else {
+                effectiveEnd.setHours(eHours, eMins, 0, 0);
+            }
+        } else {
+            if (!isSameDay(start, day)) {
+                effectiveStart = new Date(day);
+                effectiveStart.setHours(0, 0, 0, 0);
+            }
+            if (!isSameDay(end, day)) {
+                effectiveEnd = new Date(day);
+                effectiveEnd.setHours(23, 59, 59, 999);
+            }
+        }
+        return { event, effectiveStart, effectiveEnd };
+    });
+
+    const positionedEvents = dailyPositionedEvents.map((item, _, array) => {
+        const start = item.effectiveStart.getTime();
+        const end = item.effectiveEnd.getTime();
+        const overlaps = array.filter(e => start < e.effectiveEnd.getTime() && end > e.effectiveStart.getTime());
+        overlaps.sort((a, b) => a.effectiveStart.getTime() - b.effectiveStart.getTime());
+        const orderIndex = overlaps.findIndex(e => e.event.id === item.event.id);
+        return { ...item, orderIndex, totalOverlaps: overlaps.length };
+    });
+
+    return (
+        <div
+            key={index}
+            className={`relative h-[1536px] cursor-pointer transition-colors hover:bg-gray-50/50
+                ${isToday ? 'bg-blue-50/10' : ''}
+                ${isSelected ? 'ring-2 ring-inset ring-blue-400 bg-blue-50/20' : ''}
+            `}
+            onDragOver={(e) => e.preventDefault()} // CRITICAL: Allows the drop to happen
+            onDrop={(e) => {
+                e.preventDefault();
+                const eventId = e.dataTransfer.getData("eventId");
+                const draggedEvent = events.find(ev => String(ev.id) === eventId);
+                
+                if (!draggedEvent) return;
+
+                // Calculate drop position
+                const rect = e.currentTarget.getBoundingClientRect();
+                const y = e.clientY - rect.top;
+                const droppedHour = Math.floor(y / 64);
+                
+                const newStart = new Date(day);
+                newStart.setHours(droppedHour, 0, 0, 0);
+                
+                const duration = new Date(draggedEvent.end_time).getTime() - new Date(draggedEvent.start_time).getTime();
+                const newEnd = new Date(newStart.getTime() + duration);
+
+                // 1. Conflict Check: Is the employee already busy?
+                const hasConflict = events.some(ev => {
+                    if (ev.id === draggedEvent.id) return false;
+                    const evStart = new Date(ev.start_time);
+                    const evEnd = new Date(ev.end_time);
+                    return ev.organizer === draggedEvent.organizer && newStart < evEnd && newEnd > evStart;
+                });
+
+                if (hasConflict) {
+                    alert("This time slot is already taken! The event will stay in its original position.");
+                    return;
+                }
+
+                // 2. 5-Event Limit Check: Only check if moving to a different date
+                if (new Date(draggedEvent.start_time).toDateString() !== newStart.toDateString()) {
+                    const dayCount = events.filter(ev => 
+                        new Date(ev.start_time).toDateString() === newStart.toDateString() && 
+                        ev.organizer === currentUser?.id
+                    ).length;
+
+                    if (dayCount >= 5) {
+                        alert("Daily limit reached! You cannot move more than 5 events to this day.");
+                        return;
+                    }
+                }
+
+                // Trigger update via mutation passed from parent
+                updateEvent({
+                    id: draggedEvent.id,
+                    start_time: newStart.toISOString(),
+                    end_time: newEnd.toISOString()
+                });
+            }}
+            onClick={(e) => {
+                if (e.target === e.currentTarget) {
+                    onDateClick(day);
+                }
+            }}
+        >
+            {positionedEvents.map(({ event, effectiveStart, effectiveEnd, orderIndex, totalOverlaps }) => {
+                const startMinutes = (effectiveStart.getHours() * 60) + effectiveStart.getMinutes();
+                const endMinutes = (effectiveEnd.getHours() * 60) + effectiveEnd.getMinutes();
+                const durationMinutes = endMinutes - startMinutes;
+                const topOffset = startMinutes * (64 / 60); 
+                const eventHeight = Math.max(durationMinutes * (64 / 60), 24); 
+                const widthPercent = 100 / totalOverlaps;
+                const leftPercent = orderIndex * widthPercent;
+
+                return (
+                    <div
+                        key={`event-${event.id}`}
+                        className="absolute transition-all duration-200 p-0.5 group hover:!z-50 hover:!w-[calc(100%-8px)] hover:!left-1"
+                        style={{ 
+                            top: `${topOffset}px`, 
+                            height: `${eventHeight}px`,
+                            left: `${leftPercent}%`,
+                            width: `${widthPercent}%`,
+                            zIndex: 10 + orderIndex
+                        }}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (onEventClick) onEventClick(event);
+                        }}
+                    >
+                        <div className="h-full w-full bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md overflow-hidden p-1.5 text-xs leading-tight cursor-pointer shadow-sm group-hover:bg-indigo-100 group-hover:shadow-md transition-all flex flex-col relative">
+                            <div className="w-1 h-full absolute left-0 top-0 bottom-0 bg-indigo-500 rounded-l-md" />
+                            <div className="font-semibold truncate ml-1">{event.title}</div>
+                            {eventHeight >= 40 && (
+                                <div className="text-[10px] truncate ml-1 opacity-80 mt-0.5">
+                                    {effectiveStart.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false})} - {effectiveEnd.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false})}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    );
+})}
                 </div>
             </div>
 
@@ -2078,15 +2221,17 @@ export const Calendar: React.FC = () => {
                         </>
                     ) : (
                         <DaysView
-                        currentDate={currentDate}
-                        tasks={tasks}
-                        events={events}
-                        selectedDate={selectedDate}
-                        onTaskClick={handleTaskClick}
-                        onEventClick={handleEventClick} 
-                        onDateClick={handleDateClick}
-                        viewMode={viewMode as 'day' | 'work_week' | 'week'}
-                    />
+    currentDate={currentDate}
+    tasks={tasks}
+    events={events}
+    selectedDate={selectedDate}
+    onTaskClick={handleTaskClick}
+    onEventClick={handleEventClick} 
+    onDateClick={handleDateClick}
+    viewMode={viewMode as 'day' | 'work_week' | 'week'}
+    updateEvent={updateEventMutation} // New
+    currentUser={user ? { id: user.id, role: user.role } : null} // New
+/>
                 )}
                 </div>
     
