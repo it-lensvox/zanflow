@@ -1,3 +1,5 @@
+import json
+from django.db import transaction
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.generics import ListCreateAPIView
@@ -15,6 +17,7 @@ from apps.users.auth import StaticTokenAuthentication
 # Ensure this import matches your project structure
 from apps.users.models import User
 from apps.groundtruth.models import Document
+from apps.notification.services import notify_task_created
 from .models import Task, TaskComment, TaskAttachment
 from .serializers import TaskSerializer, TaskStatusUpdateSerializer, UserManagementSerializer, TaskCommentSerializer
 from apps.notification.services import (
@@ -385,3 +388,85 @@ class TaskPinToggleView(APIView):
             "message": message,
             "is_pinned": is_pinned
         }, status=status.HTTP_200_OK)
+    
+class TaskBulkUploadView(APIView):
+    authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser)
+
+    def post(self, request, project_id):
+        # 1. Permission check (Only managers/superusers)
+        if not (request.user.is_manager or request.user.is_superuser):
+            return Response(
+                {"detail": "You do not have permission to bulk create tasks."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # 2. Get the uploaded file
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return Response({"error": "No JSON file provided in the 'file' field."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 3. Read and parse the JSON
+        try:
+            file_content = file_obj.read().decode('utf-8')
+            json_data = json.loads(file_content)
+        except json.JSONDecodeError:
+            return Response({"error": "Invalid JSON format in the uploaded file."}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": f"Error reading file: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        tasks_data = json_data.get('tasks', [])
+        if not tasks_data:
+            return Response({"error": "No 'tasks' array found in the JSON file."}, status=status.HTTP_400_BAD_REQUEST)
+
+        created_tasks = []
+        errors = []
+
+        # 4. Process within an Atomic Transaction
+        try:
+            with transaction.atomic():
+                for index, task_data in enumerate(tasks_data):
+                    # Inject the project ID from the URL into the payload
+                    task_data['project'] = project_id
+
+                    # Extract assignee emails if provided in JSON to map to User IDs
+                    assignee_emails = task_data.pop('assignee_emails', [])
+
+                    # Pass data to your existing serializer
+                    serializer = TaskSerializer(data=task_data, context={'request': request})
+                    
+                    if serializer.is_valid():
+                        # Save the task
+                        task = serializer.save(assigned_by=request.user)
+                        
+                        # Map emails to user objects and assign them
+                        if assignee_emails:
+                            users = User.objects.filter(email__in=assignee_emails)
+                            task.assigned_to.set(users)
+                            
+                        created_tasks.append(task)
+                    else:
+                        # Record the error and force a rollback
+                        errors.append({
+                            "row": index + 1,
+                            "heading": task_data.get('heading', 'Unknown'),
+                            "errors": serializer.errors
+                        })
+                        raise Exception("Validation Error") 
+                        
+        except Exception as e:
+            if errors:
+                return Response({
+                    "message": "Bulk upload failed. No tasks were created.",
+                    "details": errors
+                }, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # 5. Trigger Notifications (Optional: You might want to batch this later if uploads are huge)
+        for task in created_tasks:
+            notify_task_created(task=task, actor=request.user)
+
+        return Response({
+            "message": f"{len(created_tasks)} tasks successfully created.",
+        }, status=status.HTTP_201_CREATED)
