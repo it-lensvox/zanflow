@@ -122,12 +122,17 @@ export function ProjectSettings() {
   const updateMutation = useMutation({
     mutationFn: (data: Partial<Project>) => projectsApi.update(Number(id), data),
     onSuccess: () => {
+      // Invalidate project specific data
       queryClient.invalidateQueries({ queryKey: ['project', id] });
       queryClient.invalidateQueries({ queryKey: ['projects'] });
+      
+      // --- NEW: Invalidate chat rooms to sync the updated project name instantly ---
+      queryClient.invalidateQueries({ queryKey: ['project-chat-rooms'] });
+      queryClient.invalidateQueries({ queryKey: ['sidebar-all-chat-rooms'] });
+      
       setIsFormDirty(false);
     },
   });
-
   const deleteMutation = useMutation({
     mutationFn: () => projectsApi.delete(Number(id)),
     onSuccess: () => {

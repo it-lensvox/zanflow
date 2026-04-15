@@ -24,6 +24,7 @@ import DeleteModal from '@/components/common/Deletemodal';
 import Threads from '../Project/Thread';
 import { useProjectDetails, TabType } from '@/hooks/useTaskDetails';
 import type { Task, FilteredDocument, QuickNote } from '@/types';
+import { taskApi } from '@/services/api';
 
 //Date Field Dropdown
 function DateFieldDropdown({
@@ -180,6 +181,78 @@ export function TaskDetails() {
   const ctx = useProjectDetails();
   useDocumentPreviewKeyboard(() => ctx.setPreviewDocument(null));
 
+  // Bulk Upload State & Refs
+  const bulkFileInputRef = React.useRef<HTMLInputElement>(null);
+  const [isBulkUploading, setIsBulkUploading] = React.useState(false);
+  const [uploadResultModal, setUploadResultModal] = React.useState<{ type: 'success' | 'error', message: string } | null>(null);
+  
+  const [isBulkUploadModalOpen, setIsBulkUploadModalOpen] = React.useState(false);
+  const [pastedJson, setPastedJson] = React.useState("");
+
+  const dummyJsonExample = `{
+  "tasks": [
+    {
+      "heading": "Integrate AWS Bedrock APIs",
+      "description": "Set up the initial endpoints for LLM interaction.",
+      "priority": "high",
+      "status": "pending",
+      "assignee_emails": ["shifali@example.com", "harshit@example.com"]
+    },
+    {
+      "heading": "Write Unit Tests for Chat Bot",
+      "description": "Ensure WebSocket connections handle disconnects gracefully.",
+      "priority": "medium",
+      "status": "backlog",
+      "assignee_emails": ["megha@example.com"]
+    }
+  ]
+}`;
+
+  const processBulkFile = async (file: File) => {
+    if (!ctx.id) return;
+    setIsBulkUploading(true);
+    try {
+      await taskApi.bulkUpload(ctx.id, file);
+      if (ctx.queryClient) {
+        ctx.queryClient.invalidateQueries(); 
+      }
+      setUploadResultModal({ type: 'success', message: 'Tasks successfully created from JSON!' });
+      setIsBulkUploadModalOpen(false); // Close the input modal on success
+      setPastedJson(""); // Clear pasted text
+    } catch (error: any) {
+      console.error('Bulk upload error:', error);
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || 'Failed to upload tasks.';
+      setUploadResultModal({ type: 'error', message: errorMessage });
+    } finally {
+      setIsBulkUploading(false);
+      if (bulkFileInputRef.current) bulkFileInputRef.current.value = '';
+    }
+  };
+
+  const handleBulkUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    await processBulkFile(file);
+  };
+
+  const handlePasteUpload = async () => {
+    if (!pastedJson.trim()) return;
+    
+    // Quick frontend validation to catch syntax errors before hitting the API
+    try {
+      JSON.parse(pastedJson); 
+    } catch (e) {
+      setUploadResultModal({ type: 'error', message: "Invalid JSON format. Please check your syntax." });
+      return;
+    }
+
+    // Convert the pasted string into a File object so the API accepts it normally
+    const file = new File([pastedJson], 'pasted_tasks.json', { type: 'application/json' });
+    await processBulkFile(file);
+  };
+
+  // DateFieldLabel
+
   // DateFieldLabel 
   const DateFieldLabel = useMemo(
     () => (
@@ -291,6 +364,18 @@ export function TaskDetails() {
             >
               Create Task
             </button>
+
+            {/* Bulk Upload JSON */}
+            {ctx.activeTab === 'tasks' && (
+              <button
+                onClick={() => setIsBulkUploadModalOpen(true)}
+                className="flex items-center gap-2 px-6 py-3.5 border-b-[3px] border-transparent text-slate-500 font-semibold text-[0.95rem] cursor-pointer transition-all duration-200 hover:bg-gradient-to-r hover:from-[#5568d3] hover:to-[#65408b] hover:text-white rounded-t-lg"
+                title="Import tasks via JSON"
+              >
+                <Upload className="w-4 h-4" />
+                Import Tasks
+              </button>
+            )}
 
             {/* Quick Notes */}
             <button
@@ -923,6 +1008,116 @@ export function TaskDetails() {
         </div>
       )}
       
+      {/* ── Import Tasks Modal ── */}
+      {isBulkUploadModalOpen && (
+        <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col transform transition-all animate-in zoom-in-95 duration-200">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-gray-100 bg-gray-50">
+              <div className="flex items-center gap-2">
+                <Upload className="w-5 h-5 text-[#65408b]" />
+                <h2 className="text-[1.1rem] font-bold text-gray-800">Import Tasks via JSON</h2>
+              </div>
+              <button onClick={() => setIsBulkUploadModalOpen(false)} className="p-1.5 rounded-full hover:bg-gray-200 transition-colors">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1 bg-[#f8fafc] flex flex-col gap-6">
+              
+              {/* Expected Format Section */}
+              <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+                  <Info className="w-4 h-4 text-blue-500" /> Expected Format
+                </h3>
+                <pre className="bg-slate-900 text-green-400 p-4 rounded-lg text-[12px] overflow-x-auto font-mono leading-relaxed">
+                  {dummyJsonExample}
+                </pre>
+              </div>
+
+              {/* Paste or Upload Section */}
+              <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-4">
+                <h3 className="text-sm font-bold text-gray-800">Paste JSON Code</h3>
+                <textarea
+                  value={pastedJson}
+                  onChange={(e) => setPastedJson(e.target.value)}
+                  placeholder="Paste your JSON array here..."
+                  className="w-full h-48 p-3 text-[13px] text-gray-700 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#65408b] font-mono resize-y bg-gray-50"
+                />
+                
+                <div className="flex items-center justify-between mt-2 pt-4 border-t border-gray-100">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="file"
+                      accept=".json"
+                      ref={bulkFileInputRef}
+                      className="hidden"
+                      onChange={handleBulkUpload}
+                      disabled={isBulkUploading}
+                    />
+                    <button
+                      onClick={() => bulkFileInputRef.current?.click()}
+                      disabled={isBulkUploading}
+                      className="px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 text-sm font-semibold rounded-lg transition-colors flex items-center gap-2 border border-gray-300 shadow-sm"
+                    >
+                      <FileText className="w-4 h-4 text-gray-500" />
+                      Select .json File
+                    </button>
+                  </div>
+                  
+                  <button
+                    onClick={handlePasteUpload}
+                    disabled={isBulkUploading || !pastedJson.trim()}
+                    className="px-6 py-2 bg-[#65408b] hover:bg-[#553675] text-white text-sm font-bold rounded-lg transition-all shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {isBulkUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    Create Tasks
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bulk Upload Result Modal ── */}
+      {uploadResultModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all animate-in zoom-in-95 duration-200">
+            <div className={`p-6 text-center border-t-4 ${uploadResultModal.type === 'success' ? 'border-green-500' : 'border-red-500'}`}>
+              <div className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full mb-4 ${uploadResultModal.type === 'success' ? 'bg-green-100' : 'bg-red-100'}`}>
+                {uploadResultModal.type === 'success' ? (
+                  <svg className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <svg className="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                )}
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">
+                {uploadResultModal.type === 'success' ? 'Success!' : 'Upload Failed'}
+              </h3>
+              <p className="text-gray-500 text-sm mb-6 px-2 break-words">
+                {uploadResultModal.message}
+              </p>
+              <button
+                onClick={() => setUploadResultModal(null)}
+                className={`w-full py-2.5 px-4 rounded-lg font-bold text-white transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                  uploadResultModal.type === 'success' 
+                    ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500 hover:shadow-lg hover:-translate-y-0.5' 
+                    : 'bg-red-600 hover:bg-red-700 focus:ring-red-500 hover:shadow-lg hover:-translate-y-0.5'
+                }`}
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <DateFieldDropdown
         show={ctx.showDateFieldDropdown}
         dropdownPos={ctx.dropdownPos}

@@ -63,20 +63,24 @@ export function CreateProjectModal({ isOpen, onClose, navigateOnSuccess = false 
     });
 
     const createMutation = useMutation({
-        mutationFn: (data: ProjectCreatePayload) => {
-            return projectsApi.create(data);
+        mutationFn: (data: ProjectCreatePayload) => projectsApi.create(data),
+        onSuccess: (newProject) => {
+          // 1. Invalidate the projects list so the new project appears
+          queryClient.invalidateQueries({ queryKey: ['projects'] });
+          
+          // --- NEW: Invalidate chat rooms so the new project chat appears instantly ---
+          queryClient.invalidateQueries({ queryKey: ['project-chat-rooms'] });
+          queryClient.invalidateQueries({ queryKey: ['sidebar-all-chat-rooms'] });
+          
+          // Close the modal (your existing logic)
+          onClose();
+          
+          // (Any other existing success logic you have...)
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['projects'], exact: false });
-            handleClose();
-            if (navigateOnSuccess) {
-                navigate('/projects');
-            }
-        },
-        onError: (err: any) => {
-            setError(err.response?.data?.detail || 'Failed to create project');
-        },
-    });
+        onError: (error) => {
+          console.error("Failed to create project:", error);
+        }
+      });
 
     const handleClose = () => {
         setFormData({ name: '', description: '', task_type: 'key_value' });
