@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from dateutil.parser import parse
 from .models import DailyUpdate, Event
 from .serializers import DailyUpdateSerializer, EventSerializer
-
+from rest_framework.decorators import action
 class IsOwnerOrReadOnly(permissions.BasePermission):
     """
     Custom permission to only allow the user who created the update to edit it.
@@ -92,7 +92,68 @@ class EventViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(start_time__date__gte=start_date)
             
         return queryset
+    @action(detail=False, methods=['get'])
+    def check_availability(self, request):
+        """
+        Check if a specific attendee is available for a given time slot
+        before attempting to create or update an event.
+        """
+        attendee_id = request.query_params.get('attendee_id')
+        start_time_str = request.query_params.get('start_time')
+        end_time_str = request.query_params.get('end_time')
+        event_id = request.query_params.get('event_id')  # Optional: Pass if updating an existing event
 
+        # 1. Validate inputs
+        if not all([attendee_id, start_time_str, end_time_str]):
+            return Response(
+                {"error": "attendee_id, start_time, and end_time are required parameters."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            start_time = parse(start_time_str)
+            end_time = parse(end_time_str)
+        except Exception:
+            return Response({"error": "Invalid date/time format."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if start_time >= end_time:
+            return Response({"error": "End time must be after start time."}, status=status.HTTP_400_BAD_REQUEST)
+
+        event_date = start_time.date()
+        
+        # Base QuerySet
+        existing_events = Event.objects.all()
+        if event_id:
+            # Exclude the current event if we are checking availability during an update
+            existing_events = existing_events.exclude(id=event_id)
+
+        # 2. Rule A: Maximum 5 events per day check
+        daily_event_count = existing_events.filter(
+            attendees__id=attendee_id,
+            start_time__date=event_date
+        ).count()
+
+        if daily_event_count >= 5:
+            return Response({
+                "is_available": False,
+                "reason": f"They have already reached the maximum limit of 5 events on {event_date}."
+            })
+
+        # 3. Rule B: Time Overlap Check
+        overlapping_events = existing_events.filter(
+            attendees__id=attendee_id,
+            start_time__lt=end_time,
+            end_time__gt=start_time
+        )
+
+        if overlapping_events.exists():
+            return Response({
+                "is_available": False,
+                "reason": "They already have a conflicting event scheduled during this time."
+            })
+
+        # If it passes both rules
+        return Response({"is_available": True})
     def create(self, request, *args, **kwargs):
         is_recurring = request.data.get('is_recurring', False)
         

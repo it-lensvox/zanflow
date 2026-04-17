@@ -155,7 +155,7 @@ def remove_user_from_team_chat(sender, instance, **kwargs):
 
 @receiver(post_save, sender=Project)
 def create_project_chat_room(sender, instance, created, **kwargs):
-    """Auto-create a chat room when a new project is created."""
+    """Auto-create or sync a chat room when a project is created or updated."""
     if created:
         try:
             creator = getattr(instance, 'created_by', None)
@@ -183,6 +183,18 @@ def create_project_chat_room(sender, instance, created, **kwargs):
             
         except Exception as e:
             logger.error(f"Failed to auto-create chat room for project {instance.id}: {str(e)}", exc_info=True)
+    else:
+        # --- NEW LOGIC: Sync name on project update ---
+        try:
+            updated_count = ChatRoom.objects.filter(
+                room_type=ChatRoom.RoomType.PROJECT,
+                project=instance
+            ).update(name=f"{instance.name} Chat")
+            
+            if updated_count > 0:
+                logger.info(f"Successfully synced chat room name for updated project: {instance.name}")
+        except Exception as e:
+            logger.error(f"Failed to sync chat room name for project {instance.id}: {str(e)}", exc_info=True)
 
 
 @receiver(post_save, sender=ProjectMembership)

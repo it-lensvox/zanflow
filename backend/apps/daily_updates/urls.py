@@ -25,6 +25,10 @@ urlpatterns = [
         'post': 'create'
     }), name='event-list'),
     
+    path('events/check-availability/', EventViewSet.as_view({
+        'get': 'check_availability'
+    }), name='event-check-availability'),
+
     path('events/<int:pk>/', EventViewSet.as_view({
         'get': 'retrieve', 
         'put': 'update', 
