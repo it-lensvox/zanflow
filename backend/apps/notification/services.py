@@ -710,7 +710,21 @@ def notify_organizer_rsvp(invitation, action_type):
         
     elif action_type == 'RESCHEDULE':
         title = "Reschedule Requested"
-        new_time = invitation.proposed_reschedule_time.strftime("%b %d, %Y at %I:%M %p") if invitation.proposed_reschedule_time else "Unknown time"
+        
+        # Safely handle the time whether it's a string (from request) or datetime (from DB)
+        raw_time = invitation.proposed_reschedule_time
+        new_time = "Unknown time"
+        
+        if raw_time:
+            if isinstance(raw_time, str):
+                from django.utils.dateparse import parse_datetime
+                parsed = parse_datetime(raw_time)
+                # Fallback to the raw string if parsing somehow fails
+                new_time = parsed.strftime("%b %d, %Y at %I:%M %p") if parsed else raw_time
+            else:
+                # It's already a datetime object
+                new_time = raw_time.strftime("%b %d, %Y at %I:%M %p")
+                
         message = f"{actor_name} wants to reschedule '{event_title}' to {new_time}."
         priority = Notification.Priority.MEDIUM
         

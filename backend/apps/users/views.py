@@ -10,7 +10,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from django.shortcuts import get_object_or_404
-from .serializers import UserRoleUpdateSerializer
+from .serializers import UserRoleUpdateSerializer, ContactMessageSerializer
 from .serializers import UserCreateSerializer, UserSerializer, VerifyOTPSerializer, ForgotPasswordSerializer, SetNewPasswordSerializer, AuthenticatedResetPasswordSerializer, SendInvitationSerializer, AcceptInvitationSerializer
 import random
 import uuid
@@ -18,7 +18,7 @@ from django.core.mail import send_mail,EmailMultiAlternatives
 from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
-from .models import PasswordResetOTP, Invitation
+from .models import PasswordResetOTP, Invitation, ContactMessage
 User = get_user_model()
 
 
@@ -408,3 +408,53 @@ class AcceptInvitationView(APIView):
         invitation.save()
 
         return Response({"detail": "Account setup successful. You can now log in."}, status=status.HTTP_201_CREATED)
+    
+class ContactUsView(APIView):
+    """
+    Public endpoint for the Dyuksa landing page contact form.
+    Requires no authentication. Emails superusers upon submission.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = ContactMessageSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        # 1. Save the record to the database
+        contact_message = serializer.save()
+
+        # 2. Fetch all active superusers
+        superuser_emails = list(
+            User.objects.filter(is_superuser=True, is_active=True)
+            .exclude(email='')
+            .values_list('email', flat=True)
+        )
+
+        # 3. Send email via AWS SES if superusers exist
+        if superuser_emails:
+            subject = f"New Contact Submission on Dyuksa from {contact_message.name}"
+            
+            # You can also use render_to_string here if you want a beautiful HTML email like your invitations
+            text_content = f"""
+New contact form submission on the Dyuksa platform:
+
+Name: {contact_message.name}
+Email: {contact_message.email}
+Company: {contact_message.company or 'Not provided'}
+
+Problem / Message:
+{contact_message.problem}
+            """
+            
+            send_mail(
+                subject=subject,
+                message=text_content,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=superuser_emails,
+                fail_silently=False, 
+            )
+
+        return Response(
+            {"detail": "Thank you! Your message has been sent successfully."}, 
+            status=status.HTTP_201_CREATED
+        )
