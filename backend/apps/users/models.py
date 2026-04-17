@@ -119,3 +119,20 @@ class Invitation(models.Model):
     @property
     def is_valid(self):
         return not self.is_used and timezone.now() < self.expires_at
+    
+class ContactMessage(models.Model):
+    """
+    Stores contact form submissions from the public Dyuksa landing page.
+    """
+    name = models.CharField(max_length=255)
+    email = models.EmailField()
+    company = models.CharField(max_length=255, blank=True, null=True)
+    problem = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "contact_messages"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Message from {self.name} ({self.email})"

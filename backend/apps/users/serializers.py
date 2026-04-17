@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
-from .models import Invitation
+from .models import Invitation, ContactMessage
 User = get_user_model()
 
 class UserSerializer(serializers.ModelSerializer):
@@ -155,3 +155,8 @@ class AcceptInvitationSerializer(serializers.Serializer):
              raise serializers.ValidationError({"username": "This username is already taken."})
              
         return data
+
+class ContactMessageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContactMessage
+        fields = ['name', 'email', 'company', 'problem']
