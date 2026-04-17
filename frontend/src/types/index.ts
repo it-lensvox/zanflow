@@ -834,7 +834,7 @@ export interface NotificationData {
     priority?: string;
     [key: string]: any;
   };
-related_object?: NotificationRelatedObject;
+  related_object?: NotificationRelatedObject;
   related_object_info?: NotificationRelatedObject & { app?: string };
   time_since?: string;
   created_at?: string;
@@ -919,7 +919,7 @@ export interface ChatRoomListItem {
   slug: string;
   project: number | null;
   participant_count: number;
-  participants: number[]; 
+  participants: number[];
   last_message: {
     id: string;
     sender_username: string;
@@ -1364,21 +1364,30 @@ export type InvitationStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'ORGANIZER'
 
 // Keep ONLY this Event interface (with the new fields)
 export interface Event {
-    id: number;
-    organizer: number;
-    organizer_name: string;
-    title: string;
-    attendees: number[];
-    start_time: string;
-    end_time: string;
-    location?: string;
-    is_online_meeting: boolean;
-    description?: string;
-    event_type?: string; 
-    created_at: string;
-    updated_at: string;
-    // NEW FIELDS FOR INVITATION SYSTEM
-    my_invitation_status?: InvitationStatus;
-    my_invitation_id?: number;
+  id: number;
+  organizer: number;
+  organizer_name: string;
+  title: string;
+  attendees: number[];
+  start_time: string;
+  end_time: string;
+  location?: string;
+  is_online_meeting: boolean;
+  description?: string;
+  event_type?: string;
+  created_at: string;
+  updated_at: string;
+  // NEW FIELDS FOR INVITATION SYSTEM
+  my_invitation_status?: InvitationStatus;
+  my_invitation_id?: number;
+}
+
+// Dyuksa AI Scheduling Assistant
+export interface DyuksaAIChatPayload {
+    message: string;
+}
+
+export interface DyuksaAIChatResponse {
+    reply: string;
 }
 

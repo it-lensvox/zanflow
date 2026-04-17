@@ -20,11 +20,12 @@ import {
     XCircle,
     RefreshCw,
     Crown,
-    AlertCircle
+    AlertCircle,
+    Sparkles
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { taskApi, dailyUpdateApi, eventApi, usersApi, notificationSocket } from '@/services/api';
+import { taskApi, dailyUpdateApi, eventApi, usersApi, notificationSocket, dyuksaAI } from '@/services/api';
 import { useAuth } from '@/hooks/useAuth';
 import { TaskDetailModal } from '../MyTask/TaskDetailModal';
 import type { Task, DailyUpdate, DailyUpdatePayload, Event as CalendarEventType, InvitationStatus } from '@/types';
@@ -990,6 +991,7 @@ const EventModal: React.FC<EventModalProps> = ({
     const [location, setLocation] = useState('');
     const [isOnline, setIsOnline] = useState(false);
     const [description, setDescription] = useState('');
+
 
     // NEW: Event Type state
     const [eventType, setEventType] = useState('Meeting');
@@ -2613,6 +2615,10 @@ export const Calendar: React.FC = () => {
     const [showDeclineModal, setShowDeclineModal] = useState(false);
     const [showRescheduleModal, setShowRescheduleModal] = useState(false);
     const [selectedInvitationEvent, setSelectedInvitationEvent] = useState<CalendarEventType | null>(null);
+    // ═══════════════ DYUKSA AI STATE ═══════════════
+    const [dyuksaInput, setDyuksaInput] = useState('');
+    const [dyuksaResponse, setDyuksaResponse] = useState<string | null>(null);
+    const [isDyuksaLoading, setIsDyuksaLoading] = useState(false);
 
     // ═══════════════ INVITATION MUTATIONS ═══════════════
     const { mutate: acceptInvitation, isPending: isAccepting } = useMutation({
@@ -2683,6 +2689,29 @@ export const Calendar: React.FC = () => {
             rescheduleInvitation({ invitationId: selectedInvitationEvent.my_invitation_id, proposedTime });
         }
     }, [selectedInvitationEvent, rescheduleInvitation]);
+    const handleDyuksaSubmit = async () => {
+        if (!dyuksaInput.trim()) return;
+
+        // Check if message starts with "dyuksa"
+        if (!dyuksaInput.toLowerCase().startsWith('dyuksa')) {
+            setDyuksaResponse('Please start your message with "dyuksa" to use the AI assistant. Example: "dyuksa find 30 mins with Shifali tomorrow"');
+            return;
+        }
+
+        setIsDyuksaLoading(true);
+        setDyuksaResponse(null);
+
+        try {
+            const response = await dyuksaAI.chat(dyuksaInput);
+            setDyuksaResponse(response.reply);
+            setDyuksaInput(''); // Clear input after successful response
+        } catch (error) {
+            console.error('Dyuksa AI error:', error);
+            setDyuksaResponse('Sorry, I encountered an error. Please try again.');
+        } finally {
+            setIsDyuksaLoading(false);
+        }
+    };
 
     const {
         data: eventsData,
@@ -2710,21 +2739,21 @@ export const Calendar: React.FC = () => {
         enabled: !!user,
     });
     // ═══════════════ REAL-TIME CALENDAR UPDATES VIA WEBSOCKET ═══════════════
-React.useEffect(() => {
-    // Subscribe to notification socket for real-time calendar updates
-    const unsubscribe = notificationSocket.onNotification((notification) => {
-        // Check if it's an event-related notification
-        if (notification.related_object?.type === 'event') {
-            console.log('📅 New event notification received, refreshing calendar...');
-            queryClient.invalidateQueries({ queryKey: ['events-calendar'] });
-        }
-    });
+    React.useEffect(() => {
+        // Subscribe to notification socket for real-time calendar updates
+        const unsubscribe = notificationSocket.onNotification((notification) => {
+            // Check if it's an event-related notification
+            if (notification.related_object?.type === 'event') {
+                console.log('📅 New event notification received, refreshing calendar...');
+                queryClient.invalidateQueries({ queryKey: ['events-calendar'] });
+            }
+        });
 
-    // Cleanup on unmount
-    return () => {
-        unsubscribe();
-    };
-}, [queryClient]);
+        // Cleanup on unmount
+        return () => {
+            unsubscribe();
+        };
+    }, [queryClient]);
 
     React.useEffect(() => {
         if (hasNextEventsPage && !isFetchingNextEventsPage) {
@@ -3066,6 +3095,59 @@ React.useEffect(() => {
                         <span className="text-sm font-medium">New event</span>
                     </button>
                 </div>
+            </div>
+            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                <div className="flex items-center gap-3">
+                    <div className="relative flex-1">
+                        <input
+                            type="text"
+                            value={dyuksaInput}
+                            onChange={(e) => setDyuksaInput(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleDyuksaSubmit()}
+                            placeholder='Try: "dyuksa find 30 mins with Shifali tomorrow"'
+                            className="w-full px-4 py-2.5 pl-10 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                        />
+                        <Sparkles size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-500" />
+                    </div>
+                    <button
+                        onClick={handleDyuksaSubmit}
+                        disabled={isDyuksaLoading || !dyuksaInput.trim()}
+                        className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl transition-colors flex items-center gap-2 shadow-sm"
+                    >
+                        {isDyuksaLoading ? (
+                            <>
+                                <Loader2 size={16} className="animate-spin" />
+                                Thinking...
+                            </>
+                        ) : (
+                            <>
+                                <Send size={16} />
+                                Ask Dyuksa
+                            </>
+                        )}
+                    </button>
+                </div>
+
+                {/* Dyuksa Response */}
+                {dyuksaResponse && (
+                    <div className="mt-3 p-4 bg-purple-50 border border-purple-200 rounded-xl">
+                        <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0">
+                                <Sparkles size={14} className="text-white" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-xs font-semibold text-purple-900 uppercase tracking-wider mb-1">Dyuksa AI</p>
+                                <p className="text-sm text-purple-800 whitespace-pre-wrap">{dyuksaResponse}</p>
+                            </div>
+                            <button
+                                onClick={() => setDyuksaResponse(null)}
+                                className="p-1 text-purple-400 hover:text-purple-600 hover:bg-purple-100 rounded-lg transition-colors"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Calendar Content Area */}

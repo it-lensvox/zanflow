@@ -1561,6 +1561,17 @@ export const eventApi = {
     return data;
   },
 };
+// ═══════════════════════════════════════════════════════════════════════
+// DYUKSA AI SCHEDULING ASSISTANT
+// ═══════════════════════════════════════════════════════════════════════
+
+export const dyuksaAI = {
+    // Send a natural language scheduling request to the AI
+    chat: async (message: string): Promise<{ reply: string }> => {
+        const { data } = await api.post('/task-ai/chat/agent/', { message });
+        return data;
+    },
+};
 
 
 export default api;
