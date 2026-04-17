@@ -1,11 +1,11 @@
-from django.db.models.signals import post_save, m2m_changed
+from django.db.models.signals import post_save, m2m_changed, post_save
 from django.dispatch import receiver
 from django.contrib.auth import get_user_model
 from django.utils.timezone import localtime
 from django.db.models import Q
 from apps.quicknotes.models import Folder, Note
 from apps.notification.services import notify_event_created
-from .models import Event
+from .models import Event, EventInvitation
 User = get_user_model()
 
 @receiver(post_save, sender='daily_updates.DailyUpdate')
@@ -115,4 +115,21 @@ def event_attendees_changed(sender, instance, action, pk_set, **kwargs):
             event=instance,
             actor=actor,
             attendees=added_users
+        )
+@receiver(post_save, sender=EventInvitation)
+def send_rsvp_notification(sender, instance, created, **kwargs):
+    """
+    Trigger notifications when an invitation is created for an Event.
+    """
+    # Only send the notification if this is a brand new, pending invitation
+    if created and instance.status == 'PENDING':
+        actor = getattr(instance.event, 'organizer', None)
+        
+        # We pass the specific user in a list to keep compatibility with your 
+        # existing service, but we also pass the invitation instance itself!
+        notify_event_created(
+            event=instance.event,
+            actor=actor,
+            attendees=[instance.user], 
+            invitation=instance  # <--- CRUCIAL: Make sure to update your service to accept this!
         )

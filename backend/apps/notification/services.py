@@ -628,28 +628,36 @@ def notify_new_chat_message(room, message, actor: User, recipients: List[User]) 
 # EVENT-SPECIFIC NOTIFICATION FUNCTIONS
 # ============================================================================
 
-def notify_event_created(event, actor: User, attendees: List[User]) -> List[Notification]:
+def notify_event_created(event, actor: User, attendees: List[User], invitation=None) -> List[Notification]:
     """
     Send notifications when users are invited to a calendar event.
+    Now supports interactive RSVP actions if an invitation instance is provided.
     """
     if not attendees:
         return []
     
-    # Assuming your event model has a 'title' or 'name' attribute. Adjust if needed.
     event_title = getattr(event, 'title', 'a new event')
+    
+    metadata = {
+        'event_id': str(event.id),
+        'event_title': event_title,
+    }
+    
+    # NEW LOGIC: If we receive the specific EventInvitation object, 
+    # we tell the frontend to render the RSVP buttons.
+    if invitation:
+        metadata['invitation_id'] = str(invitation.id)
+        metadata['actions'] = ["ACCEPT", "DECLINE", "RESCHEDULE"]
     
     return notify(
         recipients=attendees,
         title="Event Invitation",
-        message=f"You have been invited to '{event_title}'",
+        message=f"You have been invited to '{event_title}'. Please RSVP.",
         notification_type=Notification.NotificationType.EVENT_CREATED,
         actor=actor,
         priority=Notification.Priority.MEDIUM,
         related_object=event,
-        metadata={
-            'event_id': str(event.id),
-            'event_title': event_title,
-        }
+        metadata=metadata
     )
 
 def notify_event_reminder(event) -> List[Notification]:
@@ -677,5 +685,53 @@ def notify_event_reminder(event) -> List[Notification]:
         metadata={
             'event_id': str(event.id),
             'event_title': event_title,
+        }
+    )
+
+def notify_organizer_rsvp(invitation, action_type):
+    """
+    Sends a notification back to the organizer when an assignee RSVPs.
+    """
+    organizer = getattr(invitation.event, 'organizer', None)
+    actor = invitation.user
+    
+    # Don't notify if the organizer is somehow accepting their own invite
+    if not organizer or organizer == actor:
+        return []
+
+    event_title = invitation.event.title
+    actor_name = actor.get_full_name() or actor.username
+
+    if action_type == 'DECLINED':
+        title = "Event Declined"
+        reason = invitation.decline_reason or "No reason provided."
+        message = f"{actor_name} declined '{event_title}'. Reason: {reason}"
+        priority = Notification.Priority.HIGH
+        
+    elif action_type == 'RESCHEDULE':
+        title = "Reschedule Requested"
+        new_time = invitation.proposed_reschedule_time.strftime("%b %d, %Y at %I:%M %p") if invitation.proposed_reschedule_time else "Unknown time"
+        message = f"{actor_name} wants to reschedule '{event_title}' to {new_time}."
+        priority = Notification.Priority.MEDIUM
+        
+    elif action_type == 'ACCEPTED':
+        title = "Event Accepted"
+        message = f"{actor_name} accepted your invitation to '{event_title}'."
+        priority = Notification.Priority.LOW
+    else:
+        return []
+
+    return notify(
+        recipients=[organizer],
+        title=title,
+        message=message,
+        notification_type=Notification.NotificationType.SYSTEM, # Or create a specific RSVP type
+        actor=actor,
+        priority=priority,
+        related_object=invitation.event,
+        metadata={
+            'event_id': str(invitation.event.id),
+            'invitation_id': str(invitation.id),
+            'action_taken': action_type
         }
     )

@@ -30,8 +30,11 @@ class Event(models.Model):
         related_name='organized_events'
     )
     title = models.CharField(max_length=255)
+    event_type = models.CharField(max_length=100, default='Meeting')
+    
     attendees = models.ManyToManyField(
         settings.AUTH_USER_MODEL, 
+        through='EventInvitation',
         related_name='attending_events',
         blank=True
     )
@@ -50,3 +53,43 @@ class Event(models.Model):
 
     def __str__(self):
         return f"{self.title} organized by {self.organizer.username}"
+    
+# Add this below your Event class in models.py
+
+class EventInvitation(models.Model):
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
+        ('ACCEPTED', 'Accepted'),
+        ('DECLINED', 'Declined'),
+        ('RESCHEDULE_REQUESTED', 'Reschedule Requested')
+    ]
+
+    event = models.ForeignKey(
+        'Event', 
+        on_delete=models.CASCADE, 
+        related_name='invitations'
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='event_invitations'
+    )
+    status = models.CharField(
+        max_length=25, 
+        choices=STATUS_CHOICES, 
+        default='PENDING'
+    )
+    decline_reason = models.TextField(blank=True, null=True)
+    proposed_reschedule_time = models.DateTimeField(blank=True, null=True)
+    
+    # Audit timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        # A user should only have one invitation per event
+        unique_together = ['event', 'user']
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Invitation for {self.user.username} to {self.event.title} ({self.status})"
