@@ -494,6 +494,12 @@ export interface GetUploadUrlResponse {
   file_key: string;
 }
 
+// Confirm Upload Payload
+export interface ConfirmUploadPayload {
+  file_key: string;
+  document_id?: string;
+}
+
 export interface ConfirmUploadResponse {
   id: string;
   status: DocumentStatus;
@@ -805,7 +811,7 @@ export interface UnreadCount {
 
 // WebSocket Notification System Types
 export interface NotificationRelatedObject {
-  type: 'task' | 'project' | 'message' | 'comment' | 'team' | 'document';
+  type: 'task' | 'project' | 'message' | 'comment' | 'team' | 'document' | 'event';
   id: string | number;
 }
 
@@ -1353,6 +1359,10 @@ export interface DailyUpdateListResponse {
   results: DailyUpdate[];
 }
 
+// Add this new type (keep this)
+export type InvitationStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'ORGANIZER';
+
+// Keep ONLY this Event interface (with the new fields)
 export interface Event {
     id: number;
     organizer: number;
@@ -1364,6 +1374,11 @@ export interface Event {
     location?: string;
     is_online_meeting: boolean;
     description?: string;
+    event_type?: string; 
     created_at: string;
     updated_at: string;
+    // NEW FIELDS FOR INVITATION SYSTEM
+    my_invitation_status?: InvitationStatus;
+    my_invitation_id?: number;
 }
+
