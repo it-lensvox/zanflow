@@ -94,19 +94,24 @@ class EventSerializer(serializers.ModelSerializer):
         # 2. Create the base Event
         event = super().create(validated_data)
         
-        # 3. Create invitations ONE BY ONE so the post_save signal fires!
-        for attendee in attendees:
+        # --- THE FIX: Deduplicate the attendees to prevent IntegrityErrors ---
+        unique_attendees = set(attendees)
+        
+        # 3. Create invitations ONE BY ONE so the post_save signal fires
+        for attendee in unique_attendees:
+            # Pro-tip: If the attendee is the organizer, auto-accept their invitation!
+            invitation_status = 'ACCEPTED' if attendee == event.organizer else 'PENDING'
+            
             EventInvitation.objects.create(
                 event=event, 
                 user=attendee, 
-                status='PENDING'
+                status=invitation_status
             )
         
         # 4. Refresh the event from the DB so the response JSON includes the attendees
         event.refresh_from_db()
         
         return event
-
 # Add this new serializer for when we build the API endpoints
 class EventInvitationSerializer(serializers.ModelSerializer):
     class Meta:

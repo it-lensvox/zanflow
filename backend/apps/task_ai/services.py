@@ -12,6 +12,7 @@ from apps.daily_updates.models import Event
 from apps.daily_updates.utils import find_available_slots
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from django.db.models import Q
 
 logger = logging.getLogger('apps')
 User = get_user_model()
@@ -586,6 +587,7 @@ class CalendarAgentService:
             aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
         )
 
+        # Added 'title' and 'event_type' to the AI tool schema
         tools = [
             {
                 "toolSpec": {
@@ -607,6 +609,14 @@ class CalendarAgentService:
                                 "duration_minutes": {
                                     "type": "integer",
                                     "description": "The duration of the meeting in minutes. Default to 30 if not specified."
+                                },
+                                "title": {
+                                    "type": "string",
+                                    "description": "A short, generated title for the event, e.g., 'Meeting with Shifali'"
+                                },
+                                "event_type": {
+                                    "type": "string",
+                                    "description": "The type of event, usually 'Meeting', 'Call', or 'Code Review'"
                                 }
                             },
                             "required": ["attendee_names", "target_date", "duration_minutes"]
@@ -629,22 +639,20 @@ class CalendarAgentService:
 
             output_message = response['output']['message']
             
-            # Print for debugging (you can remove this later)
-            print(f"\nRAW BEDROCK OUTPUT: {json.dumps(output_message, indent=2)}\n")
-            
-            # --- THE FIX: Iterate correctly looking for 'toolUse' ---
             for content_block in output_message['content']:
                 if 'toolUse' in content_block:
                     tool_use = content_block['toolUse']
                     if tool_use['name'] == 'check_calendar_availability':
                         args = tool_use['input']
                         
-                        # Call the deterministic Python logic using standard integer IDs
+                        # Pass all arguments, including the new optional ones
                         result = CalendarAgentService.execute_phase_1_logic(
                             requesting_user=user,
                             names=args['attendee_names'],
                             date_str=args['target_date'],
-                            duration=args['duration_minutes']
+                            duration=args['duration_minutes'],
+                            title=args.get('title', ''),
+                            event_type=args.get('event_type', 'Meeting')
                         )
                         
                         CalendarAgentService.log_ai_interaction(user, prompt_text, response, result)
@@ -652,24 +660,49 @@ class CalendarAgentService:
 
         except Exception as e:
             logger.error(f"Bedrock API Error: {str(e)}")
-            return {"error": "There was an issue connecting to the AI service."}
+            return {"reply": "There was an issue connecting to the AI service."}
 
-        return {"message": "I couldn't determine the scheduling details. Could you clarify who and when?"}
+        return {"reply": "I couldn't determine the scheduling details. Could you clarify who and when?"}
 
     @staticmethod
-    def execute_phase_1_logic(requesting_user, names, date_str, duration):
+    def execute_phase_1_logic(requesting_user, names, date_str, duration, title, event_type):
         attendee_ids = [requesting_user.id]
+        attendee_full_names = [requesting_user.get_full_name() or requesting_user.username]
         unfound_names = []
         
         for name in names:
-            colleague = User.objects.filter(first_name__iexact=name).first() 
+            name_parts = name.strip().split()
+            colleague = None
+            
+            # If the AI provided a full name (e.g., "Shifali Gupta")
+            if len(name_parts) >= 2:
+                first_name_guess = name_parts[0]
+                last_name_guess = name_parts[-1]
+                
+                colleague = User.objects.filter(
+                    (Q(first_name__icontains=first_name_guess) & Q(last_name__icontains=last_name_guess)) |
+                    Q(username__icontains=name.replace(" ", ""))
+                ).first()
+            
+            # If it's a single name or the full name search failed, do a broad search
+            if not colleague:
+                broad_search = name_parts[0] 
+                colleague = User.objects.filter(
+                    Q(first_name__icontains=broad_search) | 
+                    Q(last_name__icontains=broad_search) | 
+                    Q(username__icontains=broad_search)
+                ).first()
+                
             if colleague:
-                attendee_ids.append(colleague.id) 
+                # --- THE FIX: Only append if they aren't already in the list! ---
+                if colleague.id not in attendee_ids:
+                    attendee_ids.append(colleague.id) 
+                    attendee_full_names.append(colleague.get_full_name() or colleague.username)
             else:
                 unfound_names.append(name)
                 
         if unfound_names:
-            return {"error": f"Could not find users: {', '.join(unfound_names)}"}
+            return {"reply": f"Could not find users: {', '.join(unfound_names)}"}
 
         target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
         day_start = timezone.make_aware(datetime.combine(target_date, datetime.strptime("09:00", "%H:%M").time()))
@@ -683,13 +716,26 @@ class CalendarAgentService:
         busy_intervals = [(e.start_time, e.end_time) for e in events]
         slots = find_available_slots(busy_intervals, day_start, day_end, duration)
         
-        formatted_slots = [slot.strftime("%I:%M %p") for slot in slots]
+        # Format slots as ISO 8601 UTC strings for the frontend
+        formatted_slots = [slot.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") for slot in slots]
         
+        # Generate default title if AI didn't provide a good one
+        final_title = title if title else f"Meeting with {', '.join(names)}"
+        final_event_type = event_type if event_type else "Meeting"
+
+        # Construct the exact dictionary structure Jyoti requested
         return {
-            "attendees_found": names,
-            "date": date_str,
-            "duration": duration,
-            "available_slots": formatted_slots
+            "action": "create_event",
+            "data": {
+                "event_type": final_event_type,
+                "title": final_title,
+                "attendee_ids": attendee_ids,
+                "attendee_names": attendee_full_names,
+                "target_date": date_str,
+                "duration_minutes": duration,
+                "available_slots": formatted_slots
+            },
+            "reply": f"I found available slots for a {final_event_type.lower()} with {', '.join(names)} on {date_str}."
         }
 
     @staticmethod
@@ -697,7 +743,7 @@ class CalendarAgentService:
         log_data = {
             "user": user.username,
             "prompt": prompt,
-            "tool_triggered": "available_slots" in final_result,
+            "tool_triggered": "action" in final_result,
             "final_result": final_result
         }
         logger.debug(f"AI Calendar Agent Interaction: {json.dumps(log_data, indent=2)}")
