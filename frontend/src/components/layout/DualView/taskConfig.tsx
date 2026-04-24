@@ -814,5 +814,29 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
         />
       ),
     },
+    {
+      key: 'created_by',
+      label: <span className="text-[14px] font-bold tracking-wide text-gray-700">Created By</span>,
+      width: '10%',
+      render: (task: Task) => {
+        const creator = task.assigned_by_user_details;
+        if (!creator) {
+          return <span className="text-gray-300 text-[11px]">—</span>;
+        }
+        return (
+          <div className="flex items-center gap-2">
+            <div
+              className="w-6 h-6 rounded-full bg-[#6366f1] text-white flex items-center justify-center text-[10px] font-semibold ring-1 ring-white"
+              title={`${creator.first_name} ${creator.last_name}`}
+            >
+              {creator.first_name?.[0] || ''}{creator.last_name?.[0] || ''}
+            </div>
+            <span className="text-[12px] text-gray-700 font-medium truncate max-w-[80px]">
+              {creator.first_name} {creator.last_name?.[0]}.
+            </span>
+          </div>
+        );
+      },
+    },
   ];
 };

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  NotebookPen, Plus, FolderPlus, Maximize2, X, Folder, FileText, MoreVertical, Paperclip, Loader2, Trash2,
+  NotebookPen, Plus, FolderPlus, Maximize2, X, Folder, FileText, MoreVertical, Paperclip, Loader2, Trash2, Bold, Italic, List, ListOrdered, Pencil
 } from 'lucide-react';
 import { cn, formatRelativeTime } from '@/lib/utils';
 import { quickNotesApi, projectsApi, authApi, usersApi } from '@/services/api';
@@ -401,6 +401,7 @@ export function FolderSidebar({
           const isMenuOpen = openMenuId === folder.id;
           const isRenaming = renamingId === folder.id;
           const isReal = folder.id !== 'all'; // 'All Notes' is virtual — no rename/delete
+          const isReadOnlyFolder = folder.name === 'Team Member Updates';
 
           return (
             <div key={folder.id} className="relative">
@@ -435,7 +436,7 @@ export function FolderSidebar({
                 <span className="text-[10px] text-muted-foreground shrink-0">{folder.count}</span>
 
                 {/* Ellipsis — only for real folders, not 'All Notes' */}
-                {isReal && (
+                {isReal && !isReadOnlyFolder && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -712,6 +713,7 @@ export function NotesList({
             const isSelected = state.selectedNoteId === note.id;
             const isMenuOpen = openMenuId === note.id;
             const isRenaming = renamingId === note.id;
+            const isReadOnlyNote = state.folders.find(f => f.id === note.folder)?.name === 'Team Member Updates' || getNoteTitle(note) === 'Team Member Updates';
 
             return (
               <div key={note.id} className="relative">
@@ -753,18 +755,20 @@ export function NotesList({
                     </div>
 
                     {/* Ellipsis trigger */}
-                    <button
-                      onClick={(e) => handleEllipsisClick(e, note.id)}
-                      title="More options"
-                      className={cn(
-                        'shrink-0 flex h-6 w-6 items-center justify-center rounded transition-colors mt-0.5',
-                        isMenuOpen
-                          ? 'bg-accent text-foreground'
-                          : 'text-muted-foreground hover:bg-accent',
-                      )}
-                    >
-                      <MoreVertical className="h-3.5 w-3.5" />
-                    </button>
+                    {!isReadOnlyNote && (
+                      <button
+                        onClick={(e) => handleEllipsisClick(e, note.id)}
+                        title="More options"
+                        className={cn(
+                          'shrink-0 flex h-6 w-6 items-center justify-center rounded transition-colors mt-0.5',
+                          isMenuOpen
+                            ? 'bg-accent text-foreground'
+                            : 'text-muted-foreground hover:bg-accent',
+                        )}
+                      >
+                        <MoreVertical className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </div>
                 </button>
 
@@ -838,8 +842,10 @@ export function NotesList({
 interface NoteEditorProps {
   selectedNote: QuickNote | null;
   isPending?: boolean;
+  isReadOnly?: boolean;
   getNoteTitle: (note: QuickNote) => string;
   onUpdateNote: (id: number | 'pending', content: string) => void;
+  onRenameNote: (noteId: number, newTitle: string) => void;
   onAddAttachment: (noteId: number, attachment: import('@/types').QuickNoteAttachment) => void;
   onRemoveAttachment: (noteId: number, attachmentId: number) => void;
   editorRef?: React.RefObject<HTMLTextAreaElement>;
@@ -849,8 +855,10 @@ interface NoteEditorProps {
 export function NoteEditor({
   selectedNote,
   isPending = false,
+  isReadOnly = false,
   getNoteTitle,
   onUpdateNote,
+  onRenameNote,
   onAddAttachment,
   onRemoveAttachment,
   editorRef,
@@ -863,6 +871,141 @@ export function NoteEditor({
   const [previewAttachment, setPreviewAttachment] = useState<import('@/types').QuickNoteAttachment | null>(null);
   const [attachmentToDelete, setAttachmentToDelete] = useState<{ id: number; name: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // --- Title Editing Logic ---
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleVal, setTitleVal] = useState('');
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditingTitle) titleInputRef.current?.focus();
+  }, [isEditingTitle]);
+
+  const startEditingTitle = () => {
+    if (isReadOnly || isPending || !selectedNote) return;
+    setTitleVal(getNoteTitle(selectedNote));
+    setIsEditingTitle(true);
+  };
+
+  const commitTitle = () => {
+    if (!selectedNote) return;
+    const trimmed = titleVal.trim();
+    if (trimmed && trimmed !== getNoteTitle(selectedNote)) {
+      onRenameNote(selectedNote.id, trimmed);
+    }
+    setIsEditingTitle(false);
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') commitTitle();
+    if (e.key === 'Escape') setIsEditingTitle(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (isReadOnly) return;
+
+    const target = e.target as HTMLTextAreaElement;
+    const { selectionStart, selectionEnd, value } = target;
+
+    // Feature: Auto-start with "1. " on a completely empty note
+    if (value.length === 0 && e.key.length === 1 && !e.ctrlKey && !e.metaKey && e.key !== 'Backspace') {
+      e.preventDefault();
+      const newValue = `1. ${e.key}`;
+      setLocalContent(newValue);
+
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        onUpdateNote(isPending ? 'pending' : selectedNote!.id, newValue);
+      }, 800);
+
+      setTimeout(() => {
+        target.selectionStart = target.selectionEnd = newValue.length;
+      }, 0);
+      return;
+    }
+
+    // Feature: Auto-continue numbering or bullets on Enter
+    if (e.key === 'Enter') {
+      const lines = value.substring(0, selectionStart).split('\n');
+      const currentLine = lines[lines.length - 1];
+
+      // Check for numbered list (e.g. "1. ")
+      const numberedMatch = currentLine.match(/^(\s*)(\d+)\.\s+(.*)$/);
+      if (numberedMatch) {
+        e.preventDefault();
+        const [, indent, numStr, text] = numberedMatch;
+
+        if (text.trim() === '') {
+          // If line is empty, break out of list
+          const newValue = value.substring(0, selectionStart - currentLine.length) + '\n' + value.substring(selectionEnd);
+          setLocalContent(newValue);
+          setTimeout(() => { target.selectionStart = target.selectionEnd = selectionStart - currentLine.length + 1; }, 0);
+          return;
+        }
+
+        const nextNum = parseInt(numStr, 10) + 1;
+        const insertion = `\n${indent}${nextNum}. `;
+        const newValue = value.substring(0, selectionStart) + insertion + value.substring(selectionEnd);
+        setLocalContent(newValue);
+        setTimeout(() => { target.selectionStart = target.selectionEnd = selectionStart + insertion.length; }, 0);
+
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => {
+          onUpdateNote(isPending ? 'pending' : selectedNote!.id, newValue);
+        }, 800);
+        return;
+      }
+
+      // Check for bullet list (e.g. "- " or "* ")
+      const bulletMatch = currentLine.match(/^(\s*)([-*])\s+(.*)$/);
+      if (bulletMatch) {
+        e.preventDefault();
+        const [, indent, bullet, text] = bulletMatch;
+
+        if (text.trim() === '') {
+          // If line is empty, break out of list
+          const newValue = value.substring(0, selectionStart - currentLine.length) + '\n' + value.substring(selectionEnd);
+          setLocalContent(newValue);
+          setTimeout(() => { target.selectionStart = target.selectionEnd = selectionStart - currentLine.length + 1; }, 0);
+          return;
+        }
+
+        const insertion = `\n${indent}${bullet} `;
+        const newValue = value.substring(0, selectionStart) + insertion + value.substring(selectionEnd);
+        setLocalContent(newValue);
+        setTimeout(() => { target.selectionStart = target.selectionEnd = selectionStart + insertion.length; }, 0);
+
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => {
+          onUpdateNote(isPending ? 'pending' : selectedNote!.id, newValue);
+        }, 800);
+        return;
+      }
+    }
+  };
+
+  const applyFormatting = (prefix: string, suffix: string = '') => {
+    if (!editorRef?.current || isReadOnly) return;
+    const target = editorRef.current;
+    const { selectionStart, selectionEnd, value } = target;
+
+    const selectedText = value.substring(selectionStart, selectionEnd);
+    const replacement = `${prefix}${selectedText}${suffix}`;
+    const newValue = value.substring(0, selectionStart) + replacement + value.substring(selectionEnd);
+
+    setLocalContent(newValue);
+    
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      onUpdateNote(isPending ? 'pending' : selectedNote!.id, newValue);
+    }, 800);
+
+    setTimeout(() => {
+      target.focus();
+      target.selectionStart = selectionStart + prefix.length;
+      target.selectionEnd = selectionEnd + prefix.length;
+    }, 0);
+  };
 
   const handleDeleteClick = (e: React.MouseEvent, attachment: import('@/types').QuickNoteAttachment) => {
     e.stopPropagation();
@@ -917,6 +1060,7 @@ export function NoteEditor({
   }, [isPending]);
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    if (isReadOnly) return;
     const value = e.target.value;
     setLocalContent(value);
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -943,11 +1087,34 @@ export function NoteEditor({
 
   return (
     <div className="flex-1 flex flex-col bg-background overflow-hidden">
-      <div className="px-8 pt-6 pb-2 shrink-0 border-b border-border flex items-start justify-between">
-        <div className="flex-1 min-w-0">
-          <p className="text-lg font-semibold text-foreground truncate">
-            {selectedNote ? getNoteTitle(selectedNote) : 'New Note'}
-          </p>
+      <div className="px-8 pt-6 pb-2 shrink-0 border-b border-border flex items-start justify-between group">
+        <div className="flex-1 min-w-0 pr-4">
+          {isEditingTitle && selectedNote ? (
+            <input
+              ref={titleInputRef}
+              value={titleVal}
+              onChange={(e) => setTitleVal(e.target.value)}
+              onKeyDown={handleTitleKeyDown}
+              onBlur={commitTitle}
+              className="w-full text-lg font-semibold text-foreground bg-background border-b border-primary focus:outline-none placeholder:text-muted-foreground/50 leading-tight py-0"
+              placeholder="Note Title..."
+            />
+          ) : (
+            <div className="flex items-center gap-2">
+              <p className="text-lg font-semibold text-foreground truncate">
+                {selectedNote ? getNoteTitle(selectedNote) : 'New Note'}
+              </p>
+              {selectedNote && !isPending && !isReadOnly && (
+                <button
+                  onClick={startEditingTitle}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-muted-foreground hover:text-foreground hover:bg-accent rounded"
+                  title="Rename Note"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          )}
           <div className="flex items-center gap-2 mt-1">
             <p className="text-[10px] text-muted-foreground">
               {selectedNote ? formatRelativeTime(selectedNote.updated_at) : 'Start typing to save…'}
@@ -962,8 +1129,8 @@ export function NoteEditor({
               </span>
             )}
           </div>
-        </div>
-        {selectedNote && !isPending && (
+          </div>
+        {selectedNote && !isPending && !isReadOnly && (
           <div className="shrink-0 ml-4 flex items-center">
             <input
               type="file"
@@ -985,17 +1152,32 @@ export function NoteEditor({
                 <Paperclip className="h-4 w-4" />
               )}
             </button>
-          </div>
+            </div>
         )}
       </div>
+      
+      {/* Editor Toolbar */}
+      {!isReadOnly && (
+        <div className="px-8 py-2 border-b border-border flex items-center gap-1 bg-muted/30 shrink-0">
+          <button onClick={() => applyFormatting('**', '**')} title="Bold" className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"><Bold className="w-4 h-4" /></button>
+          <button onClick={() => applyFormatting('*', '*')} title="Italic" className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"><Italic className="w-4 h-4" /></button>
+          <div className="w-px h-4 bg-border mx-2" />
+          <button onClick={() => applyFormatting('- ')} title="Bullet List" className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"><List className="w-4 h-4" /></button>
+          <button onClick={() => applyFormatting('1. ')} title="Numbered List" className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"><ListOrdered className="w-4 h-4" /></button>
+        </div>
+      )}
+
       <div className="flex-1 flex overflow-hidden">
         <textarea
           ref={editorRef}
           value={localContent}
           onChange={handleChange}
+          onKeyDown={handleKeyDown}
           autoFocus={isPending}
-          className="flex-1 resize-none bg-transparent text-sm text-foreground px-8 py-4 pb-8 placeholder:text-muted-foreground/40 focus:outline-none leading-relaxed selection:bg-primary/20"
-          placeholder="Start writing…"
+          readOnly={isReadOnly}
+          disabled={isReadOnly}
+          className={cn("flex-1 resize-none bg-transparent text-sm text-foreground px-8 py-4 pb-8 placeholder:text-muted-foreground/40 focus:outline-none leading-relaxed selection:bg-primary/20", isReadOnly && "cursor-not-allowed opacity-80")}
+          placeholder={isReadOnly ? "This note is read-only." : "Start writing…"}
           spellCheck
         />
 
@@ -1020,15 +1202,17 @@ export function NoteEditor({
                     <p className="text-[10px] text-muted-foreground mt-1">
                       {new Date(attachment.created_at).toLocaleDateString()}
                     </p>
-                  </div>
+                    </div>
                 </button>
-                <button
-                  onClick={(e) => handleDeleteClick(e, attachment)}
-                  title="Delete Attachment"
-                  className="absolute top-2 right-2 p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100 disabled:opacity-50"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                {!isReadOnly && (
+                  <button
+                    onClick={(e) => handleDeleteClick(e, attachment)}
+                    title="Delete Attachment"
+                    className="absolute top-2 right-2 p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100 disabled:opacity-50"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -1133,8 +1317,10 @@ export function QuickNotesContent({
       <NoteEditor
         selectedNote={selectedNote}
         isPending={isPending}
+        isReadOnly={selectedNote ? (state.folders.find(f => f.id === selectedNote.folder)?.name === 'Team Member Updates' || getNoteTitle(selectedNote) === 'Team Member Updates') : false}
         getNoteTitle={getNoteTitle}
         onUpdateNote={onUpdateNote}
+        onRenameNote={onRenameNote}
         onAddAttachment={onAddAttachment}
         onRemoveAttachment={onRemoveAttachment}
         editorRef={editorRef}
@@ -1148,6 +1334,7 @@ export function QuickNotesContent({
 
 interface MiniWindowProps {
   selectedNote: QuickNote | null;
+  isReadOnly?: boolean;
   getNoteTitle: (note: QuickNote) => string;
   onClose: () => void;
   onMaximize: () => void;
@@ -1159,6 +1346,7 @@ interface MiniWindowProps {
 
 function MiniWindow({
   selectedNote,
+  isReadOnly = false,
   getNoteTitle,
   onClose,
   onMaximize,
@@ -1247,8 +1435,9 @@ function MiniWindow({
         ref={textareaRef}
         value={localContent}
         onChange={handleChange}
-        placeholder="Start typing a note…"
-        className="h-[200px] resize-none bg-background text-sm text-foreground px-4 py-3 placeholder:text-muted-foreground/40 focus:outline-none leading-relaxed"
+        readOnly={isReadOnly}
+        placeholder={isReadOnly ? "This note is read-only." : "Start typing a note…"}
+        className={cn("h-[200px] resize-none bg-background text-sm text-foreground px-4 py-3 placeholder:text-muted-foreground/40 focus:outline-none leading-relaxed", isReadOnly && "cursor-not-allowed opacity-80")}
       />
 
       {/* Footer hint */}
@@ -1391,9 +1580,10 @@ export function QuickNotes() {
 
       {/* Mini window */}
       {isMiniOpen && (
-        <div style={{ position: 'fixed', left: miniLeft, top: miniTop, zIndex: 60 }}>
+          <div style={{ position: 'fixed', left: miniLeft, top: miniTop, zIndex: 60 }}>
           <MiniWindow
             selectedNote={selectedNote}
+            isReadOnly={selectedNote ? (state.folders.find(f => f.id === selectedNote.folder)?.name === 'Team Member Updates' || getNoteTitle(selectedNote) === 'Team Member Updates') : false}
             getNoteTitle={getNoteTitle}
             onClose={() => setIsMiniOpen(false)}
             onMaximize={handleMaximize}

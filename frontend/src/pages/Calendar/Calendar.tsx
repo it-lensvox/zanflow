@@ -21,7 +21,10 @@ import {
     RefreshCw,
     Crown,
     AlertCircle,
-    Sparkles
+    Sparkles,
+    Copy,
+    Settings,
+
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -435,6 +438,7 @@ interface DaysViewProps {
     onDeclineInvitation?: (event: CalendarEventType) => void;
     onRescheduleInvitation?: (event: CalendarEventType) => void;
     isAccepting?: boolean;
+    onEventContextMenu?: (e: React.MouseEvent, event: CalendarEventType) => void;
 }
 
 const DaysView: React.FC<DaysViewProps> = ({
@@ -444,7 +448,8 @@ const DaysView: React.FC<DaysViewProps> = ({
     onAcceptInvitation,
     onDeclineInvitation,
     onRescheduleInvitation,
-    isAccepting
+    isAccepting,
+    onEventContextMenu
 }) => {
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
@@ -715,6 +720,10 @@ const DaysView: React.FC<DaysViewProps> = ({
 
                                         const newStart = new Date(day);
                                         newStart.setHours(droppedHour, droppedMinute, 0, 0);
+                                        if (newStart < new Date()) {
+                                            alert("Cannot move an event to a past time.");
+                                            return;
+                                        }
 
                                         const duration = new Date(draggedEvent.end_time).getTime() - new Date(draggedEvent.start_time).getTime();
                                         const newEnd = new Date(newStart.getTime() + duration);
@@ -828,6 +837,7 @@ const DaysView: React.FC<DaysViewProps> = ({
                                                     zIndex: 10 + orderIndex
                                                 }}
                                                 onClick={(e) => { e.stopPropagation(); if (onEventClick) onEventClick(event); }}
+                                                onContextMenu={(e) => { if (onEventContextMenu) onEventContextMenu(e, event); }}
                                             >
                                                 <div
                                                     className={`h-full w-full rounded-md overflow-hidden p-1.5 text-xs shadow-sm flex flex-col relative border ${statusColors.bg} ${statusColors.text} ${statusColors.hover}`}
@@ -961,6 +971,7 @@ interface EventModalProps {
     isOpen: boolean;
     onClose: () => void;
     selectedDate: Date | null;
+    selectedHour?: number | null;
     event?: CalendarEventType | null;
     currentUser: { id: number; role: string } | null;
     allEvents: CalendarEventType[];
@@ -968,19 +979,31 @@ interface EventModalProps {
     onDeclineInvitation?: (event: CalendarEventType) => void;
     onRescheduleInvitation?: (event: CalendarEventType) => void;
     isAccepting?: boolean;
+    // ═══════════════ DYUKSA AI PROP ═══════════════
+    dyuksaEventData?: {
+        eventType: string;
+        title: string;
+        attendeeIds: number[];
+        attendeeNames: string[];
+        targetDate: string;
+        suggestedSlots: string[];
+        duration: number;
+    } | null;
 }
 
 const EventModal: React.FC<EventModalProps> = ({
     isOpen,
     onClose,
     selectedDate,
+    selectedHour,
     event,
     currentUser,
     allEvents,
     onAcceptInvitation,
     onDeclineInvitation,
     onRescheduleInvitation,
-    isAccepting
+    isAccepting,
+    dyuksaEventData
 }) => {
     const isReadOnly = Boolean(event && currentUser && event.organizer !== currentUser.id);
     const queryClient = useQueryClient();
@@ -1166,6 +1189,7 @@ const EventModal: React.FC<EventModalProps> = ({
 
     React.useEffect(() => {
         if (event && isOpen) {
+            // ═══════════════ EDITING EXISTING EVENT ═══════════════
             setTitle(event.title || '');
             const formatDt = (iso: string) => {
                 if (!iso) return '';
@@ -1183,10 +1207,9 @@ const EventModal: React.FC<EventModalProps> = ({
             setUserSearch('');
             setShowUserDropdown(false);
             setAvailabilityMap({});
-            setSuggestedSlots([]);        // ← ADD THIS
-            setSelectedDuration(30);      // ← ADD THIS
+            setSuggestedSlots([]);
+            setSelectedDuration(30);
 
-            // Load event type from event data, or detect from title, or use default
             if (event.event_type) {
                 setEventType(event.event_type);
             } else {
@@ -1202,7 +1225,52 @@ const EventModal: React.FC<EventModalProps> = ({
             const eventDate = new Date(event.start_time);
             setPickerMonth(eventDate.getMonth());
             setPickerYear(eventDate.getFullYear());
+
+        } else if (dyuksaEventData && isOpen) {
+            // ═══════════════ DYUKSA AI PRE-FILL ═══════════════
+            setError(null);
+            setTitle(dyuksaEventData.title || '');
+            setEventType(dyuksaEventData.eventType || 'Meeting');
+            setAttendees(dyuksaEventData.attendeeIds || []);
+            setSuggestedSlots(dyuksaEventData.suggestedSlots || []);
+            setSelectedDuration(dyuksaEventData.duration || 30);
+
+            // Set date and time
+            const targetDate = new Date(dyuksaEventData.targetDate);
+            const y = targetDate.getFullYear();
+            const m = String(targetDate.getMonth() + 1).padStart(2, '0');
+            const d = String(targetDate.getDate()).padStart(2, '0');
+            const dateStr = `${y}-${m}-${d}`;
+
+            // If there are suggested slots, pre-select the first one
+            if (dyuksaEventData.suggestedSlots && dyuksaEventData.suggestedSlots.length > 0) {
+                const firstSlot = new Date(dyuksaEventData.suggestedSlots[0]);
+                const startHour = String(firstSlot.getHours()).padStart(2, '0');
+                const startMin = String(firstSlot.getMinutes()).padStart(2, '0');
+                setStartTime(`${dateStr}T${startHour}:${startMin}`);
+
+                const endSlot = new Date(firstSlot.getTime() + dyuksaEventData.duration * 60000);
+                const endHour = String(endSlot.getHours()).padStart(2, '0');
+                const endMin = String(endSlot.getMinutes()).padStart(2, '0');
+                setEndTime(`${dateStr}T${endHour}:${endMin}`);
+            } else {
+                setStartTime(`${dateStr}T09:00`);
+                setEndTime(`${dateStr}T09:30`);
+            }
+
+            setLocation('');
+            setIsOnline(false);
+            setDescription('');
+            setUserSearch('');
+            setShowUserDropdown(false);
+            setAvailabilityMap({});
+            setCustomEventType('');
+
+            setPickerMonth(targetDate.getMonth());
+            setPickerYear(targetDate.getFullYear());
+
         } else if (isOpen) {
+            // ═══════════════ NEW EVENT (NO DYUKSA DATA) ═══════════════
             setError(null);
             const now = new Date();
             now.setHours(0, 0, 0, 0);
@@ -1215,8 +1283,13 @@ const EventModal: React.FC<EventModalProps> = ({
             const d = String(targetDate.getDate()).padStart(2, '0');
             const dateStr = `${y}-${m}-${d}`;
 
-            setStartTime(`${dateStr}T13:00`);
-            setEndTime(`${dateStr}T13:30`);
+            // Use selectedHour if provided, otherwise default to 13:00
+            const hour = selectedHour !== null && selectedHour !== undefined
+                ? String(selectedHour).padStart(2, '0')
+                : '13';
+
+            setStartTime(`${dateStr}T${hour}:00`);
+            setEndTime(`${dateStr}T${hour}:30`);
             setTitle('');
             setLocation('');
             setIsOnline(false);
@@ -1225,15 +1298,15 @@ const EventModal: React.FC<EventModalProps> = ({
             setUserSearch('');
             setShowUserDropdown(false);
             setAvailabilityMap({});
-            setSuggestedSlots([]);        // ← ADD THIS
-            setSelectedDuration(30);      // ← ADD THIS
+            setSuggestedSlots([]);
+            setSelectedDuration(30);
             setEventType('Meeting');
             setCustomEventType('');
 
             setPickerMonth(targetDate.getMonth());
             setPickerYear(targetDate.getFullYear());
         }
-    }, [selectedDate, isOpen, event]);
+    }, [selectedDate, selectedHour, isOpen, event, dyuksaEventData]);
 
     const { mutate: createEvent, isPending: isCreating } = useMutation({
         mutationFn: (data: Partial<CalendarEventType>) => eventApi.create(data),
@@ -1273,6 +1346,11 @@ const EventModal: React.FC<EventModalProps> = ({
 
         const startDt = new Date(startTime);
         const endDt = new Date(endTime);
+        const now = new Date();
+        if (startDt < now) {
+            setError("Cannot create or move an event to a past time.");
+            return;
+        }
 
         const payload = {
             title,
@@ -1522,17 +1600,32 @@ const EventModal: React.FC<EventModalProps> = ({
                                             className="absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-20 w-24 max-h-64 overflow-y-auto"
                                         >
                                             {timeSlots.map(time => {
+                                                // --- NEW LOGIC START ---
+                                                const [h, m] = time.split(':').map(Number);
+                                                const slotDate = new Date(startTime.split('T')[0]);
+                                                slotDate.setHours(h, m, 0, 0);
+
+                                                // Check if this specific time slot on the selected date is in the past
+                                                const isPastTime = slotDate < new Date();
                                                 const isSelected = (startTime.split('T')[1]?.slice(0, 5) || '13:00') === time;
+                                                // --- NEW LOGIC END ---
+
                                                 return (
                                                     <div
                                                         key={`start-${time}`}
-                                                        className={`px-4 py-2 cursor-pointer text-sm transition-colors ${isSelected
-                                                            ? 'bg-blue-50 text-blue-700 font-medium'
-                                                            : 'text-gray-700 hover:bg-gray-50'
+                                                        className={`px-4 py-2 cursor-pointer text-sm transition-colors ${isPastTime
+                                                            ? 'text-gray-300 cursor-not-allowed opacity-50'
+                                                            : isSelected
+                                                                ? 'bg-blue-50 text-blue-700 font-medium'
+                                                                : 'text-gray-700 hover:bg-gray-50'
                                                             }`}
                                                         onClick={() => {
+                                                            if (isPastTime) return; // Prevent selection of past times
+
                                                             const date = startTime.split('T')[0];
                                                             setStartTime(`${date}T${time}`);
+
+                                                            // Logic to auto-set end time 30 mins after start
                                                             const [h, m] = time.split(':').map(Number);
                                                             const endH = String(m >= 30 ? (h + 1) % 24 : h).padStart(2, '0');
                                                             const endM = m >= 30 ? '00' : '30';
@@ -1577,15 +1670,25 @@ const EventModal: React.FC<EventModalProps> = ({
                                             className="absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-20 w-24 max-h-64 overflow-y-auto"
                                         >
                                             {timeSlots.map(time => {
+                                                const [h, m] = time.split(':').map(Number);
+                                                const slotDate = new Date(endTime.split('T')[0]);
+                                                slotDate.setHours(h, m, 0, 0);
+
+                                                const isPastTime = slotDate < new Date();
                                                 const isSelected = (endTime.split('T')[1]?.slice(0, 5) || '13:30') === time;
+
                                                 return (
                                                     <div
                                                         key={`end-${time}`}
-                                                        className={`px-4 py-2 cursor-pointer text-sm transition-colors ${isSelected
-                                                            ? 'bg-blue-50 text-blue-700 font-medium'
-                                                            : 'text-gray-700 hover:bg-gray-50'
+                                                        className={`px-4 py-2 cursor-pointer text-sm transition-colors ${isPastTime
+                                                                ? 'text-gray-300 cursor-not-allowed opacity-50'
+                                                                : isSelected
+                                                                    ? 'bg-blue-50 text-blue-700 font-medium'
+                                                                    : 'text-gray-700 hover:bg-gray-50'
                                                             }`}
                                                         onClick={() => {
+                                                            if (isPastTime) return; // Prevent selection
+
                                                             setEndTime(`${endTime.split('T')[0]}T${time}`);
                                                             setShowEndTimeDropdown(false);
                                                         }}
@@ -2619,6 +2722,24 @@ export const Calendar: React.FC = () => {
     const [dyuksaInput, setDyuksaInput] = useState('');
     const [dyuksaResponse, setDyuksaResponse] = useState<string | null>(null);
     const [isDyuksaLoading, setIsDyuksaLoading] = useState(false);
+    const [selectedHour, setSelectedHour] = useState<number | null>(null);
+    const [dyuksaEventData, setDyuksaEventData] = useState<{
+        eventType: string;
+        title: string;
+        attendeeIds: number[];
+        attendeeNames: string[];
+        targetDate: string;
+        suggestedSlots: string[];
+        duration: number;
+    } | null>(null);
+
+    // ═══════════════ EVENT CONTEXT MENU STATE ═══════════════
+    const [contextMenu, setContextMenu] = useState<{
+        x: number;
+        y: number;
+        event: CalendarEventType;
+    } | null>(null);
+    const [showRepeatSubmenu, setShowRepeatSubmenu] = useState(false);
 
     // ═══════════════ INVITATION MUTATIONS ═══════════════
     const { mutate: acceptInvitation, isPending: isAccepting } = useMutation({
@@ -2689,6 +2810,7 @@ export const Calendar: React.FC = () => {
             rescheduleInvitation({ invitationId: selectedInvitationEvent.my_invitation_id, proposedTime });
         }
     }, [selectedInvitationEvent, rescheduleInvitation]);
+    // ═══════════════ DYUKSA AI HANDLER ═══════════════
     const handleDyuksaSubmit = async () => {
         if (!dyuksaInput.trim()) return;
 
@@ -2702,9 +2824,34 @@ export const Calendar: React.FC = () => {
         setDyuksaResponse(null);
 
         try {
+            // Call the real Dyuksa AI API
             const response = await dyuksaAI.chat(dyuksaInput);
-            setDyuksaResponse(response.reply);
-            setDyuksaInput(''); // Clear input after successful response
+
+            // Check if AI wants to create an event
+            if (response.action === 'create_event' && response.data) {
+                // Set pre-filled data for EventModal
+                setDyuksaEventData({
+                    eventType: response.data.event_type || 'Meeting',
+                    title: response.data.title || '',
+                    attendeeIds: response.data.attendee_ids || [],
+                    attendeeNames: response.data.attendee_names || [],
+                    targetDate: response.data.target_date || new Date().toISOString().split('T')[0],
+                    suggestedSlots: response.data.available_slots || [],
+                    duration: response.data.duration_minutes || 30
+                });
+
+                // Set the date and open EventModal
+                if (response.data.target_date) {
+                    setSelectedDate(new Date(response.data.target_date));
+                }
+                setSelectedEvent(null);
+                setIsEventModalOpen(true);
+                setDyuksaInput('');
+                setDyuksaResponse(response.reply || 'Opening event creator with your preferences...');
+            } else {
+                // Fallback to text response
+                setDyuksaResponse(response.reply);
+            }
         } catch (error) {
             console.error('Dyuksa AI error:', error);
             setDyuksaResponse('Sorry, I encountered an error. Please try again.');
@@ -2712,6 +2859,92 @@ export const Calendar: React.FC = () => {
             setIsDyuksaLoading(false);
         }
     };
+    // ═══════════════ EVENT CONTEXT MENU HANDLERS ═══════════════
+    const handleEventContextMenu = (e: React.MouseEvent, event: CalendarEventType) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setContextMenu({
+            x: e.clientX,
+            y: e.clientY,
+            event
+        });
+        setShowRepeatSubmenu(false);
+    };
+
+    const closeContextMenu = () => {
+        setContextMenu(null);
+        setShowRepeatSubmenu(false);
+    };
+
+    const handleRepeatEvent = async (repeatType: 'daily' | 'workday' | 'weekly' | 'monthly' | 'yearly') => {
+        if (!contextMenu?.event) return;
+
+        const originalEvent = contextMenu.event;
+        const startDate = new Date(originalEvent.start_time);
+
+        // Calculate end date based on repeat type
+        const recurrenceEndDate = new Date(startDate);
+        let recurrencePattern: string;
+
+        switch (repeatType) {
+            case 'daily':
+                recurrencePattern = 'DAILY';
+                recurrenceEndDate.setDate(startDate.getDate() + 30); // 30 days
+                break;
+            case 'workday':
+                recurrencePattern = 'WORK_WEEK';
+                recurrenceEndDate.setDate(startDate.getDate() + 30); // ~20 workdays
+                break;
+            case 'weekly':
+                recurrencePattern = 'WEEKLY';
+                recurrenceEndDate.setDate(startDate.getDate() + 84); // 12 weeks
+                break;
+            case 'monthly':
+                recurrencePattern = 'MONTHLY';
+                recurrenceEndDate.setMonth(startDate.getMonth() + 6); // 6 months
+                break;
+            case 'yearly':
+                recurrencePattern = 'YEARLY';
+                recurrenceEndDate.setFullYear(startDate.getFullYear() + 2); // 2 years
+                break;
+            default:
+                recurrencePattern = 'WEEKLY';
+                recurrenceEndDate.setDate(startDate.getDate() + 28);
+        }
+
+        // Format end date as YYYY-MM-DD
+        const endDateStr = recurrenceEndDate.toISOString().split('T')[0];
+
+        try {
+            await eventApi.create({
+                title: originalEvent.title,
+                event_type: originalEvent.event_type,
+                start_time: originalEvent.start_time,
+                end_time: originalEvent.end_time,
+                location: originalEvent.location,
+                is_online_meeting: originalEvent.is_online_meeting,
+                description: originalEvent.description,
+                attendees: originalEvent.attendees,
+                is_recurring: true,
+                recurrence_pattern: recurrencePattern,
+                recurrence_end_date: endDateStr
+            } as any);
+
+            queryClient.invalidateQueries({ queryKey: ['events-calendar'] });
+            closeContextMenu();
+        } catch (error) {
+            console.error('Failed to create recurring event:', error);
+        }
+    };
+
+    // Close context menu on click outside
+    React.useEffect(() => {
+        const handleClickOutside = () => closeContextMenu();
+        if (contextMenu) {
+            document.addEventListener('click', handleClickOutside);
+            return () => document.removeEventListener('click', handleClickOutside);
+        }
+    }, [contextMenu]);
 
     const {
         data: eventsData,
@@ -3198,6 +3431,7 @@ export const Calendar: React.FC = () => {
                             onDateClick={handleDateClick}
                             onCreateEventAtTime={(date, hour) => {
                                 setSelectedDate(date);
+                                setSelectedHour(hour);
                                 setIsEventModalOpen(true);
                             }}
                             viewMode={viewMode as 'day' | 'work_week' | 'week'}
@@ -3207,6 +3441,7 @@ export const Calendar: React.FC = () => {
                             onDeclineInvitation={handleDeclineClick}
                             onRescheduleInvitation={handleRescheduleClick}
                             isAccepting={isAccepting}
+                            onEventContextMenu={handleEventContextMenu}
                         />
                     )}
                 </div>
@@ -3254,12 +3489,16 @@ export const Calendar: React.FC = () => {
             </div>
 
             <EventModal
-                isOpen={isEventModalOpen || !!selectedEvent}
+                isOpen={isEventModalOpen}
                 onClose={() => {
                     setIsEventModalOpen(false);
                     setSelectedEvent(null);
+                    setSelectedDate(null);
+                    setSelectedHour(null);
+                    setDyuksaEventData(null); // Clear Dyuksa data on close
                 }}
                 selectedDate={selectedDate}
+                selectedHour={selectedHour}
                 event={selectedEvent}
                 currentUser={user ? { id: user.id, role: user.role } : null}
                 allEvents={events} // Passing the events array here
@@ -3267,6 +3506,7 @@ export const Calendar: React.FC = () => {
                 onDeclineInvitation={handleDeclineClick}
                 onRescheduleInvitation={handleRescheduleClick}
                 isAccepting={isAccepting}
+                dyuksaEventData={dyuksaEventData}
             />
 
             {selectedTask && (
@@ -3300,6 +3540,208 @@ export const Calendar: React.FC = () => {
                 eventTitle={selectedInvitationEvent?.title}
                 originalTime={selectedInvitationEvent?.start_time}
             />
+
+            {/* ═══════════════ EVENT CONTEXT MENU ═══════════════ */}
+            {contextMenu && (
+                <div
+                    className="fixed z-[100] bg-white rounded-xl shadow-2xl border border-gray-200 py-2 min-w-[200px]"
+                    style={{
+                        top: Math.min(contextMenu.y, window.innerHeight - 250),
+                        left: Math.min(contextMenu.x, window.innerWidth - 220)
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {/* Repeat Event - with submenu */}
+                    <div
+                        className="relative"
+                        onMouseEnter={() => setShowRepeatSubmenu(true)}
+                        onMouseLeave={() => setShowRepeatSubmenu(false)}
+                    >
+                        <button
+                            className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center justify-between"
+                        >
+                            <span className="flex items-center gap-3">
+                                <RefreshCw size={16} className="text-gray-400" />
+                                Repeat event
+                            </span>
+                            <ChevronRight size={14} className="text-gray-400" />
+                        </button>
+
+                        {/* Repeat Submenu */}
+                        {showRepeatSubmenu && (
+                            <div
+                                className="absolute top-0 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 min-w-[180px]"
+                                style={
+                                    contextMenu.x + 400 > window.innerWidth
+                                        ? { right: '100%', marginRight: '4px' }
+                                        : { left: '100%', marginLeft: '4px' }
+                                }
+                            >
+                                {/* Tomorrow */}
+                                <button
+                                    onClick={async () => {
+                                        if (contextMenu?.event) {
+                                            try {
+                                                const originalStart = new Date(contextMenu.event.start_time);
+                                                const originalEnd = new Date(contextMenu.event.end_time);
+
+                                                const tomorrowStart = new Date(originalStart);
+                                                tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+
+                                                const tomorrowEnd = new Date(originalEnd);
+                                                tomorrowEnd.setDate(tomorrowEnd.getDate() + 1);
+
+                                                await eventApi.create({
+                                                    title: contextMenu.event.title,
+                                                    event_type: contextMenu.event.event_type,
+                                                    start_time: tomorrowStart.toISOString(),
+                                                    end_time: tomorrowEnd.toISOString(),
+                                                    location: contextMenu.event.location,
+                                                    is_online_meeting: contextMenu.event.is_online_meeting,
+                                                    description: contextMenu.event.description,
+                                                    attendees: contextMenu.event.attendees
+                                                });
+                                                queryClient.invalidateQueries({ queryKey: ['events-calendar'] });
+                                                closeContextMenu();
+                                            } catch (error) {
+                                                console.error('Failed to copy event to tomorrow:', error);
+                                            }
+                                        }
+                                    }}
+                                    className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50"
+                                >
+                                    Tomorrow
+                                </button>
+                                <button
+                                    onClick={() => handleRepeatEvent('workday')}
+                                    className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50"
+                                >
+                                    Every workday
+                                </button>
+                                <button
+                                    onClick={() => handleRepeatEvent('weekly')}
+                                    className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50"
+                                >
+                                    Every week
+                                </button>
+                                <button
+                                    onClick={() => handleRepeatEvent('monthly')}
+                                    className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50"
+                                >
+                                    Every month
+                                </button>
+                                <button
+                                    onClick={() => handleRepeatEvent('yearly')}
+                                    className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50"
+                                >
+                                    Every year
+                                </button>
+                                <div className="border-t border-gray-100 my-1" />
+                                <button
+                                    className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                                    onClick={() => {
+                                        // TODO: Open custom repeat modal
+                                        closeContextMenu();
+                                    }}
+                                >
+                                    <Settings size={14} className="text-gray-400" />
+                                    Custom repeat
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="border-t border-gray-100 my-1" />
+
+                    {/* Duplicate Event */}
+                    <button
+                        onClick={async () => {
+                            if (contextMenu.event) {
+                                try {
+                                    await eventApi.create({
+                                        title: contextMenu.event.title,
+                                        event_type: contextMenu.event.event_type,
+                                        start_time: contextMenu.event.start_time,
+                                        end_time: contextMenu.event.end_time,
+                                        location: contextMenu.event.location,
+                                        is_online_meeting: contextMenu.event.is_online_meeting,
+                                        description: contextMenu.event.description,
+                                        attendees: contextMenu.event.attendees
+                                    });
+                                    queryClient.invalidateQueries({ queryKey: ['events-calendar'] });
+                                } catch (error) {
+                                    console.error('Failed to duplicate event:', error);
+                                }
+                            }
+                            closeContextMenu();
+                        }}
+                        className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                    >
+                        <Copy size={16} className="text-gray-400" />
+                        Duplicate event
+                    </button>
+
+                    {/* Delete This Event */}
+                    <button
+                        onClick={async () => {
+                            if (contextMenu.event?.id) {
+                                try {
+                                    await eventApi.delete(contextMenu.event.id);
+                                    await queryClient.invalidateQueries({ queryKey: ['events-calendar'] });
+                                    await queryClient.refetchQueries({ queryKey: ['events-calendar'] });
+                                } catch (error) {
+                                    console.error('Failed to delete event:', error);
+                                }
+                            }
+                            closeContextMenu();
+                        }}
+                        className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3"
+                    >
+                        <Trash2 size={16} className="text-red-400" />
+                        Delete this event
+                    </button>
+
+                    {/* Delete All Similar Events */}
+                    <button
+                        onClick={async () => {
+                            if (contextMenu.event) {
+                                const eventTitle = contextMenu.event.title;
+                                const eventHour = new Date(contextMenu.event.start_time).getHours();
+                                const eventMinute = new Date(contextMenu.event.start_time).getMinutes();
+
+                                // Find all events with same title and time
+                                const similarEvents = events.filter(e => {
+                                    const eHour = new Date(e.start_time).getHours();
+                                    const eMinute = new Date(e.start_time).getMinutes();
+                                    return e.title === eventTitle && eHour === eventHour && eMinute === eventMinute;
+                                });
+
+                                const confirmDelete = window.confirm(
+                                    `Delete ${similarEvents.length} event(s) with title "${eventTitle}"?\n\nThis action cannot be undone.`
+                                );
+
+                                if (confirmDelete) {
+                                    try {
+                                        for (const evt of similarEvents) {
+                                            await eventApi.delete(evt.id);
+                                        }
+                                        // Force refetch the events
+                                        await queryClient.invalidateQueries({ queryKey: ['events-calendar'] });
+                                        await queryClient.refetchQueries({ queryKey: ['events-calendar'] });
+                                    } catch (error) {
+                                        console.error('Failed to delete events:', error);
+                                    }
+                                }
+                            }
+                            closeContextMenu();
+                        }}
+                        className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3"
+                    >
+                        <Trash2 size={16} className="text-red-400" />
+                        Delete all similar events
+                    </button>
+                </div>
+            )}
         </div>
     );
 };

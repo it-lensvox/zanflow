@@ -1362,7 +1362,6 @@ export interface DailyUpdateListResponse {
 // Add this new type (keep this)
 export type InvitationStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'ORGANIZER';
 
-// Keep ONLY this Event interface (with the new fields)
 export interface Event {
   id: number;
   organizer: number;
@@ -1377,9 +1376,11 @@ export interface Event {
   event_type?: string;
   created_at: string;
   updated_at: string;
-  // NEW FIELDS FOR INVITATION SYSTEM
   my_invitation_status?: InvitationStatus;
   my_invitation_id?: number;
+  is_recurring?: boolean;
+  recurrence_pattern?: 'DAILY' | 'WORK_WEEK' | 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+  recurrence_end_date?: string;
 }
 
 // Dyuksa AI Scheduling Assistant
@@ -1390,4 +1391,20 @@ export interface DyuksaAIChatPayload {
 export interface DyuksaAIChatResponse {
     reply: string;
 }
+
+// Dyuksa AI Scheduling Assistant
+export interface DyuksaAIResponse {
+    action?: 'create_event' | 'show_slots' | 'clarify';
+    data?: {
+        event_type?: string;
+        title?: string;
+        attendee_ids?: number[];
+        attendee_names?: string[];
+        target_date?: string;
+        duration_minutes?: number;
+        available_slots?: string[];
+    };
+    reply: string;
+}
+
 

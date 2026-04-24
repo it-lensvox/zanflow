@@ -237,6 +237,7 @@ export function Documents() {
       documentsApi.list({
         project: projectFilter ? Number(projectFilter) : undefined,
         file_type: fileTypeFilter || undefined,
+        status: statusFilter || undefined,
         page: currentPage,
       }),
     enabled: true,
@@ -359,8 +360,11 @@ export function Documents() {
   const paginationControls = totalCount > 0 && (
     <div className="flex items-center justify-between px-4 py-3 border-t bg-background">
       <div className="text-sm text-muted-foreground">
-        Showing page {currentPage} of {Math.ceil(totalCount / 20)} ({totalCount} total documents)
-      </div>
+  {displayedDocuments.length > 0 
+    ? `Showing page ${currentPage} of ${Math.ceil(totalCount / 20)} (${totalCount} total documents)`
+    : "No documents found for this filter"
+  }
+</div>
       <div className="flex items-center gap-2">
         <Button
           variant="outline"
@@ -377,14 +381,15 @@ export function Documents() {
           </span>
         </div>
         <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setCurrentPage((prev) => prev + 1)}
-          disabled={!hasNextPage}
-        >
-          Next
-          <ChevronRight className="h-4 w-4" />
-        </Button>
+  variant="outline"
+  size="sm"
+  onClick={() => setCurrentPage((prev) => prev + 1)}
+  // Disable if backend says no more pages OR if current filtered list is empty
+  disabled={!hasNextPage || displayedDocuments.length === 0} 
+>
+  Next
+  <ChevronRight className="h-4 w-4" />
+</Button>
       </div>
     </div>
   );

@@ -1566,11 +1566,23 @@ export const eventApi = {
 // ═══════════════════════════════════════════════════════════════════════
 
 export const dyuksaAI = {
-    // Send a natural language scheduling request to the AI
-    chat: async (message: string): Promise<{ reply: string }> => {
-        const { data } = await api.post('/task-ai/chat/agent/', { message });
-        return data;
-    },
+  // Send a natural language scheduling request to the AI
+  chat: async (message: string): Promise<{
+      action?: 'create_event' | 'show_slots' | 'clarify';
+      data?: {
+          event_type?: string;
+          title?: string;
+          attendee_ids?: number[];
+          attendee_names?: string[];
+          target_date?: string;
+          duration_minutes?: number;
+          available_slots?: string[];
+      };
+      reply: string;
+  }> => {
+      const { data } = await api.post('/task-ai/chat/agent/', { message });
+      return data;
+  },
 };
 
 
