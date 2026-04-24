@@ -412,6 +412,26 @@ class ProjectAllDocumentsView(APIView):
     """
     permission_classes = [permissions.IsAuthenticated]
 
+    def _generate_presigned_url(self, s3_client, s3_key, display_filename):
+        """Single helper — avoids duplicate presign logic for docs and attachments."""
+        content_type, _ = mimetypes.guess_type(display_filename)
+        if not content_type:
+            content_type = 'application/octet-stream'
+        try:
+            return s3_client.generate_presigned_url(
+                'get_object',
+                Params={
+                    'Bucket': settings.AWS_STORAGE_BUCKET_NAME,
+                    'Key': s3_key,
+                    'ResponseContentType': content_type,
+                    'ResponseContentDisposition': f'inline; filename="{display_filename}"',
+                },
+                ExpiresIn=3600
+            )
+        except Exception as e:
+            print(f"S3 presign error for key={s3_key}: {e}")
+            return None
+
     def get(self, request, project_id):
         # 1. Initialize S3 Client ONCE for performance
         s3_client = boto3.client(
@@ -471,25 +491,8 @@ class ProjectAllDocumentsView(APIView):
             clean_filename = re.sub(r'_[a-zA-Z0-9]{7}(\.[^.]+)$', r'\1', raw_filename)
             
             file_url = None
-            if attachment.file:
-                try:
-                    # --- NEW FIX: Dynamically determine Content-Type ---
-                    content_type, _ = mimetypes.guess_type(clean_filename)
-                    if not content_type:
-                        content_type = 'application/octet-stream'
-
-                    file_url = s3_client.generate_presigned_url(
-                        'get_object',
-                        Params={
-                            'Bucket': settings.AWS_STORAGE_BUCKET_NAME,
-                            'Key': attachment.file.name,
-                            'ResponseContentType': content_type, # Forces Microsoft Viewer to recognize it as PPTX
-                            'ResponseContentDisposition': f'inline; filename="{clean_filename}"' # Forces inline viewing
-                        },
-                        ExpiresIn=3600
-                    )
-                except Exception as e:
-                    print(f"S3 Error for TaskAttachment {attachment.id}: {e}")
+            if attachment.file and attachment.file.name:
+                file_url = self._generate_presigned_url(s3_client, attachment.file.name, clean_filename)
 
             task_data.append({
                 "id": str(attachment.id),

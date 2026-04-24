@@ -746,4 +746,4 @@ class CalendarAgentService:
             "tool_triggered": "action" in final_result,
             "final_result": final_result
         }
-        logger.debug(f"AI Calendar Agent Interaction: {json.dumps(log_data, indent=2)}")
+        # logger.debug(f"AI Calendar Agent Interaction: {json.dumps(log_data, indent=2)}")
