@@ -4,7 +4,7 @@ Serializers for Ground Truth app.
 import os
 from django.utils import timezone
 from rest_framework import serializers
-
+from django.utils import timezone
 from apps.users.serializers import UserMinimalSerializer
 from .models import Document, DocumentComment, GTVersion
 
@@ -226,8 +226,19 @@ class DocumentShareSerializer(serializers.Serializer):
     project_id = serializers.IntegerField(required=False, allow_null=True)
 
     def validate(self, data):
-        if not data.get('user_id') and not data.get('project_id'):
-            raise serializers.ValidationError("Must provide either user_id or project_id.")
-        if data.get('user_id') and data.get('project_id'):
-            raise serializers.ValidationError("Provide either user_id or project_id, not both.")
+        start_time = data.get('start_time', getattr(self.instance, 'start_time', None))
+        end_time = data.get('end_time', getattr(self.instance, 'end_time', None))
+
+        # --- NEW LOGIC: Prevent events from being created in the past ---
+        if start_time and start_time < timezone.now():
+            raise serializers.ValidationError({
+                "start_time": "Event time cannot be in the past."
+            })
+
+        # --- EXISTING LOGIC: Ensure end time is after start time ---
+        if start_time and end_time and start_time >= end_time:
+            raise serializers.ValidationError({
+                "end_time": "End time must be after the start time."
+            })
+            
         return data
