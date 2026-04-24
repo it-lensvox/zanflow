@@ -15,15 +15,34 @@ import {
     Video,
     X,
     CalendarPlus,
-    Trash2
+    Trash2,
+    Check,
+    XCircle,
+    RefreshCw,
+    Crown,
+    AlertCircle,
+    Sparkles,
+    Copy,
+    Settings,
+
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { taskApi, dailyUpdateApi, eventApi, usersApi } from '@/services/api';
+import { taskApi, dailyUpdateApi, eventApi, usersApi, notificationSocket, dyuksaAI } from '@/services/api';
 import { useAuth } from '@/hooks/useAuth';
 import { TaskDetailModal } from '../MyTask/TaskDetailModal';
-import type { Task, DailyUpdate, DailyUpdatePayload, Event as CalendarEventType } from '@/types';
+import type { Task, DailyUpdate, DailyUpdatePayload, Event as CalendarEventType, InvitationStatus } from '@/types';
 import { getStatusConfig } from '@/components/layout/DualView/taskConfig';
+import DeclineModal from '@/components/Calendar/DeclineModal';
+import RescheduleModal from '@/components/Calendar/RescheduleModal';
+
+
+// Declare global WebSocket type
+declare global {
+    interface Window {
+        socket?: WebSocket;
+    }
+}
 
 // --- Types & Constants ---
 type ViewMode = 'day' | 'work_week' | 'week' | 'month';
@@ -43,6 +62,84 @@ const getPriorityColor = (priority: string) => {
     }
 };
 
+// ═══════════════ INVITATION STATUS HELPERS ═══════════════
+const getEventStatusColors = (status?: InvitationStatus) => {
+    switch (status) {
+        case 'ORGANIZER':
+            return {
+                bg: 'bg-blue-50',
+                border: 'border-blue-500',
+                text: 'text-blue-700',
+                accent: 'bg-blue-500',
+                hover: 'hover:bg-blue-100'
+            };
+        case 'PENDING':
+            return {
+                bg: 'bg-amber-50',
+                border: 'border-amber-500',
+                text: 'text-amber-700',
+                accent: 'bg-amber-500',
+                hover: 'hover:bg-amber-100'
+            };
+        case 'ACCEPTED':
+            return {
+                bg: 'bg-emerald-50',
+                border: 'border-emerald-500',
+                text: 'text-emerald-700',
+                accent: 'bg-emerald-500',
+                hover: 'hover:bg-emerald-100'
+            };
+        case 'DECLINED':
+            return {
+                bg: 'bg-red-50 opacity-60',
+                border: 'border-red-400',
+                text: 'text-red-600',
+                accent: 'bg-red-500',
+                hover: 'hover:bg-red-100'
+            };
+        default:
+            return {
+                bg: 'bg-indigo-50',
+                border: 'border-indigo-500',
+                text: 'text-indigo-700',
+                accent: 'bg-indigo-500',
+                hover: 'hover:bg-indigo-100'
+            };
+    }
+};
+
+const getStatusBadgeColors = (status?: InvitationStatus) => {
+    switch (status) {
+        case 'ORGANIZER': return 'bg-blue-500 text-white';
+        case 'PENDING': return 'bg-amber-500 text-white';
+        case 'ACCEPTED': return 'bg-emerald-500 text-white';
+        case 'DECLINED': return 'bg-red-500 text-white';
+        default: return 'bg-gray-400 text-white';
+    }
+};
+
+const getStatusIcon = (status?: InvitationStatus) => {
+    switch (status) {
+        case 'ORGANIZER': return Crown;
+        case 'PENDING': return AlertCircle;
+        case 'ACCEPTED': return Check;
+        case 'DECLINED': return XCircle;
+        default: return CalendarIcon;
+    }
+};
+
+const getStatusLabel = (status?: InvitationStatus) => {
+    switch (status) {
+        case 'ORGANIZER': return 'Organizer';
+        case 'PENDING': return 'Pending';
+        case 'ACCEPTED': return 'Accepted';
+        case 'DECLINED': return 'Declined';
+        default: return '';
+    }
+};
+
+const requiresAction = (status?: InvitationStatus) => status === 'PENDING';
+
 interface CalendarDay {
     date: Date;
     isCurrentMonth: boolean;
@@ -57,9 +154,26 @@ interface CalendarEventUIProps {
     event: CalendarEventType;
     onClick: (event: CalendarEventType) => void;
     compact?: boolean;
+    currentUserId?: number;
+    onAccept?: (invitationId: number) => void;
+    onDecline?: (event: CalendarEventType) => void;
+    onReschedule?: (event: CalendarEventType) => void;
+    isAccepting?: boolean;
 }
 
-const CalendarEventUI: React.FC<CalendarEventUIProps> = ({ event, onClick, compact = false }) => {
+const CalendarEventUI: React.FC<CalendarEventUIProps> = ({
+    event,
+    onClick,
+    compact = false,
+    currentUserId,
+    onAccept,
+    onDecline,
+    onReschedule,
+    isAccepting
+}) => {
+    const statusColors = getEventStatusColors(event.my_invitation_status);
+    const isPending = requiresAction(event.my_invitation_status);
+
     const handleDragStart = (e: React.DragEvent) => {
         e.dataTransfer.setData("eventId", String(event.id));
         e.dataTransfer.effectAllowed = "move";
@@ -71,18 +185,44 @@ const CalendarEventUI: React.FC<CalendarEventUIProps> = ({ event, onClick, compa
             draggable={true}
             onDragStart={handleDragStart}
             onDragEnd={(e) => e.currentTarget.classList.remove('opacity-50')}
-            className={`group relative flex items-center gap-2 rounded-md cursor-grab active:cursor-grabbing transition-all duration-200 border border-transparent hover:shadow-sm hover:z-10 ${compact ? 'py-0.5 px-1.5' : 'py-1 px-2'} bg-indigo-50 text-indigo-700`}
+            className={`group relative flex items-center gap-2 rounded-md cursor-grab active:cursor-grabbing transition-all duration-200 border border-transparent hover:shadow-sm hover:z-10 ${compact ? 'py-0.5 px-1.5' : 'py-1 px-2'} ${statusColors.bg} ${statusColors.text}`}
             onClick={(e) => {
                 e.stopPropagation();
                 onClick(event);
             }}
         >
-            {/* Add pointer-events-none to everything INSIDE this div */}
-            <div className="w-1 h-full absolute left-0 top-0 bottom-0 rounded-l-md bg-indigo-500 pointer-events-none" />
-            <CalendarIcon size={compact ? 12 : 14} className="flex-shrink-0 text-indigo-500 pointer-events-none" />
+            <div className={`w-1 h-full absolute left-0 top-0 bottom-0 rounded-l-md ${statusColors.accent} pointer-events-none`} />
+            <CalendarIcon size={compact ? 12 : 14} className={`flex-shrink-0 pointer-events-none ${statusColors.text}`} />
             <span className={`font-medium truncate pointer-events-none ${compact ? 'text-[10px]' : 'text-xs'}`}>
                 {event.title}
             </span>
+
+            {/* Quick action buttons on hover for PENDING events */}
+            {isPending && event.my_invitation_id && !compact && (
+                <div className="hidden group-hover:flex items-center gap-1 ml-auto">
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onAccept?.(event.my_invitation_id!);
+                        }}
+                        disabled={isAccepting}
+                        className="p-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded transition-colors"
+                        title="Accept"
+                    >
+                        {isAccepting ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                    </button>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onDecline?.(event);
+                        }}
+                        className="p-1 bg-red-500 hover:bg-red-600 text-white rounded transition-colors"
+                        title="Decline"
+                    >
+                        <X size={12} />
+                    </button>
+                </div>
+            )}
         </div>
     );
 };
@@ -294,12 +434,22 @@ interface DaysViewProps {
     viewMode: 'day' | 'work_week' | 'week';
     updateEvent: (data: Partial<CalendarEventType>) => void;
     currentUser: { id: number; role: string } | null;
+    onAcceptInvitation?: (invitationId: number) => void;
+    onDeclineInvitation?: (event: CalendarEventType) => void;
+    onRescheduleInvitation?: (event: CalendarEventType) => void;
+    isAccepting?: boolean;
+    onEventContextMenu?: (e: React.MouseEvent, event: CalendarEventType) => void;
 }
 
 const DaysView: React.FC<DaysViewProps> = ({
     currentDate, tasks, events, selectedDate, onTaskClick, onEventClick, onDateClick, onCreateEventAtTime, viewMode,
     updateEvent,
-    currentUser
+    currentUser,
+    onAcceptInvitation,
+    onDeclineInvitation,
+    onRescheduleInvitation,
+    isAccepting,
+    onEventContextMenu
 }) => {
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
@@ -403,7 +553,6 @@ const DaysView: React.FC<DaysViewProps> = ({
 
     return (
         <div className="flex flex-col h-full bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden relative">
-            {/* Header Row (Weekday Names & Numbers) */}
             {/* Header Row (Weekday Names & Numbers) */}
             <div className="flex border-b border-gray-200 bg-gray-50">
                 <div className="w-16 flex-shrink-0 border-r border-gray-200 bg-gray-50"></div>
@@ -571,6 +720,10 @@ const DaysView: React.FC<DaysViewProps> = ({
 
                                         const newStart = new Date(day);
                                         newStart.setHours(droppedHour, droppedMinute, 0, 0);
+                                        if (newStart < new Date()) {
+                                            alert("Cannot move an event to a past time.");
+                                            return;
+                                        }
 
                                         const duration = new Date(draggedEvent.end_time).getTime() - new Date(draggedEvent.start_time).getTime();
                                         const newEnd = new Date(newStart.getTime() + duration);
@@ -661,6 +814,10 @@ const DaysView: React.FC<DaysViewProps> = ({
                                         const eventHeight = Math.max((endMinutes - startMinutes) * (64 / 60), 24);
                                         const widthPercent = 100 / totalOverlaps;
 
+                                        // Get status-based colors
+                                        const statusColors = getEventStatusColors(event.my_invitation_status);
+                                        const isPending = event.my_invitation_status === 'PENDING';
+
                                         return (
                                             <div
                                                 key={`event-${event.id}`}
@@ -680,13 +837,54 @@ const DaysView: React.FC<DaysViewProps> = ({
                                                     zIndex: 10 + orderIndex
                                                 }}
                                                 onClick={(e) => { e.stopPropagation(); if (onEventClick) onEventClick(event); }}
+                                                onContextMenu={(e) => { if (onEventContextMenu) onEventContextMenu(e, event); }}
                                             >
-                                                <div className="h-full w-full bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md overflow-hidden p-1.5 text-xs shadow-sm group-hover:bg-indigo-100 flex flex-col relative" title={event.title}>
-                                                    <div className="w-1 h-full absolute left-0 top-0 bottom-0 bg-indigo-500 rounded-l-md" />
+                                                <div
+                                                    className={`h-full w-full rounded-md overflow-hidden p-1.5 text-xs shadow-sm flex flex-col relative border ${statusColors.bg} ${statusColors.text} ${statusColors.hover}`}
+                                                    title={event.title}
+                                                >
+                                                    <div className={`w-1 h-full absolute left-0 top-0 bottom-0 rounded-l-md ${statusColors.accent}`} />
                                                     <div className="font-semibold truncate ml-1">{event.title}</div>
                                                     {eventHeight >= 40 && (
                                                         <div className="text-[10px] truncate ml-1 opacity-80 mt-0.5">
                                                             {effectiveStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })} - {effectiveEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Quick action buttons for PENDING events */}
+                                                    {isPending && event.my_invitation_id && eventHeight >= 50 && (
+                                                        <div className="hidden group-hover:flex items-center gap-1 mt-auto ml-1">
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    onAcceptInvitation?.(event.my_invitation_id!);
+                                                                }}
+                                                                disabled={isAccepting}
+                                                                className="p-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded transition-colors"
+                                                                title="Accept"
+                                                            >
+                                                                {isAccepting ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />}
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    onDeclineInvitation?.(event);
+                                                                }}
+                                                                className="p-1 bg-red-500 hover:bg-red-600 text-white rounded transition-colors"
+                                                                title="Decline"
+                                                            >
+                                                                <X size={10} />
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    onRescheduleInvitation?.(event);
+                                                                }}
+                                                                className="p-1 bg-amber-500 hover:bg-amber-600 text-white rounded transition-colors"
+                                                                title="Reschedule"
+                                                            >
+                                                                <RefreshCw size={10} />
+                                                            </button>
                                                         </div>
                                                     )}
                                                 </div>
@@ -712,6 +910,10 @@ interface TaskListSidebarProps {
     onClose: () => void;
     currentUser: { id: number; role: string } | null;
     onOpenEventModal: () => void;
+    onAcceptInvitation?: (invitationId: number) => void;
+    onDeclineInvitation?: (event: CalendarEventType) => void;
+    onRescheduleInvitation?: (event: CalendarEventType) => void;
+    isAccepting?: boolean;
 }
 
 // Helper: format date as "2 March 2026"
@@ -769,13 +971,40 @@ interface EventModalProps {
     isOpen: boolean;
     onClose: () => void;
     selectedDate: Date | null;
+    selectedHour?: number | null;
     event?: CalendarEventType | null;
     currentUser: { id: number; role: string } | null;
     allEvents: CalendarEventType[];
+    onAcceptInvitation?: (invitationId: number) => void;
+    onDeclineInvitation?: (event: CalendarEventType) => void;
+    onRescheduleInvitation?: (event: CalendarEventType) => void;
+    isAccepting?: boolean;
+    // ═══════════════ DYUKSA AI PROP ═══════════════
+    dyuksaEventData?: {
+        eventType: string;
+        title: string;
+        attendeeIds: number[];
+        attendeeNames: string[];
+        targetDate: string;
+        suggestedSlots: string[];
+        duration: number;
+    } | null;
 }
 
-const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, selectedDate, event, currentUser, allEvents }) => {
-    // If the event exists and the current user is NOT the organizer, it is Read-Only
+const EventModal: React.FC<EventModalProps> = ({
+    isOpen,
+    onClose,
+    selectedDate,
+    selectedHour,
+    event,
+    currentUser,
+    allEvents,
+    onAcceptInvitation,
+    onDeclineInvitation,
+    onRescheduleInvitation,
+    isAccepting,
+    dyuksaEventData
+}) => {
     const isReadOnly = Boolean(event && currentUser && event.organizer !== currentUser.id);
     const queryClient = useQueryClient();
     const [title, setTitle] = useState('');
@@ -786,16 +1015,44 @@ const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, selectedDate, 
     const [isOnline, setIsOnline] = useState(false);
     const [description, setDescription] = useState('');
 
-    // New states for Attendees Search & Select
+
+    // NEW: Event Type state
+    const [eventType, setEventType] = useState('Meeting');
+    const [showEventTypeDropdown, setShowEventTypeDropdown] = useState(false);
+    const [customEventType, setCustomEventType] = useState('');
+    const [suggestedSlots, setSuggestedSlots] = useState<string[]>([]);
+    const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+    const [selectedDuration, setSelectedDuration] = useState(30);
+
+    // Predefined event types
+    const EVENT_TYPES = [
+        { value: 'Meeting', icon: '👥', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+        { value: 'Review', icon: '📋', color: 'bg-purple-100 text-purple-700 border-purple-200' },
+        { value: 'Interview', icon: '🎯', color: 'bg-green-100 text-green-700 border-green-200' },
+        { value: 'Training', icon: '📚', color: 'bg-orange-100 text-orange-700 border-orange-200' },
+    ];
+
+    // Attendees states
     const [attendees, setAttendees] = useState<number[]>([]);
     const [userSearch, setUserSearch] = useState('');
     const [showUserDropdown, setShowUserDropdown] = useState(false);
+
+    // Dropdown states
     const [showStartTimeDropdown, setShowStartTimeDropdown] = useState(false);
     const [showEndTimeDropdown, setShowEndTimeDropdown] = useState(false);
+    const [showDatePicker, setShowDatePicker] = useState(false);
 
-    // Multi-day states
-    const [isAllDay, setIsAllDay] = useState(false);
-    const [allDayPreset, setAllDayPreset] = useState('1_day');
+    // Date picker state
+    const [pickerMonth, setPickerMonth] = useState(new Date().getMonth());
+    const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
+
+    // Refs for scrolling time dropdowns
+    const startTimeRef = React.useRef<HTMLDivElement>(null);
+    const endTimeRef = React.useRef<HTMLDivElement>(null);
+
+    // Availability tracking
+    const [availabilityMap, setAvailabilityMap] = useState<Record<number, boolean>>({});
+    const [checkingAvailability, setCheckingAvailability] = useState(false);
 
     // Fetch available team members
     const { data: availableUsers = [] } = useQuery({
@@ -804,8 +1061,135 @@ const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, selectedDate, 
         enabled: isOpen,
     });
 
+    // Fetch RSVP status for existing events
+    const { data: rsvpData, isLoading: loadingRsvp } = useQuery({
+        queryKey: ['event-rsvp', event?.id],
+        queryFn: () => eventApi.getEventRsvpStatus(event!.id),
+        enabled: !!event?.id && isOpen,
+    });
+
+    // Check availability for all users when time changes
+    const checkAllUsersAvailability = React.useCallback(async () => {
+        if (!startTime || !endTime || availableUsers.length === 0) return;
+
+        setCheckingAvailability(true);
+        const newAvailabilityMap: Record<number, boolean> = {};
+
+        try {
+            const checks = availableUsers.map(async (user: any) => {
+                try {
+                    const result = await eventApi.checkAvailability(
+                        user.id,
+                        new Date(startTime).toISOString(),
+                        new Date(endTime).toISOString()
+                    );
+                    return { userId: user.id, available: result.is_available };
+                } catch (error) {
+                    console.error(`Error checking availability for user ${user.id}:`, error);
+                    return { userId: user.id, available: true };
+                }
+            });
+
+            const results = await Promise.all(checks);
+            results.forEach(({ userId, available }) => {
+                newAvailabilityMap[userId] = available;
+            });
+
+            setAvailabilityMap(newAvailabilityMap);
+        } catch (error) {
+            console.error('Error checking availability:', error);
+        } finally {
+            setCheckingAvailability(false);
+        }
+    }, [startTime, endTime, availableUsers]);
+
+    // Helper to get availability status
+    const getUserAvailability = (userId: number): { available: boolean; loading: boolean } => {
+        if (!startTime || !endTime) return { available: true, loading: false };
+        if (checkingAvailability && availabilityMap[userId] === undefined) {
+            return { available: true, loading: true };
+        }
+        return { available: availabilityMap[userId] ?? true, loading: false };
+    };
+
+    // ═══════════════ FETCH SUGGESTED SLOTS ═══════════════
+    const fetchSuggestedSlots = async () => {
+        if (attendees.length === 0) {
+            setSuggestedSlots([]);
+            return;
+        }
+
+        const targetDate = startTime.split('T')[0];
+        if (!targetDate) return;
+
+        setLoadingSuggestions(true);
+        try {
+            const response = await eventApi.suggestSlots(
+                attendees,
+                targetDate,
+                selectedDuration
+            );
+            setSuggestedSlots(response.available_slots || []);
+        } catch (error) {
+            console.error('Error fetching suggested slots:', error);
+            setSuggestedSlots([]);
+        } finally {
+            setLoadingSuggestions(false);
+        }
+    };
+
+    // Handle slot selection - populate start and end time
+    const handleSlotSelect = (slotIso: string) => {
+        const startDate = new Date(slotIso);
+        const endDate = new Date(startDate.getTime() + selectedDuration * 60 * 1000);
+
+        // Format for datetime-local input
+        const formatForInput = (date: Date) => {
+            const d = new Date(date);
+            d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+            return d.toISOString().slice(0, 16);
+        };
+
+        setStartTime(formatForInput(startDate));
+        setEndTime(formatForInput(endDate));
+        setSuggestedSlots([]); // Clear suggestions after selection
+    };
+
+    // Format slot time for display (e.g., "10:00 AM")
+    const formatSlotTime = (isoString: string) => {
+        const date = new Date(isoString);
+        return date.toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+        });
+    };
+
+    // Trigger availability check when time changes
+    React.useEffect(() => {
+        if (isOpen && startTime && endTime && availableUsers.length > 0) {
+            checkAllUsersAvailability();
+        }
+    }, [isOpen, startTime, endTime, availableUsers.length, checkAllUsersAvailability]);
+
+    // Scroll time dropdown to show 9:00 AM area when opened
+    React.useEffect(() => {
+        if (showStartTimeDropdown && startTimeRef.current) {
+            const scrollPos = 18 * 36 - 50;
+            startTimeRef.current.scrollTop = scrollPos;
+        }
+    }, [showStartTimeDropdown]);
+
+    React.useEffect(() => {
+        if (showEndTimeDropdown && endTimeRef.current) {
+            const scrollPos = 18 * 36 - 50;
+            endTimeRef.current.scrollTop = scrollPos;
+        }
+    }, [showEndTimeDropdown]);
+
     React.useEffect(() => {
         if (event && isOpen) {
+            // ═══════════════ EDITING EXISTING EVENT ═══════════════
             setTitle(event.title || '');
             const formatDt = (iso: string) => {
                 if (!iso) return '';
@@ -814,56 +1198,98 @@ const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, selectedDate, 
                 return d.toISOString().slice(0, 16);
             };
 
-            const sTime = formatDt(event.start_time);
-            const eTime = formatDt(event.end_time);
-            setStartTime(sTime);
-            setEndTime(eTime);
-
-            // Detect multi-day / all day events (>23 hours duration)
-            const s = new Date(event.start_time);
-            const e = new Date(event.end_time);
-
-            // Strict check for true "All Day" events (00:00 to 23:59)
-            if (s.getHours() === 0 && s.getMinutes() === 0 && e.getHours() === 23 && e.getMinutes() === 59) {
-                setIsAllDay(true);
-                const diffDays = Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24));
-                if (diffDays <= 1) setAllDayPreset('1_day');
-                else if (diffDays === 5) setAllDayPreset('work_week');
-                else if (diffDays === 7) setAllDayPreset('full_week');
-                else setAllDayPreset('custom');
-            } else {
-                setIsAllDay(false);
-                // Detect if a specific-time event was saved with a multi-day duration preset
-                const diffDays = Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24));
-                if (diffDays === 0) setAllDayPreset('1_day');
-                else if (diffDays === 4) setAllDayPreset('work_week');
-                else if (diffDays === 6) setAllDayPreset('full_week');
-                else setAllDayPreset('custom');
-            }
-
+            setStartTime(formatDt(event.start_time));
+            setEndTime(formatDt(event.end_time));
             setLocation(event.location || '');
             setIsOnline(event.is_online_meeting || false);
             setDescription(event.description || '');
             setAttendees(event.attendees || []);
             setUserSearch('');
             setShowUserDropdown(false);
-        } else if (isOpen) {
-            setError(null);
-            // Safely fallback to today's date if no specific selectedDate is provided or if the selectedDate is in the past
-            const now = new Date();
-            now.setHours(0, 0, 0, 0);
+            setAvailabilityMap({});
+            setSuggestedSlots([]);
+            setSelectedDuration(30);
 
-            let targetDate = selectedDate || new Date();
-            if (targetDate < now) {
-                targetDate = new Date(); // Reset to today if selected date is in the past
+            if (event.event_type) {
+                setEventType(event.event_type);
+            } else {
+                const detectedType = EVENT_TYPES.find(t => event.title?.toLowerCase().includes(t.value.toLowerCase()));
+                if (detectedType) {
+                    setEventType(detectedType.value);
+                } else {
+                    setEventType('Meeting');
+                }
             }
+            setCustomEventType('');
+
+            const eventDate = new Date(event.start_time);
+            setPickerMonth(eventDate.getMonth());
+            setPickerYear(eventDate.getFullYear());
+
+        } else if (dyuksaEventData && isOpen) {
+            // ═══════════════ DYUKSA AI PRE-FILL ═══════════════
+            setError(null);
+            setTitle(dyuksaEventData.title || '');
+            setEventType(dyuksaEventData.eventType || 'Meeting');
+            setAttendees(dyuksaEventData.attendeeIds || []);
+            setSuggestedSlots(dyuksaEventData.suggestedSlots || []);
+            setSelectedDuration(dyuksaEventData.duration || 30);
+
+            // Set date and time
+            const targetDate = new Date(dyuksaEventData.targetDate);
             const y = targetDate.getFullYear();
             const m = String(targetDate.getMonth() + 1).padStart(2, '0');
             const d = String(targetDate.getDate()).padStart(2, '0');
             const dateStr = `${y}-${m}-${d}`;
 
-            setStartTime(`${dateStr}T13:00`);
-            setEndTime(`${dateStr}T13:30`);
+            // If there are suggested slots, pre-select the first one
+            if (dyuksaEventData.suggestedSlots && dyuksaEventData.suggestedSlots.length > 0) {
+                const firstSlot = new Date(dyuksaEventData.suggestedSlots[0]);
+                const startHour = String(firstSlot.getHours()).padStart(2, '0');
+                const startMin = String(firstSlot.getMinutes()).padStart(2, '0');
+                setStartTime(`${dateStr}T${startHour}:${startMin}`);
+
+                const endSlot = new Date(firstSlot.getTime() + dyuksaEventData.duration * 60000);
+                const endHour = String(endSlot.getHours()).padStart(2, '0');
+                const endMin = String(endSlot.getMinutes()).padStart(2, '0');
+                setEndTime(`${dateStr}T${endHour}:${endMin}`);
+            } else {
+                setStartTime(`${dateStr}T09:00`);
+                setEndTime(`${dateStr}T09:30`);
+            }
+
+            setLocation('');
+            setIsOnline(false);
+            setDescription('');
+            setUserSearch('');
+            setShowUserDropdown(false);
+            setAvailabilityMap({});
+            setCustomEventType('');
+
+            setPickerMonth(targetDate.getMonth());
+            setPickerYear(targetDate.getFullYear());
+
+        } else if (isOpen) {
+            // ═══════════════ NEW EVENT (NO DYUKSA DATA) ═══════════════
+            setError(null);
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+
+            let targetDate = selectedDate || new Date();
+            if (targetDate < now) targetDate = new Date();
+
+            const y = targetDate.getFullYear();
+            const m = String(targetDate.getMonth() + 1).padStart(2, '0');
+            const d = String(targetDate.getDate()).padStart(2, '0');
+            const dateStr = `${y}-${m}-${d}`;
+
+            // Use selectedHour if provided, otherwise default to 13:00
+            const hour = selectedHour !== null && selectedHour !== undefined
+                ? String(selectedHour).padStart(2, '0')
+                : '13';
+
+            setStartTime(`${dateStr}T${hour}:00`);
+            setEndTime(`${dateStr}T${hour}:30`);
             setTitle('');
             setLocation('');
             setIsOnline(false);
@@ -871,10 +1297,16 @@ const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, selectedDate, 
             setAttendees([]);
             setUserSearch('');
             setShowUserDropdown(false);
-            setIsAllDay(false);
-            setAllDayPreset('1_day');
+            setAvailabilityMap({});
+            setSuggestedSlots([]);
+            setSelectedDuration(30);
+            setEventType('Meeting');
+            setCustomEventType('');
+
+            setPickerMonth(targetDate.getMonth());
+            setPickerYear(targetDate.getFullYear());
         }
-    }, [selectedDate, isOpen, event]);
+    }, [selectedDate, selectedHour, isOpen, event, dyuksaEventData]);
 
     const { mutate: createEvent, isPending: isCreating } = useMutation({
         mutationFn: (data: Partial<CalendarEventType>) => eventApi.create(data),
@@ -883,7 +1315,7 @@ const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, selectedDate, 
             onClose();
         },
         onError: (err: any) => {
-            const conflictMsg = err.response?.data?.attendees?.[0] || err.response?.data?.detail || "Could not create event. Please check for schedule conflicts.";
+            const conflictMsg = err.response?.data?.attendees?.[0] || err.response?.data?.detail || "Could not create event.";
             setError(conflictMsg);
         }
     });
@@ -895,7 +1327,7 @@ const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, selectedDate, 
             onClose();
         },
         onError: (err: any) => {
-            const conflictMsg = err.response?.data?.attendees?.[0] || err.response?.data?.detail || "Could not update event. Please check for schedule conflicts.";
+            const conflictMsg = err.response?.data?.attendees?.[0] || err.response?.data?.detail || "Could not update event.";
             setError(conflictMsg);
         }
     });
@@ -910,496 +1342,925 @@ const EventModal: React.FC<EventModalProps> = ({ isOpen, onClose, selectedDate, 
 
     const isPending = isCreating || isUpdating || isDeleting;
 
-    const handleDelete = () => {
-        deleteEvent();
-    };
-
     const handleSave = () => {
-        // Logic to check 5 events per day limit
-        if (!event && selectedDate) {
-            const dateStr = selectedDate.toISOString().split('T')[0];
-            const eventsOnThisDay = allEvents.filter(e => {
-                const eventDate = new Date(e.start_time).toISOString().split('T')[0];
-                return eventDate === dateStr && e.organizer === currentUser?.id;
-            });
-
-            if (eventsOnThisDay.length >= 5) {
-                setError("You have reached the limit of 5 events for this day. Please choose another date.");
-                return;
-            }
-        }
-
-        const basePayload = {
-            title,
-            location,
-            is_online_meeting: isOnline,
-            description,
-            attendees
-        };
 
         const startDt = new Date(startTime);
         const endDt = new Date(endTime);
-
-        if (!event && allDayPreset === 'work_week' && startDt.toDateString() !== endDt.toDateString()) {
-            let current = new Date(startDt);
-            current.setHours(0, 0, 0, 0);
-
-            const endLimit = new Date(endDt);
-            endLimit.setHours(23, 59, 59, 999);
-
-            while (current <= endLimit) {
-                if (current.getDay() !== 0 && current.getDay() !== 6) {
-                    const dayStart = new Date(current);
-                    dayStart.setHours(startDt.getHours(), startDt.getMinutes(), 0, 0);
-
-                    const dayEnd = new Date(current);
-                    dayEnd.setHours(endDt.getHours(), endDt.getMinutes(), 0, 0);
-
-                    if (dayEnd < dayStart) {
-                        dayEnd.setDate(dayEnd.getDate() + 1);
-                    }
-
-                    createEvent({
-                        ...basePayload,
-                        start_time: dayStart.toISOString(),
-                        end_time: dayEnd.toISOString()
-                    });
-                }
-                current.setDate(current.getDate() + 1);
-            }
-        } else {
-            const finalPayload = {
-                ...basePayload,
-                start_time: startDt.toISOString(),
-                end_time: endDt.toISOString()
-            };
-            if (event) {
-                updateEvent(finalPayload);
-            } else {
-                createEvent(finalPayload);
-            }
+        const now = new Date();
+        if (startDt < now) {
+            setError("Cannot create or move an event to a past time.");
+            return;
         }
+
+        const payload = {
+            title,
+            event_type: eventType,
+            location,
+            is_online_meeting: isOnline,
+            description,
+            attendees,
+            start_time: startDt.toISOString(),
+            end_time: endDt.toISOString()
+        };
+
+        if (event) updateEvent(payload);
+        else createEvent(payload);
+    };
+
+    // Close all dropdowns helper
+    const closeAllDropdowns = () => {
+        setShowDatePicker(false);
+        setShowStartTimeDropdown(false);
+        setShowEndTimeDropdown(false);
+        setShowEventTypeDropdown(false);
+        setShowUserDropdown(false);
     };
 
     if (!isOpen) return null;
 
     const filteredUsers = availableUsers.filter((u: any) => {
         const name = `${u.first_name || ''} ${u.last_name || ''}`.trim().toLowerCase();
-        const userSearchLower = userSearch.toLowerCase();
-        return name.includes(userSearchLower) ||
-            u.username?.toLowerCase().includes(userSearchLower) ||
-            u.email?.toLowerCase().includes(userSearchLower);
-    }).filter((u: any) => !attendees.includes(u.id));
+        const searchLower = userSearch.toLowerCase();
+        return (name.includes(searchLower) || u.email?.toLowerCase().includes(searchLower)) && !attendees.includes(u.id);
+    });
+
+    // Avatar helpers
+    const getInitials = (user: any) => {
+        const first = user?.first_name?.[0] || user?.username?.[0] || '';
+        const last = user?.last_name?.[0] || '';
+        return (first + last).toUpperCase() || '?';
+    };
+
+    const avatarColors = ['bg-amber-500', 'bg-cyan-500', 'bg-violet-500', 'bg-rose-500', 'bg-emerald-500', 'bg-blue-500', 'bg-orange-500', 'bg-pink-500'];
+    const getAvatarColor = (id: number) => avatarColors[id % avatarColors.length];
+
+    // Format date for display: "15 Apr 2026"
+    const formatDisplayDate = (dateStr: string) => {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    };
+
+    // Generate time slots
+    const timeSlots = Array.from({ length: 48 }).map((_, i) => {
+        const h = String(Math.floor(i / 2)).padStart(2, '0');
+        const m = i % 2 === 0 ? '00' : '30';
+        return `${h}:${m}`;
+    });
+
+    // Mini Calendar helpers
+    const MINI_DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+    const MINI_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+    const getCalendarDays = () => {
+        const firstDay = new Date(pickerYear, pickerMonth, 1);
+        const startDay = new Date(firstDay);
+        startDay.setDate(firstDay.getDate() - firstDay.getDay());
+
+        const days = [];
+        const iter = new Date(startDay);
+        while (days.length < 42) {
+            days.push(new Date(iter));
+            iter.setDate(iter.getDate() + 1);
+        }
+        return days;
+    };
+
+    const handleDateSelect = (date: Date) => {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        const newDateStr = `${y}-${m}-${d}`;
+
+        setStartTime(`${newDateStr}T${startTime.split('T')[1] || '13:00'}`);
+        setEndTime(`${newDateStr}T${endTime.split('T')[1] || '13:30'}`);
+        setShowDatePicker(false);
+    };
+
+    const currentSelectedDate = startTime ? new Date(startTime.split('T')[0]) : new Date();
+
+    // Get current event type config
+    const currentEventTypeConfig = EVENT_TYPES.find(t => t.value === eventType) || { value: eventType, icon: '📅', color: 'bg-gray-100 text-gray-700 border-gray-200' };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-            <div className="bg-white text-gray-900 w-full max-w-[800px] rounded-xl shadow-2xl flex flex-col overflow-hidden border border-gray-200" onClick={() => setShowUserDropdown(false)}>
-                <div className="flex items-center justify-between p-5 border-b border-gray-100 bg-gray-50">
-                    <h2 className="text-base font-semibold text-gray-900">
-                        {event ? (isReadOnly ? 'View event' : 'Edit event') : 'New event'}
-                    </h2>
-                    <button onClick={onClose} className="p-1.5 rounded-md text-gray-400 hover:bg-gray-200 hover:text-gray-700 transition-colors">
-                        <X size={20} />
-                    </button>
-                </div>
-                <div className="p-6 space-y-6 flex-1 overflow-y-auto max-h-[75vh]">
-                    <div>
-                        <input
-                            type="text"
-                            placeholder="Add title"
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            disabled={isReadOnly}
-                            className={`w-full bg-transparent border-b border-gray-200 text-2xl text-gray-900 py-2 focus:outline-none focus:border-blue-500 transition-colors placeholder:text-gray-400 ${isReadOnly ? 'opacity-90 cursor-not-allowed border-transparent' : ''}`}
-                        />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={onClose}>
+            <div
+                className="bg-white w-full max-w-[850px] rounded-2xl shadow-2xl flex overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+            >
+                {/* ═══════════════ LEFT PANEL - Event Details ═══════════════ */}
+                <div className="flex-1 flex flex-col min-w-0">
+                    {/* Header */}
+                    <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                        <div className="flex items-center gap-3">
+                            <h2 className="text-lg font-semibold text-gray-900">
+                                {event ? (isReadOnly ? 'View event' : 'Edit event') : 'Create event'}
+                            </h2>
+                            {event?.my_invitation_status && (
+                                <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${getStatusBadgeColors(event.my_invitation_status)}`}>
+                                    {getStatusLabel(event.my_invitation_status)}
+                                </span>
+                            )}
+                        </div>
+                        <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
+                            <X size={20} />
+                        </button>
                     </div>
 
-                    <div className="flex items-start gap-4 text-gray-500 relative">
-                        <Users size={20} className="mt-2 text-gray-400" />
-                        <div className={`flex-1 border-b pb-2 relative ${isReadOnly ? 'border-transparent' : 'border-gray-200'}`} onClick={(e) => e.stopPropagation()}>
-                            <div className="flex flex-wrap gap-2 mb-2">
-                                {attendees.map(id => {
-                                    const user = availableUsers.find((u: any) => u.id === id);
-                                    return (
-                                        <span key={id} className={`bg-indigo-50 text-indigo-700 border border-indigo-100 text-xs px-2 py-1 rounded-md flex items-center gap-1 font-medium ${isReadOnly ? 'opacity-90' : ''}`}>
-                                            {user ? (user.first_name || user.username) : 'User'}
-                                            {!isReadOnly && (
-                                                <button type="button" onClick={() => setAttendees(prev => prev.filter(a => a !== id))} className="hover:text-indigo-900 ml-1">
-                                                    <X size={12} />
+                    {/* Content */}
+                    <div className="flex-1 px-6 py-5 space-y-5 overflow-y-auto">
+                        {/* ── Date & Time Row ── */}
+                        <div className="flex items-center gap-3 flex-wrap">
+                            {/* Date Picker Button */}
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    disabled={isReadOnly}
+                                    onClick={() => {
+                                        closeAllDropdowns();
+                                        setShowDatePicker(!showDatePicker);
+                                    }}
+                                    className={`flex items-center gap-2 px-4 py-2.5 bg-gray-50 rounded-xl border border-gray-200 hover:border-gray-300 transition-colors ${isReadOnly ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
+                                >
+                                    <CalendarIcon size={16} className="text-gray-500" />
+                                    <span className="text-sm font-medium text-gray-900">
+                                        {formatDisplayDate(startTime)}
+                                    </span>
+                                </button>
+
+                                {/* Mini Calendar Dropdown */}
+                                {showDatePicker && !isReadOnly && (
+                                    <>
+                                        <div className="fixed inset-0 z-10" onClick={() => setShowDatePicker(false)} />
+                                        <div className="absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-20 p-4 w-72">
+                                            {/* Month/Year Header */}
+                                            <div className="flex items-center justify-between mb-4">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (pickerMonth === 0) {
+                                                            setPickerMonth(11);
+                                                            setPickerYear(pickerYear - 1);
+                                                        } else {
+                                                            setPickerMonth(pickerMonth - 1);
+                                                        }
+                                                    }}
+                                                    className="p-1 hover:bg-gray-100 rounded-lg text-gray-600"
+                                                >
+                                                    <ChevronLeft size={18} />
                                                 </button>
-                                            )}
-                                        </span>
-                                    );
-                                })}
+                                                <span className="text-sm font-semibold text-gray-900">
+                                                    {MINI_MONTHS[pickerMonth]} {pickerYear}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (pickerMonth === 11) {
+                                                            setPickerMonth(0);
+                                                            setPickerYear(pickerYear + 1);
+                                                        } else {
+                                                            setPickerMonth(pickerMonth + 1);
+                                                        }
+                                                    }}
+                                                    className="p-1 hover:bg-gray-100 rounded-lg text-gray-600"
+                                                >
+                                                    <ChevronRight size={18} />
+                                                </button>
+                                            </div>
+
+                                            {/* Day Headers */}
+                                            <div className="grid grid-cols-7 mb-2">
+                                                {MINI_DAYS.map(d => (
+                                                    <div key={d} className="text-[11px] font-semibold text-gray-400 text-center py-1">
+                                                        {d}
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            {/* Calendar Days */}
+                                            <div className="grid grid-cols-7 gap-1">
+                                                {getCalendarDays().map((date, i) => {
+                                                    const isCurrentMonth = date.getMonth() === pickerMonth;
+                                                    const isSelected = date.toDateString() === currentSelectedDate.toDateString();
+                                                    const isToday = date.toDateString() === new Date().toDateString();
+                                                    const isPast = date < new Date(new Date().setHours(0, 0, 0, 0));
+
+                                                    return (
+                                                        <button
+                                                            key={i}
+                                                            type="button"
+                                                            disabled={isPast}
+                                                            onClick={() => handleDateSelect(date)}
+                                                            className={`
+                                                                text-sm h-8 w-8 flex items-center justify-center rounded-full mx-auto transition-all
+                                                                ${isSelected
+                                                                    ? 'bg-blue-600 text-white font-semibold'
+                                                                    : isToday
+                                                                        ? 'text-blue-600 font-semibold border border-blue-300'
+                                                                        : isCurrentMonth
+                                                                            ? isPast
+                                                                                ? 'text-gray-300 cursor-not-allowed'
+                                                                                : 'text-gray-700 hover:bg-gray-100'
+                                                                            : 'text-gray-300'
+                                                                }
+                                                            `}
+                                                        >
+                                                            {date.getDate()}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
                             </div>
-                            {!isReadOnly && (
+
+                            {/* Start Time Dropdown */}
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    disabled={isReadOnly}
+                                    onClick={() => {
+                                        closeAllDropdowns();
+                                        setShowStartTimeDropdown(!showStartTimeDropdown);
+                                    }}
+                                    className={`flex items-center gap-2 px-4 py-2.5 bg-gray-50 rounded-xl border border-gray-200 hover:border-gray-300 transition-colors ${isReadOnly ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
+                                >
+                                    <span className="text-sm font-medium text-gray-900">
+                                        {startTime.split('T')[1]?.slice(0, 5) || '13:00'}
+                                    </span>
+                                    <ChevronRight size={14} className="text-gray-400 rotate-90" />
+                                </button>
+
+                                {showStartTimeDropdown && !isReadOnly && (
+                                    <>
+                                        <div className="fixed inset-0 z-10" onClick={() => setShowStartTimeDropdown(false)} />
+                                        <div
+                                            ref={startTimeRef}
+                                            className="absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-20 w-24 max-h-64 overflow-y-auto"
+                                        >
+                                            {timeSlots.map(time => {
+                                                // --- NEW LOGIC START ---
+                                                const [h, m] = time.split(':').map(Number);
+                                                const slotDate = new Date(startTime.split('T')[0]);
+                                                slotDate.setHours(h, m, 0, 0);
+
+                                                // Check if this specific time slot on the selected date is in the past
+                                                const isPastTime = slotDate < new Date();
+                                                const isSelected = (startTime.split('T')[1]?.slice(0, 5) || '13:00') === time;
+                                                // --- NEW LOGIC END ---
+
+                                                return (
+                                                    <div
+                                                        key={`start-${time}`}
+                                                        className={`px-4 py-2 cursor-pointer text-sm transition-colors ${isPastTime
+                                                            ? 'text-gray-300 cursor-not-allowed opacity-50'
+                                                            : isSelected
+                                                                ? 'bg-blue-50 text-blue-700 font-medium'
+                                                                : 'text-gray-700 hover:bg-gray-50'
+                                                            }`}
+                                                        onClick={() => {
+                                                            if (isPastTime) return; // Prevent selection of past times
+
+                                                            const date = startTime.split('T')[0];
+                                                            setStartTime(`${date}T${time}`);
+
+                                                            // Logic to auto-set end time 30 mins after start
+                                                            const [h, m] = time.split(':').map(Number);
+                                                            const endH = String(m >= 30 ? (h + 1) % 24 : h).padStart(2, '0');
+                                                            const endM = m >= 30 ? '00' : '30';
+                                                            setEndTime(`${date}T${endH}:${endM}`);
+                                                            setShowStartTimeDropdown(false);
+                                                        }}
+                                                    >
+                                                        {isSelected && <span className="mr-1">✓</span>}
+                                                        {time}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+
+                            <span className="text-gray-400 font-medium">—</span>
+
+                            {/* End Time Dropdown */}
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    disabled={isReadOnly}
+                                    onClick={() => {
+                                        closeAllDropdowns();
+                                        setShowEndTimeDropdown(!showEndTimeDropdown);
+                                    }}
+                                    className={`flex items-center gap-2 px-4 py-2.5 bg-gray-50 rounded-xl border border-gray-200 hover:border-gray-300 transition-colors ${isReadOnly ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
+                                >
+                                    <span className="text-sm font-medium text-gray-900">
+                                        {endTime.split('T')[1]?.slice(0, 5) || '13:30'}
+                                    </span>
+                                    <ChevronRight size={14} className="text-gray-400 rotate-90" />
+                                </button>
+
+                                {showEndTimeDropdown && !isReadOnly && (
+                                    <>
+                                        <div className="fixed inset-0 z-10" onClick={() => setShowEndTimeDropdown(false)} />
+                                        <div
+                                            ref={endTimeRef}
+                                            className="absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-20 w-24 max-h-64 overflow-y-auto"
+                                        >
+                                            {timeSlots.map(time => {
+                                                const [h, m] = time.split(':').map(Number);
+                                                const slotDate = new Date(endTime.split('T')[0]);
+                                                slotDate.setHours(h, m, 0, 0);
+
+                                                const isPastTime = slotDate < new Date();
+                                                const isSelected = (endTime.split('T')[1]?.slice(0, 5) || '13:30') === time;
+
+                                                return (
+                                                    <div
+                                                        key={`end-${time}`}
+                                                        className={`px-4 py-2 cursor-pointer text-sm transition-colors ${isPastTime
+                                                                ? 'text-gray-300 cursor-not-allowed opacity-50'
+                                                                : isSelected
+                                                                    ? 'bg-blue-50 text-blue-700 font-medium'
+                                                                    : 'text-gray-700 hover:bg-gray-50'
+                                                            }`}
+                                                        onClick={() => {
+                                                            if (isPastTime) return; // Prevent selection
+
+                                                            setEndTime(`${endTime.split('T')[0]}T${time}`);
+                                                            setShowEndTimeDropdown(false);
+                                                        }}
+                                                    >
+                                                        {isSelected && <span className="mr-1">✓</span>}
+                                                        {time}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                        {/* ═══════════════ SUGGEST TIMES SECTION ═══════════════ */}
+                        {!isReadOnly && !event && attendees.length > 0 && (
+                            <div className="space-y-3">
+                                {/* Duration selector + Suggest button */}
+                                <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-2">
+                                        <Clock size={16} className="text-gray-400" />
+                                        <span className="text-xs font-medium text-gray-500">Duration:</span>
+                                        <select
+                                            value={selectedDuration}
+                                            onChange={(e) => setSelectedDuration(Number(e.target.value))}
+                                            className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        >
+                                            <option value={15}>15 min</option>
+                                            <option value={30}>30 min</option>
+                                            <option value={45}>45 min</option>
+                                            <option value={60}>1 hour</option>
+                                            <option value={90}>1.5 hours</option>
+                                            <option value={120}>2 hours</option>
+                                        </select>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={fetchSuggestedSlots}
+                                        disabled={loadingSuggestions || attendees.length === 0}
+                                        className="flex items-center gap-2 px-4 py-2 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed text-emerald-700 text-sm font-medium rounded-lg border border-emerald-200 transition-colors"
+                                    >
+                                        {loadingSuggestions ? (
+                                            <>
+                                                <Loader2 size={14} className="animate-spin" />
+                                                Finding times...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <CalendarIcon size={14} />
+                                                Suggest Times
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+
+                                {/* Suggested slots pills */}
+                                {suggestedSlots.length > 0 && (
+                                    <div className="space-y-2">
+                                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                            Available Slots ({suggestedSlots.length})
+                                        </p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {suggestedSlots.map((slot) => (
+                                                <button
+                                                    key={slot}
+                                                    type="button"
+                                                    onClick={() => handleSlotSelect(slot)}
+                                                    className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-sm font-medium rounded-lg border border-emerald-200 transition-all hover:shadow-sm hover:scale-105"
+                                                >
+                                                    {formatSlotTime(slot)}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* No slots available message */}
+                                {!loadingSuggestions && suggestedSlots.length === 0 && attendees.length > 0 && (
+                                    <p className="text-xs text-gray-400 italic">
+                                        Click "Suggest Times" to find available slots for all participants
+                                    </p>
+                                )}
+                            </div>
+                        )}
+
+                        {/* ── Event Name Input ── */}
+                        <div>
+                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                                Event Name
+                            </label>
+                            <input
+                                type="text"
+                                placeholder="Enter event name"
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
+                                disabled={isReadOnly}
+                                className={`w-full text-base font-medium text-gray-900 placeholder:text-gray-400 bg-transparent border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${isReadOnly ? 'cursor-not-allowed opacity-80' : ''}`}
+                            />
+                        </div>
+
+                        {/* ── Event Type Selector ── */}
+                        <div>
+                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                                Event Type
+                            </label>
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    disabled={isReadOnly}
+                                    onClick={() => {
+                                        closeAllDropdowns();
+                                        setShowEventTypeDropdown(!showEventTypeDropdown);
+                                    }}
+                                    className={`flex items-center justify-between w-full px-4 py-3 rounded-xl border transition-all ${currentEventTypeConfig.color} ${isReadOnly ? 'cursor-not-allowed opacity-80' : 'cursor-pointer hover:shadow-sm'}`}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-lg">{currentEventTypeConfig.icon}</span>
+                                        <span className="text-sm font-medium">{eventType}</span>
+                                    </div>
+                                    <ChevronRight size={16} className={`transition-transform ${showEventTypeDropdown ? 'rotate-90' : ''}`} />
+                                </button>
+
+                                {showEventTypeDropdown && !isReadOnly && (
+                                    <>
+                                        <div className="fixed inset-0 z-10" onClick={() => setShowEventTypeDropdown(false)} />
+                                        <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-20 overflow-hidden">
+                                            {/* Predefined Types */}
+                                            {EVENT_TYPES.map(type => (
+                                                <div
+                                                    key={type.value}
+                                                    className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-gray-50 ${eventType === type.value ? 'bg-gray-50' : ''}`}
+                                                    onClick={() => {
+                                                        setEventType(type.value);
+                                                        setCustomEventType('');
+                                                        setShowEventTypeDropdown(false);
+                                                    }}
+                                                >
+                                                    <span className="text-lg">{type.icon}</span>
+                                                    <span className="text-sm font-medium text-gray-900">{type.value}</span>
+                                                    {eventType === type.value && (
+                                                        <CheckSquare size={16} className="ml-auto text-blue-600" />
+                                                    )}
+                                                </div>
+                                            ))}
+
+                                            {/* Divider */}
+                                            <div className="border-t border-gray-100" />
+
+                                            {/* Custom Type Input */}
+                                            <div className="p-3">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-lg">✏️</span>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Other (type custom name)"
+                                                        value={customEventType}
+                                                        onChange={(e) => setCustomEventType(e.target.value)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter' && customEventType.trim()) {
+                                                                setEventType(customEventType.trim());
+                                                                setShowEventTypeDropdown(false);
+                                                            }
+                                                        }}
+                                                        className="flex-1 text-sm text-gray-900 placeholder:text-gray-400 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    />
+                                                    {customEventType.trim() && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setEventType(customEventType.trim());
+                                                                setShowEventTypeDropdown(false);
+                                                            }}
+                                                            className="px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                                                        >
+                                                            Add
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* ── Teams Meeting Toggle ── */}
+                        <button
+                            type="button"
+                            disabled={isReadOnly}
+                            onClick={() => setIsOnline(!isOnline)}
+                            className={`flex items-center gap-3 px-4 py-3 rounded-xl border transition-all w-fit ${isOnline
+                                ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                                : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                                } ${isReadOnly ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
+                        >
+                            <Video size={18} className={isOnline ? 'text-indigo-600' : 'text-gray-500'} />
+                            <span className="text-sm font-medium">Teams meeting</span>
+                            {isOnline && <X size={14} className="ml-1 text-indigo-400" />}
+                        </button>
+                        {isOnline && (
+                            <p className="text-xs text-gray-500 -mt-3 ml-1">Link will be generated automatically</p>
+                        )}
+
+                        {/* ── Description ── */}
+                        <div>
+                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                                Description
+                            </label>
+                            <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
+                                <textarea
+                                    placeholder="Let's discuss"
+                                    value={description}
+                                    disabled={isReadOnly}
+                                    onChange={e => setDescription(e.target.value)}
+                                    rows={4}
+                                    className={`w-full bg-transparent resize-none focus:outline-none text-sm text-gray-700 placeholder:text-gray-400 p-4 ${isReadOnly ? 'cursor-not-allowed opacity-80' : ''}`}
+                                />
+                            </div>
+                        </div>
+
+                        {/* ── Location (Optional) ── */}
+                        <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl border border-gray-200">
+                            <MapPin size={18} className="text-gray-400 flex-shrink-0" />
+                            <input
+                                type="text"
+                                disabled={isReadOnly}
+                                placeholder="Add location (optional)"
+                                value={location}
+                                onChange={e => setLocation(e.target.value)}
+                                className={`flex-1 text-sm text-gray-900 placeholder:text-gray-400 bg-transparent focus:outline-none ${isReadOnly ? 'cursor-not-allowed opacity-80' : ''}`}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Error */}
+                    {error && (
+                        <div className="mx-6 mb-3">
+                            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
+                                {error}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Footer */}
+                    {/* Footer */}
+                    <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/50">
+                        <div>
+                            {event && !isReadOnly && (
+                                <button
+                                    onClick={() => deleteEvent()}
+                                    disabled={isPending}
+                                    className="text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                                >
+                                    <Trash2 size={16} /> Delete
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Show invitation buttons for PENDING events */}
+                        {event && event.my_invitation_status === 'PENDING' && event.my_invitation_id ? (
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => onAcceptInvitation?.(event.my_invitation_id!)}
+                                    disabled={isAccepting}
+                                    className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors"
+                                >
+                                    {isAccepting ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                                    Accept
+                                </button>
+                                <button
+                                    onClick={() => onDeclineInvitation?.(event)}
+                                    className="flex items-center gap-2 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold rounded-xl transition-colors"
+                                >
+                                    <XCircle size={16} />
+                                    Decline
+                                </button>
+                                <button
+                                    onClick={() => onRescheduleInvitation?.(event)}
+                                    className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold rounded-xl transition-colors"
+                                >
+                                    <RefreshCw size={16} />
+                                    Reschedule
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={onClose}
+                                    className="px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                {!isReadOnly && (
+                                    <button
+                                        onClick={handleSave}
+                                        disabled={!title || isPending}
+                                        className="px-6 py-2.5 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-xl transition-colors shadow-sm"
+                                    >
+                                        {isPending ? 'Saving...' : event ? 'Save changes' : 'Create event'}
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* ═══════════════ RIGHT PANEL - Participants ═══════════════ */}
+                <div className="w-64 bg-slate-50 border-l border-gray-200 flex flex-col">
+                    {/* Participants Header */}
+                    <div className="px-4 py-4 border-b border-gray-200">
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Participants</h3>
+                        {checkingAvailability && (
+                            <div className="flex items-center gap-1.5 text-[11px] text-blue-600 mt-1.5">
+                                <Loader2 size={10} className="animate-spin" />
+                                Checking availability...
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Participants List */}
+                    <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+                        {/* Show Organizer First */}
+                        {event && (
+                            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-blue-50 border border-blue-100 mb-2">
+                                <div className="relative flex-shrink-0">
+                                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-semibold shadow-sm ${getAvatarColor(event.organizer)}`}>
+                                        {(() => {
+                                            const organizer = availableUsers.find((u: any) => u.id === event.organizer);
+                                            return organizer?.avatar ? (
+                                                <img src={organizer.avatar} alt="" className="w-full h-full rounded-full object-cover" />
+                                            ) : (
+                                                getInitials(organizer || { first_name: rsvpData?.organizer })
+                                            );
+                                        })()}
+                                    </div>
+                                    <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-blue-50 bg-blue-500 flex items-center justify-center">
+                                        <Crown size={8} className="text-white" />
+                                    </div>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-gray-900 truncate">
+                                        {rsvpData?.organizer || event.organizer_name || 'Organizer'}
+                                    </p>
+                                    <p className="text-[10px] font-medium text-blue-600">Organizer</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Loading state */}
+                        {loadingRsvp && (
+                            <div className="flex items-center justify-center py-4">
+                                <Loader2 size={16} className="animate-spin text-gray-400" />
+                            </div>
+                        )}
+
+                        {/* Attendees with RSVP status (for existing events) */}
+                        {rsvpData?.attendee_status?.map((attendee) => {
+                            const statusColor =
+                                attendee.status === 'ACCEPTED' ? 'bg-emerald-500' :
+                                    attendee.status === 'DECLINED' ? 'bg-red-500' :
+                                        'bg-amber-500';
+
+                            const statusLabel =
+                                attendee.status === 'ACCEPTED' ? 'Accepted' :
+                                    attendee.status === 'DECLINED' ? 'Declined' :
+                                        'Pending';
+
+                            const statusTextColor =
+                                attendee.status === 'ACCEPTED' ? 'text-emerald-600' :
+                                    attendee.status === 'DECLINED' ? 'text-red-600' :
+                                        'text-amber-600';
+
+                            return (
+                                <div
+                                    key={attendee.user_id}
+                                    className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-white transition-colors group"
+                                >
+                                    <div className="relative flex-shrink-0">
+                                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-semibold shadow-sm ${getAvatarColor(attendee.user_id)}`}>
+                                            {getInitials({ first_name: attendee.name.split(' ')[0], last_name: attendee.name.split(' ')[1] })}
+                                        </div>
+                                        <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-slate-50 ${statusColor}`} />
+                                    </div>
+
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium text-gray-900 truncate">{attendee.name}</p>
+                                        <p className={`text-[10px] font-medium ${statusTextColor}`}>
+                                            {statusLabel}
+                                        </p>
+                                        {attendee.status === 'DECLINED' && attendee.decline_reason && (
+                                            <p className="text-[9px] text-gray-400 truncate" title={attendee.decline_reason}>
+                                                Reason: {attendee.decline_reason}
+                                            </p>
+                                        )}
+                                        {attendee.proposed_reschedule_time && (
+                                            <p className="text-[9px] text-amber-600 truncate">
+                                                Proposed: {new Date(attendee.proposed_reschedule_time).toLocaleString()}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    {!isReadOnly && (
+                                        <button
+                                            onClick={() => setAttendees(prev => prev.filter(a => a !== attendee.user_id))}
+                                            className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    )}
+                                </div>
+                            );
+                        })}
+
+                        {/* Fallback for new events (no RSVP data yet) - shows availability */}
+                        {!event && attendees.map(id => {
+                            const user = availableUsers.find((u: any) => u.id === id);
+                            const { available, loading } = getUserAvailability(id);
+                            const fullName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username : 'User';
+
+                            return (
+                                <div
+                                    key={id}
+                                    className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-white transition-colors group"
+                                >
+                                    <div className="relative flex-shrink-0">
+                                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-semibold shadow-sm ${getAvatarColor(id)}`}>
+                                            {user?.avatar ? (
+                                                <img src={user.avatar} alt="" className="w-full h-full rounded-full object-cover" />
+                                            ) : (
+                                                getInitials(user || {})
+                                            )}
+                                        </div>
+                                        <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-slate-50 ${loading ? 'bg-gray-300' : available ? 'bg-green-500' : 'bg-red-500'
+                                            }`}>
+                                            {loading && <Loader2 size={8} className="animate-spin text-gray-500 m-0.5" />}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium text-gray-900 truncate">{fullName}</p>
+                                        {!loading && (
+                                            <p className={`text-[10px] font-medium ${available ? 'text-green-600' : 'text-red-600'}`}>
+                                                {available ? 'Available' : 'Busy'}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <button
+                                        onClick={() => setAttendees(prev => prev.filter(a => a !== id))}
+                                        className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                            );
+                        })}
+
+                        {/* Empty state for new events */}
+                        {!event && attendees.length === 0 && (
+                            <div className="text-center py-8 text-gray-400">
+                                <Users size={28} className="mx-auto mb-2 opacity-40" />
+                                <p className="text-xs">No participants yet</p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Add Participant */}
+                    {!isReadOnly && (
+                        <div className="p-3 border-t border-gray-200 relative">
+                            <div
+                                className="flex items-center gap-2.5 p-2.5 rounded-xl border border-dashed border-gray-300 hover:border-blue-400 hover:bg-white cursor-text transition-all"
+                                onClick={() => setShowUserDropdown(true)}
+                            >
+                                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                                    <Users size={14} className="text-gray-500" />
+                                </div>
                                 <input
                                     type="text"
-                                    placeholder="Invite required attendees (Search by name or email)"
+                                    placeholder="+ Add participants"
                                     value={userSearch}
                                     onChange={e => {
                                         setUserSearch(e.target.value);
                                         setShowUserDropdown(true);
                                     }}
                                     onFocus={() => setShowUserDropdown(true)}
-                                    className="bg-transparent w-full focus:outline-none text-sm text-gray-900 placeholder:text-gray-400"
+                                    className="flex-1 bg-transparent text-sm text-gray-700 placeholder:text-gray-500 focus:outline-none min-w-0"
                                 />
-                            )}
-                            {showUserDropdown && filteredUsers.length > 0 && !isReadOnly && (
-                                <div className="absolute top-full left-0 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-20 max-h-48 overflow-y-auto">
-                                    {filteredUsers.map((u: any) => (
-                                        <div
-                                            key={u.id}
-                                            className="px-4 py-2 hover:bg-gray-50 cursor-pointer flex items-center justify-between transition-colors"
-                                            onClick={() => {
-                                                setAttendees(prev => [...prev, u.id]);
-                                                setUserSearch('');
-                                                setShowUserDropdown(false);
-                                            }}
-                                        >
-                                            <div>
-                                                <div className="text-sm font-medium text-gray-900">{u.first_name} {u.last_name}</div>
-                                                <div className="text-xs text-gray-500">{u.email}</div>
-                                            </div>
+                            </div>
+
+                            {showUserDropdown && (
+                                <>
+                                    <div className="fixed inset-0 z-10" onClick={() => setShowUserDropdown(false)} />
+                                    <div className="absolute bottom-full left-3 right-3 mb-2 bg-white border border-gray-200 rounded-xl shadow-xl z-20 max-h-60 overflow-hidden flex flex-col">
+                                        <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 flex items-center gap-4 text-[10px] font-semibold text-gray-500">
+                                            <span className="flex items-center gap-1">
+                                                <span className="w-2 h-2 rounded-full bg-green-500" />
+                                                Available
+                                            </span>
+                                            <span className="flex items-center gap-1">
+                                                <span className="w-2 h-2 rounded-full bg-red-500" />
+                                                Busy
+                                            </span>
                                         </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
 
-                    <div className="flex items-start gap-4 text-gray-500">
-                        <Clock size={20} className="mt-2 text-gray-400" />
-                        <div className={`flex flex-col gap-3 border-b pb-3 pt-1 flex-1 ${isReadOnly ? 'border-transparent' : 'border-gray-200'}`}>
-
-                            {/* All Day Toggle */}
-                            <label className={`flex items-center gap-2 w-fit ${isReadOnly ? 'cursor-not-allowed opacity-90' : 'cursor-pointer'}`}>
-                                <input
-                                    type="checkbox"
-                                    disabled={isReadOnly}
-                                    checked={isAllDay}
-                                    onChange={(e) => {
-                                        const checked = e.target.checked;
-                                        setIsAllDay(checked);
-                                        if (checked) {
-                                            setAllDayPreset('1_day');
-                                            setStartTime(`${startTime.split('T')[0]}T00:00`);
-                                            setEndTime(`${startTime.split('T')[0]}T23:59`);
-                                        } else {
-                                            setStartTime(`${startTime.split('T')[0]}T13:00`);
-                                            setEndTime(`${startTime.split('T')[0]}T13:30`);
-                                        }
-                                    }}
-                                    className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 border-gray-300"
-                                />
-                                <span className="text-sm font-medium text-gray-700">All day</span>
-                            </label>
-
-                            <div className="flex flex-wrap items-center gap-4">
-                                {/* Start Date */}
-                                <div className="flex flex-col">
-                                    <label className="text-[11px] font-medium text-gray-500 mb-1">Start date</label>
-                                    <div className="relative flex items-center h-5">
-                                        <input
-                                            type="date"
-                                            disabled={isReadOnly}
-                                            min={new Date().toISOString().split('T')[0]}
-                                            value={startTime.split('T')[0] || ''}
-                                            className={`absolute inset-0 opacity-0 z-10 cursor-pointer disabled:cursor-not-allowed w-full`}
-                                            onChange={e => {
-                                                const newDate = e.target.value;
-                                                const startDt = new Date(newDate);
-                                                let endDt = new Date(startDt);
-
-                                                if (allDayPreset === 'work_week') {
-                                                    let added = 0;
-                                                    while (added < 4) {
-                                                        endDt.setDate(endDt.getDate() + 1);
-                                                        if (endDt.getDay() !== 0 && endDt.getDay() !== 6) {
-                                                            added++;
-                                                        }
-                                                    }
-                                                }
-                                                else if (allDayPreset === 'full_week') endDt.setDate(startDt.getDate() + 6);
-                                                else if (allDayPreset === 'custom') {
-                                                    endDt = new Date(endTime.split('T')[0]);
-                                                    if (endDt < startDt) endDt = new Date(startDt);
-                                                }
-
-                                                const endY = endDt.getFullYear();
-                                                const endM = String(endDt.getMonth() + 1).padStart(2, '0');
-                                                const endD = String(endDt.getDate()).padStart(2, '0');
-
-                                                setStartTime(`${newDate}T${startTime.split('T')[1] || '00:00'}`);
-                                                setEndTime(`${endY}-${endM}-${endD}T${endTime.split('T')[1] || '00:00'}`);
-                                            }}
-                                        />
-                                        <div className={`text-sm text-gray-900 pointer-events-none ${isReadOnly ? 'opacity-90' : ''}`}>
-                                            {startTime ? (() => {
-                                                const [y, m, d] = startTime.split('T')[0].split('-');
-                                                return `${d}/${m}/${y}`;
-                                            })() : 'DD/MM/YYYY'}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Start Time */}
-                                <div className="flex flex-col border-l border-gray-200 pl-4 relative">
-                                    <label className="text-[11px] font-medium text-gray-500 mb-1">Start time</label>
-                                    <button
-                                        type="button"
-                                        disabled={isReadOnly}
-                                        onClick={() => {
-                                            setShowStartTimeDropdown(!showStartTimeDropdown);
-                                            setShowEndTimeDropdown(false);
-                                        }}
-                                        className={`bg-transparent focus:outline-none text-sm text-gray-900 w-20 flex justify-between items-center ${isReadOnly ? 'cursor-not-allowed opacity-70' : ''}`}
-                                    >
-                                        {startTime.split('T')[1]?.slice(0, 5) || '00:00'}
-                                        {!isReadOnly && <ChevronRight size={14} className="text-gray-400 rotate-90" />}
-                                    </button>
-                                    {showStartTimeDropdown && !isReadOnly && (
-                                        <>
-                                            <div className="fixed inset-0 z-10" onClick={() => setShowStartTimeDropdown(false)} />
-                                            <div className="absolute top-full left-4 mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-xl z-20 max-h-60 overflow-y-auto py-1">
-                                                {Array.from({ length: 48 }).map((_, i) => {
-                                                    const hour = Math.floor(i / 2).toString().padStart(2, '0');
-                                                    const min = (i % 2 === 0) ? '00' : '30';
-                                                    const time = `${hour}:${min}`;
-                                                    const isSelected = (startTime.split('T')[1]?.slice(0, 5) || '00:00') === time;
+                                        <div className="overflow-y-auto flex-1">
+                                            {filteredUsers.length === 0 ? (
+                                                <div className="p-4 text-center text-sm text-gray-500">
+                                                    {userSearch ? 'No users found' : 'All users added'}
+                                                </div>
+                                            ) : (
+                                                filteredUsers.map((u: any) => {
+                                                    const { available, loading } = getUserAvailability(u.id);
+                                                    const fullName = `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.username;
 
                                                     return (
                                                         <div
-                                                            key={`start-${time}`}
-                                                            className={`px-3 py-1.5 cursor-pointer text-sm transition-colors ${isSelected ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-900 hover:bg-gray-50'}`}
+                                                            key={u.id}
+                                                            className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors ${loading ? 'hover:bg-gray-50' : available ? 'hover:bg-green-50' : 'hover:bg-red-50'
+                                                                }`}
                                                             onClick={() => {
-                                                                const date = startTime.split('T')[0];
-                                                                setStartTime(`${date}T${time}`);
-
-                                                                // Always adjust end time to be exactly +30 minutes
-                                                                const startDt = new Date(`${date}T${time}`);
-                                                                const newEndDt = new Date(startDt.getTime() + 30 * 60000);
-
-                                                                const endY = newEndDt.getFullYear();
-                                                                const endM = String(newEndDt.getMonth() + 1).padStart(2, '0');
-                                                                const endD = String(newEndDt.getDate()).padStart(2, '0');
-                                                                const endH = String(newEndDt.getHours()).padStart(2, '0');
-                                                                const endMin = String(newEndDt.getMinutes()).padStart(2, '0');
-
-                                                                // If "1 Day" is selected, force it to be same day or next day if overflow
-                                                                if (allDayPreset === '1_day') {
-                                                                    setEndTime(`${endY}-${endM}-${endD}T${endH}:${endMin}`);
-                                                                } else {
-                                                                    // For multi-day, keep the existing end date, just update the time
-                                                                    setEndTime(`${endTime.split('T')[0]}T${endH}:${endMin}`);
-                                                                }
-
-                                                                setShowStartTimeDropdown(false);
+                                                                setAttendees(prev => [...prev, u.id]);
+                                                                setUserSearch('');
+                                                                setShowUserDropdown(false);
                                                             }}
                                                         >
-                                                            {time}
+                                                            <div className="relative flex-shrink-0">
+                                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold ${getAvatarColor(u.id)}`}>
+                                                                    {u.avatar ? (
+                                                                        <img src={u.avatar} alt="" className="w-full h-full rounded-full object-cover" />
+                                                                    ) : (
+                                                                        getInitials(u)
+                                                                    )}
+                                                                </div>
+                                                                {!loading && (
+                                                                    <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${available ? 'bg-green-500' : 'bg-red-500'
+                                                                        }`} />
+                                                                )}
+                                                            </div>
+
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-sm font-medium text-gray-900 truncate">{fullName}</p>
+                                                                <p className="text-[11px] text-gray-500 truncate">{u.email}</p>
+                                                            </div>
+
+                                                            <div className={`text-[10px] font-bold px-2 py-1 rounded-full flex-shrink-0 ${loading
+                                                                ? 'bg-gray-100 text-gray-500'
+                                                                : available
+                                                                    ? 'bg-green-100 text-green-700'
+                                                                    : 'bg-red-100 text-red-700'
+                                                                }`}>
+                                                                {loading ? '...' : available ? 'Free' : 'Busy'}
+                                                            </div>
                                                         </div>
                                                     );
-                                                })}
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-
-                                {/* Duration Shortcut */}
-                                <div className="flex flex-col border-l border-gray-200 pl-4 relative">
-                                    <label className="text-[11px] font-medium text-gray-500 mb-1">Duration</label>
-                                    <select
-                                        disabled={isReadOnly}
-                                        value={allDayPreset}
-                                        onChange={(e) => {
-                                            const preset = e.target.value;
-                                            setAllDayPreset(preset);
-                                            const startDt = new Date(startTime.split('T')[0]);
-                                            let endDt = new Date(startDt);
-
-                                            if (preset === 'work_week') {
-                                                let added = 0;
-                                                while (added < 4) {
-                                                    endDt.setDate(endDt.getDate() + 1);
-                                                    if (endDt.getDay() !== 0 && endDt.getDay() !== 6) {
-                                                        added++;
-                                                    }
-                                                }
-                                            }
-                                            else if (preset === 'full_week') endDt.setDate(startDt.getDate() + 6);
-
-                                            if (preset !== 'custom') {
-                                                const endY = endDt.getFullYear();
-                                                const endM = String(endDt.getMonth() + 1).padStart(2, '0');
-                                                const endD = String(endDt.getDate()).padStart(2, '0');
-                                                const timePart = endTime.split('T')[1] || '00:00';
-                                                setEndTime(`${endY}-${endM}-${endD}T${timePart}`);
-                                            }
-                                        }}
-                                        className={`bg-transparent focus:outline-none text-sm text-gray-900 cursor-pointer ${isReadOnly ? 'cursor-not-allowed opacity-90 appearance-none' : ''}`}
-                                    >
-                                        <option value="1_day">1 Day</option>
-                                        <option value="work_week">Work Week (5 Days)</option>
-                                        <option value="full_week">Full Week (7 Days)</option>
-                                        <option value="custom">Custom</option>
-                                    </select>
-                                </div>
-
-                                {/* End Date */}
-                                <div className="relative flex items-center h-5">
-                                    <input
-                                        type="date"
-                                        disabled={isReadOnly}
-                                        min={startTime.split('T')[0] || new Date().toISOString().split('T')[0]}
-                                        value={endTime.split('T')[0] || ''}
-                                        className="absolute inset-0 opacity-0 z-10 cursor-pointer disabled:cursor-not-allowed w-full"
-                                        onChange={e => {
-                                            const newDate = e.target.value;
-                                            const timePart = endTime.split('T')[1] || '00:00';
-                                            setEndTime(`${newDate}T${timePart}`);
-                                        }}
-                                    />
-                                    <div className={`text-sm text-gray-900 pointer-events-none ${isReadOnly ? 'opacity-90' : ''}`}>
-                                        {endTime ? (() => {
-                                            const [y, m, d] = endTime.split('T')[0].split('-');
-                                            return `${d}/${m}/${y}`;
-                                        })() : 'DD/MM/YYYY'}
+                                                })
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
+                                </>
+                            )}
 
-                                {/* End Time */}
-                                <div className="flex flex-col border-l border-gray-200 pl-4 relative">
-                                    <label className="text-[11px] font-medium text-gray-500 mb-1">End time</label>
-                                    <button
-                                        type="button"
-                                        disabled={isReadOnly}
-                                        onClick={() => {
-                                            setShowEndTimeDropdown(!showEndTimeDropdown);
-                                            setShowStartTimeDropdown(false);
-                                        }}
-                                        className={`bg-transparent focus:outline-none text-sm text-gray-900 w-24 flex justify-between items-center whitespace-nowrap ${isReadOnly ? 'cursor-not-allowed opacity-70' : ''}`}
-                                    >
-                                        {endTime.split('T')[1]?.slice(0, 5) || '00:00'}
-                                        {!isReadOnly && <ChevronRight size={14} className="text-gray-400 rotate-90 ml-1" />}
-                                    </button>
-                                    {showEndTimeDropdown && !isReadOnly && (
-                                        <>
-                                            <div className="fixed inset-0 z-10" onClick={() => setShowEndTimeDropdown(false)} />
-                                            <div className="absolute top-full left-4 mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-xl z-20 max-h-60 overflow-y-auto py-1">
-                                                {Array.from({ length: 48 }).map((_, i) => {
-                                                    const hour = Math.floor(i / 2).toString().padStart(2, '0');
-                                                    const min = (i % 2 === 0) ? '00' : '30';
-                                                    const time = `${hour}:${min}`;
-                                                    const isSelected = (endTime.split('T')[1]?.slice(0, 5) || '00:00') === time;
-
-                                                    // Duration logic
-                                                    let durationStr = '';
-                                                    const startT = startTime.split('T')[1]?.slice(0, 5) || '00:00';
-                                                    const startMins = parseInt(startT.split(':')[0]) * 60 + parseInt(startT.split(':')[1]);
-                                                    let endMins = parseInt(hour) * 60 + parseInt(min);
-
-                                                    if (endMins < startMins) endMins += 24 * 60; // Next day
-                                                    const diffHrs = (endMins - startMins) / 60;
-
-                                                    if (diffHrs > 0 && allDayPreset === '1_day') {
-                                                        durationStr = ` (${diffHrs} hour${diffHrs !== 1 ? 's' : ''})`;
-                                                    }
-
-                                                    return (
-                                                        <div
-                                                            key={`end-${time}`}
-                                                            className={`px-3 py-1.5 cursor-pointer text-sm transition-colors flex justify-between ${isSelected ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-900 hover:bg-gray-50'}`}
-                                                            onClick={() => {
-                                                                const sDate = startTime.split('T')[0];
-                                                                let eDate = endTime.split('T')[0];
-
-                                                                // If "1 Day" preset, roll over the End Date automatically if time is earlier
-                                                                if (allDayPreset === '1_day') {
-                                                                    if (time < (startTime.split('T')[1]?.slice(0, 5) || '00:00')) {
-                                                                        const nextDay = new Date(sDate);
-                                                                        nextDay.setDate(nextDay.getDate() + 1);
-                                                                        eDate = nextDay.toISOString().split('T')[0];
-                                                                    } else {
-                                                                        eDate = sDate;
-                                                                    }
-                                                                }
-
-                                                                setEndTime(`${eDate}T${time}`);
-                                                                setShowEndTimeDropdown(false);
-                                                            }}
-                                                        >
-                                                            <span>{time}</span>
-                                                            <span className="text-gray-500 text-xs">{durationStr}</span>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
+                            {(!startTime || !endTime) && (
+                                <p className="text-[10px] text-amber-600 mt-2 flex items-center gap-1 px-1">
+                                    <Clock size={10} />
+                                    Select time to check availability
+                                </p>
+                            )}
                         </div>
-                    </div>
-                    <div className="flex items-center gap-4 text-gray-500">
-                        <MapPin size={20} className="text-gray-400" />
-                        <input type="text" disabled={isReadOnly} placeholder={isReadOnly && !location ? "No location specified" : "Add a room or location"} value={location} onChange={e => setLocation(e.target.value)} className={`bg-transparent flex-1 focus:outline-none text-sm text-gray-900 border-b pb-2 placeholder:text-gray-400 ${isReadOnly ? 'cursor-not-allowed opacity-90 border-transparent' : 'border-gray-200'}`} />
-                    </div>
-                    <div className="flex items-center gap-4 text-gray-500">
-                        <Video size={20} className="text-gray-400" />
-                        <label className={`flex items-center gap-3 ${isReadOnly ? 'cursor-not-allowed opacity-90' : 'cursor-pointer'}`}>
-                            <div className={`w-10 h-5 rounded-full relative transition-colors shadow-inner ${isOnline ? 'bg-blue-600' : 'bg-gray-200'}`}>
-                                <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform shadow-sm ${isOnline ? 'translate-x-5' : ''}`} />
-                            </div>
-                            <span className="text-sm font-medium text-gray-700">Teams meeting</span>
-                            <input type="checkbox" disabled={isReadOnly} className="hidden" checked={isOnline} onChange={(e) => setIsOnline(e.target.checked)} />
-                        </label>
-                    </div>
-                    <div className="mt-6 border border-gray-200 rounded-lg overflow-hidden bg-gray-50 min-h-[250px] flex flex-col shadow-inner">
-                        <textarea
-                            placeholder={isReadOnly && !description ? "No description provided." : "Add an agenda or description"}
-                            value={description}
-                            disabled={isReadOnly}
-                            onChange={e => setDescription(e.target.value)}
-                            className={`w-full flex-1 bg-transparent resize-none p-4 focus:outline-none text-sm text-gray-900 placeholder:text-gray-400 ${isReadOnly ? 'cursor-not-allowed opacity-90' : ''}`}
-                        />
-                    </div>
-                </div>
-                {/* Conflict Error Message Alert */}
-                {error && (
-                    <div className="px-6 py-2">
-                        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-xs font-semibold flex items-center gap-2 animate-in slide-in-from-bottom-2">
-                            <span className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-red-500" />
-                            {error}
-                        </div>
-                    </div>
-                )}
-                <div className="p-4 border-t border-gray-100 flex justify-between items-center bg-gray-50">
-                    <div>
-                        {event && !isReadOnly && (
-                            <button
-                                onClick={handleDelete}
-                                disabled={isPending}
-                                className="text-red-600 hover:bg-red-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 disabled:opacity-50"
-                            >
-                                <Trash2 size={16} /> Delete
-                            </button>
-                        )}
-                    </div>
-                    <div className="flex gap-3">
-                        <button onClick={onClose} className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors border ${isReadOnly ? 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-100'}`}>
-                            {isReadOnly ? 'Close' : 'Cancel'}
-                        </button>
-                        {!isReadOnly && (
-                            <button
-                                onClick={handleSave}
-                                disabled={!title || isPending}
-                                className="bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-                            >
-                                {isPending ? 'Saving...' : 'Save'}
-                            </button>
-                        )}
-                    </div>
+                    )}
                 </div>
             </div>
         </div>
@@ -1415,6 +2276,10 @@ const TaskListSidebar: React.FC<TaskListSidebarProps> = ({
     onClose,
     currentUser,
     onOpenEventModal,
+    onAcceptInvitation,
+    onDeclineInvitation,
+    onRescheduleInvitation,
+    isAccepting
 }) => {
     const queryClient = useQueryClient();
     const navigate = useNavigate();
@@ -1559,26 +2424,75 @@ const TaskListSidebar: React.FC<TaskListSidebarProps> = ({
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            {events.map((event) => (
-                                <div
-                                    key={`sidebar-event-${event.id}`}
-                                    onClick={() => onEventClick(event)}
-                                    className="group flex gap-3 p-3 rounded-lg border border-transparent bg-indigo-50 hover:bg-white hover:border-indigo-200 hover:shadow-sm cursor-pointer transition-all"
-                                >
-                                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-white shadow-sm bg-indigo-500">
-                                        <CalendarIcon size={14} />
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <h4 className="text-sm font-medium text-gray-900 truncate mb-1">{event.title}</h4>
-                                        <div className="flex items-center gap-3 text-xs text-gray-500">
-                                            <span className="font-medium text-indigo-600 flex items-center gap-1">
-                                                <Clock size={12} />
-                                                {new Date(event.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
-                                            </span>
+                            {events.map((event) => {
+                                const statusColors = getEventStatusColors(event.my_invitation_status);
+                                const isPending = event.my_invitation_status === 'PENDING';
+
+                                return (
+                                    <div
+                                        key={`sidebar-event-${event.id}`}
+                                        onClick={() => onEventClick(event)}
+                                        className={`group flex flex-col gap-2 p-3 rounded-lg border border-transparent hover:bg-white hover:shadow-sm cursor-pointer transition-all ${statusColors.bg}`}
+                                    >
+                                        <div className="flex gap-3">
+                                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-white shadow-sm ${statusColors.accent}`}>
+                                                <CalendarIcon size={14} />
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <h4 className="text-sm font-medium text-gray-900 truncate mb-1">{event.title}</h4>
+                                                <div className="flex items-center gap-3 text-xs text-gray-500">
+                                                    <span className={`font-medium flex items-center gap-1 ${statusColors.text}`}>
+                                                        <Clock size={12} />
+                                                        {new Date(event.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
+                                                    </span>
+                                                    {event.my_invitation_status && (
+                                                        <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded ${getStatusBadgeColors(event.my_invitation_status)}`}>
+                                                            {getStatusLabel(event.my_invitation_status)}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
+
+                                        {/* Inline action buttons for PENDING events */}
+                                        {isPending && event.my_invitation_id && (
+                                            <div className="flex items-center gap-2 ml-11">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onAcceptInvitation?.(event.my_invitation_id!);
+                                                    }}
+                                                    disabled={isAccepting}
+                                                    className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white text-xs font-medium rounded-md transition-colors"
+                                                >
+                                                    {isAccepting ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                                                    Accept
+                                                </button>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onDeclineInvitation?.(event);
+                                                    }}
+                                                    className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-md transition-colors"
+                                                >
+                                                    <X size={12} />
+                                                    Decline
+                                                </button>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onRescheduleInvitation?.(event);
+                                                    }}
+                                                    className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium rounded-md transition-colors"
+                                                >
+                                                    <RefreshCw size={12} />
+                                                    Propose
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                             {tasks.map((task) => {
                                 const statusConfig = getStatusConfig(task.status);
                                 const StatusIcon = statusConfig.icon;
@@ -1800,6 +2714,237 @@ export const Calendar: React.FC = () => {
     const [selectedEvent, setSelectedEvent] = useState<CalendarEventType | null>(null);
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+    // ═══════════════ INVITATION MODAL STATES ═══════════════
+    const [showDeclineModal, setShowDeclineModal] = useState(false);
+    const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+    const [selectedInvitationEvent, setSelectedInvitationEvent] = useState<CalendarEventType | null>(null);
+    // ═══════════════ DYUKSA AI STATE ═══════════════
+    const [dyuksaInput, setDyuksaInput] = useState('');
+    const [dyuksaResponse, setDyuksaResponse] = useState<string | null>(null);
+    const [isDyuksaLoading, setIsDyuksaLoading] = useState(false);
+    const [selectedHour, setSelectedHour] = useState<number | null>(null);
+    const [dyuksaEventData, setDyuksaEventData] = useState<{
+        eventType: string;
+        title: string;
+        attendeeIds: number[];
+        attendeeNames: string[];
+        targetDate: string;
+        suggestedSlots: string[];
+        duration: number;
+    } | null>(null);
+
+    // ═══════════════ EVENT CONTEXT MENU STATE ═══════════════
+    const [contextMenu, setContextMenu] = useState<{
+        x: number;
+        y: number;
+        event: CalendarEventType;
+    } | null>(null);
+    const [showRepeatSubmenu, setShowRepeatSubmenu] = useState(false);
+
+    // ═══════════════ INVITATION MUTATIONS ═══════════════
+    const { mutate: acceptInvitation, isPending: isAccepting } = useMutation({
+        mutationFn: (invitationId: number) => eventApi.acceptInvitation(invitationId),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['events-calendar'] });
+            setIsEventModalOpen(false);
+            setSelectedEvent(null);
+        },
+        onError: (err: any) => {
+            alert(err.response?.data?.detail || "Failed to accept invitation.");
+        }
+    });
+
+    const { mutate: declineInvitation, isPending: isDeclining } = useMutation({
+        mutationFn: ({ invitationId, reason }: { invitationId: number; reason: string }) =>
+            eventApi.declineInvitation(invitationId, reason),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['events-calendar'] });
+            setShowDeclineModal(false);
+            setSelectedInvitationEvent(null);
+            setIsEventModalOpen(false);
+            setSelectedEvent(null);
+        },
+        onError: (err: any) => {
+            alert(err.response?.data?.detail || "Failed to decline invitation.");
+        }
+    });
+
+    const { mutate: rescheduleInvitation, isPending: isRescheduling } = useMutation({
+        mutationFn: ({ invitationId, proposedTime }: { invitationId: number; proposedTime: string }) =>
+            eventApi.rescheduleInvitation(invitationId, proposedTime),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['events-calendar'] });
+            setShowRescheduleModal(false);
+            setSelectedInvitationEvent(null);
+            setIsEventModalOpen(false);
+            setSelectedEvent(null);
+        },
+        onError: (err: any) => {
+            alert(err.response?.data?.detail || "Failed to propose new time.");
+        }
+    });
+
+    // ═══════════════ INVITATION HANDLERS ═══════════════
+    const handleAcceptInvitation = useCallback((invitationId: number) => {
+        acceptInvitation(invitationId);
+    }, [acceptInvitation]);
+
+    const handleDeclineClick = useCallback((event: CalendarEventType) => {
+        setSelectedInvitationEvent(event);
+        setShowDeclineModal(true);
+    }, []);
+
+    const handleRescheduleClick = useCallback((event: CalendarEventType) => {
+        setSelectedInvitationEvent(event);
+        setShowRescheduleModal(true);
+    }, []);
+
+    const handleDeclineSubmit = useCallback((reason: string) => {
+        if (selectedInvitationEvent?.my_invitation_id) {
+            declineInvitation({ invitationId: selectedInvitationEvent.my_invitation_id, reason });
+        }
+    }, [selectedInvitationEvent, declineInvitation]);
+
+    const handleRescheduleSubmit = useCallback((proposedTime: string) => {
+        if (selectedInvitationEvent?.my_invitation_id) {
+            rescheduleInvitation({ invitationId: selectedInvitationEvent.my_invitation_id, proposedTime });
+        }
+    }, [selectedInvitationEvent, rescheduleInvitation]);
+    // ═══════════════ DYUKSA AI HANDLER ═══════════════
+    const handleDyuksaSubmit = async () => {
+        if (!dyuksaInput.trim()) return;
+
+        // Check if message starts with "dyuksa"
+        if (!dyuksaInput.toLowerCase().startsWith('dyuksa')) {
+            setDyuksaResponse('Please start your message with "dyuksa" to use the AI assistant. Example: "dyuksa find 30 mins with Shifali tomorrow"');
+            return;
+        }
+
+        setIsDyuksaLoading(true);
+        setDyuksaResponse(null);
+
+        try {
+            // Call the real Dyuksa AI API
+            const response = await dyuksaAI.chat(dyuksaInput);
+
+            // Check if AI wants to create an event
+            if (response.action === 'create_event' && response.data) {
+                // Set pre-filled data for EventModal
+                setDyuksaEventData({
+                    eventType: response.data.event_type || 'Meeting',
+                    title: response.data.title || '',
+                    attendeeIds: response.data.attendee_ids || [],
+                    attendeeNames: response.data.attendee_names || [],
+                    targetDate: response.data.target_date || new Date().toISOString().split('T')[0],
+                    suggestedSlots: response.data.available_slots || [],
+                    duration: response.data.duration_minutes || 30
+                });
+
+                // Set the date and open EventModal
+                if (response.data.target_date) {
+                    setSelectedDate(new Date(response.data.target_date));
+                }
+                setSelectedEvent(null);
+                setIsEventModalOpen(true);
+                setDyuksaInput('');
+                setDyuksaResponse(response.reply || 'Opening event creator with your preferences...');
+            } else {
+                // Fallback to text response
+                setDyuksaResponse(response.reply);
+            }
+        } catch (error) {
+            console.error('Dyuksa AI error:', error);
+            setDyuksaResponse('Sorry, I encountered an error. Please try again.');
+        } finally {
+            setIsDyuksaLoading(false);
+        }
+    };
+    // ═══════════════ EVENT CONTEXT MENU HANDLERS ═══════════════
+    const handleEventContextMenu = (e: React.MouseEvent, event: CalendarEventType) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setContextMenu({
+            x: e.clientX,
+            y: e.clientY,
+            event
+        });
+        setShowRepeatSubmenu(false);
+    };
+
+    const closeContextMenu = () => {
+        setContextMenu(null);
+        setShowRepeatSubmenu(false);
+    };
+
+    const handleRepeatEvent = async (repeatType: 'daily' | 'workday' | 'weekly' | 'monthly' | 'yearly') => {
+        if (!contextMenu?.event) return;
+
+        const originalEvent = contextMenu.event;
+        const startDate = new Date(originalEvent.start_time);
+
+        // Calculate end date based on repeat type
+        const recurrenceEndDate = new Date(startDate);
+        let recurrencePattern: string;
+
+        switch (repeatType) {
+            case 'daily':
+                recurrencePattern = 'DAILY';
+                recurrenceEndDate.setDate(startDate.getDate() + 30); // 30 days
+                break;
+            case 'workday':
+                recurrencePattern = 'WORK_WEEK';
+                recurrenceEndDate.setDate(startDate.getDate() + 30); // ~20 workdays
+                break;
+            case 'weekly':
+                recurrencePattern = 'WEEKLY';
+                recurrenceEndDate.setDate(startDate.getDate() + 84); // 12 weeks
+                break;
+            case 'monthly':
+                recurrencePattern = 'MONTHLY';
+                recurrenceEndDate.setMonth(startDate.getMonth() + 6); // 6 months
+                break;
+            case 'yearly':
+                recurrencePattern = 'YEARLY';
+                recurrenceEndDate.setFullYear(startDate.getFullYear() + 2); // 2 years
+                break;
+            default:
+                recurrencePattern = 'WEEKLY';
+                recurrenceEndDate.setDate(startDate.getDate() + 28);
+        }
+
+        // Format end date as YYYY-MM-DD
+        const endDateStr = recurrenceEndDate.toISOString().split('T')[0];
+
+        try {
+            await eventApi.create({
+                title: originalEvent.title,
+                event_type: originalEvent.event_type,
+                start_time: originalEvent.start_time,
+                end_time: originalEvent.end_time,
+                location: originalEvent.location,
+                is_online_meeting: originalEvent.is_online_meeting,
+                description: originalEvent.description,
+                attendees: originalEvent.attendees,
+                is_recurring: true,
+                recurrence_pattern: recurrencePattern,
+                recurrence_end_date: endDateStr
+            } as any);
+
+            queryClient.invalidateQueries({ queryKey: ['events-calendar'] });
+            closeContextMenu();
+        } catch (error) {
+            console.error('Failed to create recurring event:', error);
+        }
+    };
+
+    // Close context menu on click outside
+    React.useEffect(() => {
+        const handleClickOutside = () => closeContextMenu();
+        if (contextMenu) {
+            document.addEventListener('click', handleClickOutside);
+            return () => document.removeEventListener('click', handleClickOutside);
+        }
+    }, [contextMenu]);
 
     const {
         data: eventsData,
@@ -1826,6 +2971,22 @@ export const Calendar: React.FC = () => {
         initialPageParam: 1,
         enabled: !!user,
     });
+    // ═══════════════ REAL-TIME CALENDAR UPDATES VIA WEBSOCKET ═══════════════
+    React.useEffect(() => {
+        // Subscribe to notification socket for real-time calendar updates
+        const unsubscribe = notificationSocket.onNotification((notification) => {
+            // Check if it's an event-related notification
+            if (notification.related_object?.type === 'event') {
+                console.log('📅 New event notification received, refreshing calendar...');
+                queryClient.invalidateQueries({ queryKey: ['events-calendar'] });
+            }
+        });
+
+        // Cleanup on unmount
+        return () => {
+            unsubscribe();
+        };
+    }, [queryClient]);
 
     React.useEffect(() => {
         if (hasNextEventsPage && !isFetchingNextEventsPage) {
@@ -2168,6 +3329,59 @@ export const Calendar: React.FC = () => {
                     </button>
                 </div>
             </div>
+            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                <div className="flex items-center gap-3">
+                    <div className="relative flex-1">
+                        <input
+                            type="text"
+                            value={dyuksaInput}
+                            onChange={(e) => setDyuksaInput(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleDyuksaSubmit()}
+                            placeholder='Try: "dyuksa find 30 mins with Shifali tomorrow"'
+                            className="w-full px-4 py-2.5 pl-10 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                        />
+                        <Sparkles size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-500" />
+                    </div>
+                    <button
+                        onClick={handleDyuksaSubmit}
+                        disabled={isDyuksaLoading || !dyuksaInput.trim()}
+                        className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl transition-colors flex items-center gap-2 shadow-sm"
+                    >
+                        {isDyuksaLoading ? (
+                            <>
+                                <Loader2 size={16} className="animate-spin" />
+                                Thinking...
+                            </>
+                        ) : (
+                            <>
+                                <Send size={16} />
+                                Ask Dyuksa
+                            </>
+                        )}
+                    </button>
+                </div>
+
+                {/* Dyuksa Response */}
+                {dyuksaResponse && (
+                    <div className="mt-3 p-4 bg-purple-50 border border-purple-200 rounded-xl">
+                        <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center flex-shrink-0">
+                                <Sparkles size={14} className="text-white" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-xs font-semibold text-purple-900 uppercase tracking-wider mb-1">Dyuksa AI</p>
+                                <p className="text-sm text-purple-800 whitespace-pre-wrap">{dyuksaResponse}</p>
+                            </div>
+                            <button
+                                onClick={() => setDyuksaResponse(null)}
+                                className="p-1 text-purple-400 hover:text-purple-600 hover:bg-purple-100 rounded-lg transition-colors"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
 
             {/* Calendar Content Area */}
             <div className="flex gap-6 min-h-[600px]">
@@ -2217,11 +3431,17 @@ export const Calendar: React.FC = () => {
                             onDateClick={handleDateClick}
                             onCreateEventAtTime={(date, hour) => {
                                 setSelectedDate(date);
+                                setSelectedHour(hour);
                                 setIsEventModalOpen(true);
                             }}
                             viewMode={viewMode as 'day' | 'work_week' | 'week'}
                             updateEvent={updateEventMutation}
                             currentUser={user ? { id: user.id, role: user.role } : null}
+                            onAcceptInvitation={handleAcceptInvitation}
+                            onDeclineInvitation={handleDeclineClick}
+                            onRescheduleInvitation={handleRescheduleClick}
+                            isAccepting={isAccepting}
+                            onEventContextMenu={handleEventContextMenu}
                         />
                     )}
                 </div>
@@ -2236,6 +3456,11 @@ export const Calendar: React.FC = () => {
                         onClose={() => setSelectedDate(null)}
                         currentUser={user ? { id: user.id, role: user.role } : null}
                         onOpenEventModal={() => setIsEventModalOpen(true)}
+                        onAcceptInvitation={handleAcceptInvitation}
+                        onDeclineInvitation={handleDeclineClick}
+                        onRescheduleInvitation={handleRescheduleClick}
+                        isAccepting={isAccepting}
+
                     />
                 )}
             </div> {/* <-- THIS IS THE MISSING DIV THAT CLOSES THE FLEX CONTAINER */}
@@ -2264,15 +3489,24 @@ export const Calendar: React.FC = () => {
             </div>
 
             <EventModal
-                isOpen={isEventModalOpen || !!selectedEvent}
+                isOpen={isEventModalOpen}
                 onClose={() => {
                     setIsEventModalOpen(false);
                     setSelectedEvent(null);
+                    setSelectedDate(null);
+                    setSelectedHour(null);
+                    setDyuksaEventData(null); // Clear Dyuksa data on close
                 }}
                 selectedDate={selectedDate}
+                selectedHour={selectedHour}
                 event={selectedEvent}
                 currentUser={user ? { id: user.id, role: user.role } : null}
                 allEvents={events} // Passing the events array here
+                onAcceptInvitation={handleAcceptInvitation}
+                onDeclineInvitation={handleDeclineClick}
+                onRescheduleInvitation={handleRescheduleClick}
+                isAccepting={isAccepting}
+                dyuksaEventData={dyuksaEventData}
             />
 
             {selectedTask && (
@@ -2282,6 +3516,231 @@ export const Calendar: React.FC = () => {
                     onDelete={async () => setSelectedTask(null)}
                     onTaskUpdated={(updatedTask) => setSelectedTask(updatedTask)}
                 />
+
+            )}
+            <DeclineModal
+                isOpen={showDeclineModal}
+                onClose={() => {
+                    setShowDeclineModal(false);
+                    setSelectedInvitationEvent(null);
+                }}
+                onDecline={handleDeclineSubmit}
+                isLoading={isDeclining}
+                eventTitle={selectedInvitationEvent?.title}
+            />
+
+            <RescheduleModal
+                isOpen={showRescheduleModal}
+                onClose={() => {
+                    setShowRescheduleModal(false);
+                    setSelectedInvitationEvent(null);
+                }}
+                onReschedule={handleRescheduleSubmit}
+                isLoading={isRescheduling}
+                eventTitle={selectedInvitationEvent?.title}
+                originalTime={selectedInvitationEvent?.start_time}
+            />
+
+            {/* ═══════════════ EVENT CONTEXT MENU ═══════════════ */}
+            {contextMenu && (
+                <div
+                    className="fixed z-[100] bg-white rounded-xl shadow-2xl border border-gray-200 py-2 min-w-[200px]"
+                    style={{
+                        top: Math.min(contextMenu.y, window.innerHeight - 250),
+                        left: Math.min(contextMenu.x, window.innerWidth - 220)
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {/* Repeat Event - with submenu */}
+                    <div
+                        className="relative"
+                        onMouseEnter={() => setShowRepeatSubmenu(true)}
+                        onMouseLeave={() => setShowRepeatSubmenu(false)}
+                    >
+                        <button
+                            className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center justify-between"
+                        >
+                            <span className="flex items-center gap-3">
+                                <RefreshCw size={16} className="text-gray-400" />
+                                Repeat event
+                            </span>
+                            <ChevronRight size={14} className="text-gray-400" />
+                        </button>
+
+                        {/* Repeat Submenu */}
+                        {showRepeatSubmenu && (
+                            <div
+                                className="absolute top-0 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 min-w-[180px]"
+                                style={
+                                    contextMenu.x + 400 > window.innerWidth
+                                        ? { right: '100%', marginRight: '4px' }
+                                        : { left: '100%', marginLeft: '4px' }
+                                }
+                            >
+                                {/* Tomorrow */}
+                                <button
+                                    onClick={async () => {
+                                        if (contextMenu?.event) {
+                                            try {
+                                                const originalStart = new Date(contextMenu.event.start_time);
+                                                const originalEnd = new Date(contextMenu.event.end_time);
+
+                                                const tomorrowStart = new Date(originalStart);
+                                                tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+
+                                                const tomorrowEnd = new Date(originalEnd);
+                                                tomorrowEnd.setDate(tomorrowEnd.getDate() + 1);
+
+                                                await eventApi.create({
+                                                    title: contextMenu.event.title,
+                                                    event_type: contextMenu.event.event_type,
+                                                    start_time: tomorrowStart.toISOString(),
+                                                    end_time: tomorrowEnd.toISOString(),
+                                                    location: contextMenu.event.location,
+                                                    is_online_meeting: contextMenu.event.is_online_meeting,
+                                                    description: contextMenu.event.description,
+                                                    attendees: contextMenu.event.attendees
+                                                });
+                                                queryClient.invalidateQueries({ queryKey: ['events-calendar'] });
+                                                closeContextMenu();
+                                            } catch (error) {
+                                                console.error('Failed to copy event to tomorrow:', error);
+                                            }
+                                        }
+                                    }}
+                                    className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50"
+                                >
+                                    Tomorrow
+                                </button>
+                                <button
+                                    onClick={() => handleRepeatEvent('workday')}
+                                    className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50"
+                                >
+                                    Every workday
+                                </button>
+                                <button
+                                    onClick={() => handleRepeatEvent('weekly')}
+                                    className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50"
+                                >
+                                    Every week
+                                </button>
+                                <button
+                                    onClick={() => handleRepeatEvent('monthly')}
+                                    className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50"
+                                >
+                                    Every month
+                                </button>
+                                <button
+                                    onClick={() => handleRepeatEvent('yearly')}
+                                    className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50"
+                                >
+                                    Every year
+                                </button>
+                                <div className="border-t border-gray-100 my-1" />
+                                <button
+                                    className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                                    onClick={() => {
+                                        // TODO: Open custom repeat modal
+                                        closeContextMenu();
+                                    }}
+                                >
+                                    <Settings size={14} className="text-gray-400" />
+                                    Custom repeat
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="border-t border-gray-100 my-1" />
+
+                    {/* Duplicate Event */}
+                    <button
+                        onClick={async () => {
+                            if (contextMenu.event) {
+                                try {
+                                    await eventApi.create({
+                                        title: contextMenu.event.title,
+                                        event_type: contextMenu.event.event_type,
+                                        start_time: contextMenu.event.start_time,
+                                        end_time: contextMenu.event.end_time,
+                                        location: contextMenu.event.location,
+                                        is_online_meeting: contextMenu.event.is_online_meeting,
+                                        description: contextMenu.event.description,
+                                        attendees: contextMenu.event.attendees
+                                    });
+                                    queryClient.invalidateQueries({ queryKey: ['events-calendar'] });
+                                } catch (error) {
+                                    console.error('Failed to duplicate event:', error);
+                                }
+                            }
+                            closeContextMenu();
+                        }}
+                        className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                    >
+                        <Copy size={16} className="text-gray-400" />
+                        Duplicate event
+                    </button>
+
+                    {/* Delete This Event */}
+                    <button
+                        onClick={async () => {
+                            if (contextMenu.event?.id) {
+                                try {
+                                    await eventApi.delete(contextMenu.event.id);
+                                    await queryClient.invalidateQueries({ queryKey: ['events-calendar'] });
+                                    await queryClient.refetchQueries({ queryKey: ['events-calendar'] });
+                                } catch (error) {
+                                    console.error('Failed to delete event:', error);
+                                }
+                            }
+                            closeContextMenu();
+                        }}
+                        className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3"
+                    >
+                        <Trash2 size={16} className="text-red-400" />
+                        Delete this event
+                    </button>
+
+                    {/* Delete All Similar Events */}
+                    <button
+                        onClick={async () => {
+                            if (contextMenu.event) {
+                                const eventTitle = contextMenu.event.title;
+                                const eventHour = new Date(contextMenu.event.start_time).getHours();
+                                const eventMinute = new Date(contextMenu.event.start_time).getMinutes();
+
+                                // Find all events with same title and time
+                                const similarEvents = events.filter(e => {
+                                    const eHour = new Date(e.start_time).getHours();
+                                    const eMinute = new Date(e.start_time).getMinutes();
+                                    return e.title === eventTitle && eHour === eventHour && eMinute === eventMinute;
+                                });
+
+                                const confirmDelete = window.confirm(
+                                    `Delete ${similarEvents.length} event(s) with title "${eventTitle}"?\n\nThis action cannot be undone.`
+                                );
+
+                                if (confirmDelete) {
+                                    try {
+                                        for (const evt of similarEvents) {
+                                            await eventApi.delete(evt.id);
+                                        }
+                                        // Force refetch the events
+                                        await queryClient.invalidateQueries({ queryKey: ['events-calendar'] });
+                                        await queryClient.refetchQueries({ queryKey: ['events-calendar'] });
+                                    } catch (error) {
+                                        console.error('Failed to delete events:', error);
+                                    }
+                                }
+                            }
+                            closeContextMenu();
+                        }}
+                        className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3"
+                    >
+                        <Trash2 size={16} className="text-red-400" />
+                        Delete all similar events
+                    </button>
+                </div>
             )}
         </div>
     );

@@ -443,7 +443,7 @@ export const taskApi = {
   bulkUpload: async (projectId: number | string, file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    
+
     const response = await api.post<import('@/types').BulkTaskUploadResponse>(
       `/tasksite/project/${projectId}/bulk-upload/`,
       formData,
@@ -546,7 +546,7 @@ export const taskApi = {
   },
 
   // Upload files directly to Exiting taskdetail
-uploadFiles: async (taskId: number, files: File[]) => {
+  uploadFiles: async (taskId: number, files: File[]) => {
     const formData = new FormData();
     files.forEach((file) => {
       formData.append('uploaded_files', file);
@@ -807,7 +807,7 @@ export const chatApi = {
 export class GatewayWebSocketService {
   private ws: WebSocket | null = null;
   private messageCallbacks: Set<(msg: GatewayIncomingMessage) => void> = new Set();
-  private reconnectTimeout: NodeJS.Timeout | null = null;
+ private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private userId: number | null = null;
@@ -961,7 +961,7 @@ export class NotificationWebSocketService {
   private ws: WebSocket | null = null;
   private notificationCallbacks: Set<NotificationCallback> = new Set();
   private chatUnreadCallbacks: Set<(data: { total_unread: number; room_id: string; room_unread: number }) => void> = new Set();
-  private reconnectTimeout: NodeJS.Timeout | null = null;
+  private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private isConnecting = false;
@@ -1478,24 +1478,111 @@ export const dailyUpdateApi = {
 };
 export const eventApi = {
   list: async (params?: any) => {
-      const { data } = await api.get('/daily-updates/events/', { params });
-      return data;
+    const { data } = await api.get('/daily-updates/events/', { params });
+    return data;
   },
   create: async (payload: Partial<CalendarEventType>) => {
-      const { data } = await api.post('/daily-updates/events/', payload);
-      return data;
+    const { data } = await api.post('/daily-updates/events/', payload);
+    return data;
   },
   retrieve: async (id: number) => {
-      const { data } = await api.get(`/daily-updates/events/${id}/`);
-      return data;
+    const { data } = await api.get(`/daily-updates/events/${id}/`);
+    return data;
   },
   update: async (id: number, payload: Partial<CalendarEventType>) => {
-      const { data } = await api.patch(`/daily-updates/events/${id}/`, payload);
-      return data;
+    const { data } = await api.patch(`/daily-updates/events/${id}/`, payload);
+    return data;
   },
   delete: async (id: number) => {
-      await api.delete(`/daily-updates/events/${id}/`);
-  }
+    await api.delete(`/daily-updates/events/${id}/`);
+  },
+  checkAvailability: async (attendeeId: number, startTime: string, endTime: string): Promise<{ is_available: boolean }> => {
+    const { data } = await api.get('/daily-updates/events/check-availability/', {
+      params: {
+        attendee_id: attendeeId,
+        start_time: startTime,
+        end_time: endTime
+      }
+    });
+    return data;
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // INVITATION API FUNCTIONS
+  // ═══════════════════════════════════════════════════════════════════════
+
+  acceptInvitation: async (invitationId: number): Promise<void> => {
+    await api.patch(`/daily-updates/events/invitations/${invitationId}/accept/`, {});
+  },
+
+  declineInvitation: async (invitationId: number, reason: string): Promise<void> => {
+    await api.patch(`/daily-updates/events/invitations/${invitationId}/decline/`, { reason });
+  },
+
+  rescheduleInvitation: async (invitationId: number, proposedTime: string): Promise<void> => {
+    await api.patch(`/daily-updates/events/invitations/${invitationId}/reschedule/`, {
+      proposed_time: proposedTime
+    });
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // RSVP STATUS API - Get all attendees' response status for an event
+  // ═══════════════════════════════════════════════════════════════════════
+
+  getEventRsvpStatus: async (eventId: number): Promise<{
+    event_id: number;
+    organizer: string;
+    attendee_status: Array<{
+      user_id: number;
+      name: string;
+      status: 'PENDING' | 'ACCEPTED' | 'DECLINED';
+      decline_reason: string | null;
+      proposed_reschedule_time: string | null;
+    }>;
+  }> => {
+    const { data } = await api.get(`/daily-updates/events/${eventId}/rsvp-status/`);
+    return data;
+  },
+  // Suggest available time slots for a group of attendees
+  suggestSlots: async (
+    attendeeIds: number[],
+    targetDate: string,
+    durationMinutes: number = 30
+  ): Promise<{
+    target_date: string;
+    duration_minutes: number;
+    available_slots: string[];
+  }> => {
+    const { data } = await api.post('/daily-updates/events/suggest-slots/', {
+      attendee_ids: attendeeIds,
+      target_date: targetDate,
+      duration_minutes: durationMinutes
+    });
+    return data;
+  },
+};
+// ═══════════════════════════════════════════════════════════════════════
+// DYUKSA AI SCHEDULING ASSISTANT
+// ═══════════════════════════════════════════════════════════════════════
+
+export const dyuksaAI = {
+  // Send a natural language scheduling request to the AI
+  chat: async (message: string): Promise<{
+      action?: 'create_event' | 'show_slots' | 'clarify';
+      data?: {
+          event_type?: string;
+          title?: string;
+          attendee_ids?: number[];
+          attendee_names?: string[];
+          target_date?: string;
+          duration_minutes?: number;
+          available_slots?: string[];
+      };
+      reply: string;
+  }> => {
+      const { data } = await api.post('/task-ai/chat/agent/', { message });
+      return data;
+  },
 };
 
 

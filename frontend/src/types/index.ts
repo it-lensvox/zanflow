@@ -494,6 +494,12 @@ export interface GetUploadUrlResponse {
   file_key: string;
 }
 
+// Confirm Upload Payload
+export interface ConfirmUploadPayload {
+  file_key: string;
+  document_id?: string;
+}
+
 export interface ConfirmUploadResponse {
   id: string;
   status: DocumentStatus;
@@ -805,7 +811,7 @@ export interface UnreadCount {
 
 // WebSocket Notification System Types
 export interface NotificationRelatedObject {
-  type: 'task' | 'project' | 'message' | 'comment' | 'team' | 'document';
+  type: 'task' | 'project' | 'message' | 'comment' | 'team' | 'document' | 'event';
   id: string | number;
 }
 
@@ -828,7 +834,7 @@ export interface NotificationData {
     priority?: string;
     [key: string]: any;
   };
-related_object?: NotificationRelatedObject;
+  related_object?: NotificationRelatedObject;
   related_object_info?: NotificationRelatedObject & { app?: string };
   time_since?: string;
   created_at?: string;
@@ -913,7 +919,7 @@ export interface ChatRoomListItem {
   slug: string;
   project: number | null;
   participant_count: number;
-  participants: number[]; 
+  participants: number[];
   last_message: {
     id: string;
     sender_username: string;
@@ -1353,17 +1359,52 @@ export interface DailyUpdateListResponse {
   results: DailyUpdate[];
 }
 
+// Add this new type (keep this)
+export type InvitationStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'ORGANIZER';
+
 export interface Event {
-    id: number;
-    organizer: number;
-    organizer_name: string;
-    title: string;
-    attendees: number[];
-    start_time: string;
-    end_time: string;
-    location?: string;
-    is_online_meeting: boolean;
-    description?: string;
-    created_at: string;
-    updated_at: string;
+  id: number;
+  organizer: number;
+  organizer_name: string;
+  title: string;
+  attendees: number[];
+  start_time: string;
+  end_time: string;
+  location?: string;
+  is_online_meeting: boolean;
+  description?: string;
+  event_type?: string;
+  created_at: string;
+  updated_at: string;
+  my_invitation_status?: InvitationStatus;
+  my_invitation_id?: number;
+  is_recurring?: boolean;
+  recurrence_pattern?: 'DAILY' | 'WORK_WEEK' | 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+  recurrence_end_date?: string;
 }
+
+// Dyuksa AI Scheduling Assistant
+export interface DyuksaAIChatPayload {
+    message: string;
+}
+
+export interface DyuksaAIChatResponse {
+    reply: string;
+}
+
+// Dyuksa AI Scheduling Assistant
+export interface DyuksaAIResponse {
+    action?: 'create_event' | 'show_slots' | 'clarify';
+    data?: {
+        event_type?: string;
+        title?: string;
+        attendee_ids?: number[];
+        attendee_names?: string[];
+        target_date?: string;
+        duration_minutes?: number;
+        available_slots?: string[];
+    };
+    reply: string;
+}
+
+

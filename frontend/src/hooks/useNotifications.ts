@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { notificationSocket, api } from '@/services/api';
 import type { NotificationData } from '@/types';
 import notificationSoundFile from '../public/assets/notification-sound.mp3';
-
+import dyuksaLogo from '../public/assets/logo.png'
 function showBrowserNotification(notification: {
   title?: string;
   message?: string;
@@ -12,21 +12,22 @@ function showBrowserNotification(notification: {
 }) {
   if (!('Notification' in window)) return;
   if (Notification.permission !== 'granted') return;
-
+ 
   const browserNotif = new Notification(notification.title || 'New Notification', {
     body: notification.message || '',
-    icon: '/favicon.ico', // your app icon path
+    icon: dyuksaLogo,
+    badge: dyuksaLogo,
     tag: `dyuksa-notif-${notification.id || Date.now()}`, // prevents duplicate popups
     silent: true, // we already play our own sound
   });
-
+ 
   browserNotif.onclick = () => {
     window.focus();
     browserNotif.close();
   };
-
-  // Auto-close after 5 seconds
-  setTimeout(() => browserNotif.close(), 5000);
+ 
+  // // Auto-close after 5 seconds
+  // setTimeout(() => browserNotif.close(), 5000);
 }
 
 export function useNotifications() {
