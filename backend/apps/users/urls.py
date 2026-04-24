@@ -3,7 +3,7 @@ URL configuration for Users app.
 """
 from django.urls import path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from .views import ChangeUserRoleView, ForgotPasswordView, VerifyOTPView, SetNewPasswordView, AuthenticatedResetPasswordView, SendInvitationView, VerifyInvitationTokenView, AcceptInvitationView
+from .views import ChangeUserRoleView, ForgotPasswordView, VerifyOTPView, SetNewPasswordView, AuthenticatedResetPasswordView, SendInvitationView, VerifyInvitationTokenView, AcceptInvitationView, ContactUsView
 
 from . import views
 
@@ -22,5 +22,6 @@ urlpatterns = [
     path("invite/send/", SendInvitationView.as_view(), name="send-invite"),
     path("invite/verify/<str:token>/", VerifyInvitationTokenView.as_view(), name="verify-invite"),
     path("invite/accept/", AcceptInvitationView.as_view(), name="accept-invite"),
+    path("contact/", ContactUsView.as_view(), name="contact-us"),
 ]
 

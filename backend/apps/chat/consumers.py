@@ -7,7 +7,6 @@ from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
 from .models import ChatRoom, ChatRoomMembership
 from apps.chat.services import ChatMessageService
-
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
@@ -98,9 +97,9 @@ class GatewayConsumer(AsyncWebsocketConsumer):
                 content = data.get('content', '')
                 room_id = data.get('room_id')
                 
-                # if content and room_id and "@dyuksa" in content.lower():
-                #     logger.info("Spawning background AI task...")
-                #     asyncio.create_task(self.invoke_zanflow_ai(room_id, content, self.user.id))
+                if content and room_id and "@dyuksa" in content.lower():
+                    logger.info("Spawning background AI task...")
+                    asyncio.create_task(self.invoke_zanflow_ai(room_id, content, self.user.id))
 
             elif command == 'join_room':
                 room_slug = data.get('room_slug')

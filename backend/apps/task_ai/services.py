@@ -1,13 +1,20 @@
 import boto3
 import requests
 import json
+import logging
 from django.conf import settings
-from datetime import date
+from datetime import date, datetime, timedelta
 import io
 import PyPDF2
 from apps.projects.models import Project
 from apps.tasksite.models import Task
+from apps.daily_updates.models import Event
+from apps.daily_updates.utils import find_available_slots
+from django.contrib.auth import get_user_model
 from django.utils import timezone
+
+logger = logging.getLogger('apps')
+User = get_user_model()
 
 class TaskAIService:
     @staticmethod
@@ -52,10 +59,6 @@ class TaskAIService:
         
         # Get all members from the project
         for member in project.members.all():
-            # REMOVED: The check that skipped admin users
-            # if member.role == 'admin':
-            #    continue
-                
             member_info = {
                 'id': member.id,
                 'username': member.username,
@@ -88,8 +91,6 @@ class TaskAIService:
 
     @staticmethod
     def generate_task_data_with_assignment(project_context, user_description, members_with_skills):
-        # Initialize the client using settings.py values explicitly
-        
         client = boto3.client(
             "bedrock-runtime",
             aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
@@ -97,29 +98,23 @@ class TaskAIService:
             region_name=settings.AWS_REGION
         )
         
-        # Ensure your .env has BEDROCK_MODEL_ID=amazon.nova-lite-v1:0
         model_id = settings.BEDROCK_MODEL_ID
         
         # Format members data for the prompt
         members_summary = []
         for member in members_with_skills:
-            # --- FIX START: Handle both string and dict skills safely ---
             formatted_skills = []
             for s in member['skills']:
                 if isinstance(s, dict):
-                    # If skill is an object: {'name': 'Python', 'proficiency': 'Expert'}
                     name = s.get('name', 'Unknown')
                     prof = s.get('proficiency', 'N/A')
                     formatted_skills.append(f"{name} ({prof})")
                 elif isinstance(s, str):
-                    # If skill is just a string: "Python"
                     formatted_skills.append(s)
                 else:
-                    # Fallback for other types
                     formatted_skills.append(str(s))
                     
             skills_text = ", ".join(formatted_skills)
-            # --- FIX END ---
 
             members_summary.append(
                 f"- {member['username']} (Role: {member['role']}, ID: {member['id']}): {skills_text}"
@@ -191,19 +186,17 @@ Return ONLY a FLAT JSON object with this exact schema:
             response_body = json.loads(response["body"].read())
             raw_text = response_body["output"]["message"]["content"][0]["text"]
 
-                # 1. First, handle the markdown backticks (existing logic)
             if "```" in raw_text:
                 raw_text = raw_text.split("```")[1].split("```")[0]
                 if raw_text.startswith("json"):
                     raw_text = raw_text[4:]
 
-            # 2. ADD THIS: Strip extra double quotes from the start and end
-            # This prevents the ""Text"" issue in your output
             return raw_text.strip().strip('"') 
             
         except Exception as e:
             print(f"Error calling AWS Bedrock: {e}")
-            return raw_text  # Return original if AI fails
+            return raw_text  
+
     @staticmethod
     def execute_project_search(user):
         """
@@ -214,7 +207,6 @@ Return ONLY a FLAT JSON object with this exact schema:
             
         from apps.projects.models import Project
         
-        # Assuming your Project model has a 'members' ManyToMany field
         projects = Project.objects.filter(members=user)
         count = projects.count()
         
@@ -226,11 +218,11 @@ Return ONLY a FLAT JSON object with this exact schema:
             result_text += f"- {project.name}\n"
             
         return result_text
+
     @staticmethod
     def fallback_assignment(members_with_skills, task_category='general'):
         """
         Fallback logic if AI assignment fails.
-        Enforces Admin -> Manager hierarchy for mandatory assignment.
         """
         users = [m for m in members_with_skills if m['role'] == 'user']
         managers = [m for m in members_with_skills if m['role'] == 'manager']
@@ -238,15 +230,11 @@ Return ONLY a FLAT JSON object with this exact schema:
         
         matching_members = []
         
-        # 1. Mandatory Monitor Assignment
         if admins:
-            # If admin exists, they are mandatory
             matching_members.append(admins[0]['id'])
         elif managers:
-            # If no admin, manager is mandatory
             matching_members.append(managers[0]['id'])
             
-        # 2. Assign Worker (User) based on skills
         if task_category in ['frontend', 'backend']:
             for member in users:
                 has_skill = any(
@@ -255,11 +243,9 @@ Return ONLY a FLAT JSON object with this exact schema:
                 )
                 if has_skill:
                     matching_members.append(member['id'])
-                    # We just need one or two workers + the monitor
                     if len(matching_members) >= 3:
                         break
         
-        # 3. If no skilled user found, pick first available user
         if len(matching_members) == 1 and users:
              matching_members.append(users[0]['id'])
         
@@ -269,7 +255,6 @@ Return ONLY a FLAT JSON object with this exact schema:
     def refine_text(text, task_type):
         """
         Refines task title or description using Amazon Bedrock.
-        task_type: 'optimize_title' | 'generate_description' | 'refine_description'
         """
         client = boto3.client(
             "bedrock-runtime",
@@ -300,16 +285,13 @@ Return ONLY a FLAT JSON object with this exact schema:
             response_body = json.loads(response["body"].read())
             raw_text = response_body["output"]["message"]["content"][0]["text"]
 
-            # --- UPDATED LOGIC TO REMOVE FORMATTING ---
-            # Remove Markdown symbols like ### and **
             cleaned_text = raw_text.replace("###", "").replace("**", "")
-            
-            # Strip extra double quotes from start/end
             return cleaned_text.strip().strip('"')
             
         except Exception as e:
             print(f"Error refining text: {e}")
             return text
+
     @staticmethod
     def execute_global_task_search(user, priority=None, status=None, username=None, date_filter=None):
         if not user or not user.is_authenticated:
@@ -317,7 +299,6 @@ Return ONLY a FLAT JSON object with this exact schema:
 
         tasks = Task.objects.all().select_related('project').prefetch_related('assigned_to')
 
-        # 1. Apply Assignee Filter
         if username:
             try:
                 from apps.users.models import User
@@ -328,7 +309,6 @@ Return ONLY a FLAT JSON object with this exact schema:
         else:
             tasks = tasks.filter(assigned_to=user)
 
-        # 2. Apply Status/Priority/Date Filters
         if priority:
             tasks = tasks.filter(priority=priority.lower())
         if status:
@@ -339,19 +319,16 @@ Return ONLY a FLAT JSON object with this exact schema:
             today = timezone.now().date()
             tasks = tasks.filter(end_date__date=today)
 
-        # 3. GET THE TRUE EXACT COUNT BEFORE SLICING
         total_count = tasks.count()
 
         if total_count == 0:
             return "DATABASE RESULT: 0 tasks found matching that criteria."
 
-        # 4. Return the exact count, plus a small sample so the AI can name a few tasks if asked
         result_text = f"DATABASE RESULT: There are exactly {total_count} tasks matching this criteria.\n"
         result_text += "Here is a sample of the first 5 for context:\n"
         
-        for task in tasks[:5]: # Safe to slice to 5 now, because the AI already knows the true total
+        for task in tasks[:5]: 
             project_name = task.project.name if task.project else "No Project"
-            assignees = ", ".join([u.username for u in task.assigned_to.all()])
             result_text += (
                 f"- Task: '{task.heading}' (Project: {project_name}) | Status: {task.status} | Priority: {task.priority}\n"
             )
@@ -360,33 +337,26 @@ Return ONLY a FLAT JSON object with this exact schema:
     
     @staticmethod
     def get_page_context(user, context_data):
-        """
-        Determines what data to fetch based on the frontend's current page context.
-        """
         page = context_data.get("page", "dashboard")
         page_id = context_data.get("id", None)
         
         context_text = f"The user is currently on the {page.capitalize()} page.\n\n"
 
         try:
-            # --- TASKBOARD PAGE CONTEXT ---
             if page == "taskboard" and page_id:
                 project = Project.objects.get(id=page_id)
                 context_text += f"Project Name: {project.name}\n"
                 
-                # Fetch tasks and use prefetch_related for the ManyToMany 'assigned_to' field to prevent N+1 query issues
                 tasks = Task.objects.filter(project=project).prefetch_related('assigned_to')
                 
                 context_text += f"Total Tasks in Project: {tasks.count()}\n"
                 context_text += "Current Tasks:\n"
                 
                 for task in tasks:
-                    # Get assigned usernames
                     assignees = ", ".join([u.username for u in task.assigned_to.all()])
                     if not assignees:
                         assignees = "Unassigned"
                         
-                    # Format the due date safely
                     due_date = task.end_date.strftime('%Y-%m-%d') if task.end_date else "No due date"
                     
                     context_text += (
@@ -394,14 +364,10 @@ Return ONLY a FLAT JSON object with this exact schema:
                         f"Priority: {task.priority} | Assigned to: {assignees} | Due: {due_date}\n"
                     )
 
-            # --- DASHBOARD PAGE CONTEXT ---
             elif page == "dashboard":
                 context_text += "Here is the user's current personalized data:\n"
                 
-                # UPDATE THIS LINE to explicitly check is_authenticated
                 if user and user.is_authenticated:
-                    
-                    # Fetch tasks assigned to the current user that are NOT completed
                     active_tasks = Task.objects.filter(
                         assigned_to=user,
                         status__in=['pending', 'in_progress', 'review']
@@ -424,10 +390,9 @@ Return ONLY a FLAT JSON object with this exact schema:
                         today = timezone.now().date()
                         context_text += f"Today's Date is {today}.\n"
                         
-                        # Fetch tasks due today for the current user
                         todays_tasks = Task.objects.filter(
                             assigned_to=user,
-                            end_date__date=today, # Filters for tasks ending exactly today
+                            end_date__date=today,
                             status__in=['pending', 'in_progress', 'review']
                         ).select_related('project')
                         
@@ -465,11 +430,10 @@ Return ONLY a FLAT JSON object with this exact schema:
         )
 
         prompt = """You are the Dyuksa ERP AI Assistant. 
-        
         CRITICAL RULES:
-        1. Answer directly and concisely. DO NOT narrate your actions (never say "I will search the database" or "Let me check"). Just give the answer.
+        1. Answer directly and concisely. DO NOT narrate your actions.
         2. You have NO direct access to the user's screen or data. 
-        3. You MUST use your tools to fetch real-time database information whenever the user asks about tasks, projects, or schedules.
+        3. You MUST use your tools to fetch real-time database information.
         4. When a tool returns a "Total Count", use that exact number in your response.
         """
 
@@ -480,7 +444,6 @@ Return ONLY a FLAT JSON object with this exact schema:
             
         formatted_messages.append({"role": "user", "content": [{"text": user_message}]})
 
-        # --- UPDATED TOOL CONFIGURATION ---
         tool_config = {
             "tools": [
                 {
@@ -494,7 +457,7 @@ Return ONLY a FLAT JSON object with this exact schema:
                                     "priority": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
                                     "status": {"type": "string", "enum": ["pending", "in_progress", "completed", "review"]},
                                     "username": {"type": "string", "description": "The username of the assignee."},
-                                    "date_filter": {"type": "string", "enum": ["today"], "description": "Use 'today' if the user asks for tasks due today or tasks they are working on today."}
+                                    "date_filter": {"type": "string", "enum": ["today"], "description": "Use 'today' if the user asks for tasks due today."}
                                 }
                             }
                         }
@@ -503,11 +466,11 @@ Return ONLY a FLAT JSON object with this exact schema:
                 {
                     "toolSpec": {
                         "name": "search_user_projects",
-                        "description": "Use this tool to find out how many projects the user is enrolled in or what projects they belong to.",
+                        "description": "Use this tool to find out how many projects the user is enrolled in.",
                         "inputSchema": {
                             "json": {
                                 "type": "object",
-                                "properties": {} # No inputs needed, we use the authenticated user
+                                "properties": {}
                             }
                         }
                     }
@@ -532,7 +495,6 @@ Return ONLY a FLAT JSON object with this exact schema:
 
             print(f"\n=== AI IS USING TOOL: {tool_name} with args {tool_inputs} ===\n")
 
-            # --- UPDATED TOOL ROUTING ---
             if tool_name == "search_global_tasks":
                 tool_result_text = TaskAIService.execute_global_task_search(
                     user=user, 
@@ -570,9 +532,6 @@ Return ONLY a FLAT JSON object with this exact schema:
 
     @staticmethod
     def generate_chat_title(first_message):
-        """
-        Takes the first message of a chat and uses AWS Bedrock to generate a short title.
-        """
         client = boto3.client(
             "bedrock-runtime",
             aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
@@ -584,15 +543,14 @@ Return ONLY a FLAT JSON object with this exact schema:
         Read the following user message and generate a short, descriptive title for the chat session.
         RULES:
         1. Maximum 4 words.
-        2. Return ONLY the title text. No quotes, no periods, no introductory words like "Title:".
-        
+        2. Return ONLY the title text. No quotes, no periods, no introductory words.
         User Message: "{first_message}"
         """
 
         native_request = {
             "system": [{"text": "You are a helpful assistant that only outputs short titles."}],
             "messages": [{"role": "user", "content": [{"text": prompt}]}],
-            "inferenceConfig": {"maxTokens": 20, "temperature": 0.3} # Low tokens and temp for a strict, short response
+            "inferenceConfig": {"maxTokens": 20, "temperature": 0.3} 
         }
 
         try:
@@ -604,10 +562,142 @@ Return ONLY a FLAT JSON object with this exact schema:
             )
             
             raw_title = response['output']['message']['content'][0]['text']
-            
-            # Clean up just in case the AI added quotes anyway
             return raw_title.strip().strip('"').strip("'")
             
         except Exception as e:
             print(f"Error generating chat title: {e}")
-            return "New Conversation" # Safe fallback
+            return "New Conversation"
+
+
+class CalendarAgentService:
+    """
+    Dedicated AI Agent service for scheduling, keeping bot logic 
+    separated from standard thread/chat processing.
+    """
+    
+    @staticmethod
+    def process_scheduling_intent(user, prompt_text):
+        today_str = timezone.now().strftime("%Y-%m-%d")
+        
+        bedrock_runtime = boto3.client(
+            service_name='bedrock-runtime',
+            region_name=settings.AWS_REGION,
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
+        )
+
+        tools = [
+            {
+                "toolSpec": {
+                    "name": "check_calendar_availability",
+                    "description": "Finds available meeting times between the current user and colleagues.",
+                    "inputSchema": {
+                        "json": {
+                            "type": "object",
+                            "properties": {
+                                "attendee_names": {
+                                    "type": "array",
+                                    "items": {"type": "string"},
+                                    "description": "List of first names of colleagues to meet with (e.g., ['Shifali', 'Nikhil'])"
+                                },
+                                "target_date": {
+                                    "type": "string",
+                                    "description": f"The specific date for the meeting in YYYY-MM-DD format. Today is {today_str}."
+                                },
+                                "duration_minutes": {
+                                    "type": "integer",
+                                    "description": "The duration of the meeting in minutes. Default to 30 if not specified."
+                                }
+                            },
+                            "required": ["attendee_names", "target_date", "duration_minutes"]
+                        }
+                    }
+                }
+            }
+        ]
+
+        system_prompt = "You are a helpful AI scheduling assistant for the Dyuksa platform. Extract scheduling details to use the calendar tool."
+        messages = [{"role": "user", "content": [{"text": prompt_text}]}]
+        
+        try:
+            response = bedrock_runtime.converse(
+                modelId=settings.BEDROCK_MODEL_ID,
+                messages=messages,
+                system=[{"text": system_prompt}],
+                toolConfig={"tools": tools}
+            )
+
+            output_message = response['output']['message']
+            
+            # Print for debugging (you can remove this later)
+            print(f"\nRAW BEDROCK OUTPUT: {json.dumps(output_message, indent=2)}\n")
+            
+            # --- THE FIX: Iterate correctly looking for 'toolUse' ---
+            for content_block in output_message['content']:
+                if 'toolUse' in content_block:
+                    tool_use = content_block['toolUse']
+                    if tool_use['name'] == 'check_calendar_availability':
+                        args = tool_use['input']
+                        
+                        # Call the deterministic Python logic using standard integer IDs
+                        result = CalendarAgentService.execute_phase_1_logic(
+                            requesting_user=user,
+                            names=args['attendee_names'],
+                            date_str=args['target_date'],
+                            duration=args['duration_minutes']
+                        )
+                        
+                        CalendarAgentService.log_ai_interaction(user, prompt_text, response, result)
+                        return result
+
+        except Exception as e:
+            logger.error(f"Bedrock API Error: {str(e)}")
+            return {"error": "There was an issue connecting to the AI service."}
+
+        return {"message": "I couldn't determine the scheduling details. Could you clarify who and when?"}
+
+    @staticmethod
+    def execute_phase_1_logic(requesting_user, names, date_str, duration):
+        attendee_ids = [requesting_user.id]
+        unfound_names = []
+        
+        for name in names:
+            colleague = User.objects.filter(first_name__iexact=name).first() 
+            if colleague:
+                attendee_ids.append(colleague.id) 
+            else:
+                unfound_names.append(name)
+                
+        if unfound_names:
+            return {"error": f"Could not find users: {', '.join(unfound_names)}"}
+
+        target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        day_start = timezone.make_aware(datetime.combine(target_date, datetime.strptime("09:00", "%H:%M").time()))
+        day_end = timezone.make_aware(datetime.combine(target_date, datetime.strptime("18:00", "%H:%M").time()))
+
+        events = Event.objects.filter(
+            start_time__date=target_date,
+            attendees__id__in=attendee_ids
+        ).distinct()
+        
+        busy_intervals = [(e.start_time, e.end_time) for e in events]
+        slots = find_available_slots(busy_intervals, day_start, day_end, duration)
+        
+        formatted_slots = [slot.strftime("%I:%M %p") for slot in slots]
+        
+        return {
+            "attendees_found": names,
+            "date": date_str,
+            "duration": duration,
+            "available_slots": formatted_slots
+        }
+
+    @staticmethod
+    def log_ai_interaction(user, prompt, bedrock_raw, final_result):
+        log_data = {
+            "user": user.username,
+            "prompt": prompt,
+            "tool_triggered": "available_slots" in final_result,
+            "final_result": final_result
+        }
+        logger.debug(f"AI Calendar Agent Interaction: {json.dumps(log_data, indent=2)}")
