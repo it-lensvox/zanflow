@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import DailyUpdateViewSet, EventViewSet, EventInvitationViewSet
+from .views import DailyUpdateViewSet, EventViewSet, EventInvitationViewSet, CalendarShareViewSet, CalendarShareLinkViewSet, PublicSharedCalendarView
 
 router = DefaultRouter()
 router.register(r'', DailyUpdateViewSet, basename='daily-update')
@@ -58,6 +58,55 @@ urlpatterns = [
         'delete': 'destroy'
     }), name='event-detail'),
 
+    path('events/<int:pk>/', EventViewSet.as_view({
+        'get': 'retrieve', 
+        'put': 'update', 
+        'patch': 'partial_update', 
+        'delete': 'destroy'
+    }), name='event-detail'),
+
+    # --- CALENDAR SHARING ENDPOINTS ---
+    path('calendar-shares/', CalendarShareViewSet.as_view({
+        'get': 'list', 
+        'post': 'create'
+    }), name='calendar-share-list'),
+
+    path('calendar-shares/<int:pk>/', CalendarShareViewSet.as_view({
+        'get': 'retrieve', 
+        'put': 'update', 
+        'patch': 'partial_update', 
+        'delete': 'destroy'
+    }), name='calendar-share-detail'),
+
+    # Endpoints for the logged-in user to manage their links
+    path('calendar-links/', CalendarShareLinkViewSet.as_view({
+        'get': 'list', 
+        'post': 'create'
+    }), name='calendar-link-list'),
+
+    path('calendar-links/<int:pk>/', CalendarShareLinkViewSet.as_view({
+        'get': 'retrieve', 
+        'put': 'update', 
+        'patch': 'partial_update', 
+        'delete': 'destroy'
+    }), name='calendar-link-detail'),
+
+    # The actual public endpoint for the external client
+    # Notice we pass the token directly in the URL path
+    path('shared-calendar/<uuid:token>/', PublicSharedCalendarView.as_view(), name='public-shared-calendar'),
+
+    # --- ICS EXPORT ENDPOINT ---
+    # --- BULK EXPORT (All Events) ---
+    path('events/export-all/', EventViewSet.as_view({
+        'get': 'export_all_ics'
+    }), name='event-export-all'),
+
+    # --- SINGLE EXPORT (One Event) ---
+    path('events/<int:pk>/export/', EventViewSet.as_view({
+        'get': 'export_ics'
+    }), name='event-export-ics'),
+
+    # Your existing detail endpoint
     path('events/<int:pk>/', EventViewSet.as_view({
         'get': 'retrieve', 
         'put': 'update', 
