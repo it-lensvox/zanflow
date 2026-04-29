@@ -749,3 +749,30 @@ def notify_organizer_rsvp(invitation, action_type):
             'action_taken': action_type
         }
     )
+
+def notify_calendar_shared(share_record, actor: User) -> List[Notification]:
+    """
+    Send a notification when a user shares their calendar with a teammate.
+    """
+    owner = share_record.owner
+    shared_with = share_record.shared_with
+    permission = share_record.permission
+    
+    # Format the permission nicely for the message
+    permission_text = "view" if permission == 'view' else "manage"
+    owner_name = owner.get_full_name() or owner.username
+    
+    return notify(
+        recipients=[shared_with],
+        title="Calendar Shared",
+        message=f"{owner_name} has given you {permission_text} access to their calendar.",
+        notification_type=Notification.NotificationType.SYSTEM, 
+        actor=actor,
+        priority=Notification.Priority.MEDIUM,
+        related_object=share_record,
+        metadata={
+            'share_id': str(share_record.id),
+            'owner_id': str(owner.id),
+            'permission': permission,
+        }
+    )

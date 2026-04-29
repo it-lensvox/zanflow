@@ -170,11 +170,13 @@ class TaskRetrieveUpdateView(APIView):
 
         if serializer.is_valid():
             # Save the serializer and capture the updated task instance
-            updated_task = serializer.save()
+            new_status_val = serializer.validated_data.get('status', old_status)
             
-            # ================================================================
-            # TRIGGER NOTIFICATION: Status Updated (only if status changed)
-            # ================================================================
+            # Add request.user to 'status_updated_by' if status is actually modified
+            if new_status_val != old_status:
+                updated_task = serializer.save(status_updated_by=request.user)
+            else:
+                updated_task = serializer.save()
             new_status = updated_task.status
             if old_status != new_status:
                 notify_task_status_updated(

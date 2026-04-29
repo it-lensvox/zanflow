@@ -79,6 +79,7 @@ class TaskCommentSerializer(serializers.ModelSerializer):
 class TaskSerializer(serializers.ModelSerializer):
     assigned_to_user_details = AssignedByUserSerializer(source='assigned_to', read_only=True, many=True)
     assigned_by_user_details = AssignedByUserSerializer(source='assigned_by', read_only=True)
+    status_updated_by_details = AssignedByUserSerializer(source='status_updated_by', read_only=True)
     attachments = TaskAttachmentSerializer(source='documents', many=True, read_only=True)
     
     links = TaskLinkSerializer(many=True, read_only=True)
@@ -126,6 +127,7 @@ class TaskSerializer(serializers.ModelSerializer):
             'assigned_by',
             'assigned_by_user_details',
             'status',
+            'status_updated_by_details',
             'attachments',    # <--- Include in output
             'uploaded_files',
             'links',
@@ -135,7 +137,7 @@ class TaskSerializer(serializers.ModelSerializer):
             'comments',
             'is_pinned'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'assigned_by', 'assigned_by_user_details']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'assigned_by', 'assigned_by_user_details', 'status_updated_by_details']
 
     def get_is_pinned(self, obj):
         request = self.context.get('request')
