@@ -253,6 +253,23 @@ class ChatMessage(TenantModel):
         blank=True,
         help_text="Original filename of attachment"
     )
+     # ============ NEW: PDF preview for Office files ============
+    preview_pdf = models.FileField(
+        upload_to='chat_attachments/previews/%Y/%m/%d/',
+        null=True,
+        blank=True,
+        help_text="Auto-generated PDF version of attachment for browser preview"
+    )
+    preview_status = models.CharField(
+        max_length=20,
+        default='pending',
+        help_text="pending, processing, ready, failed, not_needed"
+    )
+    preview_error = models.TextField(
+        blank=True,
+        help_text="Error if PDF conversion failed"
+    )
+    # ============================================================
     metadata = models.JSONField(
         default=dict, 
         blank=True, 

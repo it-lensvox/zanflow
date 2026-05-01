@@ -481,11 +481,30 @@ class CalendarShareViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        # Users can see whom they have shared their calendar with, AND who has shared with them
         return CalendarShare.objects.filter(Q(owner=user) | Q(shared_with=user))
 
+    def create(self, request, *args, **kwargs):
+        # 1. Check if they are trying to share with someone specific
+        shared_with_id = request.data.get('shared_with')
+        
+        if shared_with_id:
+            # 2. Look for an existing share record between these two users
+            existing_share = CalendarShare.objects.filter(
+                owner=request.user, 
+                shared_with_id=shared_with_id
+            ).first()
+            
+            if existing_share:
+                # 3. If it exists, UPDATE the existing record instead of crashing
+                serializer = self.get_serializer(existing_share, data=request.data, partial=True)
+                serializer.is_valid(raise_exception=True)
+                self.perform_update(serializer)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+        
+        # 4. Otherwise, proceed with normal creation
+        return super().create(request, *args, **kwargs)
+
     def perform_create(self, serializer):
-        # The logged-in user is automatically the owner of the share configuration
         serializer.save(owner=self.request.user)
 class EventInvitationViewSet(viewsets.ModelViewSet):
     """

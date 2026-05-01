@@ -9,7 +9,32 @@ from apps.users.models import User
 # Import your existing Project model here too
 from apps.projects.models import Project, Label
 from apps.groundtruth.models import Document
-
+def trigger_task_attachment_conversion(document):
+    """
+    Convert task attachment to PDF synchronously during upload.
+    User waits ~10-15 sec but file is ready to preview immediately on click.
+    """
+    from apps.groundtruth.services import (
+        needs_pdf_conversion,
+        generate_document_preview,
+    )
+    
+    if not document.source_file:
+        return
+    
+    if not needs_pdf_conversion(document.source_file.name):
+        # File doesn't need conversion (image, PDF, video, etc.)
+        document.preview_status = 'not_needed'
+        document.save(update_fields=['preview_status'])
+        return
+    
+    # Office file — convert SYNCHRONOUSLY so file is ready on first click
+    try:
+        generate_document_preview(document)
+    except Exception as e:
+        import logging
+        logging.error(f"Task attachment conversion failed: {e}")
+        # Don't fail the upload — user can still download original
 class AssignedByUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
@@ -38,16 +63,32 @@ class TaskAttachmentSerializer(serializers.ModelSerializer):
     file_name = serializers.CharField(source='name', read_only=True)
     uploaded_at = serializers.DateTimeField(source='created_at', read_only=True)
     file_url = serializers.SerializerMethodField()
-
+    preview_status = serializers.CharField(read_only=True)
     class Meta:
         model = Document  # <--- Now uses Document!
-        fields = ['id', 'file_name', 'file_url', 'uploaded_at']
+        fields = ['id', 'file_name', 'file_url', 'uploaded_at', 'preview_status']
 
     def get_file_url(self, obj):
         if not obj.source_file:
-            return obj.source_file_url # Fallback for external links
+            return obj.source_file_url  # Fallback for external links
+        
+        # ============ NEW: Prefer PDF preview if conversion is ready ============
+        # If this Document has been converted to PDF, return the PDF URL instead
+        # so Office files (PPTX/DOCX/XLSX) preview inline as PDFs
+        use_pdf_preview = (
+            obj.preview_pdf 
+            and obj.preview_pdf.name
+            and obj.preview_status == 'ready'
+        )
+        
+        if use_pdf_preview:
+            target_key = obj.preview_pdf.name
+            content_type = 'application/pdf'
+        else:
+            target_key = obj.source_file.name
+            content_type = None
+        # =========================================================================
             
-        # Same boto3 logic as before!
         s3_client = boto3.client(
             's3',
             aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
@@ -55,9 +96,17 @@ class TaskAttachmentSerializer(serializers.ModelSerializer):
             region_name=settings.AWS_S3_REGION_NAME
         )
         try:
+            params = {
+                'Bucket': settings.AWS_STORAGE_BUCKET_NAME, 
+                'Key': target_key,
+                'ResponseContentDisposition': 'inline',
+            }
+            if content_type:
+                params['ResponseContentType'] = content_type
+            
             return s3_client.generate_presigned_url(
                 'get_object',
-                Params={'Bucket': settings.AWS_STORAGE_BUCKET_NAME, 'Key': obj.source_file.name},
+                Params=params,
                 ExpiresIn=3600 
             )
         except Exception as e:
@@ -173,17 +222,27 @@ class TaskSerializer(serializers.ModelSerializer):
         
         # --- NEW LOGIC: Save files as Documents ---
         user = self.context['request'].user
-        for file in uploaded_files:
-            # Clean the filename for the DB
-            clean_name = re.sub(r'_[a-zA-Z0-9]{7}(\.[^.]+)$', r'\1', file.name)
-            Document.objects.create(
-                project=task.project, # Inherits the project from the task!
-                task=task,            # Links to this specific task
-                name=clean_name,
-                source_file=file,
-                status='draft',
-                created_by=user
+        
+        # Safety: Tasks must have a project to attach documents
+        if uploaded_files and not task.project:
+            import logging
+            logging.warning(
+                f"Cannot create documents for task {task.id} — task has no project"
             )
+        else:
+            for file in uploaded_files:
+                # Clean the filename for the DB
+                clean_name = re.sub(r'_[a-zA-Z0-9]{7}(\.[^.]+)$', r'\1', file.name)
+                document = Document.objects.create(
+                    project=task.project, # Inherits the project from the task!
+                    task=task,            # Links to this specific task
+                    name=clean_name,
+                    source_file=file,
+                    status='draft',
+                    created_by=user
+                )
+                # Trigger PDF preview conversion in background
+                trigger_task_attachment_conversion(document)
             
         for url in uploaded_links:
             TaskLink.objects.create(task=task, url=url)
@@ -195,22 +254,35 @@ class TaskSerializer(serializers.ModelSerializer):
         uploaded_links = validated_data.pop('uploaded_links', [])
         validated_data.pop('assigned_by', None)
         instance = super().update(instance, validated_data)
+        
+        # Refresh to make sure project relationship is loaded after update
+        instance.refresh_from_db()
+        
         # --- NEW LOGIC: Save NEW files as Documents ---
         user = self.context['request'].user
-        for file in uploaded_files:
-            clean_name = re.sub(r'_[a-zA-Z0-9]{7}(\.[^.]+)$', r'\1', file.name)
-            Document.objects.create(
-                project=instance.project,
-                task=instance,
-                name=clean_name,
-                source_file=file,
-                status='draft',
-                created_by=user
+        
+        # Safety: Tasks must have a project to attach documents
+        if uploaded_files and not instance.project:
+            import logging
+            logging.warning(
+                f"Cannot create documents for task {instance.id} — task has no project"
             )
+        else:
+            for file in uploaded_files:
+                clean_name = re.sub(r'_[a-zA-Z0-9]{7}(\.[^.]+)$', r'\1', file.name)
+                document = Document.objects.create(
+                    project=instance.project,
+                    task=instance,
+                    name=clean_name,
+                    source_file=file,
+                    status='draft',
+                    created_by=user
+                )
+                # Trigger PDF preview conversion in background
+                trigger_task_attachment_conversion(document)
             
         for url in uploaded_links:
             TaskLink.objects.create(task=instance, url=url)
-
         return instance
 
 class TaskStatusUpdateSerializer(serializers.ModelSerializer):

@@ -42,6 +42,15 @@ class Document(TenantModel, UserStampedModel):
         MP4 = "mp4", "MP4"
         OTHER = "other", "Other"
     
+    # ============ ADD THIS NEW CLASS ============
+    class PreviewStatus(models.TextChoices):
+        PENDING = "pending", "Pending"
+        PROCESSING = "processing", "Processing"
+        READY = "ready", "Ready"
+        FAILED = "failed", "Failed"
+        NOT_NEEDED = "not_needed", "Not Needed"
+    # ============================================
+    
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     project = models.ForeignKey(
         Project,
@@ -49,8 +58,6 @@ class Document(TenantModel, UserStampedModel):
         related_name="documents",
     )
     
-    # --- ADD THIS NEW FIELD ---
-    # We use a string 'tasksite.Task' to prevent circular import errors
     task = models.ForeignKey(
         'tasksite.Task',
         on_delete=models.SET_NULL,
@@ -67,6 +74,21 @@ class Document(TenantModel, UserStampedModel):
     source_file_url = models.URLField(max_length=2000, blank=True)
     file_type = models.CharField(max_length=20, choices=FileType.choices, default=FileType.PDF)
     file_size = models.PositiveIntegerField(null=True, blank=True)
+    
+    # ============ ADD THESE NEW FIELDS ============
+    preview_pdf = models.FileField(
+        upload_to='documents/previews/',
+        null=True,
+        blank=True,
+        help_text="Auto-generated PDF version for browser preview"
+    )
+    preview_status = models.CharField(
+        max_length=20,
+        choices=PreviewStatus.choices,
+        default=PreviewStatus.PENDING
+    )
+    preview_error = models.TextField(blank=True, help_text="Error if conversion failed")
+    # ==============================================
     
     # Metadata
     metadata = models.JSONField(default=dict, blank=True)
@@ -100,6 +122,15 @@ class Document(TenantModel, UserStampedModel):
         if self.source_file and self.source_file.name:
             return self.source_file.url
         return self.source_file_url or None
+    
+    # ============ ADD THIS NEW PROPERTY ============
+    @property
+    def preview_pdf_url(self):
+        """Returns the URL of the converted PDF preview, if available."""
+        if self.preview_pdf and self.preview_pdf.name:
+            return self.preview_pdf.url
+        return None
+    # ===============================================
     
     @property
     def latest_version(self):

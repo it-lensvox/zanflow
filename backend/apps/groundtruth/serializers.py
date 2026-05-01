@@ -175,22 +175,43 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
         source_file = validated_data.get("source_file")
         project = validated_data.get("project")
         
-        # --- NEW CLEAN NAME LOGIC ---
-        # 1. Get the name from the request, or fallback to the actual uploaded filename
+        # Existing clean name logic
         original_name = validated_data.get("name")
         if not original_name and source_file:
             original_name = source_file.name
             
-        # 2. Run it through our cleaner function
         if original_name and project:
             clean_name = get_clean_unique_name(project.id, original_name)
-            validated_data["name"] = clean_name # Save the beautiful name to DB
-        # ----------------------------
+            validated_data["name"] = clean_name
 
         if source_file:
             validated_data["file_size"] = source_file.size
         
-        return Document.objects.create(created_by=user, **validated_data)
+        # Create the document first
+        document = Document.objects.create(created_by=user, **validated_data)
+        
+        # ============ NEW: Trigger PDF conversion in background ============
+        if source_file:
+            from .services import generate_document_preview, needs_pdf_conversion
+            
+            if needs_pdf_conversion(source_file.name):
+                # Run conversion synchronously
+                # Note: This adds 5-30 seconds to upload time
+                # For better UX, switch to Celery later (see comments below)
+                try:
+                    generate_document_preview(document)
+                except Exception as e:
+                    # Don't fail the upload if conversion fails
+                    # User still has access to original file
+                    import logging
+                    logging.error(f"Preview generation failed: {e}")
+            else:
+                # File type doesn't need conversion (PDF, image, video, etc.)
+                document.preview_status = Document.PreviewStatus.NOT_NEEDED
+                document.save(update_fields=['preview_status'])
+        # ===================================================================
+        
+        return document
 
 
 class DocumentBulkImportSerializer(serializers.Serializer):

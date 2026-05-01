@@ -450,6 +450,7 @@ class ProjectAllDocumentsView(APIView):
             filename = doc.source_file.name.split('/')[-1] if doc.source_file else doc.name
             
             file_url = None
+            preview_url = None 
             if doc.source_file:
                 try:
                     # --- NEW FIX: Dynamically determine Content-Type ---
@@ -467,6 +468,20 @@ class ProjectAllDocumentsView(APIView):
                         },
                         ExpiresIn=3600 
                     )
+                    # ============ NEW: Generate preview PDF URL ============
+                    if doc.preview_pdf and doc.preview_status == 'ready':
+                        pdf_filename = f"{filename.rsplit('.', 1)[0]}.pdf"
+                        preview_url = s3_client.generate_presigned_url(
+                            'get_object',
+                            Params={
+                                'Bucket': settings.AWS_STORAGE_BUCKET_NAME,
+                                'Key': doc.preview_pdf.name,
+                                'ResponseContentType': 'application/pdf',
+                                'ResponseContentDisposition': f'inline; filename="{pdf_filename}"'
+                            },
+                            ExpiresIn=3600
+                        )
+                    # ========================================================
                 except Exception as e:
                     print(f"S3 Error for Document {doc.id}: {e}")
             elif doc.source_file_url:
@@ -476,6 +491,8 @@ class ProjectAllDocumentsView(APIView):
                 "id": str(doc.id), # UUID converted to string
                 "file_name": doc.name, 
                 "file_url": file_url, 
+                "preview_url": preview_url,  # NEW
+                "preview_status": doc.preview_status, 
                 "uploaded_at": doc.created_at,
                 "updated_at": doc.updated_at,
                 "source": "Project",

@@ -208,14 +208,21 @@ class SendMessageView(APIView):
                 reply_to_id=serializer.validated_data.get('reply_to')
             )
             
-            # # # ---> NEW: Auto-trigger AI if this is the global AI Bot room <---
-            # if room.room_type == ChatRoom.RoomType.AI_BOT and message_type == 'text':
-            #     # Run asynchronously using threading (or Celery if you have it set up)
-            #     import threading
-            #     threading.Thread(
-            #         target=ChatMessageService.process_zanflow_ai,
-            #         args=(room.id, content, request.user.id)
-            #     ).start()
+            # ============ NEW: Trigger PDF preview generation ============
+            if attachment:
+                from .preview_service import (
+                    needs_pdf_conversion,
+                    trigger_preview_generation_async,
+                )
+                
+                if needs_pdf_conversion(attachment.name):
+                    # Convert in background - chat send stays fast
+                    trigger_preview_generation_async(message.id)
+                else:
+                    # No conversion needed for this file type
+                    message.preview_status = 'not_needed'
+                    message.save(update_fields=['preview_status'])
+            # ============================================================
             
             # # ---> Optional: Keep your existing @zanflow trigger for other rooms <---
             if '@dyuksa' in content.lower() and message_type == 'text':

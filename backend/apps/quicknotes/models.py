@@ -42,7 +42,20 @@ class NoteAttachment(models.Model):
     # Store the original filename for display purposes
     filename = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-
+    # ============ NEW: PDF preview fields ============
+    preview_pdf = models.FileField(
+        upload_to='quicknotes/previews/%Y/%m/%d/',
+        null=True,
+        blank=True,
+        help_text="Auto-generated PDF version for browser preview"
+    )
+    preview_status = models.CharField(
+        max_length=20,
+        default='pending',
+        help_text="pending, processing, ready, failed, not_needed"
+    )
+    preview_error = models.TextField(blank=True)
+    # =================================================
     class Meta:
         ordering = ['-created_at']
 
