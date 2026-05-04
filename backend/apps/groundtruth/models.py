@@ -17,8 +17,9 @@ def document_upload_path(instance, filename):
     if hasattr(instance, 'task') and instance.task:
         return f"task_documents/task_{instance.task.id}/{filename}"
     
-    # Otherwise, it goes in the standard project folder
-    return f"projects/{instance.project_id}/documents/{instance.id}/source/{filename}"
+    import uuid as _uuid
+    doc_id = instance.id if instance.id else _uuid.uuid4()
+    return f"projects/{instance.project_id}/documents/{doc_id}/source/{filename}"
 
 
 class Document(TenantModel, UserStampedModel):
@@ -92,6 +93,13 @@ class Document(TenantModel, UserStampedModel):
     
     def __str__(self):
         return f"{self.name} ({self.project.name})"
+
+    @property
+    def file_url(self):
+        """Always returns the correct file URL, preferring source_file over source_file_url."""
+        if self.source_file and self.source_file.name:
+            return self.source_file.url
+        return self.source_file_url or None
     
     @property
     def latest_version(self):
@@ -148,11 +156,15 @@ class GTVersion(TenantModel, UserStampedModel):
     
     def save(self, *args, **kwargs):
         if not self.version_number:
-            last_version = GTVersion.original_objects.filter(
-                document=self.document
-            ).order_by("-version_number").first()
-            self.version_number = (last_version.version_number + 1) if last_version else 1
-        super().save(*args, **kwargs)
+            from django.db import transaction
+            with transaction.atomic():
+                last_version = GTVersion.original_objects.select_for_update().filter(
+                    document=self.document
+                ).order_by("-version_number").first()
+                self.version_number = (last_version.version_number + 1) if last_version else 1
+                super().save(*args, **kwargs)
+        else:
+            super().save(*args, **kwargs)
 
 
 class DocumentComment(TenantModel, UserStampedModel):

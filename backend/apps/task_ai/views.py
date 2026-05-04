@@ -134,33 +134,18 @@ class DyuksaChatAgentView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # 1. Intercept the AI Trigger
         if message.lower().startswith("dyuksa "):
-            # Strip the trigger word to pass only the intent to Bedrock
             intent_string = message[7:].strip() 
             
-            # 2. Call the Bedrock Agent Service
+            # The service now returns the fully formatted JSON payload
             result = CalendarAgentService.process_scheduling_intent(
                 user=request.user, 
                 prompt_text=intent_string
             )
             
-            # 3. Format the successful tool execution
-            if "available_slots" in result:
-                # Grab the first 5 slots to keep the chat message concise
-                slots_str = ", ".join(result['available_slots'][:5]) 
-                reply = f"I checked the schedules for {', '.join(result['attendees_found'])} on {result['date']}. Here are a few available {result['duration']}-minute slots: {slots_str}."
-                
-                return Response({"reply": reply}, status=status.HTTP_200_OK)
-            
-            # 4. Handle tool failure or missing users
-            return Response(
-                {"reply": result.get('error', "I couldn't determine the scheduling details. Could you clarify who and when?")}, 
-                status=status.HTTP_200_OK 
-            )
+            # Return the result exactly as Jyoti requested it
+            return Response(result, status=status.HTTP_200_OK)
 
-        # If it doesn't start with 'dyuksa', it shouldn't hit this endpoint ideally, 
-        # but we handle it gracefully just in case.
         return Response(
             {"reply": "Standard message ignored by AI."}, 
             status=status.HTTP_200_OK

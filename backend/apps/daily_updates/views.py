@@ -10,6 +10,8 @@ from .models import DailyUpdate, Event, EventInvitation
 from .serializers import DailyUpdateSerializer, EventSerializer, EventInvitationSerializer
 from rest_framework.decorators import action
 from apps.notification.services import notify_organizer_rsvp
+from dateutil.relativedelta import relativedelta
+import uuid # Recommended for grouping recurring events
 class IsOwnerOrReadOnly(permissions.BasePermission):
     """
     Custom permission to only allow the user who created the update to edit it.
@@ -150,74 +152,95 @@ class EventViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         is_recurring = request.data.get('is_recurring', False)
         
-        # 1. STANDARD EVENT: If it's not recurring, use the normal creation process
+        # 1. STANDARD EVENT
         if not is_recurring:
             return super().create(request, *args, **kwargs)
 
-        # 2. RECURRING EVENT: Extract recurrence data
-        recurring_days = request.data.get('recurring_days', []) # e.g., [0, 3]
+        # 2. RECURRING EVENT SETUP
+        # Patterns: DAILY, WORK_WEEK, WEEKLY, MONTHLY, YEARLY
+        recurrence_pattern = request.data.get('recurrence_pattern', 'WEEKLY').upper()
+        recurring_days = request.data.get('recurring_days', []) 
         recurrence_end_date_str = request.data.get('recurrence_end_date')
         
-        if not recurring_days or not recurrence_end_date_str:
+        if not recurrence_end_date_str:
             return Response(
-                {"error": "recurring_days and recurrence_end_date are required for recurring events."}, 
+                {"error": "recurrence_end_date is required for recurring events."}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         recurrence_end_date = parse(recurrence_end_date_str).date()
-        
-        # Parse the initial start and end times
         current_start_time = parse(request.data.get('start_time'))
         current_end_time = parse(request.data.get('end_time'))
         
-        # We will store all generated events to return them
         created_events = []
         errors = []
+        
+        # Optional but highly recommended: Link these events together
+        recurrence_group_id = str(uuid.uuid4())
 
         # 3. GENERATE OCCURRENCES
-        # Loop day by day until we hit the end date
         current_date = current_start_time.date()
+        months_added = 0
+        years_added = 0
         
         while current_date <= recurrence_end_date:
-            # Check if the current day of the week is in our target days (0=Mon, 3=Thu)
-            if current_date.weekday() in recurring_days:
+            create_this_occurrence = False
+            
+            # Check if an event should be created on this specific day
+            if recurrence_pattern == 'DAILY':
+                create_this_occurrence = True
                 
-                # Create a copy of the request data for this specific occurrence
+            elif recurrence_pattern == 'WORK_WEEK':
+                if current_date.weekday() < 5: # 0-4 are Monday-Friday
+                    create_this_occurrence = True
+                    
+            elif recurrence_pattern == 'WEEKLY':
+                if current_date.weekday() in recurring_days:
+                    create_this_occurrence = True
+                    
+            elif recurrence_pattern in ['MONTHLY', 'YEARLY']:
+                # The relativedelta math handles the date matching automatically
+                create_this_occurrence = True
+
+            # Create the event if it matches the pattern
+            if create_this_occurrence:
                 event_data = request.data.copy()
-                
-                # Update the times for this specific date
                 event_data['start_time'] = datetime.combine(current_date, current_start_time.time())
                 event_data['end_time'] = datetime.combine(current_date, current_end_time.time())
+                # If you add the UUID to models.py, pass it here:
+                # event_data['recurrence_group_id'] = recurrence_group_id
                 
-                # Pass data to serializer (this automatically triggers the validation rules 
-                # we wrote earlier for limits and overlaps!)
                 serializer = self.get_serializer(data=event_data)
                 
                 if serializer.is_valid():
-                    # Save the event and assign the organizer
                     self.perform_create(serializer)
                     created_events.append(serializer.data)
                 else:
-                    # If it fails validation (e.g., overlap on a specific Thursday), record the error
                     errors.append({
                         "date": str(current_date),
                         "errors": serializer.errors
                     })
             
-            # Move to the next day
-            current_date += timedelta(days=1)
+            # 4. SMART INCREMENTING 
+            # We add to the *original* start date to prevent month-end drift
+            if recurrence_pattern == 'MONTHLY':
+                months_added += 1
+                current_date = current_start_time.date() + relativedelta(months=months_added)
+            elif recurrence_pattern == 'YEARLY':
+                years_added += 1
+                current_date = current_start_time.date() + relativedelta(years=years_added)
+            else:
+                # Daily, Work Week, and Weekly just move forward day-by-day
+                current_date += timedelta(days=1)
 
-        # 4. RETURN RESPONSE
-        # If some dates failed, we let the user know, but still return the successful ones
+        # 5. RETURN RESPONSE
         response_data = {
             "message": f"Successfully created {len(created_events)} events.",
             "created_events": created_events,
             "conflicts_skipped": errors
         }
         
-        # Return 207 Multi-Status if there were partial failures, otherwise 201 Created
         response_status = status.HTTP_207_MULTI_STATUS if errors else status.HTTP_201_CREATED
-        
         return Response(response_data, status=response_status)
     
     @action(detail=True, methods=['get'], url_path='rsvp-status')
