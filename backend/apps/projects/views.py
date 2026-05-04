@@ -109,8 +109,16 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 from apps.groundtruth.models import Document 
                 document = Document.objects.get(id=document_id, project_id=pk)
                 
-                # --- FIX IS HERE: Use source_file.name ---
-                file_key = document.source_file.name 
+                # ============ NEW: Prefer converted PDF preview if available ============
+                if document.preview_pdf and document.preview_status == 'ready':
+                    # Use the converted PDF instead of the original Office file
+                    file_key = document.preview_pdf.name
+                    is_pdf_preview = True
+                else:
+                    # Fallback to original file
+                    file_key = document.source_file.name
+                    is_pdf_preview = False
+                # =========================================================================
                 
             except Document.DoesNotExist:
                 return Response({"detail": "Document not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -124,12 +132,20 @@ class ProjectViewSet(viewsets.ModelViewSet):
         )
 
         try:
+            # Build params — add PDF content type if we're serving the preview
+            params = {
+                'Bucket': settings.AWS_STORAGE_BUCKET_NAME,
+                'Key': file_key,
+            }
+            
+            # If using PDF preview, force browser to render it inline as PDF
+            if document_id and 'is_pdf_preview' in locals() and is_pdf_preview:
+                params['ResponseContentType'] = 'application/pdf'
+                params['ResponseContentDisposition'] = 'inline'
+            
             url = s3_client.generate_presigned_url(
                 ClientMethod='get_object',
-                Params={
-                    'Bucket': settings.AWS_STORAGE_BUCKET_NAME,
-                    'Key': file_key,
-                },
+                Params=params,
                 ExpiresIn=3600 
             )
         except ClientError as e:
@@ -162,6 +178,26 @@ class ProjectViewSet(viewsets.ModelViewSet):
             status=Document.Status.DRAFT, 
             created_by=request.user
         )
+
+        # ============ NEW: Convert Office files to PDF synchronously ============
+        # User waits during upload (~10-20 sec for PPT) but the file is ready
+        # to preview immediately on click — no refresh needed.
+        from apps.groundtruth.services import (
+            needs_pdf_conversion,
+            generate_document_preview,
+        )
+        
+        if document.source_file and needs_pdf_conversion(document.source_file.name):
+            try:
+                generate_document_preview(document)
+            except Exception as e:
+                import logging
+                logging.error(f"Preview generation failed during upload: {e}")
+                # Don't fail the upload — original file still accessible
+        else:
+            document.preview_status = 'not_needed'
+            document.save(update_fields=['preview_status'])
+        # ========================================================================
 
         return Response(
             {"id": document.id, "status": "saved"}, 

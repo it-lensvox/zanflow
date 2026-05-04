@@ -4,10 +4,28 @@ from django.contrib.auth import get_user_model
 from django.utils.timezone import localtime
 from django.db.models import Q
 from apps.quicknotes.models import Folder, Note
-from apps.notification.services import notify_event_created
-from .models import Event, EventInvitation
+from apps.notification.services import notify_event_created, notify_calendar_shared
+from .models import Event, EventInvitation, CalendarShare
 User = get_user_model()
 
+@receiver(post_save, sender=CalendarShare)
+def send_calendar_share_notification(sender, instance, created, **kwargs):
+    """
+    Trigger notifications when a user shares their calendar with a teammate.
+    """
+    # We only want to notify them when the share is first CREATED, 
+    # not every time the permission is updated later.
+    if created:
+        try:
+            # Trigger your real-time notification service
+            notify_calendar_shared(
+                share_record=instance,  # Pass the entire instance here
+                actor=instance.owner    # Pass the owner as the actor
+            )
+        except Exception as e:
+            # Catching the exception ensures that if the notification system fails,
+            # it doesn't crash the actual API request that created the calendar share.
+            print(f"Error sending calendar share notification: {e}")
 @receiver(post_save, sender='daily_updates.DailyUpdate')
 def sync_daily_update_to_quick_notes(sender, instance, created, **kwargs):
     try:

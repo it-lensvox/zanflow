@@ -1,6 +1,7 @@
 from rest_framework import serializers
-from .models import DailyUpdate, Event, EventInvitation
+from .models import DailyUpdate, Event, EventInvitation ,CalendarShare
 from django.contrib.auth import get_user_model
+from .models import CalendarShareLink
 User = get_user_model()
 class DailyUpdateSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source='user.get_full_name', read_only=True)
@@ -118,3 +119,33 @@ class EventInvitationSerializer(serializers.ModelSerializer):
         model = EventInvitation
         fields = ['id', 'event', 'user', 'status', 'decline_reason', 'proposed_reschedule_time']
         read_only_fields = ['event', 'user']
+
+class CalendarShareSerializer(serializers.ModelSerializer):
+    owner_name = serializers.CharField(source='owner.get_full_name', read_only=True)
+    shared_with_name = serializers.CharField(source='shared_with.get_full_name', read_only=True)
+
+    class Meta:
+        model = CalendarShare
+        fields = ['id', 'owner', 'owner_name', 'shared_with', 'shared_with_name', 'permission', 'created_at']
+        read_only_fields = ['owner', 'created_at']
+
+class CalendarShareLinkSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CalendarShareLink
+        fields = ['id', 'token', 'is_active', 'expires_at', 'created_at']
+        read_only_fields = ['token', 'created_at']
+
+# 2. Ultra-safe serializer for the public view
+class PublicEventSerializer(serializers.ModelSerializer):
+    """
+    Strips away attendees, descriptions, and internal IDs. 
+    Only shows the bare minimum needed for a calendar grid.
+    """
+    organizer_name = serializers.CharField(source='organizer.get_full_name', read_only=True)
+    
+    class Meta:
+        model = Event
+        fields = [
+            'id', 'organizer_name', 'title', 'event_type', 
+            'start_time', 'end_time', 'is_online_meeting'
+        ]

@@ -67,3 +67,20 @@ class NoteAttachmentViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         # Security: Only let users see attachments belonging to their own notes
         return NoteAttachment.objects.filter(note__user=self.request.user)
+     # ============ NEW: Trigger PDF conversion after upload ============
+    def perform_create(self, serializer):
+        attachment = serializer.save()
+        
+        # Kick off PDF preview generation in background
+        if attachment.file:
+            from .preview_service import (
+                needs_pdf_conversion,
+                trigger_note_preview_async,
+            )
+            
+            if needs_pdf_conversion(attachment.file.name):
+                trigger_note_preview_async(attachment.id)
+            else:
+                attachment.preview_status = 'not_needed'
+                attachment.save(update_fields=['preview_status'])
+    # ===================================================================

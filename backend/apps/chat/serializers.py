@@ -91,7 +91,22 @@ class ChatMessageSerializer(serializers.ModelSerializer):
         """
         if not obj.attachment:
             return None
-
+        # ============ NEW: Prefer PDF preview if available ============
+        # If the attachment has been converted to PDF, return that URL
+        # so the frontend can preview Office files inline as PDFs
+        use_pdf_preview = (
+            obj.preview_pdf 
+            and obj.preview_pdf.name
+            and obj.preview_status == 'ready'
+        )
+        
+        if use_pdf_preview:
+            target_key = obj.preview_pdf.name
+            content_type = 'application/pdf'
+        else:
+            target_key = obj.attachment.name
+            content_type = 'application/octet-stream'
+        # ===============================================================
         # Check if we are using S3
         if hasattr(settings, 'USE_S3') and settings.USE_S3:
             try:
@@ -107,9 +122,9 @@ class ChatMessageSerializer(serializers.ModelSerializer):
                     'get_object',
                     Params={
                         'Bucket': settings.AWS_STORAGE_BUCKET_NAME,
-                        'Key': obj.attachment.name,
-                        'ResponseContentDisposition': 'inline', # Helps images display in browser
-                        'ResponseContentType': 'application/octet-stream' # Default fallback
+                        'Key': target_key,                          # Changed
+                        'ResponseContentDisposition': 'inline',
+                        'ResponseContentType': content_type,        # Changed
                     },
                     ExpiresIn=3600  # Link expires in 1 hour
                 )

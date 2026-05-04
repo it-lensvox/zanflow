@@ -6,12 +6,17 @@ from dateutil.parser import parse
 from django.utils.dateparse import parse_date
 from django.utils import timezone
 from .utils import find_available_slots
-from .models import DailyUpdate, Event, EventInvitation
-from .serializers import DailyUpdateSerializer, EventSerializer, EventInvitationSerializer
+from .models import DailyUpdate, Event, EventInvitation, CalendarShare, CalendarShareLink
+from .serializers import DailyUpdateSerializer, EventSerializer, EventInvitationSerializer, CalendarShareSerializer, CalendarShareLinkSerializer, PublicEventSerializer
 from rest_framework.decorators import action
 from apps.notification.services import notify_organizer_rsvp
 from dateutil.relativedelta import relativedelta
 import uuid # Recommended for grouping recurring events
+from django.utils import timezone
+from dateutil.parser import parse
+from rest_framework import generics
+from django.http import HttpResponse
+from icalendar import Calendar, Event as IcalEvent
 class IsOwnerOrReadOnly(permissions.BasePermission):
     """
     Custom permission to only allow the user who created the update to edit it.
@@ -71,22 +76,70 @@ class DailyUpdateViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         # Automatically assign the logged-in user when creating a new update
         serializer.save(user=self.request.user)
-
+class IsOrganizerOrSharedEdit(permissions.BasePermission):
+    """
+    Allows the organizer to edit, OR a user who has been granted 'edit' or 'full' calendar access.
+    """
+    def has_object_permission(self, request, view, obj):
+        # Read permissions are allowed to any request (fetching events is handled in get_queryset)
+        if request.method in permissions.SAFE_METHODS:
+            return True
+            
+        # Write permissions are only allowed to the organizer
+        if obj.organizer == request.user:
+            return True
+            
+        # OR users who have explicitly been granted edit/full permissions by the organizer
+        has_edit_access = CalendarShare.objects.filter(
+            owner=obj.organizer, 
+            shared_with=request.user, 
+            permission__in=['edit', 'full']
+        ).exists()
+        
+        return has_edit_access
 class EventViewSet(viewsets.ModelViewSet):
     serializer_class = EventSerializer
-    # Apply the new permission class here
-    permission_classes = [permissions.IsAuthenticated, IsOrganizerOrReadOnly]
+    # Replace IsOrganizerOrReadOnly with the new permission
+    permission_classes = [permissions.IsAuthenticated, IsOrganizerOrSharedEdit] 
 
     def get_queryset(self):
         user = self.request.user
         
-        # CHANGED: We now allow 'PENDING' events to be returned so they render on the calendar!
-        queryset = Event.objects.filter(
-            Q(organizer=user) | 
-            Q(invitations__user=user, invitations__status__in=['ACCEPTED', 'PENDING'])
-        ).distinct()
+        # --- NEW: TEAM CALENDAR VIEW FILTER ---
+        user_ids_param = self.request.query_params.get('user_ids')
+        
+        if user_ids_param:
+            # Parse the comma-separated string (e.g., "?user_ids=2,4,5") into a list of integers
+            requested_ids = [int(id.strip()) for id in user_ids_param.split(',') if id.strip().isdigit()]
             
-        # Optional date filtering for the calendar view
+            # SECURITY CHECK: Only allow fetching IDs that have explicitly shared their calendar with the logged-in user
+            allowed_shared_owners = CalendarShare.objects.filter(
+                shared_with=user, 
+                owner_id__in=requested_ids
+            ).values_list('owner_id', flat=True)
+            
+            valid_ids = list(allowed_shared_owners)
+            
+            # The logged-in user is always allowed to see their own events
+            if user.id in requested_ids:
+                valid_ids.append(user.id)
+                
+            # Override the query to ONLY return events organized by these specific validated users
+            base_query = Q(organizer_id__in=valid_ids)
+
+        # --- EXISTING: STANDARD CALENDAR VIEW ---
+        else:
+            base_query = Q(organizer=user) | Q(invitations__user=user, invitations__status__in=['ACCEPTED', 'PENDING'])
+            
+            include_shared = self.request.query_params.get('include_shared', 'false').lower() == 'true'
+            if include_shared:
+                shared_owners = CalendarShare.objects.filter(shared_with=user).values_list('owner', flat=True)
+                base_query |= Q(organizer__in=shared_owners)
+
+        # Apply the final query
+        queryset = Event.objects.filter(base_query).distinct()
+            
+        # Optional date filtering for the calendar grid
         start_date = self.request.query_params.get('start_date')
         end_date = self.request.query_params.get('end_date')
         
@@ -120,6 +173,14 @@ class EventViewSet(viewsets.ModelViewSet):
         try:
             start_time = parse(start_time_str)
             end_time = parse(end_time_str)
+
+            # --- NEW TIMEZONE SAFEGUARDS ---
+            if timezone.is_naive(start_time):
+                start_time = timezone.make_aware(start_time)
+            if timezone.is_naive(end_time):
+                end_time = timezone.make_aware(end_time)
+            # -------------------------------
+
         except Exception:
             return Response({"error": "Invalid date/time format."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -171,6 +232,13 @@ class EventViewSet(viewsets.ModelViewSet):
         recurrence_end_date = parse(recurrence_end_date_str).date()
         current_start_time = parse(request.data.get('start_time'))
         current_end_time = parse(request.data.get('end_time'))
+
+        # --- NEW TIMEZONE SAFEGUARDS ---
+        if timezone.is_naive(current_start_time):
+            current_start_time = timezone.make_aware(current_start_time)
+        if timezone.is_naive(current_end_time):
+            current_end_time = timezone.make_aware(current_end_time)
+        # -------------------------------
         
         created_events = []
         errors = []
@@ -338,6 +406,106 @@ class EventViewSet(viewsets.ModelViewSet):
         # Automatically set the organizer to the logged-in user
         serializer.save(organizer=self.request.user)
 
+    def export_ics(self, request, pk=None):
+        """
+        Generates and downloads an ICS file for a specific event.
+        """
+        # 1. Fetch the event (this automatically respects your IsOrganizerOrSharedEdit permissions)
+        event = self.get_object()
+
+        # 2. Initialize the Calendar and Event components
+        cal = Calendar()
+        ical_event = IcalEvent()
+
+        # 3. Map the Django database fields to the ICS format
+        ical_event.add('summary', event.title)
+        
+        # Because your database already stores these as UTC timezone-aware objects,
+        # the icalendar library will perfectly format them as standard UTC strings (ending in 'Z')
+        ical_event.add('dtstart', event.start_time)
+        ical_event.add('dtend', event.end_time)
+
+        # Optional fields
+        if event.description:
+            ical_event.add('description', event.description)
+        if event.location:
+            ical_event.add('location', event.location)
+
+        # 4. Attach the event to the calendar
+        cal.add_component(ical_event)
+
+        # 5. Build the HTTP Response to trigger a file download
+        response = HttpResponse(cal.to_ical(), content_type="text/calendar")
+        
+        # The Content-Disposition header is what tells the browser to "Download" instead of "Display"
+        filename = f"dyuksa_event_{event.id}.ics"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+        return response
+    def export_all_ics(self, request):
+        """
+        Generates and downloads an ICS file containing ALL of the user's events.
+        """
+        # 1. Fetch ALL events the user is allowed to see (uses your existing get_queryset logic)
+        # We also pass include_shared=true in case they want to export their team's events too!
+        events = self.get_queryset()
+
+        # 2. Initialize the master Calendar
+        cal = Calendar()
+
+        # 3. Loop through every event and add it to the calendar
+        for event in events:
+            ical_event = IcalEvent()
+            ical_event.add('summary', event.title)
+            ical_event.add('dtstart', event.start_time)
+            ical_event.add('dtend', event.end_time)
+            
+            if event.description:
+                ical_event.add('description', event.description)
+            if event.location:
+                ical_event.add('location', event.location)
+                
+            cal.add_component(ical_event)
+
+        # 4. Build the HTTP Response
+        response = HttpResponse(cal.to_ical(), content_type="text/calendar")
+        
+        # Name the file differently so the user knows it is their full calendar
+        filename = f"dyuksa_full_calendar_{request.user.username}.ics"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+        return response
+class CalendarShareViewSet(viewsets.ModelViewSet):
+    serializer_class = CalendarShareSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        return CalendarShare.objects.filter(Q(owner=user) | Q(shared_with=user))
+
+    def create(self, request, *args, **kwargs):
+        # 1. Check if they are trying to share with someone specific
+        shared_with_id = request.data.get('shared_with')
+        
+        if shared_with_id:
+            # 2. Look for an existing share record between these two users
+            existing_share = CalendarShare.objects.filter(
+                owner=request.user, 
+                shared_with_id=shared_with_id
+            ).first()
+            
+            if existing_share:
+                # 3. If it exists, UPDATE the existing record instead of crashing
+                serializer = self.get_serializer(existing_share, data=request.data, partial=True)
+                serializer.is_valid(raise_exception=True)
+                self.perform_update(serializer)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+        
+        # 4. Otherwise, proceed with normal creation
+        return super().create(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        serializer.save(owner=self.request.user)
 class EventInvitationViewSet(viewsets.ModelViewSet):
     """
     Handles the RSVP actions for Event Invitations triggered from notifications.
@@ -391,3 +559,39 @@ class EventInvitationViewSet(viewsets.ModelViewSet):
         notify_organizer_rsvp(invitation, 'RESCHEDULE')
         
         return Response({'message': 'Reschedule request sent to organizer.'})
+    
+class CalendarShareLinkViewSet(viewsets.ModelViewSet):
+    serializer_class = CalendarShareLinkSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        # A user can only see and manage their own generated links
+        return CalendarShareLink.objects.filter(owner=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(owner=self.request.user)
+
+
+# 2. Public View (For the external client)
+class PublicSharedCalendarView(generics.ListAPIView):
+    serializer_class = PublicEventSerializer
+    # CRUCIAL: AllowAny lets unauthenticated users hit this endpoint
+    permission_classes = [permissions.AllowAny] 
+
+    def get_queryset(self):
+        token = self.kwargs.get('token')
+        
+        try:
+            # Look up the token in the database
+            share_link = CalendarShareLink.objects.get(token=token, is_active=True)
+        except CalendarShareLink.DoesNotExist:
+            # If token is fake or deactivated, return empty list
+            return Event.objects.none()
+
+        # Check if the link has an expiration date that has passed
+        if share_link.expires_at and share_link.expires_at < timezone.now():
+            return Event.objects.none()
+
+        # If everything is valid, return the owner's events
+        # We only return events where they are the organizer to keep it simple and secure
+        return Event.objects.filter(organizer=share_link.owner).order_by('-start_time')
