@@ -433,11 +433,40 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
       updateAllTaskListCaches(updatedTaskForProjects);
 
       setActiveDropdown(false);
-
-      taskApi.update(task.id, { status: newStatus } as any).catch((error) => {
-        console.error('[StatusChange] ❌ API update failed:', error);
-        queryClient?.invalidateQueries({ queryKey: ['tasks'] });
-      });
+      taskApi.update(task.id, { status: newStatus } as any)
+        .then((response) => {
+          // Update cache with the full task data from the API response (includes status_updated_by_details)
+          const updatedTaskFromServer = response.task || response;
+          queryClient.setQueryData(['tasks'], (old: any) => {
+            if (!old) return old;
+            if (old.pages) {
+              return {
+                ...old,
+                pages: old.pages.map((page: any) => ({
+                  ...page,
+                  results: page.results.map((t: Task) =>
+                    t.id === task.id ? updatedTaskFromServer : t
+                  ),
+                })),
+              };
+            }
+            if (Array.isArray(old)) {
+              return old.map((t: Task) => (t.id === task.id ? updatedTaskFromServer : t));
+            }
+            if (old.tasks) {
+              return { ...old, tasks: old.tasks.map((t: Task) => (t.id === task.id ? updatedTaskFromServer : t)) };
+            }
+            if (old.results) {
+              return { ...old, results: old.results.map((t: Task) => (t.id === task.id ? updatedTaskFromServer : t)) };
+            }
+            return old;
+          });
+          updateAllTaskListCaches(updatedTaskFromServer);
+        })
+        .catch((error) => {
+          console.error('[StatusChange] ❌ API update failed:', error);
+          queryClient?.invalidateQueries({ queryKey: ['tasks'] });
+        });
     };
     const trigger = (
       <div
@@ -680,7 +709,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     },
     {
       key: personField,
-      label: <span className="text-[14px] font-bold tracking-wide text-gray-700">{personField === 'assigned_to' ? 'Assignee' : personField === 'created_by' ? 'Created By' : 'Updated By'}</span>,      width: '8%',
+      label: <span className="text-[14px] font-bold tracking-wide text-gray-700">{personField === 'assigned_to' ? 'Assignee' : personField === 'created_by' ? 'Created By' : 'Updated By'}</span>, width: '8%',
       render: (task: Task) => {
         if (personField === 'created_by') {
           // Show Created By
