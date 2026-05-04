@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Download, Loader2, FileText, AlertCircle, ZoomIn, ZoomOut, Maximize2, Minimize2, ExternalLink } from 'lucide-react';/**
+import { X, Download, Loader2, FileText, AlertCircle, ZoomIn, ZoomOut, Maximize2, Minimize2, ExternalLink } from 'lucide-react';
+import * as XLSX from 'xlsx';
+/**
  * Supports: Images, PDF, DOCX, PPTX, TXT, Code files, and more.
  * 
  * @param url - The URL of the document to preview
@@ -32,6 +34,13 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
     const [downloading, setDownloading] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(defaultFullscreen);
 
+    // Excel preview state - holds parsed sheets and active tab index
+    const [excelSheets, setExcelSheets] = useState<{
+        name: string;
+        data: any[][];
+    }[]>([]);
+    const [activeSheetIndex, setActiveSheetIndex] = useState(0);
+
     // Toggle fullscreen mode
     const toggleFullscreen = () => {
         setIsFullscreen(!isFullscreen);
@@ -45,7 +54,7 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
 
     const extension = getFileExtension();
 
-    // Helper: detect if the URL itself points to a PDF (regardless of fileName)
+    // Detect if the URL itself points to a PDF (regardless of fileName)
     // This handles the case where backend converted Office files to PDF for preview
     const urlPointsToPdf = (() => {
         try {
@@ -59,11 +68,11 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
 
     const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(extension);
     const isPDF = urlPointsToPdf || extension === 'pdf' || fileType?.includes('pdf');
-    
+
     // If URL is a PDF (converted from Office), don't treat it as an Office doc
     const isOfficeDoc = !urlPointsToPdf && ['doc', 'docx'].includes(extension);
     const isPresentation = !urlPointsToPdf && ['ppt', 'pptx'].includes(extension);
-    const isSpreadsheet = !urlPointsToPdf && ['xls', 'xlsx'].includes(extension);   
+    const isSpreadsheet = !urlPointsToPdf && ['xls', 'xlsx'].includes(extension);
     const isText = ['txt', 'md', 'log', 'csv'].includes(extension);
     const isCode = ['js', 'jsx', 'ts', 'tsx', 'json', 'html', 'css', 'py', 'java', 'cpp', 'c', 'sh', 'yml', 'yaml', 'xml'].includes(extension);
     const isVideo = ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'].includes(extension) || fileType?.startsWith('video/') || false;
@@ -130,15 +139,6 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
         }
     };
 
-    const handleOpenInNewTab = () => {
-        try {
-            window.open(url, '_blank', 'noopener,noreferrer');
-        } catch (error) {
-            console.error('Failed to open in new tab:', error);
-            alert('Could not open file. Please try downloading instead.')
-        }
-    }
-
 
     // Fetch text content for text/code files
     useEffect(() => {
@@ -159,23 +159,40 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
             setLoading(false);
         }
     }, [url, isImage, isPDF, isOfficeDoc, isPresentation, isSpreadsheet, isText, isCode, isVideo, isAudio]);
-
-    // Timeout detection for Office viewer failures
+    
+    // Load and parse Excel files using SheetJS
     useEffect(() => {
-        if (isOfficeDoc || isPresentation || isSpreadsheet || isPDF) {
-            const timeout = setTimeout(() => {
-                if (loading) {
+        // Skip if URL points to a converted PDF (shouldn't happen for Excel anymore, but safe)
+        if (isSpreadsheet && !urlPointsToPdf) {
+            fetch(url)
+                .then(res => {
+                    if (!res.ok) throw new Error('Failed to download Excel file');
+                    return res.arrayBuffer();
+                })
+                .then(buffer => {
+                    const workbook = XLSX.read(buffer, { type: 'array' });
+                    
+                    const sheets = workbook.SheetNames.map(name => ({
+                        name,
+                        data: XLSX.utils.sheet_to_json(workbook.Sheets[name], {
+                            header: 1,    // Get array-of-arrays
+                            defval: '',   // Default value for empty cells
+                        }) as any[][]
+                    }));
+                    
+                    setExcelSheets(sheets);
+                    setLoading(false);
+                })
+                .catch(err => {
+                    console.error('Excel parse error:', err);
                     setError(
-                        `Preview is taking too long or this ${extension.toUpperCase()} file ` +
-                        `cannot be previewed in browser. You can open it in a new tab or download it.`
+                        'Failed to load Excel file. The file may be corrupted, ' +
+                        'password-protected, or in an unsupported format.'
                     );
                     setLoading(false);
-                }
-            }, 10000); // 10 seconds
-
-            return () => clearTimeout(timeout);
+                });
         }
-    }, [url, isOfficeDoc, isPresentation, isSpreadsheet, isPDF, loading, extension]);
+    }, [url, isSpreadsheet, urlPointsToPdf]);
 
     // Zoom controls
     const handleZoomIn = () => setZoom(prev => Math.min(prev + 25, 200));
@@ -222,7 +239,85 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
         }
 
         // Office Documents (DOCX, PPTX, XLSX) - Using Microsoft Office Online Viewer
-        if (isOfficeDoc || isPresentation || isSpreadsheet) {
+        // Excel/Spreadsheet Preview using SheetJS (interactive table view)
+        if (isSpreadsheet && !urlPointsToPdf && excelSheets.length > 0) {
+            const currentSheet = excelSheets[activeSheetIndex];
+            
+            return (
+                <div className="h-full w-full flex flex-col bg-white overflow-hidden">
+                    {/* Sheet tabs (only show if multiple sheets) */}
+                    {excelSheets.length > 1 && (
+                        <div className="flex-shrink-0 flex items-center gap-1 px-4 py-2 bg-gray-100 border-b border-gray-200 overflow-x-auto">
+                            {excelSheets.map((sheet, index) => (
+                                <button
+                                    key={sheet.name}
+                                    onClick={() => setActiveSheetIndex(index)}
+                                    className={`px-3 py-1 text-sm font-medium rounded transition-colors whitespace-nowrap ${
+                                        activeSheetIndex === index
+                                            ? 'bg-white text-blue-600 border border-blue-300 shadow-sm'
+                                            : 'text-gray-600 hover:bg-white'
+                                    }`}
+                                >
+                                    {sheet.name}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    
+                    {/* Spreadsheet table content */}
+                    <div className="flex-1 overflow-auto">
+                        <table className="text-sm border-collapse">
+                            <tbody>
+                                {currentSheet.data.length === 0 ? (
+                                    <tr>
+                                        <td className="p-8 text-center text-gray-500">
+                                            This sheet is empty
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    currentSheet.data.map((row, rowIndex) => (
+                                        <tr 
+                                            key={rowIndex}
+                                            className={rowIndex === 0 ? 'bg-gray-100 font-semibold' : 'hover:bg-gray-50'}
+                                        >
+                                            {/* Row number cell */}
+                                            <td className="px-3 py-1.5 text-xs text-gray-400 bg-gray-50 border border-gray-200 text-center min-w-[40px] sticky left-0 z-10">
+                                                {rowIndex + 1}
+                                            </td>
+                                            
+                                            {/* Data cells */}
+                                            {row.map((cell, cellIndex) => (
+                                                <td 
+                                                    key={cellIndex}
+                                                    className="px-3 py-1.5 border border-gray-200 whitespace-nowrap"
+                                                    title={String(cell || '')}
+                                                >
+                                                    {cell !== null && cell !== undefined ? String(cell) : ''}
+                                                </td>
+                                            ))}
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    {/* Footer info */}
+                    <div className="flex-shrink-0 px-4 py-2 bg-gray-50 border-t border-gray-200 text-xs text-gray-500 flex justify-between items-center">
+                        <span>
+                            {currentSheet.data.length} rows × {currentSheet.data[0]?.length || 0} columns
+                        </span>
+                        <span>
+                            Sheet {activeSheetIndex + 1} of {excelSheets.length}
+                        </span>
+                    </div>
+                </div>
+            );
+        }
+
+        // Office Documents (DOCX, PPTX) - Using Microsoft Office Online Viewer
+        // Note: Spreadsheets are handled above with SheetJS for better UX
+        if (isOfficeDoc || isPresentation) {
             const encodedUrl = encodeURIComponent(url);
             const viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodedUrl}`;
 
@@ -370,7 +465,7 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
                         </div>
                     )}
 
-{/* Maximize/Minimize Button */}
+                    {/* Maximize/Minimize Button */}
                     <button
                         onClick={toggleFullscreen}
                         className="p-2 hover:bg-gray-700 rounded transition-colors"
@@ -382,19 +477,6 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
                             <Maximize2 className="w-5 h-5" />
                         )}
                     </button>
-
-                    {/* ============ ADD THIS NEW BUTTON HERE ============ */}
-                    {/* Open in New Tab Button - always visible */}
-                    <a
-                        href={url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-2 hover:bg-gray-700 rounded transition-colors text-white flex items-center"
-                        title="Open in New Tab"
-                    >
-                        <ExternalLink className="w-5 h-5" />
-                    </a>
-                    {/* ============ END NEW BUTTON ============ */}
 
                     {/* Download Button */}
                     <button
@@ -436,43 +518,25 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
                     <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-10">
                         <div className="flex flex-col items-center gap-4 max-w-md p-6">
                             <AlertCircle className="w-16 h-16 text-red-500" />
-                            <h3 className="text-xl font-semibold text-white">Preview Not Available</h3>
+                            <h3 className="text-xl font-semibold text-white">Preview Error</h3>
                             <p className="text-gray-300 text-center">{error}</p>
-
-                            {/* Two action buttons side by side */}
-                            <div className="flex flex-col sm:flex-row gap-3 mt-2 w-full">
-                                {/* Open in New Tab Button - PRIMARY ACTION */}
-                                <button
-                                    onClick={handleOpenInNewTab}
-                                    className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-                                >
-                                    <Maximize2 className="w-5 h-5" />
-                                    Open in New Tab
-                                </button>
-
-                                {/* Download Button - SECONDARY ACTION */}
-                                <button
-                                    onClick={handleDownload}
-                                    disabled={downloading}
-                                    className="flex-1 px-6 py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {downloading ? (
-                                        <>
-                                            <Loader2 className="w-5 h-5 animate-spin" />
-                                            Downloading...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Download className="w-5 h-5" />
-                                            Download
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-
-                            <p className="text-gray-400 text-xs text-center mt-2">
-                                Tip: Opening in a new tab uses your browser's native viewer
-                            </p>
+                            <button
+                                onClick={handleDownload}
+                                disabled={downloading}
+                                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {downloading ? (
+                                    <>
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                        Downloading...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Download className="w-5 h-5" />
+                                        Download File
+                                    </>
+                                )}
+                            </button>
                         </div>
                     </div>
                 )}
@@ -486,7 +550,8 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
                 <span className="text-xs">
                     {isImage && 'Use zoom controls to adjust size'}
                     {isPDF && 'Scroll to navigate pages'}
-                    {(isOfficeDoc || isPresentation || isSpreadsheet) && 'Powered by Microsoft Office Online Viewer'}
+                    {isSpreadsheet && !urlPointsToPdf && 'Spreadsheet preview — switch tabs to view sheets'}
+                    {(isOfficeDoc || isPresentation) && !urlPointsToPdf && 'Powered by Microsoft Office Online Viewer'}
                 </span>
             </div>
         </div>
