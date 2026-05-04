@@ -1506,6 +1506,39 @@ export const eventApi = {
     });
     return data;
   },
+  exportEvent: async (eventId: number) => {
+    const response = await api.get(`/daily-updates/events/${eventId}/export/`, {
+      responseType: 'blob',
+    });
+    
+    // Create download link
+    const blob = new Blob([response.data], { type: 'text/calendar' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `event-${eventId}.ics`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
+
+  exportAllEvents: async () => {
+    const response = await api.get('/daily-updates/events/export-all/', {
+      responseType: 'blob',
+    });
+    
+    // Create download link
+    const blob = new Blob([response.data], { type: 'text/calendar' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `dyuksa-calendar-${new Date().toISOString().split('T')[0]}.ics`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
 
   // ═══════════════════════════════════════════════════════════════════════
   // INVITATION API FUNCTIONS
@@ -1585,5 +1618,52 @@ export const dyuksaAI = {
   },
 };
 
+// Add to your api.ts exports
+export const calendarShareApi = {
+  list: async () => {
+      const response = await api.get('/daily-updates/calendar-shares/');
+      return Array.isArray(response.data) ? response.data : (response.data.results || []);
+  },
+  create: async (data: { shared_with: number; permission: 'view' | 'edit' | 'full' }) => {
+      const response = await api.post('/daily-updates/calendar-shares/', data);
+      return response.data;
+  },
+  update: async (shareId: number, data: { permission: 'view' | 'edit' | 'full' }) => {
+      const response = await api.patch(`/daily-updates/calendar-shares/${shareId}/`, data);
+      return response.data;
+  },
+  delete: async (shareId: number) => {
+      await api.delete(`/daily-updates/calendar-shares/${shareId}/`);
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// CALENDAR PUBLIC LINK API
+// ═══════════════════════════════════════════════════════════════════════
+
+export const calendarLinkApi = {
+    list: async () => {
+        const response = await api.get('/daily-updates/calendar-links/');
+        return Array.isArray(response.data) ? response.data : (response.data.results || []);
+    },
+    create: async (expiresAt?: string) => {
+        const payload = expiresAt ? { expires_at: expiresAt } : {};
+        const response = await api.post('/daily-updates/calendar-links/', payload);
+        return response.data;
+    },
+    delete: async (linkId: number) => {
+        await api.delete(`/daily-updates/calendar-links/${linkId}/`);
+    },
+    // Public endpoint - no auth required
+    getPublicCalendar: async (token: string) => {
+        const response = await api.get(`/daily-updates/shared-calendar/${token}/`, {
+            headers: {
+                // Remove auth header for public endpoint
+                Authorization: undefined
+            }
+        });
+        return response.data;
+    },
+};
 
 export default api;

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import ReactDOM from 'react-dom';
+import ReactDOM, { createPortal } from 'react-dom';
 import { Plus, Grid3X3, List, Search, Bell } from 'lucide-react';
 import { useNavigate, Outlet, useLocation, useOutletContext } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -21,6 +21,11 @@ const DATE_FIELD_OPTIONS: { value: 'end_date' | 'start_date' | 'created_at'; lab
     { value: 'end_date', label: 'Due Date' },
     { value: 'start_date', label: 'Start Date' },
     { value: 'created_at', label: 'Created At' },
+];
+const PERSON_FIELD_OPTIONS: { value: 'assigned_to' | 'created_by' | 'updated_by'; label: string }[] = [
+    { value: 'assigned_to', label: 'Assignee' },
+    { value: 'created_by', label: 'Created By' },
+    { value: 'updated_by', label: 'Updated By' },
 ];
 
 // ── Sanitise the tasks cache on every mount to prevent InfiniteQuery crashes ──
@@ -75,6 +80,9 @@ export const MyTask: React.FC = () => {
 
     sanitiseTaskCache(queryClient);
     const [dateField, setDateField] = useState<'end_date' | 'start_date' | 'created_at'>('end_date');
+    const [personField, setPersonField] = useState<'assigned_to' | 'created_by' | 'updated_by'>('updated_by');
+    const [showPersonFieldDropdown, setShowPersonFieldDropdown] = useState(false);
+    const personTriggerRef = React.useRef<HTMLButtonElement>(null);
     const [showDateFieldDropdown, setShowDateFieldDropdown] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -278,10 +286,18 @@ export const MyTask: React.FC = () => {
             const matchesFilter = activeFilter === 'ALL' || task.status.toUpperCase() === activeFilter;
             const matchesSearch = searchQuery.trim() === '' ||
                 (task.heading || '').toLowerCase().includes(searchQuery.toLowerCase());
+
+            // Filter by Assignee
             const assigneeFilterValue = columnFilters['assigned_to'];
             const matchesAssignee = !assigneeFilterValue ||
                 (task.assigned_to || []).map(String).includes(String(assigneeFilterValue));
-            return matchesFilter && matchesSearch && matchesAssignee;
+
+            // Filter by Created By
+            const createdByFilterValue = columnFilters['created_by'];
+            const matchesCreatedBy = !createdByFilterValue ||
+                String(task.assigned_by) === String(createdByFilterValue);
+
+            return matchesFilter && matchesSearch && matchesAssignee && matchesCreatedBy;
         });
     }, [hookFilteredTasks, activeFilter, searchQuery, columnFilters]);
     const handleFilter = useCallback((key: string) => {
@@ -301,7 +317,8 @@ export const MyTask: React.FC = () => {
         user,
         navigate,
         dateField,
-    }), [handleTaskClick, queryClient, user, navigate, dateField]);
+        personField,
+    }), [handleTaskClick, queryClient, user, navigate, dateField, personField]);
     const { unreadCount } = useNotifications();
 
     const outletContext = useOutletContext<{
@@ -344,6 +361,29 @@ export const MyTask: React.FC = () => {
             </svg>
         </button>
     ), [showDateFieldDropdown, dateField, activeDateLabel]);
+    const activePersonLabel = PERSON_FIELD_OPTIONS.find(o => o.value === personField)?.label ?? 'Assignee';
+
+    const PersonFieldLabel = useMemo(() => (
+        <button
+            ref={personTriggerRef}
+            type="button"
+            onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                if (personTriggerRef.current) {
+                    const rect = personTriggerRef.current.getBoundingClientRect();
+                    setDropdownPos({ top: rect.bottom + window.scrollY + 4, left: rect.left + window.scrollX });
+                }
+                setShowPersonFieldDropdown(v => !v);
+            }}
+            className="flex items-center gap-1 text-[14px] font-bold tracking-wide text-gray-700 hover:text-purple-600 transition-colors"
+        >
+            {activePersonLabel}
+            <svg className="w-3 h-3 mt-0.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+        </button>
+    ), [showPersonFieldDropdown, personField, activePersonLabel]);
 
     return (
         <div className="w-full flex flex-col h-screen overflow-hidden">
@@ -443,10 +483,10 @@ export const MyTask: React.FC = () => {
                                             /* Auto-Close for both search and dropdowns */
                                             <div ref={activeFilterKey === col.key ? filterContainerRef : null}>
                                                 <FilterHeaderWrapper
-                                                    columnLabel={col.key === dateField ? DateFieldLabel : col.label as string}
+                                                    columnLabel={col.key === personField ? PersonFieldLabel : col.key === dateField ? DateFieldLabel : col.label as string}
                                                     filterType={
                                                         ['project', 'heading', 'labels'].includes(col.key) ? 'search' :
-                                                            ['status', 'priority', 'assigned_to'].includes(col.key) ? 'list' :
+                                                            ['status', 'priority'].includes(col.key) || col.key === personField ? 'list' :
                                                                 col.key === dateField ? 'date' : 'none'
                                                     }
                                                     isActive={activeFilterKey === col.key}
@@ -479,17 +519,17 @@ export const MyTask: React.FC = () => {
                                                                     containerRef={filterContainerRef}
                                                                 />
                                                             )}
-                                                            {col.key === 'assigned_to' && (
+                                                            {col.key === personField && (
                                                                 <ListFilter
-                                                                    columnKey="assigned_to"
+                                                                    columnKey={personField}
                                                                     options={(usersData || []).map(u => ({
                                                                         value: String(u.id),
                                                                         label: `${u.first_name} ${u.last_name}`.trim() || u.username,
                                                                     }))}
-                                                                    selectedValue={columnFilters['assigned_to'] || ''}
-                                                                    onSelect={(value) => { setColumnFilters(prev => ({ ...prev, assigned_to: value })); setActiveFilterKey(null); }}
-                                                                    onClear={() => { clearFilter('assigned_to'); setActiveFilterKey(null); }}
-                                                                    isActive={activeFilterKey === 'assigned_to'}
+                                                                    selectedValue={columnFilters[personField] || ''}
+                                                                    onSelect={(value) => { setColumnFilters(prev => ({ ...prev, [personField]: value })); setActiveFilterKey(null); }}
+                                                                    onClear={() => { clearFilter(personField); setActiveFilterKey(null); }}
+                                                                    isActive={activeFilterKey === personField}
                                                                     containerRef={filterContainerRef}
                                                                 />
                                                             )}
@@ -603,6 +643,35 @@ export const MyTask: React.FC = () => {
                             className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-purple-50 hover:text-purple-700 transition-colors ${dateField === opt.value ? 'font-semibold text-purple-600 bg-purple-50' : 'text-gray-700'}`}
                         >
                             {dateField === opt.value && <span className="mr-1.5">✓</span>}{opt.label}
+                        </button>
+                    ))}
+                </div>,
+                document.body
+            )}
+            {/* Person Field Dropdown */}
+            {showPersonFieldDropdown && dropdownPos && createPortal(
+                <div
+                    style={{ position: 'absolute', top: dropdownPos.top, left: dropdownPos.left, zIndex: 9999 }}
+                    className="bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[140px]"
+                    onMouseDown={(e) => e.stopPropagation()}
+                >
+                    {PERSON_FIELD_OPTIONS.map(opt => (
+                        <button
+                            key={opt.value}
+                            onMouseDown={(e) => {
+                                e.stopPropagation();
+                                // Clear all filters when switching
+                                clearFilter('assigned_to');
+                                clearFilter('created_by');
+                                clearFilter('updated_by');
+                                setPersonField(opt.value);
+                                setShowPersonFieldDropdown(false);
+                                setDropdownPos(null);
+                                setActiveFilterKey(null);
+                            }}
+                            className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-purple-50 hover:text-purple-700 transition-colors ${personField === opt.value ? 'font-semibold text-purple-600 bg-purple-50' : 'text-gray-700'}`}
+                        >
+                            {personField === opt.value && <span className="mr-1.5">✓</span>}{opt.label}
                         </button>
                     ))}
                 </div>,

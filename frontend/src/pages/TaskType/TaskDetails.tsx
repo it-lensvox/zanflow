@@ -9,7 +9,7 @@ import {
   Grid3X3,
   Settings,
   MessageCircle,
-  Search, FileText , Info, X, Calendar, User, NotebookPen , Pencil, Plus, Trash2
+  Search, FileText, Info, X, Calendar, User, NotebookPen, Pencil, Plus, Trash2
 } from 'lucide-react';
 import { DualView, ViewToggle } from '@/components/layout/DualView';
 import { createDocumentsTableColumns, DocumentGridCard } from '@/components/layout/DualView/documentsConfig';
@@ -66,6 +66,46 @@ function DateFieldDropdown({
   );
 }
 
+// Person Field Dropdown
+function PersonFieldDropdown({
+  show,
+  dropdownPos,
+  personField,
+  PERSON_FIELD_OPTIONS,
+  onSelect,
+}: {
+  show: boolean;
+  dropdownPos: { top: number; left: number } | null;
+  personField: string;
+  PERSON_FIELD_OPTIONS: { value: 'assigned_to' | 'created_by' | 'updated_by'; label: string }[];
+  onSelect: (value: 'assigned_to' | 'created_by' | 'updated_by') => void;
+}) {
+  if (!show || !dropdownPos) return null;
+  return ReactDOM.createPortal(
+    <div
+      style={{ position: 'absolute', top: dropdownPos.top, left: dropdownPos.left, zIndex: 9999 }}
+      className="bg-white border border-gray-200 rounded-lg shadow-lg min-w-[130px] py-1"
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      {PERSON_FIELD_OPTIONS.map((opt) => (
+        <button
+          key={opt.value}
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            onSelect(opt.value);
+          }}
+          className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-purple-50 hover:text-purple-700 transition-colors ${personField === opt.value ? 'font-semibold text-purple-600 bg-purple-50' : 'text-gray-700'
+            }`}
+        >
+          {personField === opt.value && <span className="mr-1.5">✓</span>}
+          {opt.label}
+        </button>
+      ))}
+    </div>,
+    document.body,
+  );
+}
+
 // ─── Document Filter Bar 
 function DocumentFilterBar({
   documentFilter,
@@ -93,8 +133,8 @@ function DocumentFilterBar({
             key={f}
             onClick={() => handleFilterChange(f)}
             className={`px-5 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 capitalize ${documentFilter === f
-                ? 'bg-black text-white shadow-md'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              ? 'bg-black text-white shadow-md'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
           >
             {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -185,7 +225,7 @@ export function TaskDetails() {
   const bulkFileInputRef = React.useRef<HTMLInputElement>(null);
   const [isBulkUploading, setIsBulkUploading] = React.useState(false);
   const [uploadResultModal, setUploadResultModal] = React.useState<{ type: 'success' | 'error', message: string } | null>(null);
-  
+
   const [isBulkUploadModalOpen, setIsBulkUploadModalOpen] = React.useState(false);
   const [pastedJson, setPastedJson] = React.useState("");
 
@@ -214,7 +254,7 @@ export function TaskDetails() {
     try {
       await taskApi.bulkUpload(ctx.id, file);
       if (ctx.queryClient) {
-        ctx.queryClient.invalidateQueries(); 
+        ctx.queryClient.invalidateQueries();
       }
       setUploadResultModal({ type: 'success', message: 'Tasks successfully created from JSON!' });
       setIsBulkUploadModalOpen(false); // Close the input modal on success
@@ -237,10 +277,10 @@ export function TaskDetails() {
 
   const handlePasteUpload = async () => {
     if (!pastedJson.trim()) return;
-    
+
     // Quick frontend validation to catch syntax errors before hitting the API
     try {
-      JSON.parse(pastedJson); 
+      JSON.parse(pastedJson);
     } catch (e) {
       setUploadResultModal({ type: 'error', message: "Invalid JSON format. Please check your syntax." });
       return;
@@ -269,6 +309,30 @@ export function TaskDetails() {
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [ctx.showDateFieldDropdown, ctx.dateField, ctx.activeDateLabel],
+  );
+  // PersonFieldLabel
+  const PersonFieldLabel = useMemo(
+    () => (
+      <button
+        ref={ctx.personTriggerRef}
+        onClick={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          if (ctx.personTriggerRef.current) {
+            const rect = ctx.personTriggerRef.current.getBoundingClientRect();
+            ctx.setDropdownPos({ top: rect.bottom + window.scrollY + 4, left: rect.left + window.scrollX });
+          }
+          ctx.setShowPersonFieldDropdown((v: boolean) => !v);
+        }}
+        className="flex items-center gap-1 text-[14px] font-bold tracking-wide text-gray-700 hover:text-purple-600 transition-colors"
+      >
+        {ctx.activePersonLabel}
+        <svg className="w-3 h-3 mt-0.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+    ),
+    [ctx.showPersonFieldDropdown, ctx.personField, ctx.activePersonLabel],
   );
 
   if (ctx.isProjectLoading) {
@@ -326,8 +390,8 @@ export function TaskDetails() {
                 key={key}
                 onClick={() => ctx.setActiveTab(key)}
                 className={`px-8 py-3.5 rounded-t-lg border-b-[3px] text-[0.95rem] font-semibold cursor-pointer transition-all duration-200 ${ctx.activeTab === key
-                    ? 'bg-slate-100 text-black border-b-2 border-black'
-                    : 'border-transparent text-slate-500 hover:text-black hover:bg-slate-50'
+                  ? 'bg-slate-100 text-black border-b-2 border-black'
+                  : 'border-transparent text-slate-500 hover:text-black hover:bg-slate-50'
                   }`}
               >
                 {label}
@@ -436,13 +500,14 @@ export function TaskDetails() {
                               user: ctx.user,
                               navigate: ctx.navigate,
                               dateField: ctx.dateField,
+                              personField: ctx.personField,
                             }).map((col) => ({
                               ...col,
                               headerClassName: `relative ${ctx.activeFilterKey === col.key ? 'z-[100]' : ''}`,
                               label: (
                                 <div ref={ctx.activeFilterKey === col.key ? ctx.filterContainerRef : null}>
                                   <FilterHeaderWrapper
-                                    columnLabel={col.key === ctx.dateField ? DateFieldLabel : (col.label as string)}
+                                    columnLabel={col.key === ctx.personField ? PersonFieldLabel : col.key === ctx.dateField ? DateFieldLabel : (col.label as string)}
                                     filterType={
                                       ['project', 'heading', 'labels'].includes(col.key)
                                         ? 'search'
@@ -584,6 +649,7 @@ export function TaskDetails() {
                               user: ctx.user,
                               navigate: ctx.navigate,
                               dateField: ctx.dateField,
+                              personField: ctx.personField,
                             })}
                             onCancel={() => ctx.setIsInlineCreating(false)}
                             queryClient={ctx.queryClient}
@@ -808,7 +874,7 @@ export function TaskDetails() {
         <Threads projectId={ctx.project.id} projectName={ctx.project.name} />
       )}
 
-<DeleteModal
+      <DeleteModal
         isOpen={!!ctx.deleteConfirm}
         type="confirm"
         itemType="document"
@@ -820,8 +886,8 @@ export function TaskDetails() {
 
       {/* Quick Notes Slide-Out Panel */}
       {ctx.showNotesPanel && (
-        <div 
-          className="fixed inset-0 z-50 flex justify-end bg-black/20" 
+        <div
+          className="fixed inset-0 z-50 flex justify-end bg-black/20"
           onClick={() => ctx.setShowNotesPanel(false)}
         >
           <div
@@ -835,7 +901,7 @@ export function TaskDetails() {
               </div>
               <div className="flex items-center gap-2">
                 {!ctx.isCreatingNote && (
-                  <button 
+                  <button
                     onClick={ctx.handleCreateNoteStart}
                     className="p-1.5 rounded-full bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors"
                     title="Create Shared Note"
@@ -849,7 +915,7 @@ export function TaskDetails() {
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-[#f8fafc]">
-              
+
               {/* New Note Creation Form */}
               {ctx.isCreatingNote && (
                 <div className="bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.08)] border border-purple-200 p-4">
@@ -861,15 +927,15 @@ export function TaskDetails() {
                     autoFocus
                   />
                   <div className="flex justify-end gap-2 mt-3">
-                    <button 
-                      onClick={ctx.handleCreateNoteCancel} 
+                    <button
+                      onClick={ctx.handleCreateNoteCancel}
                       className="px-4 py-1.5 text-[13px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
                       disabled={ctx.isSavingNewNote}
                     >
                       Cancel
                     </button>
-                    <button 
-                      onClick={ctx.handleCreateNoteSave} 
+                    <button
+                      onClick={ctx.handleCreateNoteSave}
                       className="px-4 py-1.5 text-[13px] font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-md transition-colors flex items-center gap-2"
                       disabled={ctx.isSavingNewNote || !ctx.newNoteContent.trim()}
                     >
@@ -888,8 +954,8 @@ export function TaskDetails() {
                 ctx.projectNotes.map((note: QuickNote) => {
                   // Cross-reference the note's creator
                   const noteUser = ctx.usersData?.find((u: any) => u.id === note.user) || (ctx.user?.id === note.user ? ctx.user : null);
-                  const displayName = noteUser?.first_name 
-                    ? `${noteUser.first_name} ${noteUser.last_name || ''}`.trim() 
+                  const displayName = noteUser?.first_name
+                    ? `${noteUser.first_name} ${noteUser.last_name || ''}`.trim()
                     : noteUser?.username || 'User';
                   const initial = displayName.charAt(0).toUpperCase();
 
@@ -901,29 +967,29 @@ export function TaskDetails() {
 
                   return (
                     <div key={note.id} className="group bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 p-4 hover:shadow-md transition-all">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-sm font-bold uppercase">
-                              {initial}
-                            </div>
-                            <span className="text-sm font-bold text-gray-800">
-                              {displayName}
-                            </span>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-sm font-bold uppercase">
+                            {initial}
                           </div>
-                        
+                          <span className="text-sm font-bold text-gray-800">
+                            {displayName}
+                          </span>
+                        </div>
+
                         {/* Show Edit to everyone, but Delete ONLY to the original author */}
                         {ctx.editingNoteId !== note.id && (
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                            <button 
+                            <button
                               onClick={() => ctx.handleEditNoteStart(note)}
                               className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-md transition-colors"
                               title="Edit Note"
                             >
                               <Pencil className="h-4 w-4" />
                             </button>
-                            
+
                             {note.user === ctx.user?.id && (
-                              <button 
+                              <button
                                 onClick={() => ctx.handleDeleteNote(note.id)}
                                 className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
                                 title="Delete Note"
@@ -934,7 +1000,7 @@ export function TaskDetails() {
                           </div>
                         )}
                       </div>
-                      
+
                       {ctx.editingNoteId === note.id ? (
                         <div className="mt-2">
                           <textarea
@@ -945,15 +1011,15 @@ export function TaskDetails() {
                             autoFocus
                           />
                           <div className="flex justify-end gap-2 mt-3">
-                            <button 
-                              onClick={ctx.handleEditNoteCancel} 
+                            <button
+                              onClick={ctx.handleEditNoteCancel}
                               className="px-4 py-1.5 text-[13px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
                               disabled={ctx.isSavingNote}
                             >
                               Cancel
                             </button>
-                            <button 
-                              onClick={ctx.handleEditNoteSave} 
+                            <button
+                              onClick={ctx.handleEditNoteSave}
                               className="px-4 py-1.5 text-[13px] font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-md transition-colors flex items-center gap-2"
                               disabled={ctx.isSavingNote}
                             >
@@ -971,16 +1037,16 @@ export function TaskDetails() {
                       {/* Display the Last Edited badge when anyone edits it, including the owner */}
                       {note.updated_by && editorName && ctx.editingNoteId !== note.id && (
                         <div className="mt-2.5 flex items-center gap-1.5 text-[11px] font-medium text-gray-400 bg-gray-50/80 w-fit px-2 py-1 rounded-md border border-gray-100">
-                           <Pencil className="w-3 h-3 text-gray-400" />
-                           Last edited by {editorName}
+                          <Pencil className="w-3 h-3 text-gray-400" />
+                          Last edited by {editorName}
                         </div>
                       )}
-                      
+
                       {note.attachments && note.attachments.length > 0 && (
                         <div className="mt-4 flex flex-wrap gap-2 pt-3 border-t border-gray-50">
                           {note.attachments.map((att) => (
-                            <button 
-                              key={att.id} 
+                            <button
+                              key={att.id}
                               onClick={() => ctx.setPreviewDocument({
                                 url: att.file,
                                 fileName: att.filename,
@@ -1007,12 +1073,12 @@ export function TaskDetails() {
           </div>
         </div>
       )}
-      
+
       {/* ── Import Tasks Modal ── */}
       {isBulkUploadModalOpen && (
         <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col transform transition-all animate-in zoom-in-95 duration-200">
-            
+
             {/* Header */}
             <div className="flex items-center justify-between p-5 border-b border-gray-100 bg-gray-50">
               <div className="flex items-center gap-2">
@@ -1025,7 +1091,7 @@ export function TaskDetails() {
             </div>
 
             <div className="p-6 overflow-y-auto flex-1 bg-[#f8fafc] flex flex-col gap-6">
-              
+
               {/* Expected Format Section */}
               <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
                 <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
@@ -1045,7 +1111,7 @@ export function TaskDetails() {
                   placeholder="Paste your JSON array here..."
                   className="w-full h-48 p-3 text-[13px] text-gray-700 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#65408b] font-mono resize-y bg-gray-50"
                 />
-                
+
                 <div className="flex items-center justify-between mt-2 pt-4 border-t border-gray-100">
                   <div className="flex items-center gap-3">
                     <input
@@ -1065,7 +1131,7 @@ export function TaskDetails() {
                       Select .json File
                     </button>
                   </div>
-                  
+
                   <button
                     onClick={handlePasteUpload}
                     disabled={isBulkUploading || !pastedJson.trim()}
@@ -1105,11 +1171,10 @@ export function TaskDetails() {
               </p>
               <button
                 onClick={() => setUploadResultModal(null)}
-                className={`w-full py-2.5 px-4 rounded-lg font-bold text-white transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                  uploadResultModal.type === 'success' 
-                    ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500 hover:shadow-lg hover:-translate-y-0.5' 
+                className={`w-full py-2.5 px-4 rounded-lg font-bold text-white transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 ${uploadResultModal.type === 'success'
+                    ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500 hover:shadow-lg hover:-translate-y-0.5'
                     : 'bg-red-600 hover:bg-red-700 focus:ring-red-500 hover:shadow-lg hover:-translate-y-0.5'
-                }`}
+                  }`}
               >
                 Continue
               </button>
@@ -1124,6 +1189,20 @@ export function TaskDetails() {
         dateField={ctx.dateField}
         DATE_FIELD_OPTIONS={ctx.DATE_FIELD_OPTIONS}
         onSelect={ctx.selectDateField}
+      />
+      <PersonFieldDropdown
+        show={ctx.showPersonFieldDropdown}
+        dropdownPos={ctx.dropdownPos}
+        personField={ctx.personField}
+        PERSON_FIELD_OPTIONS={ctx.PERSON_FIELD_OPTIONS}
+        onSelect={(value) => {
+          ctx.clearFilter('assigned_to');
+          ctx.clearFilter('created_by');
+          ctx.clearFilter('updated_by');
+          ctx.setPersonField(value);
+          ctx.setShowPersonFieldDropdown(false);
+          ctx.setActiveFilterKey(null);
+        }}
       />
     </>
   );

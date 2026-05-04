@@ -188,6 +188,14 @@ export interface Task {
   updated_at?: string;
   is_pinned?: boolean;
   comments?: TaskComment[];
+  status_updated_by_details?: {
+    id: number;
+    username: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    role: string;
+  } | null;
 }
 
 // Pin task API response
