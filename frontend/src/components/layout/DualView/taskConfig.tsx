@@ -358,8 +358,7 @@ interface TaskTableColumnsProps {
   navigate: ReturnType<typeof useNavigate>;
 }
 
-export const createTasksTableColumns = ({ onTaskClick, queryClient, user, navigate, dateField = 'end_date', personField = 'assigned_to' }: TaskTableColumnsProps & { dateField?: 'end_date' | 'start_date' | 'created_at'; personField?: 'assigned_to' | 'created_by' }): TableColumn<Task>[] => {
-
+export const createTasksTableColumns = ({ onTaskClick, queryClient, user, navigate, dateField = 'end_date', personField = 'assigned_to' }: TaskTableColumnsProps & { dateField?: 'end_date' | 'start_date' | 'created_at'; personField?: 'assigned_to' | 'created_by' | 'updated_by' }): TableColumn<Task>[] => {
   // Helper: update ALL ['tasks-list', *] caches that exist in the cache
   // This ensures project pages update instantly, not just the TaskBoard
   const updateAllTaskListCaches = (updatedTask: Task) => {
@@ -681,8 +680,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     },
     {
       key: personField,
-      label: <span className="text-[14px] font-bold tracking-wide text-gray-700">{personField === 'assigned_to' ? 'Assignee' : 'Created By'}</span>,
-      width: '8%',
+      label: <span className="text-[14px] font-bold tracking-wide text-gray-700">{personField === 'assigned_to' ? 'Assignee' : personField === 'created_by' ? 'Created By' : 'Updated By'}</span>,      width: '8%',
       render: (task: Task) => {
         if (personField === 'created_by') {
           // Show Created By
@@ -700,6 +698,26 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
               </div>
               <span className="text-[12px] text-gray-700 font-medium truncate max-w-[80px]">
                 {creator.first_name} {creator.last_name?.[0]}.
+              </span>
+            </div>
+          );
+        }
+        if (personField === 'updated_by') {
+          // Show Updated By (who last changed the status)
+          const updater = task.status_updated_by_details;
+          if (!updater) {
+            return <span className="text-gray-300 text-[11px]">—</span>;
+          }
+          return (
+            <div className="flex items-center gap-2">
+              <div
+                className="w-6 h-6 rounded-full bg-[#10b981] text-white flex items-center justify-center text-[10px] font-semibold ring-1 ring-white"
+                title={`${updater.first_name} ${updater.last_name}`}
+              >
+                {updater.first_name?.[0] || ''}{updater.last_name?.[0] || ''}
+              </div>
+              <span className="text-[12px] text-gray-700 font-medium truncate max-w-[80px]">
+                {updater.first_name} {updater.last_name?.[0]}.
               </span>
             </div>
           );

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
+import { ShareCalendarModal } from '@/components/Calendar/ShareCalendarModal';
 import {
     ChevronLeft,
     ChevronRight,
@@ -11,6 +12,7 @@ import {
     Loader2,
     CheckSquare,
     Clock,
+    Download,
     MapPin,
     Video,
     X,
@@ -24,6 +26,7 @@ import {
     Sparkles,
     Copy,
     Settings,
+    Share2,
 
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
@@ -814,8 +817,17 @@ const DaysView: React.FC<DaysViewProps> = ({
                                         const eventHeight = Math.max((endMinutes - startMinutes) * (64 / 60), 24);
                                         const widthPercent = 100 / totalOverlaps;
 
-                                        // Get status-based colors
-                                        const statusColors = getEventStatusColors(event.my_invitation_status);
+                                        // Check if this is a shared event (from someone else's calendar, not an invitation)
+                                        // Shared events: organizer is not me AND I'm not an attendee (no invitation status)
+                                        const isSharedEvent = event.organizer !== currentUser?.id && !event.my_invitation_status;
+                                        const statusColors = isSharedEvent
+                                            ? {
+                                                bg: 'bg-red-100 border-red-300',
+                                                text: 'text-red-900',
+                                                hover: 'hover:bg-red-200',
+                                                accent: 'bg-red-600'
+                                            }
+                                            : getEventStatusColors(event.my_invitation_status);
                                         const isPending = event.my_invitation_status === 'PENDING';
 
                                         return (
@@ -844,7 +856,15 @@ const DaysView: React.FC<DaysViewProps> = ({
                                                     title={event.title}
                                                 >
                                                     <div className={`w-1 h-full absolute left-0 top-0 bottom-0 rounded-l-md ${statusColors.accent}`} />
-                                                    <div className="font-semibold truncate ml-1">{event.title}</div>
+                                                    <div className="flex items-center gap-1 ml-1 min-w-0">
+                                                        <span className="font-semibold truncate">{event.title}</span>
+                                                        {/* Show owner badge inline for shared events */}
+                                                        {event.organizer !== currentUser?.id && (
+                                                            <span className="text-[8px] text-amber-700 bg-amber-200/80 px-1 rounded flex-shrink-0 whitespace-nowrap">
+                                                                {event.organizer_name?.split(' ')[0]}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     {eventHeight >= 40 && (
                                                         <div className="text-[10px] truncate ml-1 opacity-80 mt-0.5">
                                                             {effectiveStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })} - {effectiveEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
@@ -1024,6 +1044,7 @@ const EventModal: React.FC<EventModalProps> = ({
     const [loadingSuggestions, setLoadingSuggestions] = useState(false);
     const [selectedDuration, setSelectedDuration] = useState(30);
 
+
     // Predefined event types
     const EVENT_TYPES = [
         { value: 'Meeting', icon: '👥', color: 'bg-blue-100 text-blue-700 border-blue-200' },
@@ -1192,10 +1213,13 @@ const EventModal: React.FC<EventModalProps> = ({
             // ═══════════════ EDITING EXISTING EVENT ═══════════════
             setTitle(event.title || '');
             const formatDt = (iso: string) => {
-                if (!iso) return '';
                 const d = new Date(iso);
-                d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-                return d.toISOString().slice(0, 16);
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                const hours = String(d.getHours()).padStart(2, '0');
+                const minutes = String(d.getMinutes()).padStart(2, '0');
+                return `${year}-${month}-${day}T${hours}:${minutes}`;
             };
 
             setStartTime(formatDt(event.start_time));
@@ -1681,10 +1705,10 @@ const EventModal: React.FC<EventModalProps> = ({
                                                     <div
                                                         key={`end-${time}`}
                                                         className={`px-4 py-2 cursor-pointer text-sm transition-colors ${isPastTime
-                                                                ? 'text-gray-300 cursor-not-allowed opacity-50'
-                                                                : isSelected
-                                                                    ? 'bg-blue-50 text-blue-700 font-medium'
-                                                                    : 'text-gray-700 hover:bg-gray-50'
+                                                            ? 'text-gray-300 cursor-not-allowed opacity-50'
+                                                            : isSelected
+                                                                ? 'bg-blue-50 text-blue-700 font-medium'
+                                                                : 'text-gray-700 hover:bg-gray-50'
                                                             }`}
                                                         onClick={() => {
                                                             if (isPastTime) return; // Prevent selection
@@ -2714,6 +2738,8 @@ export const Calendar: React.FC = () => {
     const [selectedEvent, setSelectedEvent] = useState<CalendarEventType | null>(null);
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+    const [includeSharedEvents, setIncludeSharedEvents] = useState(false);
     // ═══════════════ INVITATION MODAL STATES ═══════════════
     const [showDeclineModal, setShowDeclineModal] = useState(false);
     const [showRescheduleModal, setShowRescheduleModal] = useState(false);
@@ -2952,13 +2978,13 @@ export const Calendar: React.FC = () => {
         hasNextPage: hasNextEventsPage,
         isFetchingNextPage: isFetchingNextEventsPage
     } = useInfiniteQuery({
-        queryKey: ['events-calendar', currentDate.getFullYear(), currentDate.getMonth()],
+        queryKey: ['events-calendar', currentDate.getFullYear(), currentDate.getMonth(), includeSharedEvents],
         queryFn: async ({ pageParam = 1 }) => {
             const year = currentDate.getFullYear();
             const month = currentDate.getMonth();
             const firstDay = new Date(year, month, -7).toISOString().split('T')[0];
             const lastDay = new Date(year, month + 1, 7).toISOString().split('T')[0];
-            return eventApi.list({ start_date: firstDay, end_date: lastDay, page: pageParam });
+            return eventApi.list({ start_date: firstDay, end_date: lastDay, page: pageParam, include_shared: includeSharedEvents });
         },
         getNextPageParam: (lastPage: any) => {
             if (lastPage?.next) {
@@ -3327,6 +3353,30 @@ export const Calendar: React.FC = () => {
                         <CalendarPlus size={18} />
                         <span className="text-sm font-medium">New event</span>
                     </button>
+                    <button
+                        onClick={() => setIsShareModalOpen(true)}
+                        className="flex items-center justify-center gap-2 px-3 py-1.5 bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700 rounded-lg border border-green-200 transition-colors shadow-sm"
+                        title="Share calendar"
+                    >
+                        <Share2 size={18} />
+                        <span className="text-sm font-medium">Share</span>
+                    </button>
+
+                    {/* Toggle Shared Events */}
+                    {/* Toggle Shared Calendars */}
+                    <button
+                        onClick={() => setIncludeSharedEvents(!includeSharedEvents)}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors shadow-sm ${includeSharedEvents
+                            ? 'bg-purple-100 text-purple-700 border-purple-300'
+                            : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                            }`}
+                        title={includeSharedEvents ? "Hide shared calendars" : "Show shared calendars"}
+                    >
+                        <Users size={18} />
+                        <span className="text-sm font-medium">
+                            {includeSharedEvents ? 'Shared: On' : 'Shared: Off'}
+                        </span>
+                    </button>
                 </div>
             </div>
             <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
@@ -3540,6 +3590,12 @@ export const Calendar: React.FC = () => {
                 eventTitle={selectedInvitationEvent?.title}
                 originalTime={selectedInvitationEvent?.start_time}
             />
+            {/* Share Calendar Modal */}
+            <ShareCalendarModal
+                isOpen={isShareModalOpen}
+                onClose={() => setIsShareModalOpen(false)}
+                currentUserId={user?.id || 0}
+            />
 
             {/* ═══════════════ EVENT CONTEXT MENU ═══════════════ */}
             {contextMenu && (
@@ -3679,6 +3735,25 @@ export const Calendar: React.FC = () => {
                     >
                         <Copy size={16} className="text-gray-400" />
                         Duplicate event
+                    </button>
+
+                    {/* Download ICS */}
+                    <button
+                        onClick={async () => {
+                            if (contextMenu.event?.id) {
+                                try {
+                                    await eventApi.exportEvent(contextMenu.event.id);
+                                } catch (error) {
+                                    console.error('Failed to export event:', error);
+                                    alert('Failed to download event');
+                                }
+                            }
+                            closeContextMenu();
+                        }}
+                        className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                    >
+                        <Download size={16} className="text-gray-400" />
+                        Download ICS
                     </button>
 
                     {/* Delete This Event */}

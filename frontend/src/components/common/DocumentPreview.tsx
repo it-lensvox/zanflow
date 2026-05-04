@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Download, Loader2, FileText, AlertCircle, ZoomIn, ZoomOut, Maximize2, Minimize2 } from 'lucide-react';
-/**
+import { X, Download, Loader2, FileText, AlertCircle, ZoomIn, ZoomOut, Maximize2, Minimize2, ExternalLink } from 'lucide-react';/**
  * Supports: Images, PDF, DOCX, PPTX, TXT, Code files, and more.
  * 
  * @param url - The URL of the document to preview
@@ -46,11 +45,25 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
 
     const extension = getFileExtension();
 
+    // Helper: detect if the URL itself points to a PDF (regardless of fileName)
+    // This handles the case where backend converted Office files to PDF for preview
+    const urlPointsToPdf = (() => {
+        try {
+            // Strip query params (presigned URLs have lots of them)
+            const urlPath = url.split('?')[0].toLowerCase();
+            return urlPath.endsWith('.pdf');
+        } catch {
+            return false;
+        }
+    })();
+
     const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(extension);
-    const isPDF = extension === 'pdf' || fileType?.includes('pdf');
-    const isOfficeDoc = ['doc', 'docx'].includes(extension);
-    const isPresentation = ['ppt', 'pptx'].includes(extension);
-const isSpreadsheet = ['xls', 'xlsx'].includes(extension);
+    const isPDF = urlPointsToPdf || extension === 'pdf' || fileType?.includes('pdf');
+    
+    // If URL is a PDF (converted from Office), don't treat it as an Office doc
+    const isOfficeDoc = !urlPointsToPdf && ['doc', 'docx'].includes(extension);
+    const isPresentation = !urlPointsToPdf && ['ppt', 'pptx'].includes(extension);
+    const isSpreadsheet = !urlPointsToPdf && ['xls', 'xlsx'].includes(extension);   
     const isText = ['txt', 'md', 'log', 'csv'].includes(extension);
     const isCode = ['js', 'jsx', 'ts', 'tsx', 'json', 'html', 'css', 'py', 'java', 'cpp', 'c', 'sh', 'yml', 'yaml', 'xml'].includes(extension);
     const isVideo = ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'].includes(extension) || fileType?.startsWith('video/') || false;
@@ -117,6 +130,15 @@ const isSpreadsheet = ['xls', 'xlsx'].includes(extension);
         }
     };
 
+    const handleOpenInNewTab = () => {
+        try {
+            window.open(url, '_blank', 'noopener,noreferrer');
+        } catch (error) {
+            console.error('Failed to open in new tab:', error);
+            alert('Could not open file. Please try downloading instead.')
+        }
+    }
+
 
     // Fetch text content for text/code files
     useEffect(() => {
@@ -137,6 +159,23 @@ const isSpreadsheet = ['xls', 'xlsx'].includes(extension);
             setLoading(false);
         }
     }, [url, isImage, isPDF, isOfficeDoc, isPresentation, isSpreadsheet, isText, isCode, isVideo, isAudio]);
+
+    // Timeout detection for Office viewer failures
+    useEffect(() => {
+        if (isOfficeDoc || isPresentation || isSpreadsheet || isPDF) {
+            const timeout = setTimeout(() => {
+                if (loading) {
+                    setError(
+                        `Preview is taking too long or this ${extension.toUpperCase()} file ` +
+                        `cannot be previewed in browser. You can open it in a new tab or download it.`
+                    );
+                    setLoading(false);
+                }
+            }, 10000); // 10 seconds
+
+            return () => clearTimeout(timeout);
+        }
+    }, [url, isOfficeDoc, isPresentation, isSpreadsheet, isPDF, loading, extension]);
 
     // Zoom controls
     const handleZoomIn = () => setZoom(prev => Math.min(prev + 25, 200));
@@ -331,7 +370,7 @@ const isSpreadsheet = ['xls', 'xlsx'].includes(extension);
                         </div>
                     )}
 
-                    {/* Maximize/Minimize Button */}
+{/* Maximize/Minimize Button */}
                     <button
                         onClick={toggleFullscreen}
                         className="p-2 hover:bg-gray-700 rounded transition-colors"
@@ -343,6 +382,19 @@ const isSpreadsheet = ['xls', 'xlsx'].includes(extension);
                             <Maximize2 className="w-5 h-5" />
                         )}
                     </button>
+
+                    {/* ============ ADD THIS NEW BUTTON HERE ============ */}
+                    {/* Open in New Tab Button - always visible */}
+                    <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 hover:bg-gray-700 rounded transition-colors text-white flex items-center"
+                        title="Open in New Tab"
+                    >
+                        <ExternalLink className="w-5 h-5" />
+                    </a>
+                    {/* ============ END NEW BUTTON ============ */}
 
                     {/* Download Button */}
                     <button
@@ -384,25 +436,43 @@ const isSpreadsheet = ['xls', 'xlsx'].includes(extension);
                     <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-10">
                         <div className="flex flex-col items-center gap-4 max-w-md p-6">
                             <AlertCircle className="w-16 h-16 text-red-500" />
-                            <h3 className="text-xl font-semibold text-white">Preview Error</h3>
+                            <h3 className="text-xl font-semibold text-white">Preview Not Available</h3>
                             <p className="text-gray-300 text-center">{error}</p>
-                            <button
-                                onClick={handleDownload}
-                                disabled={downloading}
-                                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {downloading ? (
-                                    <>
-                                        <Loader2 className="w-5 h-5 animate-spin" />
-                                        Downloading...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Download className="w-5 h-5" />
-                                        Download File
-                                    </>
-                                )}
-                            </button>
+
+                            {/* Two action buttons side by side */}
+                            <div className="flex flex-col sm:flex-row gap-3 mt-2 w-full">
+                                {/* Open in New Tab Button - PRIMARY ACTION */}
+                                <button
+                                    onClick={handleOpenInNewTab}
+                                    className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <Maximize2 className="w-5 h-5" />
+                                    Open in New Tab
+                                </button>
+
+                                {/* Download Button - SECONDARY ACTION */}
+                                <button
+                                    onClick={handleDownload}
+                                    disabled={downloading}
+                                    className="flex-1 px-6 py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {downloading ? (
+                                        <>
+                                            <Loader2 className="w-5 h-5 animate-spin" />
+                                            Downloading...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Download className="w-5 h-5" />
+                                            Download
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+
+                            <p className="text-gray-400 text-xs text-center mt-2">
+                                Tip: Opening in a new tab uses your browser's native viewer
+                            </p>
                         </div>
                     </div>
                 )}

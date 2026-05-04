@@ -22,9 +22,10 @@ const DATE_FIELD_OPTIONS: { value: 'end_date' | 'start_date' | 'created_at'; lab
     { value: 'start_date', label: 'Start Date' },
     { value: 'created_at', label: 'Created At' },
 ];
-const PERSON_FIELD_OPTIONS: { value: 'assigned_to' | 'created_by'; label: string }[] = [
+const PERSON_FIELD_OPTIONS: { value: 'assigned_to' | 'created_by' | 'updated_by'; label: string }[] = [
     { value: 'assigned_to', label: 'Assignee' },
     { value: 'created_by', label: 'Created By' },
+    { value: 'updated_by', label: 'Updated By' },
 ];
 
 // ── Sanitise the tasks cache on every mount to prevent InfiniteQuery crashes ──
@@ -79,7 +80,7 @@ export const MyTask: React.FC = () => {
 
     sanitiseTaskCache(queryClient);
     const [dateField, setDateField] = useState<'end_date' | 'start_date' | 'created_at'>('end_date');
-    const [personField, setPersonField] = useState<'assigned_to' | 'created_by'>('assigned_to');
+    const [personField, setPersonField] = useState<'assigned_to' | 'created_by' | 'updated_by'>('updated_by');
     const [showPersonFieldDropdown, setShowPersonFieldDropdown] = useState(false);
     const personTriggerRef = React.useRef<HTMLButtonElement>(null);
     const [showDateFieldDropdown, setShowDateFieldDropdown] = useState(false);
@@ -285,17 +286,17 @@ export const MyTask: React.FC = () => {
             const matchesFilter = activeFilter === 'ALL' || task.status.toUpperCase() === activeFilter;
             const matchesSearch = searchQuery.trim() === '' ||
                 (task.heading || '').toLowerCase().includes(searchQuery.toLowerCase());
-            
+
             // Filter by Assignee
             const assigneeFilterValue = columnFilters['assigned_to'];
             const matchesAssignee = !assigneeFilterValue ||
                 (task.assigned_to || []).map(String).includes(String(assigneeFilterValue));
-            
+
             // Filter by Created By
             const createdByFilterValue = columnFilters['created_by'];
             const matchesCreatedBy = !createdByFilterValue ||
                 String(task.assigned_by) === String(createdByFilterValue);
-            
+
             return matchesFilter && matchesSearch && matchesAssignee && matchesCreatedBy;
         });
     }, [hookFilteredTasks, activeFilter, searchQuery, columnFilters]);
@@ -659,9 +660,10 @@ export const MyTask: React.FC = () => {
                             key={opt.value}
                             onMouseDown={(e) => {
                                 e.stopPropagation();
-                                // Clear both filters when switching
+                                // Clear all filters when switching
                                 clearFilter('assigned_to');
                                 clearFilter('created_by');
+                                clearFilter('updated_by');
                                 setPersonField(opt.value);
                                 setShowPersonFieldDropdown(false);
                                 setDropdownPos(null);

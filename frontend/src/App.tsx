@@ -24,6 +24,7 @@ const UserManagement = lazy(() => import('@/pages/TeamManagement/UserManagement'
 const TeamPerformance = lazy(() => import('@/pages/TeamManagement/TeamPerformance').then(m => ({ default: m.TeamPerformance })));
 const TaskDetails = lazy(() => import('@/pages/TaskType/TaskDetails').then(m => ({ default: m.TaskDetails })));
 const Calendar = lazy(() => import('@/pages/Calendar/Calendar').then(m => ({ default: m.Calendar })));
+const SharedCalendarView = lazy(() => import('@/pages/Calendar/SharedCalendarView').then(m => ({ default: m.SharedCalendarView })));
 const NotificationsPage = lazy(() => import('@/pages/NotificationsPage').then(m => ({ default: m.NotificationsPage })));
 const Profile = lazy(() => import('@/pages/Profile').then(m => ({ default: m.Profile })));
 const ResetPassword = lazy(() => import('@/pages/ResetPassword').then(m => ({ default: m.ResetPassword })));
@@ -185,12 +186,16 @@ function AppRoutes() {
 
 
       {/* Public — no auth required — invited user has no account yet */}
-      <Route
-        path="/setup-account"
-        element={<Suspense fallback={<PageLoader />}><SetupAccount /></Suspense>}
-      />
-
-      {/* Routes WITH Sidebar */}
+<Route
+  path="/setup-account"
+  element={<Suspense fallback={<PageLoader />}><SetupAccount /></Suspense>}
+/>
+{/* Public Calendar View - no auth required */}
+<Route
+  path="/calendar/shared/:token"
+  element={<Suspense fallback={<PageLoader />}><SharedCalendarView /></Suspense>}
+/>
+{/* Routes WITH Sidebar */}
       <Route
         element={
           <ProtectedRoute>

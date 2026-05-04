@@ -17,6 +17,11 @@ const DATE_FIELD_OPTIONS = [
     { value: 'start_date' as const, label: 'Start Date' },
     { value: 'created_at' as const, label: 'Created At' },
 ];
+const PERSON_FIELD_OPTIONS = [
+    { value: 'assigned_to' as const, label: 'Assignee' },
+    { value: 'created_by' as const, label: 'Created By' },
+    { value: 'updated_by' as const, label: 'Updated By' },
+];
 
 export function useProjectDetails() {
     const { id } = useParams<{ id: string }>();
@@ -32,12 +37,12 @@ export function useProjectDetails() {
         storageKey: 'project-documents-view-mode',
     });
 
-   // ─── Modal State ─────────────────────────────────────────────────────────────
+    // ─── Modal State ─────────────────────────────────────────────────────────────
     const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [isInlineCreating, setIsInlineCreating] = useState(false);
     const [showNotesPanel, setShowNotesPanel] = useState(false);
-    
+
     // Quick Note Edit & Create State
     const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
     const [editNoteContent, setEditNoteContent] = useState<string>('');
@@ -49,7 +54,7 @@ export function useProjectDetails() {
 
     // ─── Upload State ─────────────────────────────────────────────────────────────
 
-   // ─── Upload State ─────────────────────────────────────────────────────────────
+    // ─── Upload State ─────────────────────────────────────────────────────────────
     const [isUploading, setIsUploading] = useState(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
     const [isDragging, setIsDragging] = useState(false);
@@ -63,7 +68,7 @@ export function useProjectDetails() {
     } | null>(null);
     const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
-     const [infoDoc, setInfoDoc] = useState<any | null>(null);
+    const [infoDoc, setInfoDoc] = useState<any | null>(null);
     const [shareDoc, setShareDoc] = useState<any | null>(null);
 
     // ─── Document Filter State 
@@ -75,6 +80,9 @@ export function useProjectDetails() {
 
     // ─── Date Filter State 
     const [dateField, setDateField] = useState<'end_date' | 'start_date' | 'created_at'>('end_date');
+    const [personField, setPersonField] = useState<'assigned_to' | 'created_by' | 'updated_by'>('updated_by');
+    const [showPersonFieldDropdown, setShowPersonFieldDropdown] = useState(false);
+    const personTriggerRef = useRef<HTMLButtonElement>(null);
     const [showDateFieldDropdown, setShowDateFieldDropdown] = useState(false);
     const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
     const dateTriggerRef = useRef<HTMLButtonElement>(null);
@@ -110,7 +118,7 @@ export function useProjectDetails() {
         queryFn: () => quickNotesApi.getNotes({ project: Number(id) }),
         enabled: showNotesPanel && !!id,
     });
-    
+
     // Explicitly filter to only show notes that are shared/attached to this specific project
     const projectNotes = (notesData?.results || []).filter(
         (note: QuickNote) => note.project === Number(id)
@@ -226,6 +234,8 @@ export function useProjectDetails() {
 
     const activeDateLabel =
         DATE_FIELD_OPTIONS.find((o) => o.value === dateField)?.label ?? 'Due Date';
+
+    const activePersonLabel = PERSON_FIELD_OPTIONS.find((o) => o.value === personField)?.label ?? 'Assignee';
 
     // ─── Table Filters ────────────────────────────────────────────────────────────
     const filterConfig: ColumnFilterConfig[] = [
@@ -856,6 +866,16 @@ export function useProjectDetails() {
         dateTriggerRef,
         showDateFieldDropdown,
         dropdownPos,
+        setDropdownPos,
+
+        // Person filter
+        personField,
+        setPersonField,
+        personTriggerRef,
+        showPersonFieldDropdown,
+        setShowPersonFieldDropdown,
+        activePersonLabel,
+        PERSON_FIELD_OPTIONS,
 
         // Table filter
         columnFilters,

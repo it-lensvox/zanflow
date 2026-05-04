@@ -397,33 +397,45 @@ export function TaskDetailPage() {
     const handleAttachmentClick = async (attachment: TaskAttachment) => {
         if (!task) return;
         try {
-            let fileUrl = attachment.file_url;
-
-            // If file_url is not available, fetch it from the API
-            if (!fileUrl) {
-                const projectIdNum = task.project || (task as any).project_details?.id;
-                if (!projectIdNum) {
-                    alert('Unable to open attachment: Project information missing.');
-                    return;
-                }
-
-                const downloadResponse = await documentsApi.getDownloadUrl(projectIdNum, {
-                    document_id: attachment.id.toString()
-                });
-
-                if (downloadResponse?.url) {
-                    fileUrl = downloadResponse.url;
-                } else {
-                    alert('Unable to open attachment: Download URL not available.');
-                    return;
+            // Always fetch a fresh URL from the backend so we get the
+            // PDF preview URL when conversion is ready (instead of the
+            // cached PPTX/DOCX URL from the task data).
+            const projectIdNum = task.project || (task as any).project_details?.id;
+            
+            let fileUrl = attachment.file_url;  // Cached URL as fallback
+            
+            if (projectIdNum) {
+                try {
+                    const downloadResponse = await documentsApi.getDownloadUrl(projectIdNum, {
+                        document_id: attachment.id.toString()
+                    });
+                    
+                    if (downloadResponse?.url) {
+                        fileUrl = downloadResponse.url;  // Fresh URL — PDF if ready
+                    }
+                } catch (apiError) {
+                    console.warn('Could not fetch fresh download URL, using cached:', apiError);
+                    // Fall through and use cached URL
                 }
             }
-
+            
+            if (!fileUrl) {
+                alert('Unable to open attachment: Download URL not available.');
+                return;
+            }
+            
+            // Determine fileType from the URL we're actually using (which may be PDF)
+            // The DocumentPreview component also detects PDF from URL path itself
+            const urlPath = fileUrl.split('?')[0].toLowerCase();
+            const detectedFileType = urlPath.endsWith('.pdf') 
+                ? 'pdf' 
+                : (attachment.file_name?.split('.').pop()?.toLowerCase() || '');
+            
             // Open in-app preview
             setPreviewDocument({
                 url: fileUrl,
                 fileName: attachment.file_name,
-                fileType: attachment.file_url?.split('.').pop() || ''
+                fileType: detectedFileType
             });
         } catch (error) {
             console.error('Failed to open attachment:', error);
