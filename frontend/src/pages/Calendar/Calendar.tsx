@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { ShareCalendarModal } from '@/components/Calendar/ShareCalendarModal';
 import {
     ChevronLeft,
@@ -275,9 +275,22 @@ const TaskEvent: React.FC<TaskEventProps> = ({ task, onClick, compact = false })
 interface MiniCalendarProps {
     currentDate: Date;
     onDateSelect: (date: Date) => void;
+    includeSharedEvents: boolean;
+    onToggleSharedEvents: (enabled: boolean) => void;
+    sharedWithMeUsers: any[];
+    selectedUserIds: number[];
+    onToggleUser: (userId: number) => void;
 }
 
-const MiniCalendar: React.FC<MiniCalendarProps> = ({ currentDate, onDateSelect }) => {
+const MiniCalendar: React.FC<MiniCalendarProps> = ({
+    currentDate,
+    onDateSelect,
+    includeSharedEvents,
+    onToggleSharedEvents,
+    sharedWithMeUsers,
+    selectedUserIds,
+    onToggleUser
+}) => {
     // Internal state to track which month the mini calendar is currently viewing
     const [navDate, setNavDate] = useState(new Date(currentDate.getFullYear(), currentDate.getMonth(), 1));
     const month = navDate.getMonth();
@@ -356,6 +369,91 @@ const MiniCalendar: React.FC<MiniCalendarProps> = ({ currentDate, onDateSelect }
                     );
                 })}
             </div>
+
+            {/* 👇👇👇 ADD THE ENTIRE SECTION BELOW HERE 👇👇👇 */}
+            {/* View Shared Calendars Section */}
+            <div className="mt-4 pt-4 border-t border-gray-200">
+                {/* Header with toggle */}
+                <button
+                    onClick={() => onToggleSharedEvents(!includeSharedEvents)}
+                    className="w-full flex items-center justify-between px-2 py-2 rounded-lg hover:bg-gray-50 transition-colors group"
+                >
+                    <div className="flex items-center gap-2">
+                        <Users size={14} className="text-purple-600" />
+                        <span className="text-xs font-semibold text-gray-700">View Shared Calendars</span>
+                    </div>
+                    {/* Toggle switch */}
+                    <div className={`w-8 h-4 rounded-full transition-colors duration-200 ${includeSharedEvents ? 'bg-purple-600' : 'bg-gray-300'}`}>
+                        <div className={`w-3 h-3 bg-white rounded-full shadow-sm transition-transform duration-200 mt-0.5 ${includeSharedEvents ? 'translate-x-4 ml-0.5' : 'translate-x-0.5'}`} />
+                    </div>
+                </button>
+
+                {/* User checkboxes - only shown when toggle is ON */}
+                {includeSharedEvents && (
+                    <div className="mt-2 space-y-1 max-h-48 overflow-y-auto">
+                        {/* Select All checkbox */}
+                        <label className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-gray-50 cursor-pointer transition-colors">
+                            <input
+                                type="checkbox"
+                                checked={selectedUserIds.length === sharedWithMeUsers.length && sharedWithMeUsers.length > 0}
+                                onChange={() => {
+                                    if (selectedUserIds.length === sharedWithMeUsers.length) {
+                                        // Deselect all
+                                        sharedWithMeUsers.forEach(u => onToggleUser(u.id));
+                                    } else {
+                                        // Select all
+                                        sharedWithMeUsers.forEach(u => {
+                                            if (!selectedUserIds.includes(u.id)) {
+                                                onToggleUser(u.id);
+                                            }
+                                        });
+                                    }
+                                }}
+                                className="w-3.5 h-3.5 text-purple-600 border-gray-300 rounded focus:ring-purple-500 focus:ring-offset-0 focus:ring-1"
+                            />
+                            <span className="text-xs font-medium text-gray-700">Select All Members</span>
+                        </label>
+
+                        {/* Individual user checkboxes */}
+                        {sharedWithMeUsers.length > 0 ? (
+                            sharedWithMeUsers.map((u: any) => {
+                                const isSelected = selectedUserIds.includes(u.id);
+                                const initials = u.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || '?';
+
+                                return (
+                                    <label
+                                        key={u.id}
+                                        className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-gray-50 cursor-pointer transition-colors group"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={isSelected}
+                                            onChange={() => onToggleUser(u.id)}
+                                            className="w-3.5 h-3.5 text-purple-600 border-gray-300 rounded focus:ring-purple-500 focus:ring-offset-0 focus:ring-1"
+                                        />
+                                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                                            {/* User avatar */}
+                                            <div className="w-5 h-5 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-[9px] font-bold flex-shrink-0">
+                                                {initials}
+                                            </div>
+                                            {/* User name */}
+                                            <span className="text-xs text-gray-700 truncate">{u.name}</span>
+                                        </div>
+                                        {/* Checkmark icon when selected */}
+                                        {isSelected && <Check size={12} className="text-purple-600 flex-shrink-0" />}
+                                    </label>
+                                );
+                            })
+                        ) : (
+                            <div className="px-2 py-3 text-center">
+                                <p className="text-[10px] text-gray-400 italic">No calendars shared with you yet</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+            {/* 👆👆👆 END OF ADDED SECTION 👆👆👆 */}
+
         </div>
     );
 };
@@ -431,6 +529,8 @@ interface DaysViewProps {
     tasks: Task[];
     events: CalendarEventType[];
     selectedDate: Date | null;
+    seenEventIds: number[];
+    renderStatusDot: (event: any) => React.ReactNode;
     onTaskClick: (task: Task) => void;
     onEventClick?: (event: CalendarEventType) => void;
     onDateClick: (date: Date) => void;
@@ -453,7 +553,9 @@ const DaysView: React.FC<DaysViewProps> = ({
     onDeclineInvitation,
     onRescheduleInvitation,
     isAccepting,
-    onEventContextMenu
+    onEventContextMenu,
+    seenEventIds,
+    renderStatusDot,
 }) => {
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
@@ -862,9 +964,10 @@ const DaysView: React.FC<DaysViewProps> = ({
                                                 onContextMenu={(e) => { if (onEventContextMenu) onEventContextMenu(e, event); }}
                                             >
                                                 <div
-                                                    className={`h-full w-full rounded-md overflow-hidden p-1.5 text-xs shadow-sm flex flex-col relative border ${statusColors.bg} ${statusColors.text} ${statusColors.hover}`}
+                                                    className={`h-full w-full rounded-md overflow-visible p-1.5 text-xs shadow-sm flex flex-col relative border ${statusColors.bg} ${statusColors.text} ${statusColors.hover}`}
                                                     title={event.title}
                                                 >
+                                                    {renderStatusDot(event)}
                                                     <div className={`w-1 h-full absolute left-0 top-0 bottom-0 rounded-l-md ${statusColors.accent}`} />
                                                     <div className="flex items-center justify-between w-full ml-1 min-w-0">
                                                         <span className="font-semibold truncate">{event.title}</span>
@@ -1321,23 +1424,62 @@ const EventModal: React.FC<EventModalProps> = ({
             // ═══════════════ NEW EVENT (NO DYUKSA DATA) ═══════════════
             setError(null);
             const now = new Date();
-            now.setHours(0, 0, 0, 0);
+            const todayMidnight = new Date();
+            todayMidnight.setHours(0, 0, 0, 0);
 
             let targetDate = selectedDate || new Date();
-            if (targetDate < now) targetDate = new Date();
+            if (targetDate < todayMidnight) targetDate = new Date();
 
             const y = targetDate.getFullYear();
             const m = String(targetDate.getMonth() + 1).padStart(2, '0');
             const d = String(targetDate.getDate()).padStart(2, '0');
             const dateStr = `${y}-${m}-${d}`;
 
-            // Use selectedHour if provided, otherwise default to 13:00
-            const hour = selectedHour !== null && selectedHour !== undefined
-                ? String(selectedHour).padStart(2, '0')
-                : '13';
+            // Determine start time
+            let startHour: number;
+            let startMin: number;
 
-            setStartTime(`${dateStr}T${hour}:00`);
-            setEndTime(`${dateStr}T${hour}:30`);
+            if (selectedHour !== null && selectedHour !== undefined) {
+                // User clicked a specific hour slot in the calendar grid
+                startHour = selectedHour;
+                startMin = 0;
+            } else if (targetDate.toDateString() === now.toDateString()) {
+                // Creating event for today → snap to next 30-minute slot from current time
+                const currentMinutes = now.getMinutes();
+                if (currentMinutes < 30) {
+                    startHour = now.getHours();
+                    startMin = 30;
+                } else {
+                    startHour = now.getHours() + 1;
+                    startMin = 0;
+                }
+                // Edge case: if rounding pushes us past midnight, cap at 23:30
+                if (startHour >= 24) {
+                    startHour = 23;
+                    startMin = 30;
+                }
+            } else {
+                // Creating event for a future day → default to 9:00 AM
+                startHour = 9;
+                startMin = 0;
+            }
+
+            // Calculate end time = start + 30 minutes
+            let endHour = startHour;
+            let endMin = startMin + 30;
+            if (endMin >= 60) {
+                endHour += 1;
+                endMin -= 60;
+            }
+            if (endHour >= 24) {
+                endHour = 23;
+                endMin = 59;
+            }
+
+            const pad = (n: number) => String(n).padStart(2, '0');
+            setStartTime(`${dateStr}T${pad(startHour)}:${pad(startMin)}`);
+            setEndTime(`${dateStr}T${pad(endHour)}:${pad(endMin)}`);
+
             setTitle('');
             setLocation('');
             setIsOnline(false);
@@ -1684,7 +1826,7 @@ const EventModal: React.FC<EventModalProps> = ({
                                                     <div
                                                         key={`start-${time}`}
                                                         className={`px-4 py-2 cursor-pointer text-sm transition-colors ${isPastTime
-                                                            ? 'text-gray-300 cursor-not-allowed opacity-50'
+                                                            ? 'text-gray-500 cursor-not-allowed opacity-70'
                                                             : isSelected
                                                                 ? 'bg-blue-50 text-blue-700 font-medium'
                                                                 : 'text-gray-700 hover:bg-gray-50'
@@ -1751,7 +1893,7 @@ const EventModal: React.FC<EventModalProps> = ({
                                                     <div
                                                         key={`end-${time}`}
                                                         className={`px-4 py-2 cursor-pointer text-sm transition-colors ${isPastTime
-                                                            ? 'text-gray-300 cursor-not-allowed opacity-50'
+                                                            ? 'text-gray-500 cursor-not-allowed opacity-70'
                                                             : isSelected
                                                                 ? 'bg-blue-50 text-blue-700 font-medium'
                                                                 : 'text-gray-700 hover:bg-gray-50'
@@ -2752,6 +2894,10 @@ export const Calendar: React.FC = () => {
     });
     const [searchParams, setSearchParams] = useSearchParams();
     const [currentDate, setCurrentDate] = useState(new Date());
+    const [seenEventIds, setSeenEventIds] = useState<number[]>(() => {
+        const saved = localStorage.getItem('seen_event_notifications');
+        return saved ? JSON.parse(saved) : [];
+    });
     const [viewMode, setViewMode] = useState<ViewMode>('work_week');
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [selectedEvent, setSelectedEvent] = useState<CalendarEventType | null>(null);
@@ -2789,6 +2935,8 @@ export const Calendar: React.FC = () => {
         event: CalendarEventType;
     } | null>(null);
     const [showRepeatSubmenu, setShowRepeatSubmenu] = useState(false);
+
+
 
     // ═══════════════ INVITATION MUTATIONS ═══════════════
     const { mutate: acceptInvitation, isPending: isAccepting } = useMutation({
@@ -3078,6 +3226,7 @@ export const Calendar: React.FC = () => {
             if (notification.related_object?.type === 'event') {
                 console.log('📅 New event notification received, refreshing calendar...');
                 queryClient.invalidateQueries({ queryKey: ['events-calendar'] });
+                queryClient.invalidateQueries({ queryKey: ['events-rsvp-bulk'] });
             }
         });
 
@@ -3116,6 +3265,64 @@ export const Calendar: React.FC = () => {
             return isMyEvent || isSelectedUserInvolved;
         });
     }, [events, includeSharedEvents, selectedUserIds, user?.id]);
+
+    const myOrganizedEvents = useMemo(
+        () => events.filter((e: CalendarEventType) => e.my_invitation_status === 'ORGANIZER'),
+        [events]
+    );
+
+    const { data: rsvpStatusMap = {} } = useQuery<Record<number, any[]>>({
+        queryKey: ['events-rsvp-bulk', myOrganizedEvents.map(e => e.id).sort().join(',')],
+        queryFn: async () => {
+            if (myOrganizedEvents.length === 0) return {};
+            const results = await Promise.all(
+                myOrganizedEvents.map(async (event: CalendarEventType) => {
+                    try {
+                        const rsvp = await eventApi.getEventRsvpStatus(event.id);
+                        return { eventId: event.id, attendee_status: rsvp.attendee_status || [] };
+                    } catch {
+                        return { eventId: event.id, attendee_status: [] };
+                    }
+                })
+            );
+            const map: Record<number, any[]> = {};
+            results.forEach(r => { map[r.eventId] = r.attendee_status; });
+            return map;
+        },
+        enabled: myOrganizedEvents.length > 0,
+        staleTime: 30000,
+        refetchInterval: 30000,
+        refetchIntervalInBackground: false,
+    });
+
+    const renderStatusDot = (event: any) => {
+        if (seenEventIds.includes(event.id)) return null;
+        if (event.my_invitation_status !== 'ORGANIZER') return null;
+
+        const attendeeList = rsvpStatusMap[event.id] || [];
+        if (attendeeList.length === 0) return null;
+
+        const hasDeclined = attendeeList.some((a: any) => a.status === 'DECLINED');
+        const everyoneAccepted = attendeeList.every((a: any) => a.status === 'ACCEPTED');
+
+        if (hasDeclined) {
+            return (
+                <span
+                    className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse z-50 shadow-sm"
+                    title="Someone declined"
+                />
+            );
+        }
+        if (everyoneAccepted) {
+            return (
+                <span
+                    className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white z-50 shadow-sm"
+                    title="All accepted"
+                />
+            );
+        }
+        return null;
+    };
 
     // Automatically open event from URL parameters (e.g., from notifications)
     React.useEffect(() => {
@@ -3170,6 +3377,16 @@ export const Calendar: React.FC = () => {
             fetchNextTasksPage();
         }
     }, [hasNextTasksPage, isFetchingNextTasksPage, fetchNextTasksPage]);
+
+    // Add this inside your component
+    useEffect(() => {
+        if (dyuksaResponse) {
+            const timer = setTimeout(() => {
+                setDyuksaResponse(null);
+            }, 5000)
+            return () => clearTimeout(timer);
+        }
+    }, [dyuksaResponse]);
 
     const tasks = useMemo(() => {
         if (!tasksData || !user) return [];
@@ -3267,6 +3484,16 @@ export const Calendar: React.FC = () => {
     const handleEventClick = useCallback((event: CalendarEventType) => {
         setSelectedEvent(event);
         setIsEventModalOpen(true);
+
+        // This makes the dot disappear
+        setSeenEventIds((prev) => {
+            if (!prev.includes(event.id)) {
+                const newSeen = [...prev, event.id];
+                localStorage.setItem('seen_event_notifications', JSON.stringify(newSeen));
+                return newSeen;
+            }
+            return prev;
+        });
     }, []);
 
     const handleDateClick = useCallback((date: Date) => {
@@ -3668,6 +3895,17 @@ export const Calendar: React.FC = () => {
                         <MiniCalendar
                             currentDate={currentDate}
                             onDateSelect={(date) => setCurrentDate(date)}
+                            includeSharedEvents={includeSharedEvents}
+                            onToggleSharedEvents={setIncludeSharedEvents}
+                            sharedWithMeUsers={sharedWithMeUsers}
+                            selectedUserIds={selectedUserIds}
+                            onToggleUser={(userId) => {
+                                setSelectedUserIds(prev =>
+                                    prev.includes(userId)
+                                        ? prev.filter(id => id !== userId)
+                                        : [...prev, userId]
+                                );
+                            }}
                         />
                     </div>
 
@@ -3703,6 +3941,8 @@ export const Calendar: React.FC = () => {
                             tasks={tasks}
                             events={filteredEvents}
                             selectedDate={selectedDate}
+                            seenEventIds={seenEventIds}
+                            renderStatusDot={renderStatusDot}
                             onTaskClick={handleTaskClick}
                             onEventClick={handleEventClick}
                             onDateClick={handleDateClick}
