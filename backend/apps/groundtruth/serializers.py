@@ -6,7 +6,7 @@ from django.utils import timezone
 from rest_framework import serializers
 from django.utils import timezone
 from apps.users.serializers import UserMinimalSerializer
-from .models import Document, DocumentComment, GTVersion
+from .models import Document, DocumentComment, GTVersion, Folder
 
 def get_clean_unique_name(project_id, original_filename):
     """
@@ -174,7 +174,21 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
         user = self.context["request"].user
         source_file = validated_data.get("source_file")
         project = validated_data.get("project")
-        
+        task = validated_data.get("task")
+
+        # ============ NEW: SMART FOLDER ROUTING ============
+        # If this document belongs to a task, put it in the system Tasks folder
+        if task and project and not validated_data.get("folder"):
+            tasks_folder = Folder.objects.filter(
+                project=project,
+                name="Tasks",
+                is_system_generated=True
+            ).first()
+            
+            if tasks_folder:
+                validated_data["folder"] = tasks_folder
+        # ===================================================
+
         # Existing clean name logic
         original_name = validated_data.get("name")
         if not original_name and source_file:
@@ -193,7 +207,7 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
         # ============ NEW: Trigger PDF conversion in background ============
         if source_file:
             from .services import generate_document_preview, needs_pdf_conversion
-            
+         
             if needs_pdf_conversion(source_file.name):
                 # Run conversion synchronously
                 # Note: This adds 5-30 seconds to upload time
@@ -210,7 +224,7 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
                 document.preview_status = Document.PreviewStatus.NOT_NEEDED
                 document.save(update_fields=['preview_status'])
         # ===================================================================
-        
+        document = Document.objects.create(created_by=user, **validated_data)
         return document
 
 
@@ -263,3 +277,18 @@ class DocumentShareSerializer(serializers.Serializer):
             })
             
         return data
+    
+class FolderSerializer(serializers.ModelSerializer):
+    document_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Folder
+        fields = ['id', 'project', 'parent', 'name', 'is_system_generated', 'created_at', 'document_count']
+        read_only_fields = ['id', 'is_system_generated', 'created_at']
+
+    def get_document_count(self, obj):
+        # Look for the annotated value first (1 query). 
+        # Fallback to the ORM count if the annotation is missing (N+1 queries).
+        if hasattr(obj, 'annotated_doc_count'):
+            return obj.annotated_doc_count
+        return obj.documents.count()

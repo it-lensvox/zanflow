@@ -9,8 +9,38 @@ from django.db import models
 from apps.projects.models import Project
 from apps.organizations.models import TenantModel
 from core.models import UserStampedModel
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
+# ============ NEW FOLDER MODEL ============
+class Folder(TenantModel, UserStampedModel):
+    """
+    Hierarchical folder structure for projects.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="folders",
+    )
+    parent = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="subfolders",
+    )
+    name = models.CharField(max_length=255)
+    is_system_generated = models.BooleanField(default=False)
 
+    class Meta:
+        db_table = "folders"
+        ordering = ["-is_system_generated", "name"] # System folders appear first
+        unique_together = [["project", "name", "parent"]] # Prevent duplicate names at same level
+
+    def __str__(self):
+        return f"{self.name} - {self.project.name}"
+    
 def document_upload_path(instance, filename):
     """Generate upload path for document source files."""
     # If this file belongs to a task, put it in the task_documents folder
@@ -65,7 +95,16 @@ class Document(TenantModel, UserStampedModel):
         blank=True,
         related_name="documents",
     )
-    
+
+    folder = models.ForeignKey(
+        Folder,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="documents",
+        help_text="The folder where this document lives."
+    )
+
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     
@@ -280,3 +319,5 @@ class DocumentShare(TenantModel, UserStampedModel):
         if self.shared_project:
             return f"{self.document.name} shared with Project: {self.shared_project.name}"
         return f"{self.document.name} shared with {self.shared_with}"
+    
+    

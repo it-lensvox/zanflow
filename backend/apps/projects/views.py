@@ -158,30 +158,49 @@ class ProjectViewSet(viewsets.ModelViewSet):
         
         file_key = request.data.get("file_key")
         file_name = request.data.get("file_name")
-        # 1. Get the file_type from the Frontend request
         file_type = request.data.get("file_type")
         metadata = request.data.get("metadata", {}) 
         
+        # ============ NEW: Extract folder and task from frontend ============
+        folder_id = request.data.get("folder")
+        task_id = request.data.get("task")
+        # ====================================================================
+
         if not file_key or not file_name:
             return Response(
                 {"detail": "file_key and file_name are required."}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        # ============ NEW: Smart Folder Routing ============
+        # If Shifali sends a task_id but no folder_id, auto-route it to "Tasks"
+        if task_id and not folder_id:
+            from apps.groundtruth.models import Folder
+            tasks_folder = Folder.objects.filter(
+                project=project,
+                name="Tasks",
+                is_system_generated=True
+            ).first()
+            
+            if tasks_folder:
+                folder_id = tasks_folder.id
+        # ===================================================
+
         document = Document.objects.create(
             project=project,
             name=file_name,
             source_file=file_key,
-            # 2. Save it to the database!
             file_type=file_type, 
             metadata=metadata,
             status=Document.Status.DRAFT, 
-            created_by=request.user
+            created_by=request.user,
+            # ============ NEW: Assign them to the database ============
+            folder_id=folder_id,
+            task_id=task_id
+            # ==========================================================
         )
 
-        # ============ NEW: Convert Office files to PDF synchronously ============
-        # User waits during upload (~10-20 sec for PPT) but the file is ready
-        # to preview immediately on click — no refresh needed.
+        # ============ EXISTING: Convert Office files to PDF synchronously ============
         from apps.groundtruth.services import (
             needs_pdf_conversion,
             generate_document_preview,
@@ -193,7 +212,6 @@ class ProjectViewSet(viewsets.ModelViewSet):
             except Exception as e:
                 import logging
                 logging.error(f"Preview generation failed during upload: {e}")
-                # Don't fail the upload — original file still accessible
         else:
             document.preview_status = 'not_needed'
             document.save(update_fields=['preview_status'])
