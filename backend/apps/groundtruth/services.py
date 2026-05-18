@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 CONVERTIBLE_EXTENSIONS = {
     'ppt', 'pptx',   # PowerPoint
     'doc', 'docx',   # Word
-    'xls', 'xlsx',   # Excel
+    # 'xls', 'xlsx',   # Excel
     'odt', 'odp', 'ods',  # OpenDocument
 }
 
