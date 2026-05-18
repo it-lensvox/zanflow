@@ -7,7 +7,8 @@ from rest_framework import serializers
 from django.utils import timezone
 from apps.users.serializers import UserMinimalSerializer
 from .models import Document, DocumentComment, GTVersion, Folder
-
+from django.contrib.auth import get_user_model
+User = get_user_model()
 def get_clean_unique_name(project_id, original_filename):
     """
     Checks if a file name exists in a project. 
@@ -114,21 +115,42 @@ class DocumentCommentSerializer(serializers.ModelSerializer):
     """
     Serializer for DocumentComment.
     """
-    created_by = UserMinimalSerializer(read_only=True)
-    replies = serializers.SerializerMethodField()
+    user = serializers.SerializerMethodField()
+    parent_id = serializers.PrimaryKeyRelatedField(
+        source='parent', 
+        queryset=DocumentComment.objects.all(), 
+        required=False, 
+        allow_null=True
+    )
+    replies_count = serializers.SerializerMethodField()
     
+    mentions = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=User.objects.all(),
+        required=False
+    )
+
     class Meta:
         model = DocumentComment
         fields = [
-            "id", "content", "field_reference", "parent",
-            "is_resolved", "created_by", "created_at", "replies",
+            "id", "content", "user", "created_at", "updated_at", 
+            "parent_id", "replies_count", "is_resolved", "mentions"
         ]
-        read_only_fields = ["id", "created_by", "created_at"]
+        read_only_fields = ["id", "created_at", "updated_at", "is_resolved"]
     
-    def get_replies(self, obj):
-        if obj.replies.exists():
-            return DocumentCommentSerializer(obj.replies.all(), many=True).data
-        return []
+    def get_user(self, obj):
+        user = obj.created_by
+        if not user:
+            return None
+        return {
+            "id": user.id,
+            "full_name": f"{user.first_name} {user.last_name}".strip() or user.username,
+            "email": user.email,
+            "avatar_color": getattr(user, 'avatar_color', "#4169FF") # Default fallback color
+        }
+        
+    def get_replies_count(self, obj):
+        return obj.replies.count()
 
 
 class DocumentSerializer(serializers.ModelSerializer):
@@ -280,15 +302,24 @@ class DocumentShareSerializer(serializers.Serializer):
     
 class FolderSerializer(serializers.ModelSerializer):
     document_count = serializers.SerializerMethodField()
+    folder_count = serializers.SerializerMethodField() # <-- NEW
 
     class Meta:
         model = Folder
-        fields = ['id', 'project', 'parent', 'name', 'is_system_generated', 'created_at', 'document_count']
+        fields = [
+            'id', 'project', 'parent', 'name', 'is_system_generated', 
+            'created_at', 'document_count', 'folder_count'
+        ]
         read_only_fields = ['id', 'is_system_generated', 'created_at']
 
     def get_document_count(self, obj):
-        # Look for the annotated value first (1 query). 
-        # Fallback to the ORM count if the annotation is missing (N+1 queries).
+        # Grabs the direct document count from the DB annotation
         if hasattr(obj, 'annotated_doc_count'):
             return obj.annotated_doc_count
         return obj.documents.count()
+
+    def get_folder_count(self, obj):
+        # Grabs the direct subfolder count from the DB annotation
+        if hasattr(obj, 'annotated_folder_count'):
+            return obj.annotated_folder_count
+        return obj.subfolders.count()

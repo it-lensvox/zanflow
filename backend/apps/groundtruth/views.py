@@ -16,7 +16,7 @@ import boto3
 from rest_framework.views import APIView
 from apps.tasksite.models import TaskAttachment
 from apps.audit.services import get_object_history, log_action
-from django.db.models import Q, Count
+from django.db.models import Q, Count, F
 from .models import Document, DocumentComment, GTVersion, DocumentShare, Folder
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth import get_user_model
@@ -38,8 +38,10 @@ from .serializers import (
     GTVersionListSerializer,
     GTVersionSerializer,
     VersionDiffSerializer,
+    FolderSerializer
 )
 from .services import approve_gt_version, compute_gt_diff, submit_for_review
+from django.db.models import Count, Q
 
 
 class DocumentFilter(filters.FilterSet):
@@ -324,9 +326,9 @@ class DocumentViewSet(viewsets.ModelViewSet):
         return Response(DocumentSerializer(document).data)
     
     @action(detail=True, methods=["get"])
-    def history(self, request, pk=None):
+    def activity(self, request, pk=None):
         """
-        Get audit history for document.
+        Get activity/audit log for document formatted for frontend.
         """
         document = self.get_object()
         history = get_object_history(document)
@@ -334,14 +336,40 @@ class DocumentViewSet(viewsets.ModelViewSet):
         from apps.audit.models import AuditLog
         from rest_framework import serializers as drf_serializers
         
-        class AuditSerializer(drf_serializers.ModelSerializer):
-            user = drf_serializers.StringRelatedField()
+        class ActivitySerializer(drf_serializers.ModelSerializer):
+            user = drf_serializers.SerializerMethodField()
+            type = drf_serializers.CharField(source='action')
+            description = drf_serializers.CharField(source='change_summary')
+            created_at = drf_serializers.DateTimeField(source='timestamp')
+            metadata = drf_serializers.SerializerMethodField()
             
             class Meta:
                 model = AuditLog
-                fields = ["id", "user", "action", "change_summary", "timestamp"]
+                fields = ["id", "type", "description", "user", "created_at", "metadata"]
+
+            def get_user(self, obj):
+                user = obj.user
+                if not user:
+                    return None
+                return {
+                    "id": user.id,
+                    "full_name": f"{user.first_name} {user.last_name}".strip() or user.username,
+                    "email": user.email
+                }
+                
+            def get_metadata(self, obj):
+                meta = {}
+                # Map Django audit values to frontend expected metadata format
+                if obj.old_value:
+                    for k, v in obj.old_value.items():
+                        meta[f"old_{k}"] = v
+                if obj.new_value:
+                    for k, v in obj.new_value.items():
+                        meta[f"new_{k}"] = v
+                return meta
         
-        return Response(AuditSerializer(history, many=True).data)
+        # Wrapped in "results" to match frontend array expectation
+        return Response({"results": ActivitySerializer(history, many=True).data})
     
     @action(detail=False, methods=["post"], url_path="bulk-import")
     def bulk_import(self, request):
@@ -391,24 +419,62 @@ class DocumentCommentViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         user = self.request.user
+        # 1. Grab the document ID from the URL (/documents/<document_pk>/comments/)
+        document_id = self.kwargs.get("document_pk")
         
-        # 1. Start with the optimized base queryset
-        queryset = Document.objects.select_related(
-            "project", "created_by", "current_gt_version"
-        ).prefetch_related("versions")
+        # 2. Query COMMENTS, not Documents, filtered by the specific document
+        queryset = DocumentComment.objects.filter(document_id=document_id)
 
-        # 2. Filter: Only show documents if the project was created by the user 
-        # OR if the user is a member of the project.
+        # 3. Security: Only show comments if the user has access to the document's project
         return queryset.filter(
-            Q(project__created_by=user) | Q(project__members=user)
+            Q(document__project__created_by=user) | Q(document__project__members=user)
         ).distinct()
     
     def perform_create(self, serializer):
         document_id = self.kwargs.get("document_pk")
-        serializer.save(
+        user = self.request.user
+        
+        # 1. Save the comment (Django automatically saves the mentions array here!)
+        comment = serializer.save(
             document_id=document_id,
-            created_by=self.request.user,
+            created_by=user,
         )
+        
+        document = comment.document
+
+        # 2. Create Activity Log
+        log_action(document, "commented", change_summary="Comment added", user=user)
+
+        # 3. Process Notifications (Read straight from the database now)
+        mentioned_users = comment.mentions.exclude(id=user.id)
+        
+        if mentioned_users.exists():
+            channel_layer = get_channel_layer()
+            
+            for target_user in mentioned_users:
+                # Create Notification
+                notification = Notification.objects.create(
+                    recipient=target_user,
+                    actor=user,
+                    title="Mentioned in a Comment",
+                    message=f"{user.first_name or user.username} mentioned you in '{document.name}'.",
+                    notification_type=getattr(Notification.NotificationType, 'MENTION', 'comment'), 
+                    content_type=ContentType.objects.get_for_model(Document),
+                    object_id=str(document.id),
+                )
+                
+                # Broadcast
+                notification_data = NotificationSerializer(notification).data
+                notification_data['unread_count'] = Notification.objects.filter(recipient=target_user, is_read=False).count()
+                
+                async_to_sync(channel_layer.group_send)(
+                    f"user_{target_user.id}",
+                    {
+                        "type": "gateway_signal", 
+                        "event": "NEW_NOTIFICATION",
+                        "data": notification_data
+                    }
+                )
     
     @action(detail=True, methods=["post"])
     def resolve(self, request, document_pk=None, pk=None):
@@ -724,17 +790,8 @@ class DocumentShareView(APIView):
                 {"detail": f"Document successfully shared with project {target_project.name}."}, 
                 status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
             )
-        
-class FolderSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Folder
-        fields = ['id', 'project', 'parent', 'name', 'is_system_generated', 'created_at']
-        read_only_fields = ['id', 'is_system_generated', 'created_at']
 
 class FolderViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for managing project folders.
-    """
     serializer_class = FolderSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -742,7 +799,6 @@ class FolderViewSet(viewsets.ModelViewSet):
         user = self.request.user
         project_id = self.request.query_params.get('project')
         
-        # Your existing tenant/security filtering
         queryset = Folder.objects.all()
 
         if project_id:
@@ -756,8 +812,19 @@ class FolderViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(parent_id=parent_id)
 
         # ============ THE FIX ============
-        # Annotate the count so it is calculated in a single SQL query
-        return queryset.annotate(annotated_doc_count=Count('documents')).distinct()
+        # We apply your exact logic to BOTH counts to prevent JOIN explosions
+        return queryset.annotate(
+            document_count=Count(
+                'documents', 
+                filter=Q(documents__folder=F('id')), 
+                distinct=True
+            ),
+            folder_count=Count(
+                'subfolders',
+                filter=Q(subfolders__parent=F('id')),
+                distinct=True
+            )
+        ).distinct()
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
@@ -776,3 +843,27 @@ class FolderViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("You cannot delete a system-generated folder.")
         # ==================================================================
         instance.delete()
+
+class DocumentSummaryView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        
+        # Base querysets secured to the user's workspaces
+        secured_projects = Project.objects.filter(Q(created_by=user) | Q(members=user)).distinct()
+        secured_documents = Document.objects.filter(project__in=secured_projects)
+
+        total_projects = secured_projects.count()
+        total_documents = secured_documents.count()
+
+        # Group by project in a single query
+        project_counts = secured_documents.values('project_id').annotate(count=Count('id'))
+
+        return Response({
+            'total_documents': total_documents,
+            'total_projects': total_projects,
+            'by_project': {
+                str(pc['project_id']): pc['count'] for pc in project_counts
+            }
+        })

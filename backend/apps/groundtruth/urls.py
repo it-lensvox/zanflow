@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from .views import ProjectAllDocumentsView, DocumentShareView
+from .views import ProjectAllDocumentsView, DocumentShareView, DocumentSummaryView
 
 urlpatterns = [
     # ==========================================
@@ -94,11 +94,11 @@ urlpatterns = [
         name="document-approve"
     ),
     path(
-        "<uuid:pk>/history/", 
+        "<uuid:pk>/activity/",  
         views.DocumentViewSet.as_view({
-            'get': 'history'
+            'get': 'activity'  
         }), 
-        name="document-history"
+        name="document-activity"
     ),
 
     # Document Versions
@@ -152,5 +152,16 @@ urlpatterns = [
             'post': 'resolve'
         }), 
         name="document-comments-resolve"
+    ),
+    path(
+        "summary/", 
+        DocumentSummaryView.as_view(), 
+        name="document-summary"
+    ),
+    
+    path(
+        "project/<int:project_id>/all/", 
+        ProjectAllDocumentsView.as_view(), 
+        name="project-all-documents"
     ),
 ]

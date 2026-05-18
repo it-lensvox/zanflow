@@ -267,7 +267,11 @@ class DocumentComment(TenantModel, UserStampedModel):
         blank=True,
         related_name="replies",
     )
-    
+    mentions = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name="mentioned_in_comments",
+        blank=True
+    )
     is_resolved = models.BooleanField(default=False)
     
     class Meta:
