@@ -999,11 +999,15 @@ function TagSelectorModal({
 }) {
   const [selectedTags, setSelectedTags] = useState<number[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);  // ✅ ADD THIS
+  const [successMessage, setSuccessMessage] = useState('');  // ✅ ADD THIS
 
   React.useEffect(() => {
     if (isOpen) {
       setSelectedTags([]);
       setSearchTerm('');
+      setSuccessMessage('');  // ✅ ADD THIS
+      setIsSubmitting(false);  // ✅ ADD THIS
     }
   }, [isOpen]);
 
@@ -1073,6 +1077,38 @@ function TagSelectorModal({
               onBlur={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
             />
           </div>
+
+          {/* Success Message */}
+          {successMessage && (
+            <div
+              className="rounded-lg"
+              style={{
+                padding: '12px 16px',
+                background: '#D1FAE5',
+                border: '1px solid #10B981',
+                marginBottom: 16
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="#10B981"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+                <p style={{ fontSize: 14, fontWeight: 500, color: '#065F46', margin: 0 }}>
+                  {successMessage}
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Selected Tags Summary */}
           {selectedTags.length > 0 && (
@@ -1199,21 +1235,51 @@ function TagSelectorModal({
             Cancel
           </button>
           <button
-            onClick={() => onConfirm(selectedTags)}
-            disabled={selectedTags.length === 0}
-            className="rounded-lg flex items-center gap-2"
+            onClick={async () => {
+              if (selectedTags.length === 0) {
+                setSuccessMessage('');
+                alert('Please select at least one tag');
+                return;
+              }
+
+              setIsSubmitting(true);
+              setSuccessMessage('');
+
+              try {
+                await onConfirm(selectedTags);
+
+                // ✅ Show success message in modal
+                setSuccessMessage(`Successfully added ${selectedTags.length} tag(s) to ${selectedCount} document(s)!`);
+
+                // ✅ Auto-close after 2 seconds
+                setTimeout(() => {
+                  onClose();
+                }, 2000);
+
+              } catch (error: any) {
+                setSuccessMessage('');
+                alert(error.message || 'Failed to add tags');
+              } finally {
+                setIsSubmitting(false);
+              }
+            }}
+            disabled={selectedTags.length === 0 || isSubmitting}
             style={{
-              padding: '8px 20px',
-              background: selectedTags.length === 0 ? '#a5b4fc' : '#4169FF',
-              color: '#fff',
+              padding: '10px 20px',
+              borderRadius: 8,
               border: 'none',
+              background: selectedTags.length === 0 || isSubmitting ? '#D1D5DB' : '#4169FF',
+              color: '#fff',
               fontSize: 14,
               fontWeight: 600,
-              cursor: selectedTags.length === 0 ? 'not-allowed' : 'pointer'
+              cursor: selectedTags.length === 0 || isSubmitting ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8
             }}
           >
             <Tag className="w-4 h-4" />
-            Add {selectedTags.length > 0 ? `${selectedTags.length} ` : ''}Tag{selectedTags.length !== 1 ? 's' : ''}
+            {isSubmitting ? 'Adding...' : `Add ${selectedTags.length > 0 ? selectedTags.length : ''} Tag${selectedTags.length !== 1 ? 's' : ''}`}
           </button>
         </div>
       </div>
@@ -1263,14 +1329,17 @@ export function Documents() {
 
   const { data: projectsData } = useQuery({ queryKey: ['projects'], queryFn: () => projectsApi.list() });
   // Fetch available tags/labels
-  // Fetch available tags/labels from real API
-  // Fetch available tags/labels
   const { data: tagsData } = useQuery({
     queryKey: ['labels'],
     queryFn: async () => {
+      const token = localStorage.getItem('access_token');  // ✅ ADD THIS LINE
+
       const response = await fetch('http://192.168.1.164:8000/api/v1/documents/labels/', {
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' }
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`  // ✅ ADD THIS LINE
+        }
       });
 
       if (!response.ok) {
@@ -1652,10 +1721,15 @@ export function Documents() {
     }
 
     try {
+      const token = localStorage.getItem('access_token');  // ✅ ADD THIS LINE
+
       const response = await fetch('http://192.168.1.164:8000/api/v1/documents/bulk-add-labels/', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`  // ✅ ADD THIS LINE
+        },
         body: JSON.stringify({
           document_ids: documentIds,
           label_ids: tagIds,
@@ -1675,7 +1749,6 @@ export function Documents() {
       queryClient.invalidateQueries({ queryKey: ['documents'] });
       queryClient.invalidateQueries({ queryKey: ['documents-tree-counts'] });
 
-      // Show success message
       const message = result.skipped_count
         ? `Successfully added tags to ${result.updated_count} document(s). ${result.skipped_count} skipped due to permissions.`
         : `Successfully added tags to ${result.updated_count} document(s)`;
