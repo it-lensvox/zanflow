@@ -1749,11 +1749,11 @@ export function Documents() {
       queryClient.invalidateQueries({ queryKey: ['documents'] });
       queryClient.invalidateQueries({ queryKey: ['documents-tree-counts'] });
 
-      const message = result.skipped_count
-        ? `Successfully added tags to ${result.updated_count} document(s). ${result.skipped_count} skipped due to permissions.`
-        : `Successfully added tags to ${result.updated_count} document(s)`;
+      // const message = result.skipped_count
+      //   ? `Successfully added tags to ${result.updated_count} document(s). ${result.skipped_count} skipped due to permissions.`
+      //   : `Successfully added tags to ${result.updated_count} document(s)`;
 
-      alert(message);
+      // alert(message);
     } catch (error: any) {
       console.error('Bulk add tags failed:', error);
       alert(error.message || 'Failed to add tags. Please try again.');
