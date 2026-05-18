@@ -1,6 +1,6 @@
 import { Grid3X3, List } from 'lucide-react';
 
-export type ViewMode = 'grid' | 'table';
+export type ViewMode = 'grid' | 'table' | 'tree';
 
 interface ViewToggleProps {
   viewMode: ViewMode;

@@ -276,12 +276,41 @@ export interface Document {
   file_size?: number;
   metadata: Record<string, unknown>;
   status: DocumentStatus;
+  folder?: string | null;  // ✅ ADD THIS LINE
   assigned_users?: UserMinimal[];
   created_by: UserMinimal;
   created_at: string;
   updated_at: string;
   labels?: Label[];
   version_count?: number;
+}
+
+export interface DocumentActivity {
+  id: number;
+  type: 'created' | 'updated' | 'status_changed' | 'moved' | 'renamed' | 'shared' | 'downloaded' | 'commented';
+  description: string;
+  user?: {
+    id: number;
+    full_name: string;
+    email: string;
+  };
+  created_at: string;
+  metadata?: Record<string, any>;
+}
+
+export interface DocumentComment {
+  id: number;
+  content: string;
+  user: {
+    id: number;
+    full_name: string;
+    email: string;
+    avatar_color?: string;
+  };
+  created_at: string;
+  updated_at: string;
+  parent_id?: number | null;
+  replies_count: number;
 }
 
 export type FileType = 'pdf' | 'image' | 'json' | 'text' | 'video' | 'other';
@@ -506,6 +535,8 @@ export interface GetUploadUrlResponse {
 export interface ConfirmUploadPayload {
   file_key: string;
   document_id?: string;
+  file_type: string;
+  file_name: string; 
 }
 
 export interface ConfirmUploadResponse {
