@@ -17,7 +17,7 @@ from rest_framework.views import APIView
 from apps.tasksite.models import TaskAttachment
 from apps.audit.services import get_object_history, log_action
 from django.db.models import Q, Count, F
-from .models import Document, DocumentComment, GTVersion, DocumentShare, Folder
+from .models import Document, DocumentComment, GTVersion, DocumentShare, Folder, Label
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth import get_user_model
 from apps.notification.models import Notification
@@ -38,7 +38,8 @@ from .serializers import (
     GTVersionListSerializer,
     GTVersionSerializer,
     VersionDiffSerializer,
-    FolderSerializer
+    FolderSerializer,
+    LabelSerializer
 )
 from .services import approve_gt_version, compute_gt_diff, submit_for_review
 from django.db.models import Count, Q
@@ -65,7 +66,33 @@ class DocumentFilter(filters.FilterSet):
         model = Document
         fields = ["project", "status", "file_type"]
 
+class LabelViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for fetching and managing project labels/tags.
+    """
+    serializer_class = LabelSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
+    def get_queryset(self):
+        user = self.request.user
+        
+        # Security: Only fetch labels that belong to projects 
+        # where the user is either the creator or a member.
+        queryset = Label.objects.filter(
+            Q(project__created_by=user) | Q(project__members=user)
+        )
+        
+        # Optional: Filter by a specific project if the frontend passes ?project_id=1
+        project_id = self.request.query_params.get('project_id')
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+            
+        return queryset.distinct()
+
+    def perform_create(self, serializer):
+        # In case the frontend later wants a feature to *create* new tags 
+        # from the modal, this handles it automatically!
+        serializer.save()
 class DocumentViewSet(viewsets.ModelViewSet):
     """
     ViewSet for Document CRUD operations with restricted visibility.
@@ -99,7 +126,68 @@ class DocumentViewSet(viewsets.ModelViewSet):
         # distinct() is essential here because the Q(project__members=user) lookup 
         # spans a ManyToMany relationship, which can cause duplicate rows in SQL joins.
         return queryset.distinct()
+    
+    @action(detail=False, methods=["post"], url_path="bulk-add-labels")
+    def bulk_add_labels(self, request):
+        """
+        Bulk add labels to multiple documents.
+        Payload: {"document_ids": ["uuid1", "uuid2"], "label_ids": [1, 2]}
+        """
+        document_ids = request.data.get("document_ids", [])
+        label_ids = request.data.get("label_ids", [])
 
+        if not isinstance(document_ids, list) or not isinstance(label_ids, list):
+            return Response(
+                {"error": "document_ids and label_ids must be lists", "status": 400},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 1. Fetch Labels and Validate
+        labels = list(Label.objects.filter(id__in=label_ids))
+        if len(labels) != len(label_ids):
+            found_ids = [label.id for label in labels]
+            invalid_ids = list(set(label_ids) - set(found_ids))
+            return Response({
+                "error": "Invalid label IDs",
+                "invalid_ids": invalid_ids,
+                "status": 400
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # 2. Fetch Documents (get_queryset handles permissions automatically!)
+        # Any document_id requested that the user doesn't have access to is silently ignored.
+        documents = self.get_queryset().filter(id__in=document_ids)
+        
+        updated_docs = []
+        for doc in documents:
+            # .add() automatically skips duplicates!
+            doc.labels.add(*labels) 
+            updated_docs.append(doc)
+
+            # Audit Log for each document
+            log_action(
+                doc, 
+                "labels_added", 
+                change_summary=f"Added {len(labels)} labels",
+                user=request.user
+            )
+
+        # 3. Bulk update the 'updated_at' timestamp for all modified documents
+        valid_doc_ids = [doc.id for doc in updated_docs]
+        Document.objects.filter(id__in=valid_doc_ids).update(
+            updated_at=timezone.now(),
+            updated_by=request.user
+        )
+
+        # 4. Serialize the updated documents to return to the frontend
+        # We re-fetch to ensure the ManyToMany prefetch is clean
+        final_docs = self.get_queryset().filter(id__in=valid_doc_ids).prefetch_related('labels')
+        serializer = DocumentSerializer(final_docs, many=True)
+
+        return Response({
+            "success": True,
+            "updated_count": len(updated_docs),
+            "documents": serializer.data
+        }, status=status.HTTP_200_OK)
     # 2. Re-add the serializer logic to fix the AssertionError
     def get_serializer_class(self):
         if self.action == "create":
@@ -867,3 +955,4 @@ class DocumentSummaryView(APIView):
                 str(pc['project_id']): pc['count'] for pc in project_counts
             }
         })
+    

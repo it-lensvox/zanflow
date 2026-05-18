@@ -6,12 +6,12 @@ from rest_framework import permissions, status, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
-
-from .models import Organization
+from rest_framework.permissions import IsAuthenticated
+from .models import Organization, OrganizationMember
 from .serializers import OrganizationSerializer, TenantSignupSerializer
 from .services import TenantOnboardingService
 from .throttles import GlobalSignupDailyThrottle
-
+from django.db import transaction
 logger = logging.getLogger(__name__)
 
 
@@ -466,3 +466,72 @@ class TenantToggleStatusView(APIView):
                 "message": f"'{org.name}' has been reactivated.",
                 "is_active": True,
             })
+        
+class MyWorkspacesView(APIView):
+    """
+    Returns all workspaces the logged-in user is a member of.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # Fetch memberships and join the organization data
+        memberships = OrganizationMember.objects.filter(
+            user=request.user,
+            organization__is_active=True
+        ).select_related("organization")
+
+        data = []
+        for membership in memberships:
+            data.append({
+                "workspace_id": membership.organization.id,
+                "name": membership.organization.name,
+                "slug": membership.organization.slug,
+                "role": membership.role,  # Crucial so frontend knows if they can edit things!
+                "joined_at": membership.joined_at,
+            })
+
+        return Response(data)
+    
+class CreateWorkspaceView(APIView):
+    """
+    Allows existing logged-in Admins or Managers to create a new workspace.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        # 1. Check Global Permissions
+        # Ensure the user has the system-level authority to create workspaces
+        if getattr(request.user, 'role', None) not in ["admin", "manager"]:
+            return Response(
+                {"detail": "You do not have permission to create new workspaces."}, 
+                status=403
+            )
+
+        workspace_name = request.data.get("name")
+        if not workspace_name:
+            return Response({"detail": "Workspace name is required."}, status=400)
+
+        # Ensure the name is unique (as per your Organization model rules)
+        if Organization.objects.filter(name__iexact=workspace_name).exists():
+             return Response({"detail": "A workspace with this name already exists."}, status=400)
+
+        # 2. Execute within an atomic transaction to ensure data integrity
+        with transaction.atomic():
+            # Create the new workspace (Organization)
+            new_org = Organization.objects.create(name=workspace_name)
+
+            # 3. Link the creator to the new workspace as its 'admin'
+            OrganizationMember.objects.create(
+                organization=new_org,
+                user=request.user,
+                role="admin"  # The creator is always the admin of their new workspace
+            )
+
+        return Response({
+            "message": "Workspace created successfully.",
+            "workspace": {
+                "id": new_org.id,
+                "name": new_org.name,
+                "slug": new_org.slug
+            }
+        }, status=201)

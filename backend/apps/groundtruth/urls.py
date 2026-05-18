@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from .views import ProjectAllDocumentsView, DocumentShareView, DocumentSummaryView
+from .views import ProjectAllDocumentsView, DocumentShareView, DocumentSummaryView, LabelViewSet
 
 urlpatterns = [
     # ==========================================
@@ -163,5 +163,23 @@ urlpatterns = [
         "project/<int:project_id>/all/", 
         ProjectAllDocumentsView.as_view(), 
         name="project-all-documents"
+    ),
+    path(
+        "labels/", 
+        LabelViewSet.as_view({
+            'get': 'list',
+            'post': 'create'
+        }), 
+        name="label-list"
+    ),
+    path(
+        "labels/<int:pk>/", 
+        LabelViewSet.as_view({
+            'get': 'retrieve',
+            'put': 'update',
+            'patch': 'partial_update',
+            'delete': 'destroy'
+        }), 
+        name="label-detail"
     ),
 ]

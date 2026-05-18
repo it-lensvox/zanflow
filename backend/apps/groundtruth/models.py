@@ -6,7 +6,7 @@ import uuid
 from django.conf import settings
 from django.db import models
 
-from apps.projects.models import Project
+from apps.projects.models import Project, Label
 from apps.organizations.models import TenantModel
 from core.models import UserStampedModel
 from django.db.models.signals import post_save
@@ -95,7 +95,11 @@ class Document(TenantModel, UserStampedModel):
         blank=True,
         related_name="documents",
     )
-
+    labels = models.ManyToManyField(
+        Label,
+        blank=True,
+        related_name="documents"
+    )
     folder = models.ForeignKey(
         Folder,
         on_delete=models.SET_NULL,

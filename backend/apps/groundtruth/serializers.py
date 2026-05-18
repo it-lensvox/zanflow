@@ -6,7 +6,8 @@ from django.utils import timezone
 from rest_framework import serializers
 from django.utils import timezone
 from apps.users.serializers import UserMinimalSerializer
-from .models import Document, DocumentComment, GTVersion, Folder
+from .models import Document, DocumentComment, GTVersion, Folder, Label
+from apps.projects.models import Label
 from django.contrib.auth import get_user_model
 User = get_user_model()
 def get_clean_unique_name(project_id, original_filename):
@@ -153,20 +154,28 @@ class DocumentCommentSerializer(serializers.ModelSerializer):
         return obj.replies.count()
 
 
+# ============ NEW SERIALIZER ============
+class LabelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Label
+        fields = ["id", "name", "color"]
+
+# ============ UPDATE DOCUMENT SERIALIZER ============
 class DocumentSerializer(serializers.ModelSerializer):
     created_by = UserMinimalSerializer(read_only=True)
-    
+    labels = LabelSerializer(many=True, read_only=True) # ADD THIS
+
     class Meta:
         model = Document
         fields = [
             "id", "project", "name", "description",
             "source_file", "source_file_url", "file_type", "file_size",
-            "metadata", "status", "created_by", "created_at", "updated_at"
+            "metadata", "status", "created_by", "created_at", "updated_at",
+            "labels" # ADD THIS
         ]
         read_only_fields = [
-            "id", "file_size", "created_by", "created_at", "updated_at"
+            "id", "file_size", "created_by", "created_at", "updated_at", "labels"
         ]
-
 
 class DocumentDetailSerializer(DocumentSerializer):
     """
