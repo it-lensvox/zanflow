@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Trash2, CheckCircle, Clock, File, Info, Share2 } from 'lucide-react';
+import { FileText, Trash2, CheckCircle, Clock, File, Info, Share2, Folder } from 'lucide-react';
 import { TablePopover } from '@/components/common';
 import { formatRelativeTime } from '@/lib/utils';
 import type { Document, DocumentStatus } from '@/types';
@@ -7,114 +7,113 @@ import type { TableColumn } from '../DualView';
 import { documentsApi } from '@/services/api';
 import { useQueryClient } from '@tanstack/react-query';
 
+/*  tree_view.html exact colors:
+    doc-pdf:#EF4444 doc-docx:#2563EB doc-xlsx:#16A34A doc-pptx:#EA580C
+    status-draft:#F3F4F6/#6B7280 status-review:#FFF4E6/#D97706 status-approved:#E8F5E9/#16A34A
+    project-badge:#EEF2FF/#4F46E5
+    tag-contract:#F3E8FF/#7C3AED tag-legal:#D1FAE5/#059669 tag-finance:#DBEAFE/#2563EB
+    tag-vendor:#FEE2E2/#DC2626 tag-presentation:#FFEDD5/#EA580C tag-compliance:#CCF8FE/#0891B2
+    tag-meeting:#E0E7FF/#4F46E5 tag-nda/report/internal/notes:#F3F4F6/#6B7280
+    owner-avatar: gradient purple #6366F1->#8B5CF6  */
+
 interface DocumentTableColumnsProps {
   onDeleteClick: (e: React.MouseEvent, doc: Document) => void;
   onInfoClick?: (doc: Document) => void;
   onShareClick?: (doc: Document) => void;
 }
 
-const getDocumentStatusConfig = (status: DocumentStatus) => {
-  const normalizedStatus = status.toLowerCase() as Lowercase<DocumentStatus>;
+// --- Doc icon color by extension (HTML exact) ---
+const getDocIconColor = (name: string): string => {
+  const ext = name?.split('.').pop()?.toLowerCase() || '';
+  const map: Record<string, string> = { pdf: '#EF4444', doc: '#2563EB', docx: '#2563EB', xls: '#16A34A', xlsx: '#16A34A', csv: '#16A34A', ppt: '#EA580C', pptx: '#EA580C', png: '#6366F1', jpg: '#6366F1', jpeg: '#6366F1', gif: '#6366F1', svg: '#6366F1', ts: '#2563EB', tsx: '#2563EB', js: '#D97706', jsx: '#D97706', json: '#D97706' };
+  return map[ext] || '#6B7280';
+};
 
-  switch (normalizedStatus) {
-    case 'draft':
-      return {
-        bg: 'bg-yellow-50',
-        text: 'text-yellow-800',
-        label: 'DRAFT',
-        icon: File
-      };
-    case 'in_review':
-      return {
-        bg: 'bg-blue-50',
-        text: 'text-blue-800',
-        label: 'IN REVIEW',
-        icon: Clock
-      };
-    case 'approved':
-      return {
-        bg: 'bg-green-50',
-        text: 'text-green-800',
-        label: 'APPROVED',
-        icon: CheckCircle
-      };
-    case 'archived':
-      return {
-        bg: 'bg-gray-50',
-        text: 'text-gray-800',
-        label: 'ARCHIVED',
-        icon: FileText
-      };
-    default: {
-      const exhaustiveCheck: never = normalizedStatus;
-      return {
-        bg: 'bg-gray-50',
-        text: 'text-gray-800',
-        label: String(status).toUpperCase().replace('_', ' '),
-        icon: FileText
-      };
-    }
+// --- Status config (HTML exact — with colored borders) ---
+const getDocumentStatusConfig = (status: DocumentStatus) => {
+  const n = status.toLowerCase() as Lowercase<DocumentStatus>;
+  switch (n) {
+    case 'draft': return { bg: '#F3F4F6', text: '#6B7280', border: '#D1D5DB', label: 'Draft', icon: File };
+    case 'in_review': return { bg: '#FFF4E6', text: '#D97706', border: '#FCD34D', label: 'In Review', icon: Clock };
+    case 'approved': return { bg: '#E8F5E9', text: '#16A34A', border: '#86EFAC', label: 'Approved', icon: CheckCircle };
+    case 'archived': return { bg: '#F3F4F6', text: '#6B7280', border: '#D1D5DB', label: 'Archived', icon: FileText };
+    default: return { bg: '#F3F4F6', text: '#6B7280', border: '#D1D5DB', label: String(status).replace('_', ' '), icon: FileText };
   }
 };
 
 const statusOptions: { value: DocumentStatus; label: string; icon: any }[] = [
-  { value: 'draft', label: 'DRAFT', icon: File },
-  { value: 'in_review', label: 'IN REVIEW', icon: Clock },
-  { value: 'approved', label: 'APPROVED', icon: CheckCircle },
-  { value: 'archived', label: 'ARCHIVED', icon: FileText },
+  { value: 'draft', label: 'Draft', icon: File },
+  { value: 'in_review', label: 'In Review', icon: Clock },
+  { value: 'approved', label: 'Approved', icon: CheckCircle },
+  { value: 'archived', label: 'Archived', icon: FileText },
 ];
+
+// --- Tag colors (HTML exact — with colored borders) ---
+const getTagStyle = (name: string): { bg: string; color: string; border: string } => {
+  const n = name.toLowerCase();
+  if (n.includes('contract')) return { bg: '#F3E8FF', color: '#7C3AED', border: '#D8B4FE' };
+  if (n.includes('legal')) return { bg: '#D1FAE5', color: '#059669', border: '#6EE7B7' };
+  if (n.includes('finance') || n.includes('financial')) return { bg: '#DBEAFE', color: '#2563EB', border: '#93C5FD' };
+  if (n.includes('vendor')) return { bg: '#FEE2E2', color: '#DC2626', border: '#FCA5A5' };
+  if (n.includes('presentation')) return { bg: '#FFEDD5', color: '#EA580C', border: '#FDBA74' };
+  if (n.includes('compliance')) return { bg: '#CFFAFE', color: '#0891B2', border: '#67E8F9' };
+  if (n.includes('nda')) return { bg: '#F3F4F6', color: '#6B7280', border: '#D1D5DB' };
+  if (n.includes('report')) return { bg: '#DBEAFE', color: '#2563EB', border: '#93C5FD' };
+  if (n.includes('internal')) return { bg: '#FEF3C7', color: '#D97706', border: '#FCD34D' };
+  if (n.includes('meeting')) return { bg: '#E0E7FF', color: '#4F46E5', border: '#A5B4FC' };
+  if (n.includes('notes')) return { bg: '#F3F4F6', color: '#6B7280', border: '#D1D5DB' };
+  return { bg: '#F3F4F6', color: '#6B7280', border: '#D1D5DB' };
+};
+
+// --- Owner avatar colors (cycle through gradients like HTML) ---
+const avatarGradients = [
+  'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
+  'linear-gradient(135deg, #EC4899 0%, #F43F5E 100%)',
+  'linear-gradient(135deg, #F59E0B 0%, #EF4444 100%)',
+  'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+  'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)',
+];
+const getAvatarGradient = (name: string): string => {
+  let hash = 0;
+  for (let i = 0; i < (name || '').length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return avatarGradients[Math.abs(hash) % avatarGradients.length];
+};
+const getInitials = (name: string): string => {
+  if (!name) return 'U';
+  const parts = name.trim().split(/\s+/);
+  return parts.length >= 2 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : name.slice(0, 2).toUpperCase();
+};
 
 export const createDocumentsTableColumns = ({ onDeleteClick, onInfoClick, onShareClick }: DocumentTableColumnsProps): TableColumn<Document>[] => {
   const StatusDropdown = ({ doc }: { doc: Document }) => {
     const [activeDropdown, setActiveDropdown] = useState(false);
     const queryClient = useQueryClient();
-    const statusConfig = getDocumentStatusConfig(doc.status);
+    const sc = getDocumentStatusConfig(doc.status);
 
     const handleStatusChange = async (newStatus: DocumentStatus) => {
-      try {
-        await documentsApi.updateStatus(doc.id, newStatus);
-        queryClient.invalidateQueries({ queryKey: ['documents'] });
-        setActiveDropdown(false);
-      } catch (error) {
-        console.error('Failed to update status:', error);
-      }
+      try { await documentsApi.updateStatus(doc.id, newStatus); queryClient.invalidateQueries({ queryKey: ['documents'] }); setActiveDropdown(false); }
+      catch (e) { console.error('Failed to update status:', e); }
     };
 
     const trigger = (
-      <div
-        className={`jira-status-badge ${statusConfig.bg} ${statusConfig.text} cursor-pointer hover:opacity-80 transition-opacity flex items-center gap-1 px-2.5 py-1 rounded text-[11px] font-medium`}
-      >
-        <span>{statusConfig.label}</span>
+      <div className="cursor-pointer inline-flex items-center rounded-full transition-opacity hover:opacity-80"
+        style={{ padding: '4px 12px', fontSize: 12, fontWeight: 500, background: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
+        {sc.label}
       </div>
     );
 
     return (
-      <TablePopover
-        trigger={trigger}
-        width="min-w-[140px]"
-        estimatedHeight={200}
-        open={activeDropdown}
-        onOpen={() => setActiveDropdown(true)}
-        onClose={() => setActiveDropdown(false)}
-      >
+      <TablePopover trigger={trigger} width="min-w-[140px]" estimatedHeight={200} open={activeDropdown} onOpen={() => setActiveDropdown(true)} onClose={() => setActiveDropdown(false)}>
         <div className="max-h-[200px] overflow-y-auto py-1">
-          {statusOptions.map((option) => {
-            const optionConfig = getDocumentStatusConfig(option.value);
+          {statusOptions.map((opt) => {
+            const oc = getDocumentStatusConfig(opt.value);
             return (
-              <div
-                key={option.value}
-                className="px-3 py-2 hover:bg-gray-50 cursor-pointer text-[12px] flex items-center gap-2"
-                onClick={() => handleStatusChange(option.value)}
-              >
-                {React.createElement(option.icon, { className: `w-3.5 h-3.5 ${optionConfig.text}` })}
-                <span className={doc.status === option.value ? "font-bold text-blue-600" : ""}>
-                  {option.label}
-                </span>
-                {doc.status === option.value && (
-                  <svg className="w-3.5 h-3.5 text-blue-600 ml-auto" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                )}
+              <div key={opt.value} className="px-3 py-2 cursor-pointer text-[12px] flex items-center gap-2" style={{ background: 'transparent' }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#f9fafb'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                onClick={() => handleStatusChange(opt.value)}>
+                {React.createElement(opt.icon, { className: 'w-3.5 h-3.5', style: { color: oc.text } })}
+                <span style={{ fontWeight: doc.status === opt.value ? 700 : 400, color: doc.status === opt.value ? '#4169FF' : '#1a1a1a' }}>{opt.label}</span>
+                {doc.status === opt.value && <svg className="w-3.5 h-3.5 ml-auto" style={{ color: '#4169FF' }} fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
               </div>
             );
           })}
@@ -126,108 +125,134 @@ export const createDocumentsTableColumns = ({ onDeleteClick, onInfoClick, onShar
   return [
     {
       key: 'name',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Document</span>,
-      render: (doc: Document) => (
-        <div className="flex items-center justify-between w-full group/cell">
-          <div className="flex items-center gap-2 min-w-0 pr-2">
-            <FileText className="w-4 h-4 text-blue-600 flex-shrink-0" />
-            <span className="font-medium text-[#172b4d] truncate" title={doc.name}>
-              {doc.name}
-            </span>
+      label: <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Document</span>,
+      render: (doc: Document) => {
+        const iconColor = getDocIconColor(doc.name);
+        const ext = doc.name?.split('.').pop()?.toUpperCase() || '';
+        return (
+          <div className="flex items-center justify-between w-full group/cell">
+            <div className="flex items-center gap-2.5 min-w-0 pr-2">
+              {/* Colored doc icon matching HTML */}
+              <div className="rounded flex items-center justify-center text-white flex-shrink-0"
+                style={{ width: 32, height: 40, background: iconColor, fontSize: 12, fontWeight: 600 }}>
+                <FileText className="w-4 h-4" />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="truncate" style={{ fontWeight: 500, fontSize: 14, color: '#1a1a1a' }} title={doc.name}>{doc.name}</span>
+                <span style={{ fontSize: 12, color: '#6b7280' }}>{doc.file_size ? `${(doc.file_size / (1024*1024)).toFixed(1)} MB` : ''}</span>
+              </div>
+            </div>
+            <div className="opacity-0 group-hover/cell:opacity-100 transition-all duration-200 flex items-center gap-0.5 flex-shrink-0">
+              {onInfoClick && <button onClick={(e) => { e.stopPropagation(); onInfoClick(doc); }} className="p-1.5 rounded" style={{ color: '#6b7280' }} title="Document Info"><Info className="w-4 h-4" /></button>}
+              {onShareClick && <button onClick={(e) => { e.stopPropagation(); onShareClick(doc); }} className="p-1.5 rounded" style={{ color: '#6b7280' }} title="Share"><Share2 className="w-4 h-4" /></button>}
+              <button onClick={(e) => { e.stopPropagation(); onDeleteClick(e, doc); }} className="p-1.5 rounded" style={{ color: '#6b7280' }} title="Delete"><Trash2 className="w-4 h-4" /></button>
+            </div>
           </div>
-          <div className="opacity-0 group-hover/cell:opacity-100 transition-all duration-200 flex items-center gap-0.5 flex-shrink-0">
-            {onInfoClick && (
-              <button
-                onClick={(e) => { e.stopPropagation(); onInfoClick(doc); }}
-                className="p-1.5 hover:bg-blue-50 rounded"
-                title="Document Info"
-              >
-                <Info className="w-4 h-4 text-gray-400 hover:text-blue-600" />
-              </button>
-            )}
-            {onShareClick && (
-              <button
-                onClick={(e) => { e.stopPropagation(); onShareClick(doc); }}
-                className="p-1.5 hover:bg-blue-50 rounded"
-                title="Share Document"
-              >
-                <Share2 className="w-4 h-4 text-gray-400 hover:text-blue-600" />
-              </button>
-            )}
-            <button
-              onClick={(e) => { e.stopPropagation(); onDeleteClick(e, doc); }}
-              className="p-1.5 hover:bg-red-50 rounded"
-              title="Delete Document"
-            >
-              <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-600" />
-            </button>
-          </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       key: 'project',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Project</span>,
-      width: '180px',
+      label: <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Project</span>,
+      width: '140px',
       render: (doc: Document) => (
-        <span className="text-[12px] text-gray-700 font-medium">
-          {doc.project_name || 'General'}
+        <span className="inline-flex items-center gap-1.5 rounded-md" style={{ padding: '4px 10px', background: '#EEF2FF', color: '#4F46E5', fontSize: 13, border: '1px solid #C7D2FE' }}>
+          <Folder className="w-3 h-3" />{doc.project_name || 'General'}
         </span>
       ),
     },
     {
-      key: 'file_type',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Type</span>,
-      width: '120px',
+      key: 'labels',
+      label: <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Tags</span>,
+      width: '180px',
       render: (doc: Document) => {
-        const getFileType = (doc: Document): string => {
-          if (doc.name) {
-            const ext = doc.name.split('.').pop()?.toLowerCase();
-            if (ext) return ext;
-          }
-          return doc.file_type || 'unknown';
-        };
-
+        const labels = doc.labels || [];
+        if (labels.length === 0) return <span style={{ fontSize: 12, color: '#6b7280' }}>—</span>;
+        const visible = labels.slice(0, 2);
+        const extra = labels.length - 2;
         return (
-          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600 uppercase border border-gray-200">
-            {getFileType(doc)}
-          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {visible.map((l) => {
+              const ts = getTagStyle(l.name);
+              return <span key={l.id} className="inline-flex rounded-md" style={{ padding: '3px 10px', fontSize: 12, fontWeight: 500, background: ts.bg, color: ts.color, border: `1px solid ${ts.border}` }}>{l.name}</span>;
+            })}
+            {extra > 0 && <span className="rounded-md" style={{ padding: '3px 8px', fontSize: 12, fontWeight: 500, background: '#F3F4F6', color: '#6B7280', border: '1px solid #D1D5DB' }}>+{extra}</span>}
+          </div>
         );
       },
     },
     {
       key: 'status',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Status</span>,
+      label: <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Status</span>,
       width: '120px',
       render: (doc: Document) => <StatusDropdown doc={doc} />,
     },
     {
       key: 'updated_at',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Updated</span>,
+      label: <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Updated</span>,
       width: '120px',
-      render: (doc: Document) => (
-        <span className="text-[12px] text-gray-500">
-          {formatRelativeTime(doc.updated_at)}
-        </span>
-      ),
+      render: (doc: Document) => <span style={{ fontSize: 14, color: '#1a1a1a' }}>{formatRelativeTime(doc.updated_at)}</span>,
     },
     {
-      key: 'created_by',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Shared By</span>,
-      width: '180px',
-      render: (doc: Document) => (
-        <div className="flex items-center gap-2">
-          <div className="h-6 w-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-bold text-blue-700">
-            {doc.created_by?.full_name?.charAt(0) || 'U'}
+      key: 'created_by' as any,
+      label: 'Owner',
+      render: (doc: Document) => {
+        const ownerName = doc.created_by?.full_name || doc.created_by?.username || 'System';
+        
+        // Get initials (first letter of first name + first letter of last name)
+        const initials = ownerName
+          .split(' ')
+          .map(n => n[0])
+          .join('')
+          .toUpperCase()
+          .slice(0, 2) || 'SY';
+        
+        // Color palette matching your reference image
+        const avatarColors = [
+          '#7C3AED', // Purple (RS)
+          '#EF4444', // Red (JD)
+          '#F59E0B', // Orange/Amber (AM)
+          '#10B981', // Green (BK)
+          '#3B82F6', // Blue (LM)
+          '#EC4899', // Pink
+          '#8B5CF6', // Violet
+          '#F97316', // Orange
+          '#14B8A6', // Teal
+          '#6366F1', // Indigo
+        ];
+        
+        // Generate consistent color based on owner name
+        const colorIndex = ownerName
+          .split('')
+          .reduce((acc, char) => acc + char.charCodeAt(0), 0) % avatarColors.length;
+        
+        const backgroundColor = avatarColors[colorIndex];
+        
+        return (
+          <div className="flex items-center justify-center">
+            <div
+              className="rounded-full flex items-center justify-center text-white font-semibold"
+              style={{
+                width: 32,
+                height: 32,
+                backgroundColor,
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: '0.5px',
+              }}
+              title={ownerName}
+            >
+              {initials}
+            </div>
           </div>
-          <span className="text-gray-700">{doc.created_by?.full_name || 'System'}</span>
-        </div>
-      ),
-    },
+        );
+      },
+      width: '80px',
+    }
   ];
-
 };
 
+// ---- Grid Card ----
 interface DocumentGridCardProps {
   document: Document;
   onDeleteClick: (e: React.MouseEvent, doc: Document) => void;
@@ -236,86 +261,34 @@ interface DocumentGridCardProps {
 }
 
 export function DocumentGridCard({ document: doc, onDeleteClick, onCardClick, onShareClick }: DocumentGridCardProps) {
-  const getStatusConfig = (status: DocumentStatus) => {
-    const normalizedStatus = status.toLowerCase() as Lowercase<DocumentStatus>;
-
-    switch (normalizedStatus) {
-      case 'approved':
-        return { badge: 'bg-green-50 text-green-600 border border-green-200', label: 'APPROVED' };
-      case 'in_review':
-        return { badge: 'bg-blue-50 text-blue-600 border border-blue-200', label: 'IN REVIEW' };
-      case 'draft':
-        return { badge: 'bg-yellow-50 text-yellow-600 border border-yellow-200', label: 'DRAFT' };
-      case 'archived':
-        return { badge: 'bg-gray-100 text-gray-600 border border-gray-200', label: 'ARCHIVED' };
-      default: {
-        const exhaustiveCheck: never = normalizedStatus;
-        return {
-          badge: 'bg-gray-50 text-gray-600 border border-gray-200',
-          label: String(status).toUpperCase().replace('_', ' ')
-        };
-      }
-    }
-  };
-
-  const statusConfig = getStatusConfig(doc.status);
+  const sc = getDocumentStatusConfig(doc.status);
+  const iconColor = getDocIconColor(doc.name);
 
   return (
-    <div
-      onClick={() => onCardClick ? onCardClick(doc) : (window.location.href = `/documents/${doc.id}`)}
-      className="bg-white rounded-xl p-4 transition-all duration-300 cursor-pointer text-gray-800 hover:shadow-lg hover:-translate-y-0.5 border border-[#d0d5dd] relative hover:z-50 h-full group"
-    >
-      {/* Header */}
+    <div onClick={() => onCardClick ? onCardClick(doc) : undefined}
+      className="rounded-xl p-4 transition-all duration-300 cursor-pointer hover:shadow-lg hover:-translate-y-0.5 relative h-full group"
+      style={{ background: '#ffffff', border: '1px solid #e5e7eb' }}>
       <div className="flex justify-between items-start gap-2 mb-3">
-        <div className="pr-2 flex flex-col">
-          {/* Project Name */}
-          <span className="text-sm font-bold text-gray-700 line-clamp-1 mb-0.5" title={doc.project_name}>
-            {doc.project_name || 'General'}
-          </span>
-          {/* Document Name */}
-          <span className="text-xs font-medium text-gray-600 line-clamp-2" title={doc.name}>
-            {doc.name}
-          </span>
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="rounded flex items-center justify-center text-white flex-shrink-0" style={{ width: 32, height: 40, background: iconColor }}>
+            <FileText className="w-4 h-4" />
+          </div>
+          <div className="flex flex-col min-w-0">
+            <span className="line-clamp-1" style={{ fontWeight: 600, fontSize: 13, color: '#1a1a1a' }} title={doc.project_name}>{doc.project_name || 'General'}</span>
+            <span className="line-clamp-2" style={{ fontSize: 12, color: '#6b7280' }} title={doc.name}>{doc.name}</span>
+          </div>
         </div>
-        <div className="text-[10px] text-gray-400 whitespace-nowrap flex-shrink-0 mt-0.5">
-          {formatRelativeTime(doc.updated_at)}
-        </div>
+        <span style={{ fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap' }}>{formatRelativeTime(doc.updated_at)}</span>
       </div>
-
-      {/* Details Section */}
-      <div className="space-y-1 text-xs text-gray-500 mb-6">
-        <div className="flex items-center">
-          <FileText className="w-3 h-3 mr-1" />
-          <span className="font-medium">Type:</span>
-          <span className="ml-1 uppercase">{doc.file_type}</span>
-        </div>
+      <div className="space-y-1 mb-6" style={{ fontSize: 12, color: '#6b7280' }}>
+        <div className="flex items-center"><FileText className="w-3 h-3 mr-1" /><span className="font-medium">Type:</span><span className="ml-1 uppercase">{doc.file_type}</span></div>
       </div>
-
-      {/* Action Buttons */}
       <div className="absolute bottom-3 left-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200">
-        {onShareClick && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onShareClick(doc); }}
-            className="p-1.5 hover:bg-blue-50 rounded text-gray-400 hover:text-blue-600"
-            title="Share Document"
-          >
-            <Share2 className="w-4 h-4" />
-          </button>
-        )}
-        <button
-          onClick={(e) => onDeleteClick(e, doc)}
-          className="p-1.5 hover:bg-red-50 rounded text-gray-400 hover:text-red-600"
-          title="Delete Document"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
+        {onShareClick && <button onClick={(e) => { e.stopPropagation(); onShareClick(doc); }} className="p-1.5 rounded" style={{ color: '#6b7280' }}><Share2 className="w-4 h-4" /></button>}
+        <button onClick={(e) => onDeleteClick(e, doc)} className="p-1.5 rounded" style={{ color: '#6b7280' }}><Trash2 className="w-4 h-4" /></button>
       </div>
-
-      {/* Status Badge */}
       <div className="absolute bottom-3 right-3">
-        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${statusConfig.badge}`}>
-          {statusConfig.label}
-        </span>
+        <span className="inline-flex items-center rounded-full" style={{ padding: '4px 12px', fontSize: 10, fontWeight: 600, background: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>{sc.label}</span>
       </div>
     </div>
   );

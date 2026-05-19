@@ -1,8 +1,9 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { ShareCalendarModal } from '@/components/Calendar/ShareCalendarModal';
 import {
     ChevronLeft,
     ChevronRight,
+    ChevronDown,
     Calendar as CalendarIcon,
     Users,
     Grid3X3,
@@ -31,7 +32,7 @@ import {
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { taskApi, dailyUpdateApi, eventApi, usersApi, notificationSocket, dyuksaAI } from '@/services/api';
+import { taskApi, dailyUpdateApi, eventApi, usersApi, notificationSocket, dyuksaAI, calendarShareApi } from '@/services/api';
 import { useAuth } from '@/hooks/useAuth';
 import { TaskDetailModal } from '../MyTask/TaskDetailModal';
 import type { Task, DailyUpdate, DailyUpdatePayload, Event as CalendarEventType, InvitationStatus } from '@/types';
@@ -274,9 +275,22 @@ const TaskEvent: React.FC<TaskEventProps> = ({ task, onClick, compact = false })
 interface MiniCalendarProps {
     currentDate: Date;
     onDateSelect: (date: Date) => void;
+    includeSharedEvents: boolean;
+    onToggleSharedEvents: (enabled: boolean) => void;
+    sharedWithMeUsers: any[];
+    selectedUserIds: number[];
+    onToggleUser: (userId: number) => void;
 }
 
-const MiniCalendar: React.FC<MiniCalendarProps> = ({ currentDate, onDateSelect }) => {
+const MiniCalendar: React.FC<MiniCalendarProps> = ({
+    currentDate,
+    onDateSelect,
+    includeSharedEvents,
+    onToggleSharedEvents,
+    sharedWithMeUsers,
+    selectedUserIds,
+    onToggleUser
+}) => {
     // Internal state to track which month the mini calendar is currently viewing
     const [navDate, setNavDate] = useState(new Date(currentDate.getFullYear(), currentDate.getMonth(), 1));
     const month = navDate.getMonth();
@@ -355,6 +369,91 @@ const MiniCalendar: React.FC<MiniCalendarProps> = ({ currentDate, onDateSelect }
                     );
                 })}
             </div>
+
+            {/* 👇👇👇 ADD THE ENTIRE SECTION BELOW HERE 👇👇👇 */}
+            {/* View Shared Calendars Section */}
+            <div className="mt-4 pt-4 border-t border-gray-200">
+                {/* Header with toggle */}
+                <button
+                    onClick={() => onToggleSharedEvents(!includeSharedEvents)}
+                    className="w-full flex items-center justify-between px-2 py-2 rounded-lg hover:bg-gray-50 transition-colors group"
+                >
+                    <div className="flex items-center gap-2">
+                        <Users size={14} className="text-purple-600" />
+                        <span className="text-xs font-semibold text-gray-700">View Shared Calendars</span>
+                    </div>
+                    {/* Toggle switch */}
+                    <div className={`w-8 h-4 rounded-full transition-colors duration-200 ${includeSharedEvents ? 'bg-purple-600' : 'bg-gray-300'}`}>
+                        <div className={`w-3 h-3 bg-white rounded-full shadow-sm transition-transform duration-200 mt-0.5 ${includeSharedEvents ? 'translate-x-4 ml-0.5' : 'translate-x-0.5'}`} />
+                    </div>
+                </button>
+
+                {/* User checkboxes - only shown when toggle is ON */}
+                {includeSharedEvents && (
+                    <div className="mt-2 space-y-1 max-h-48 overflow-y-auto">
+                        {/* Select All checkbox */}
+                        <label className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-gray-50 cursor-pointer transition-colors">
+                            <input
+                                type="checkbox"
+                                checked={selectedUserIds.length === sharedWithMeUsers.length && sharedWithMeUsers.length > 0}
+                                onChange={() => {
+                                    if (selectedUserIds.length === sharedWithMeUsers.length) {
+                                        // Deselect all
+                                        sharedWithMeUsers.forEach(u => onToggleUser(u.id));
+                                    } else {
+                                        // Select all
+                                        sharedWithMeUsers.forEach(u => {
+                                            if (!selectedUserIds.includes(u.id)) {
+                                                onToggleUser(u.id);
+                                            }
+                                        });
+                                    }
+                                }}
+                                className="w-3.5 h-3.5 text-purple-600 border-gray-300 rounded focus:ring-purple-500 focus:ring-offset-0 focus:ring-1"
+                            />
+                            <span className="text-xs font-medium text-gray-700">Select All Members</span>
+                        </label>
+
+                        {/* Individual user checkboxes */}
+                        {sharedWithMeUsers.length > 0 ? (
+                            sharedWithMeUsers.map((u: any) => {
+                                const isSelected = selectedUserIds.includes(u.id);
+                                const initials = u.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || '?';
+
+                                return (
+                                    <label
+                                        key={u.id}
+                                        className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-gray-50 cursor-pointer transition-colors group"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={isSelected}
+                                            onChange={() => onToggleUser(u.id)}
+                                            className="w-3.5 h-3.5 text-purple-600 border-gray-300 rounded focus:ring-purple-500 focus:ring-offset-0 focus:ring-1"
+                                        />
+                                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                                            {/* User avatar */}
+                                            <div className="w-5 h-5 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-[9px] font-bold flex-shrink-0">
+                                                {initials}
+                                            </div>
+                                            {/* User name */}
+                                            <span className="text-xs text-gray-700 truncate">{u.name}</span>
+                                        </div>
+                                        {/* Checkmark icon when selected */}
+                                        {isSelected && <Check size={12} className="text-purple-600 flex-shrink-0" />}
+                                    </label>
+                                );
+                            })
+                        ) : (
+                            <div className="px-2 py-3 text-center">
+                                <p className="text-[10px] text-gray-400 italic">No calendars shared with you yet</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+            {/* 👆👆👆 END OF ADDED SECTION 👆👆👆 */}
+
         </div>
     );
 };
@@ -430,6 +529,8 @@ interface DaysViewProps {
     tasks: Task[];
     events: CalendarEventType[];
     selectedDate: Date | null;
+    seenEventIds: number[];
+    renderStatusDot: (event: any) => React.ReactNode;
     onTaskClick: (task: Task) => void;
     onEventClick?: (event: CalendarEventType) => void;
     onDateClick: (date: Date) => void;
@@ -452,7 +553,9 @@ const DaysView: React.FC<DaysViewProps> = ({
     onDeclineInvitation,
     onRescheduleInvitation,
     isAccepting,
-    onEventContextMenu
+    onEventContextMenu,
+    seenEventIds,
+    renderStatusDot,
 }) => {
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
@@ -701,9 +804,10 @@ const DaysView: React.FC<DaysViewProps> = ({
                                             setDragPreview(null);
                                         }
                                     }}
+
                                     onDrop={(e) => {
                                         e.preventDefault();
-                                        setDragPreview(null); // Clear preview on drop
+                                        setDragPreview(null);
 
                                         const eventId = e.dataTransfer.getData("eventId");
                                         const draggedEvent = events.find(ev => String(ev.id) === eventId);
@@ -711,38 +815,46 @@ const DaysView: React.FC<DaysViewProps> = ({
 
                                         const rect = e.currentTarget.getBoundingClientRect();
                                         const y = e.clientY - rect.top;
-
-                                        // Calculate total minutes from top (64px = 60 minutes)
                                         const totalMinutes = (y / 64) * 60;
-
-                                        // Snap DOWN to nearest 15-minute interval (use floor, not round)
                                         const snappedMinutes = Math.floor(totalMinutes / 15) * 15;
-
                                         const droppedHour = Math.floor(snappedMinutes / 60);
                                         const droppedMinute = snappedMinutes % 60;
 
                                         const newStart = new Date(day);
                                         newStart.setHours(droppedHour, droppedMinute, 0, 0);
+
                                         if (newStart < new Date()) {
-                                            alert("Cannot move an event to a past time.");
+                                            // alert("Cannot move an event to a past time.");
                                             return;
                                         }
 
                                         const duration = new Date(draggedEvent.end_time).getTime() - new Date(draggedEvent.start_time).getTime();
                                         const newEnd = new Date(newStart.getTime() + duration);
 
-                                        // Conflict Check
-                                        const hasConflict = events.some(ev => {
-                                            if (ev.id === draggedEvent.id) return false;
-                                            return ev.organizer === draggedEvent.organizer &&
-                                                newStart < new Date(ev.end_time) &&
-                                                newEnd > new Date(ev.start_time);
-                                        });
+                                        // // ─── IMPROVED CONFLICT CHECK ───
+                                        // // Check conflict for Organizer AND all Attendees
+                                        // const peopleToCheck = [draggedEvent.organizer, ...(draggedEvent.attendees || [])];
 
-                                        if (hasConflict) {
-                                            alert("This time slot is already taken!");
-                                            return;
-                                        }
+                                        // const conflict = events.find(ev => {
+                                        //     if (ev.id === draggedEvent.id) return false;
+
+                                        //     const evStart = new Date(ev.start_time);
+                                        //     const evEnd = new Date(ev.end_time);
+                                        //     const isTimeOverlapping = newStart < evEnd && newEnd > evStart;
+
+                                        //     if (!isTimeOverlapping) return false;
+
+                                        //     // Check if any person in the dragged event is also in this overlapping event
+                                        //     return peopleToCheck.some(personId =>
+                                        //         ev.organizer === personId || ev.attendees?.includes(personId)
+                                        //     );
+                                        // });
+
+                                        // if (conflict) {
+                                        //     alert(`Cannot move here. One or more participants (including organizer) are busy with the event: "${conflict.title}"`);
+                                        //     return;
+                                        // }
+                                        // // ─── END OF CHECK ───
 
                                         updateEvent({
                                             id: draggedEvent.id,
@@ -852,15 +964,16 @@ const DaysView: React.FC<DaysViewProps> = ({
                                                 onContextMenu={(e) => { if (onEventContextMenu) onEventContextMenu(e, event); }}
                                             >
                                                 <div
-                                                    className={`h-full w-full rounded-md overflow-hidden p-1.5 text-xs shadow-sm flex flex-col relative border ${statusColors.bg} ${statusColors.text} ${statusColors.hover}`}
+                                                    className={`h-full w-full rounded-md overflow-visible p-1.5 text-xs shadow-sm flex flex-col relative border ${statusColors.bg} ${statusColors.text} ${statusColors.hover}`}
                                                     title={event.title}
                                                 >
+                                                    {renderStatusDot(event)}
                                                     <div className={`w-1 h-full absolute left-0 top-0 bottom-0 rounded-l-md ${statusColors.accent}`} />
-                                                    <div className="flex items-center gap-1 ml-1 min-w-0">
+                                                    <div className="flex items-center justify-between w-full ml-1 min-w-0">
                                                         <span className="font-semibold truncate">{event.title}</span>
                                                         {/* Show owner badge inline for shared events */}
                                                         {event.organizer !== currentUser?.id && (
-                                                            <span className="text-[8px] text-amber-700 bg-amber-200/80 px-1 rounded flex-shrink-0 whitespace-nowrap">
+                                                            <span className="text-[8px] text-black bg-amber-200/80 px-1 rounded flex-shrink-0 whitespace-nowrap">
                                                                 {event.organizer_name?.split(' ')[0]}
                                                             </span>
                                                         )}
@@ -1075,6 +1188,7 @@ const EventModal: React.FC<EventModalProps> = ({
     const [availabilityMap, setAvailabilityMap] = useState<Record<number, boolean>>({});
     const [checkingAvailability, setCheckingAvailability] = useState(false);
 
+
     // Fetch available team members
     const { data: availableUsers = [] } = useQuery({
         queryKey: ['users-list-events'],
@@ -1088,6 +1202,13 @@ const EventModal: React.FC<EventModalProps> = ({
         queryFn: () => eventApi.getEventRsvpStatus(event!.id),
         enabled: !!event?.id && isOpen,
     });
+
+    const getTimeIndex = (timeStr: string) => {
+        // timeStr is usually "HH:MM"
+        const [h, m] = timeStr.split(':').map(Number);
+        // Since you have 30-minute intervals, index = (hours * 2) + (1 if 30 mins)
+        return h * 2 + (m >= 30 ? 1 : 0);
+    };
 
     // Check availability for all users when time changes
     const checkAllUsersAvailability = React.useCallback(async () => {
@@ -1196,17 +1317,23 @@ const EventModal: React.FC<EventModalProps> = ({
     // Scroll time dropdown to show 9:00 AM area when opened
     React.useEffect(() => {
         if (showStartTimeDropdown && startTimeRef.current) {
-            const scrollPos = 18 * 36 - 50;
-            startTimeRef.current.scrollTop = scrollPos;
+            // Extract "HH:MM" from the ISO string or state
+            const currentTime = startTime.split('T')[1]?.slice(0, 5) || '13:00';
+            const index = getTimeIndex(currentTime);
+
+            // 36 is the approximate height of your 'px-4 py-2' items
+            // Subtracting 72 (two rows) centers the selection slightly
+            startTimeRef.current.scrollTop = (index * 36) - 72;
         }
-    }, [showStartTimeDropdown]);
+    }, [showStartTimeDropdown, startTime]);
 
     React.useEffect(() => {
         if (showEndTimeDropdown && endTimeRef.current) {
-            const scrollPos = 18 * 36 - 50;
-            endTimeRef.current.scrollTop = scrollPos;
+            const currentTime = endTime.split('T')[1]?.slice(0, 5) || '13:30';
+            const index = getTimeIndex(currentTime);
+            endTimeRef.current.scrollTop = (index * 36) - 72;
         }
-    }, [showEndTimeDropdown]);
+    }, [showEndTimeDropdown, endTime]);
 
     React.useEffect(() => {
         if (event && isOpen) {
@@ -1297,23 +1424,62 @@ const EventModal: React.FC<EventModalProps> = ({
             // ═══════════════ NEW EVENT (NO DYUKSA DATA) ═══════════════
             setError(null);
             const now = new Date();
-            now.setHours(0, 0, 0, 0);
+            const todayMidnight = new Date();
+            todayMidnight.setHours(0, 0, 0, 0);
 
             let targetDate = selectedDate || new Date();
-            if (targetDate < now) targetDate = new Date();
+            if (targetDate < todayMidnight) targetDate = new Date();
 
             const y = targetDate.getFullYear();
             const m = String(targetDate.getMonth() + 1).padStart(2, '0');
             const d = String(targetDate.getDate()).padStart(2, '0');
             const dateStr = `${y}-${m}-${d}`;
 
-            // Use selectedHour if provided, otherwise default to 13:00
-            const hour = selectedHour !== null && selectedHour !== undefined
-                ? String(selectedHour).padStart(2, '0')
-                : '13';
+            // Determine start time
+            let startHour: number;
+            let startMin: number;
 
-            setStartTime(`${dateStr}T${hour}:00`);
-            setEndTime(`${dateStr}T${hour}:30`);
+            if (selectedHour !== null && selectedHour !== undefined) {
+                // User clicked a specific hour slot in the calendar grid
+                startHour = selectedHour;
+                startMin = 0;
+            } else if (targetDate.toDateString() === now.toDateString()) {
+                // Creating event for today → snap to next 30-minute slot from current time
+                const currentMinutes = now.getMinutes();
+                if (currentMinutes < 30) {
+                    startHour = now.getHours();
+                    startMin = 30;
+                } else {
+                    startHour = now.getHours() + 1;
+                    startMin = 0;
+                }
+                // Edge case: if rounding pushes us past midnight, cap at 23:30
+                if (startHour >= 24) {
+                    startHour = 23;
+                    startMin = 30;
+                }
+            } else {
+                // Creating event for a future day → default to 9:00 AM
+                startHour = 9;
+                startMin = 0;
+            }
+
+            // Calculate end time = start + 30 minutes
+            let endHour = startHour;
+            let endMin = startMin + 30;
+            if (endMin >= 60) {
+                endHour += 1;
+                endMin -= 60;
+            }
+            if (endHour >= 24) {
+                endHour = 23;
+                endMin = 59;
+            }
+
+            const pad = (n: number) => String(n).padStart(2, '0');
+            setStartTime(`${dateStr}T${pad(startHour)}:${pad(startMin)}`);
+            setEndTime(`${dateStr}T${pad(endHour)}:${pad(endMin)}`);
+
             setTitle('');
             setLocation('');
             setIsOnline(false);
@@ -1367,28 +1533,50 @@ const EventModal: React.FC<EventModalProps> = ({
     const isPending = isCreating || isUpdating || isDeleting;
 
     const handleSave = () => {
-
         const startDt = new Date(startTime);
         const endDt = new Date(endTime);
         const now = new Date();
+
         if (startDt < now) {
             setError("Cannot create or move an event to a past time.");
             return;
         }
 
+        // // Conflict check logic for participants
+        // const conflictAttendee = attendees.find(attendeeId => {
+        //     return allEvents.some(existingEv => {
+        //         if (event && existingEv.id === event.id) return false;
+        //         const evStart = new Date(existingEv.start_time);
+        //         const evEnd = new Date(existingEv.end_time);
+        //         const isUserInvolved = existingEv.organizer === attendeeId || existingEv.attendees?.includes(attendeeId);
+        //         return isUserInvolved && (startDt < evEnd && endDt > evStart);
+        //     });
+        // });
+
+        // if (conflictAttendee) {
+        //     const userObj = availableUsers.find((u: any) => u.id === conflictAttendee);
+        //     setError(`${userObj?.first_name || "A participant"} is already busy during this time.`);
+        //     return;
+        // }
+
+        // Build the payload with all fields to ensure they can be updated
         const payload = {
+            id: event?.id, // ID is required for the update mutation
             title,
             event_type: eventType,
             location,
             is_online_meeting: isOnline,
             description,
-            attendees,
+            attendees, // This includes any newly added participant IDs
             start_time: startDt.toISOString(),
             end_time: endDt.toISOString()
         };
 
-        if (event) updateEvent(payload);
-        else createEvent(payload);
+        if (event) {
+            updateEvent(payload);
+        } else {
+            createEvent(payload);
+        }
     };
 
     // Close all dropdowns helper
@@ -1638,7 +1826,7 @@ const EventModal: React.FC<EventModalProps> = ({
                                                     <div
                                                         key={`start-${time}`}
                                                         className={`px-4 py-2 cursor-pointer text-sm transition-colors ${isPastTime
-                                                            ? 'text-gray-300 cursor-not-allowed opacity-50'
+                                                            ? 'text-gray-500 cursor-not-allowed opacity-70'
                                                             : isSelected
                                                                 ? 'bg-blue-50 text-blue-700 font-medium'
                                                                 : 'text-gray-700 hover:bg-gray-50'
@@ -1705,7 +1893,7 @@ const EventModal: React.FC<EventModalProps> = ({
                                                     <div
                                                         key={`end-${time}`}
                                                         className={`px-4 py-2 cursor-pointer text-sm transition-colors ${isPastTime
-                                                            ? 'text-gray-300 cursor-not-allowed opacity-50'
+                                                            ? 'text-gray-500 cursor-not-allowed opacity-70'
                                                             : isSelected
                                                                 ? 'bg-blue-50 text-blue-700 font-medium'
                                                                 : 'text-gray-700 hover:bg-gray-50'
@@ -2071,104 +2259,77 @@ const EventModal: React.FC<EventModalProps> = ({
                             </div>
                         )}
 
-                        {/* Attendees with RSVP status (for existing events) */}
-                        {rsvpData?.attendee_status?.map((attendee) => {
+                        {/* Attendees with RSVP status - Now mapping over local 'attendees' state */}
+                        {attendees.map((userId) => {
+                            // 1. Skip if this user is the organizer (already shown above)
+                            if (event && userId === event.organizer) return null;
+
+                            // 2. Find detailed user info from your 'availableUsers' list
+                            const userDetail = availableUsers.find((u: any) => u.id === userId);
+
+                            // 3. Find RSVP status from the server data (if it exists yet)
+                            const rsvpStatus = rsvpData?.attendee_status?.find((a: any) => a.user_id === userId);
+
+                            // Logic for display labels
+                            const status = rsvpStatus?.status || 'PENDING';
                             const statusColor =
-                                attendee.status === 'ACCEPTED' ? 'bg-emerald-500' :
-                                    attendee.status === 'DECLINED' ? 'bg-red-500' :
+                                status === 'ACCEPTED' ? 'bg-emerald-500' :
+                                    status === 'DECLINED' ? 'bg-red-500' :
                                         'bg-amber-500';
 
-                            const statusLabel =
-                                attendee.status === 'ACCEPTED' ? 'Accepted' :
-                                    attendee.status === 'DECLINED' ? 'Declined' :
-                                        'Pending';
-
                             const statusTextColor =
-                                attendee.status === 'ACCEPTED' ? 'text-emerald-600' :
-                                    attendee.status === 'DECLINED' ? 'text-red-600' :
+                                status === 'ACCEPTED' ? 'text-emerald-600' :
+                                    status === 'DECLINED' ? 'text-red-600' :
                                         'text-amber-600';
+
+                            const fullName = userDetail
+                                ? `${userDetail.first_name || ''} ${userDetail.last_name || ''}`.trim() || userDetail.username
+                                : (rsvpStatus?.name || 'User');
 
                             return (
                                 <div
-                                    key={attendee.user_id}
+                                    key={userId}
                                     className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-white transition-colors group"
                                 >
                                     <div className="relative flex-shrink-0">
-                                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-semibold shadow-sm ${getAvatarColor(attendee.user_id)}`}>
-                                            {getInitials({ first_name: attendee.name.split(' ')[0], last_name: attendee.name.split(' ')[1] })}
+                                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-semibold shadow-sm ${getAvatarColor(userId)}`}>
+                                            {userDetail?.avatar ? (
+                                                <img src={userDetail.avatar} alt="" className="w-full h-full rounded-full object-cover" />
+                                            ) : (
+                                                getInitials(userDetail || { first_name: fullName })
+                                            )}
                                         </div>
                                         <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-slate-50 ${statusColor}`} />
                                     </div>
 
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-gray-900 truncate">{attendee.name}</p>
+                                        <p className="text-sm font-medium text-gray-900 truncate">{fullName}</p>
                                         <p className={`text-[10px] font-medium ${statusTextColor}`}>
-                                            {statusLabel}
+                                            {/* If we have no rsvpStatus, it means the user was just added locally */}
+                                            {!rsvpStatus ? 'Newly Added' : status.charAt(0) + status.slice(1).toLowerCase()}
                                         </p>
-                                        {attendee.status === 'DECLINED' && attendee.decline_reason && (
-                                            <p className="text-[9px] text-gray-400 truncate" title={attendee.decline_reason}>
-                                                Reason: {attendee.decline_reason}
+
+                                        {/* RSVP Details (Only if they exist from server) */}
+                                        {rsvpStatus?.status === 'DECLINED' && rsvpStatus.decline_reason && (
+                                            <p className="text-[9px] text-gray-400 truncate" title={rsvpStatus.decline_reason}>
+                                                Reason: {rsvpStatus.decline_reason}
                                             </p>
                                         )}
-                                        {attendee.proposed_reschedule_time && (
+                                        {rsvpStatus?.proposed_reschedule_time && (
                                             <p className="text-[9px] text-amber-600 truncate">
-                                                Proposed: {new Date(attendee.proposed_reschedule_time).toLocaleString()}
+                                                Proposed: {new Date(rsvpStatus.proposed_reschedule_time).toLocaleString()}
                                             </p>
                                         )}
                                     </div>
 
                                     {!isReadOnly && (
                                         <button
-                                            onClick={() => setAttendees(prev => prev.filter(a => a !== attendee.user_id))}
+                                            onClick={() => setAttendees(prev => prev.filter(a => a !== userId))}
                                             className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
                                         >
                                             <X size={14} />
                                         </button>
                                     )}
-                                </div>
-                            );
-                        })}
-
-                        {/* Fallback for new events (no RSVP data yet) - shows availability */}
-                        {!event && attendees.map(id => {
-                            const user = availableUsers.find((u: any) => u.id === id);
-                            const { available, loading } = getUserAvailability(id);
-                            const fullName = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username : 'User';
-
-                            return (
-                                <div
-                                    key={id}
-                                    className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-white transition-colors group"
-                                >
-                                    <div className="relative flex-shrink-0">
-                                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-semibold shadow-sm ${getAvatarColor(id)}`}>
-                                            {user?.avatar ? (
-                                                <img src={user.avatar} alt="" className="w-full h-full rounded-full object-cover" />
-                                            ) : (
-                                                getInitials(user || {})
-                                            )}
-                                        </div>
-                                        <div className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-slate-50 ${loading ? 'bg-gray-300' : available ? 'bg-green-500' : 'bg-red-500'
-                                            }`}>
-                                            {loading && <Loader2 size={8} className="animate-spin text-gray-500 m-0.5" />}
-                                        </div>
-                                    </div>
-
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-gray-900 truncate">{fullName}</p>
-                                        {!loading && (
-                                            <p className={`text-[10px] font-medium ${available ? 'text-green-600' : 'text-red-600'}`}>
-                                                {available ? 'Available' : 'Busy'}
-                                            </p>
-                                        )}
-                                    </div>
-
-                                    <button
-                                        onClick={() => setAttendees(prev => prev.filter(a => a !== id))}
-                                        className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                                    >
-                                        <X size={14} />
-                                    </button>
                                 </div>
                             );
                         })}
@@ -2733,6 +2894,10 @@ export const Calendar: React.FC = () => {
     });
     const [searchParams, setSearchParams] = useSearchParams();
     const [currentDate, setCurrentDate] = useState(new Date());
+    const [seenEventIds, setSeenEventIds] = useState<number[]>(() => {
+        const saved = localStorage.getItem('seen_event_notifications');
+        return saved ? JSON.parse(saved) : [];
+    });
     const [viewMode, setViewMode] = useState<ViewMode>('work_week');
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [selectedEvent, setSelectedEvent] = useState<CalendarEventType | null>(null);
@@ -2740,6 +2905,10 @@ export const Calendar: React.FC = () => {
     const [isEventModalOpen, setIsEventModalOpen] = useState(false);
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [includeSharedEvents, setIncludeSharedEvents] = useState(false);
+    // ═══════════════ SETTINGS DROPDOWN STATE ═══════════════
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
+    const settingsDropdownRef = React.useRef<HTMLDivElement>(null);
     // ═══════════════ INVITATION MODAL STATES ═══════════════
     const [showDeclineModal, setShowDeclineModal] = useState(false);
     const [showRescheduleModal, setShowRescheduleModal] = useState(false);
@@ -2766,6 +2935,8 @@ export const Calendar: React.FC = () => {
         event: CalendarEventType;
     } | null>(null);
     const [showRepeatSubmenu, setShowRepeatSubmenu] = useState(false);
+
+
 
     // ═══════════════ INVITATION MUTATIONS ═══════════════
     const { mutate: acceptInvitation, isPending: isAccepting } = useMutation({
@@ -2963,6 +3134,7 @@ export const Calendar: React.FC = () => {
         }
     };
 
+
     // Close context menu on click outside
     React.useEffect(() => {
         const handleClickOutside = () => closeContextMenu();
@@ -2971,6 +3143,8 @@ export const Calendar: React.FC = () => {
             return () => document.removeEventListener('click', handleClickOutside);
         }
     }, [contextMenu]);
+
+
 
     const {
         data: eventsData,
@@ -2997,6 +3171,53 @@ export const Calendar: React.FC = () => {
         initialPageParam: 1,
         enabled: !!user,
     });
+
+
+
+    const { data: sharedWithMeUsers = [] } = useQuery({
+        queryKey: ['calendar-shares-received'],
+        queryFn: async () => {
+            const response = await calendarShareApi.list();
+            console.log('📅 Calendar shares API response:', response);
+
+            // Filter: Get shares where I am the recipient (shared_with === my ID)
+            const sharesWithMe = response.filter((share: any) => share.shared_with === user?.id);
+
+            console.log('📅 Shares where I am recipient:', sharesWithMe);
+
+            // Map to user objects - extract the OWNER info (person who shared with me)
+            const users = sharesWithMe.map((share: any) => ({
+                id: share.owner,           // owner is the user ID
+                name: share.owner_name,    // owner_name is the display name
+                email: share.owner_email,
+            }));
+
+            // Remove duplicates
+            const uniqueUsers = users.filter((u: any, index: number, self: any[]) =>
+                index === self.findIndex((x) => x.id === u.id)
+            );
+
+            console.log('📅 Final sharedWithMeUsers:', uniqueUsers);
+            return uniqueUsers;
+        },
+        enabled: !!user && includeSharedEvents,
+    });
+
+    // Close settings dropdown when clicking outside
+    React.useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (settingsDropdownRef.current && !settingsDropdownRef.current.contains(event.target as Node)) {
+                setIsSettingsOpen(false);
+            }
+        };
+        if (isSettingsOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [isSettingsOpen]);
+
+
+
     // ═══════════════ REAL-TIME CALENDAR UPDATES VIA WEBSOCKET ═══════════════
     React.useEffect(() => {
         // Subscribe to notification socket for real-time calendar updates
@@ -3005,6 +3226,7 @@ export const Calendar: React.FC = () => {
             if (notification.related_object?.type === 'event') {
                 console.log('📅 New event notification received, refreshing calendar...');
                 queryClient.invalidateQueries({ queryKey: ['events-calendar'] });
+                queryClient.invalidateQueries({ queryKey: ['events-rsvp-bulk'] });
             }
         });
 
@@ -3024,6 +3246,83 @@ export const Calendar: React.FC = () => {
         if (!eventsData) return [];
         return eventsData.pages.flatMap((page: any) => page.results || page);
     }, [eventsData]);
+
+    const filteredEvents = useMemo(() => {
+        if (!includeSharedEvents) return events;
+
+        // If no specific users are selected, show only your own events
+        if (selectedUserIds.length === 0) {
+            return events.filter(event => event.organizer === user?.id);
+        }
+
+        return events.filter((event: CalendarEventType) => {
+            const isMyEvent = event.organizer === user?.id;
+
+            // Check if the organizer is in our selected list OR if any attendee is in our selected list
+            const isSelectedUserInvolved = selectedUserIds.includes(event.organizer) ||
+                event.attendees?.some(attendeeId => selectedUserIds.includes(attendeeId));
+
+            return isMyEvent || isSelectedUserInvolved;
+        });
+    }, [events, includeSharedEvents, selectedUserIds, user?.id]);
+
+    const myOrganizedEvents = useMemo(
+        () => events.filter((e: CalendarEventType) => e.my_invitation_status === 'ORGANIZER'),
+        [events]
+    );
+
+    const { data: rsvpStatusMap = {} } = useQuery<Record<number, any[]>>({
+        queryKey: ['events-rsvp-bulk', myOrganizedEvents.map(e => e.id).sort().join(',')],
+        queryFn: async () => {
+            if (myOrganizedEvents.length === 0) return {};
+            const results = await Promise.all(
+                myOrganizedEvents.map(async (event: CalendarEventType) => {
+                    try {
+                        const rsvp = await eventApi.getEventRsvpStatus(event.id);
+                        return { eventId: event.id, attendee_status: rsvp.attendee_status || [] };
+                    } catch {
+                        return { eventId: event.id, attendee_status: [] };
+                    }
+                })
+            );
+            const map: Record<number, any[]> = {};
+            results.forEach(r => { map[r.eventId] = r.attendee_status; });
+            return map;
+        },
+        enabled: myOrganizedEvents.length > 0,
+        staleTime: 30000,
+        refetchInterval: 30000,
+        refetchIntervalInBackground: false,
+    });
+
+    const renderStatusDot = (event: any) => {
+        if (seenEventIds.includes(event.id)) return null;
+        if (event.my_invitation_status !== 'ORGANIZER') return null;
+
+        const attendeeList = rsvpStatusMap[event.id] || [];
+        if (attendeeList.length === 0) return null;
+
+        const hasDeclined = attendeeList.some((a: any) => a.status === 'DECLINED');
+        const everyoneAccepted = attendeeList.every((a: any) => a.status === 'ACCEPTED');
+
+        if (hasDeclined) {
+            return (
+                <span
+                    className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse z-50 shadow-sm"
+                    title="Someone declined"
+                />
+            );
+        }
+        if (everyoneAccepted) {
+            return (
+                <span
+                    className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white z-50 shadow-sm"
+                    title="All accepted"
+                />
+            );
+        }
+        return null;
+    };
 
     // Automatically open event from URL parameters (e.g., from notifications)
     React.useEffect(() => {
@@ -3079,6 +3378,16 @@ export const Calendar: React.FC = () => {
         }
     }, [hasNextTasksPage, isFetchingNextTasksPage, fetchNextTasksPage]);
 
+    // Add this inside your component
+    useEffect(() => {
+        if (dyuksaResponse) {
+            const timer = setTimeout(() => {
+                setDyuksaResponse(null);
+            }, 5000)
+            return () => clearTimeout(timer);
+        }
+    }, [dyuksaResponse]);
+
     const tasks = useMemo(() => {
         if (!tasksData || !user) return [];
         const allTasks = tasksData.pages.flatMap((page: any) => page.results || page.tasks || page);
@@ -3126,7 +3435,7 @@ export const Calendar: React.FC = () => {
                 return startDateStr === dateStr || endDateStr === dateStr;
             });
 
-            const dayEvents = events.filter((event: CalendarEventType) => {
+            const dayEvents = filteredEvents.filter((event: CalendarEventType) => {
                 const startDateStr = toLocalDateStr(event.start_time);
                 const endDateStr = toLocalDateStr(event.end_time);
                 if (startDateStr && endDateStr) {
@@ -3175,6 +3484,16 @@ export const Calendar: React.FC = () => {
     const handleEventClick = useCallback((event: CalendarEventType) => {
         setSelectedEvent(event);
         setIsEventModalOpen(true);
+
+        // This makes the dot disappear
+        setSeenEventIds((prev) => {
+            if (!prev.includes(event.id)) {
+                const newSeen = [...prev, event.id];
+                localStorage.setItem('seen_event_notifications', JSON.stringify(newSeen));
+                return newSeen;
+            }
+            return prev;
+        });
     }, []);
 
     const handleDateClick = useCallback((date: Date) => {
@@ -3353,30 +3672,165 @@ export const Calendar: React.FC = () => {
                         <CalendarPlus size={18} />
                         <span className="text-sm font-medium">New event</span>
                     </button>
-                    <button
-                        onClick={() => setIsShareModalOpen(true)}
-                        className="flex items-center justify-center gap-2 px-3 py-1.5 bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700 rounded-lg border border-green-200 transition-colors shadow-sm"
-                        title="Share calendar"
-                    >
-                        <Share2 size={18} />
-                        <span className="text-sm font-medium">Share</span>
-                    </button>
+                    {/* Settings Dropdown */}
+                    <div className="relative" ref={settingsDropdownRef}>
+                        <button
+                            onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                            className={`flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg border transition-colors shadow-sm ${isSettingsOpen || includeSharedEvents
+                                ? 'bg-gray-100 text-gray-700 border-gray-300'
+                                : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                                }`}
+                            title="Calendar Settings"
+                        >
+                            <Settings size={18} />
+                            <span className="text-sm font-medium">Settings</span>
+                            <ChevronDown size={14} className={`transition-transform ${isSettingsOpen ? 'rotate-180' : ''}`} />
+                        </button>
 
-                    {/* Toggle Shared Events */}
-                    {/* Toggle Shared Calendars */}
-                    <button
-                        onClick={() => setIncludeSharedEvents(!includeSharedEvents)}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors shadow-sm ${includeSharedEvents
-                            ? 'bg-purple-100 text-purple-700 border-purple-300'
-                            : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
-                            }`}
-                        title={includeSharedEvents ? "Hide shared calendars" : "Show shared calendars"}
-                    >
-                        <Users size={18} />
-                        <span className="text-sm font-medium">
-                            {includeSharedEvents ? 'Shared: On' : 'Shared: Off'}
-                        </span>
-                    </button>
+                        {/* Settings Dropdown Menu */}
+                        {isSettingsOpen && (
+                            <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl shadow-xl border border-gray-200 z-50 overflow-hidden">
+                                {/* Header */}
+                                <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+                                    <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                                        <Settings size={16} />
+                                        Calendar Settings
+                                    </h3>
+                                </div>
+
+                                {/* Show Shared Events Toggle */}
+                                <div className="px-4 py-3 border-b border-gray-100">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm font-medium text-gray-700">Show Shared Events</span>
+                                        <button
+                                            onClick={() => {
+                                                setIncludeSharedEvents(!includeSharedEvents);
+                                                if (includeSharedEvents) {
+                                                    setSelectedUserIds([]);
+                                                }
+                                            }}
+                                            className={`relative w-11 h-6 rounded-full transition-colors ${includeSharedEvents ? 'bg-purple-600' : 'bg-gray-300'
+                                                }`}
+                                        >
+                                            <span
+                                                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${includeSharedEvents ? 'translate-x-5' : 'translate-x-0'
+                                                    }`}
+                                            />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Share My Calendar */}
+                                <button
+                                    onClick={() => {
+                                        setIsShareModalOpen(true);
+                                        setIsSettingsOpen(false);
+                                    }}
+                                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-b border-gray-100"
+                                >
+                                    <Share2 size={18} className="text-green-600" />
+                                    <span className="text-sm font-medium text-gray-700">Share My Calendar</span>
+                                </button>
+
+                                {/* View Shared Calendars */}
+                                {includeSharedEvents && (
+                                    <div className="px-4 py-3">
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <Users size={16} className="text-purple-600" />
+                                            <span className="text-sm font-semibold text-gray-700">View Shared Calendars</span>
+                                        </div>
+
+                                        <div className="space-y-1 max-h-48 overflow-y-auto">
+                                            {/* All Option */}
+                                            <label className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-50 cursor-pointer border-b border-gray-100 mb-1">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedUserIds.length === sharedWithMeUsers.length && sharedWithMeUsers.length > 0}
+                                                    onChange={() => {
+                                                        if (selectedUserIds.length === sharedWithMeUsers.length) {
+                                                            setSelectedUserIds([]); // Clear All
+                                                        } else {
+                                                            setSelectedUserIds(sharedWithMeUsers.map((u: any) => u.id)); // Select All
+                                                        }
+                                                    }}
+                                                    className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                                                />
+                                                <span className="text-sm font-semibold text-gray-700">All Shared Calendars</span>
+                                            </label>
+
+                                            {/* View Shared Calendars */}
+                                            {includeSharedEvents && (
+                                                <div className="px-4 py-3">
+                                                    <div className="flex items-center gap-2 mb-3">
+                                                        <Users size={16} className="text-purple-600" />
+                                                        <span className="text-sm font-semibold text-gray-700">View Shared Calendars</span>
+                                                    </div>
+
+                                                    <div className="space-y-1 max-h-48 overflow-y-auto">
+                                                        {sharedWithMeUsers.length > 0 ? (
+                                                            <>
+                                                                {/* Select All Member Toggle */}
+                                                                <label className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-50 cursor-pointer border-b border-gray-100 mb-1">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={selectedUserIds.length === sharedWithMeUsers.length}
+                                                                        onChange={() => {
+                                                                            if (selectedUserIds.length === sharedWithMeUsers.length) {
+                                                                                setSelectedUserIds([]); // Clear All
+                                                                            } else {
+                                                                                setSelectedUserIds(sharedWithMeUsers.map((u: any) => u.id)); // Select All
+                                                                            }
+                                                                        }}
+                                                                        className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                                                                    />
+                                                                    <span className="text-sm font-medium text-gray-700">Select All Members</span>
+                                                                </label>
+
+                                                                {/* Individual Users List */}
+                                                                {sharedWithMeUsers.map((u: any) => {
+                                                                    const isSelected = selectedUserIds.includes(u.id);
+                                                                    return (
+                                                                        <label
+                                                                            key={u.id}
+                                                                            className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-50 cursor-pointer"
+                                                                        >
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={isSelected}
+                                                                                onChange={() => {
+                                                                                    setSelectedUserIds(prev =>
+                                                                                        isSelected
+                                                                                            ? prev.filter(id => id !== u.id)
+                                                                                            : [...prev, u.id]
+                                                                                    );
+                                                                                }}
+                                                                                className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                                                                            />
+                                                                            <div className="flex items-center gap-2 flex-1">
+                                                                                <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-[10px] font-bold">
+                                                                                    {u.name?.charAt(0)?.toUpperCase()}
+                                                                                </div>
+                                                                                <span className="text-sm text-gray-700">{u.name}</span>
+                                                                            </div>
+                                                                            {isSelected && <Check size={14} className="text-purple-600" />}
+                                                                        </label>
+                                                                    );
+                                                                })}
+                                                            </>
+                                                        ) : (
+                                                            <div className="px-2 py-3 text-center text-sm text-gray-500 italic">
+                                                                No calendars shared with you
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
             <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
@@ -3441,6 +3895,17 @@ export const Calendar: React.FC = () => {
                         <MiniCalendar
                             currentDate={currentDate}
                             onDateSelect={(date) => setCurrentDate(date)}
+                            includeSharedEvents={includeSharedEvents}
+                            onToggleSharedEvents={setIncludeSharedEvents}
+                            sharedWithMeUsers={sharedWithMeUsers}
+                            selectedUserIds={selectedUserIds}
+                            onToggleUser={(userId) => {
+                                setSelectedUserIds(prev =>
+                                    prev.includes(userId)
+                                        ? prev.filter(id => id !== userId)
+                                        : [...prev, userId]
+                                );
+                            }}
                         />
                     </div>
 
@@ -3474,8 +3939,10 @@ export const Calendar: React.FC = () => {
                         <DaysView
                             currentDate={currentDate}
                             tasks={tasks}
-                            events={events}
+                            events={filteredEvents}
                             selectedDate={selectedDate}
+                            seenEventIds={seenEventIds}
+                            renderStatusDot={renderStatusDot}
                             onTaskClick={handleTaskClick}
                             onEventClick={handleEventClick}
                             onDateClick={handleDateClick}

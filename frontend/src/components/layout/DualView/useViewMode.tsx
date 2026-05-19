@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 
-export type ViewMode = 'grid' | 'table';
+export type ViewMode = 'grid' | 'table' | 'tree';
 
 interface UseViewModeOptions {
   defaultMode?: ViewMode;

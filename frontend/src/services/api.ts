@@ -351,6 +351,49 @@ export const documentsApi = {
     );
     return response.data;
   },
+  listFolders: async (params?: { project?: number; parent?: string }) => {
+    const response = await api.get('/documents/folders/', { params });
+    return response.data;
+  },
+ 
+  // Create a new folder under a project
+  createFolder: async (data: { project: number; name: string; parent?: string | null }) => {
+    const response = await api.post('/documents/folders/', data);
+    return response.data;
+  },
+ 
+  // Rename a folder
+  renameFolder: async (folderId: string, name: string) => {
+    const response = await api.patch(`/documents/folders/${folderId}/`, { name });
+    return response.data;
+  },
+ 
+  // Delete a folder
+  deleteFolder: async (folderId: string) => {
+    await api.delete(`/documents/folders/${folderId}/`);
+  },
+
+  getActivity: (documentId: string) => 
+    api.get(`/documents/${documentId}/activity/`),
+  
+  getComments: (documentId: string) => 
+    api.get(`/documents/${documentId}/comments/`),
+  
+  addComment: async (documentId: string, content: string, mentions: number[] = []) => {
+    const response = await api.post(  // ✅ Correct - matches your other methods
+      `/documents/${documentId}/comments/`,
+      { 
+        content,
+        mentions
+      }
+    );
+    return response.data;
+  },
+  
+  deleteComment: (documentId: string, commentId: number) =>
+    api.delete(`/documents/${documentId}/comments/${commentId}/`),
+
+  getTeamMembers: () => usersApi.listAll(),
 };
 
 
@@ -1665,5 +1708,6 @@ export const calendarLinkApi = {
         return response.data;
     },
 };
+
 
 export default api;

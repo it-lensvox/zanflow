@@ -34,6 +34,9 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
     const [downloading, setDownloading] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(defaultFullscreen);
 
+    // HTML view mode state
+    const [codeViewMode, setCodeViewMode] = useState<'code' | 'preview'>('code');
+
     // Excel preview state - holds parsed sheets and active tab index
     const [excelSheets, setExcelSheets] = useState<{
         name: string;
@@ -339,11 +342,80 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
 
         // Text and Code Files
         if ((isText || isCode) && textContent) {
+            const isHtml = ['html', 'htm'].includes(extension);
+
+            // Process HTML to inject responsive styles so tables and images don't overflow the iframe
+            const getResponsiveHtml = () => {
+                const responsiveStyles = `
+                    <style>
+                        /* Prevent horizontal scroll on the entire body */
+                        html, body { max-width: 100vw; overflow-x: hidden; margin: 0; padding: 0; }
+                        body { padding: 1rem; box-sizing: border-box; }
+                        /* Make tables scroll horizontally within their own container */
+                        table { width: 100% !important; max-width: 100%; overflow-x: auto; display: block; border-collapse: collapse; }
+                        /* Ensure media fits the screen */
+                        img, video, iframe { max-width: 100%; height: auto; }
+                        /* Prevent long un-spaced text from breaking layout */
+                        * { word-wrap: break-word; }
+                    </style>
+                `;
+                
+                // Safely inject styles into the head if it exists, otherwise prepend them
+                if (textContent.toLowerCase().includes('</head>')) {
+                    return textContent.replace(/<\/head>/i, `${responsiveStyles}</head>`);
+                }
+                return `${responsiveStyles}${textContent}`;
+            };
+
             return (
-                <div className="h-full w-full bg-gray-900 text-gray-100 overflow-auto p-6">
-                    <pre className="font-mono text-sm whitespace-pre-wrap">
-                        <code>{textContent}</code>
-                    </pre>
+                <div className="h-full w-full flex flex-col bg-gray-900">
+                    {/* View Toggles for HTML */}
+                    {isHtml && (
+                        <div className="flex-shrink-0 flex items-center gap-2 px-6 py-3 bg-gray-800 border-b border-gray-700">
+                            <button
+                                onClick={() => setCodeViewMode('code')}
+                                className={`px-4 py-1.5 text-sm font-medium rounded transition-colors ${
+                                    codeViewMode === 'code'
+                                        ? 'bg-gray-700 text-white'
+                                        : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                                }`}
+                            >
+                                Code
+                            </button>
+                            <button
+                                onClick={() => setCodeViewMode('preview')}
+                                className={`px-4 py-1.5 text-sm font-medium rounded transition-colors flex items-center gap-2 ${
+                                    codeViewMode === 'preview'
+                                        ? 'bg-blue-600 text-white'
+                                        : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                                }`}
+                            >
+                                Preview
+                            </button>
+                        </div>
+                    )}
+                    
+                    <div className="flex-1 overflow-auto relative">
+                    {isHtml && codeViewMode === 'preview' ? (
+                            <div className="absolute inset-0 bg-white">
+                                <iframe
+                                    title={fileName}
+                                    srcDoc={getResponsiveHtml()}
+                                    // Allow scripts so interactive buttons/pagination work
+                                    // Removed 'allow-same-origin' to keep the app secure from XSS
+                                    sandbox="allow-scripts allow-popups" 
+                                    className="w-full h-full border-0"
+                                    style={{ backgroundColor: '#ffffff' }}
+                                />
+                            </div>
+                        ) : (
+                            <div className="h-full w-full p-6 text-gray-100 overflow-auto">
+                                <pre className="font-mono text-sm whitespace-pre-wrap">
+                                    <code>{textContent}</code>
+                                </pre>
+                            </div>
+                        )}
+                    </div>
                 </div>
             );
         }
