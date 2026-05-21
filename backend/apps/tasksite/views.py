@@ -56,20 +56,6 @@ class TaskListCreateView(WorkspaceAPIView):
     def get(self, request):
         user = self.request.user
 
-        # ── DEBUG (remove after testing) ──
-        import threading
-        from apps.organizations.context import get_current_workspace, get_current_organization
-        import logging
-        _debug = logging.getLogger(__name__)
-        _debug.info(
-            "🔴 VIEW get(): thread=%s, org=%s, workspace=%s, header=%s",
-            threading.current_thread().ident,
-            get_current_organization(),
-            get_current_workspace(),
-            request.META.get("HTTP_X_WORKSPACE_ID"),
-        )
-        # ── END DEBUG ──
-
         queryset = Task.objects.all()
 
         tasks = queryset.filter(

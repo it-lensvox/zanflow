@@ -9,7 +9,6 @@ ON THE VIEW'S THREAD, so TenantManager works correctly.
 """
 
 import logging
-import threading
 from rest_framework.views import APIView
 from rest_framework.generics import (
     ListCreateAPIView,
@@ -24,8 +23,6 @@ from rest_framework.generics import (
 from .context import (
     set_current_organization,
     set_current_workspace,
-    get_current_organization,
-    get_current_workspace,
 )
 from .models import WorkspaceMembership
 
@@ -70,16 +67,6 @@ class WorkspaceContextMixin:
                     if is_valid:
                         set_current_workspace(workspace_id)
                         request.workspace_id = workspace_id
-
-            # DEBUG: Verify context is set on this thread
-            logger.info(
-                "🟢 MIXIN initial() DONE: thread=%s, org=%s, workspace=%s, header=%s, user=%s",
-                threading.current_thread().ident,
-                get_current_organization(),
-                get_current_workspace(),
-                request.META.get("HTTP_X_WORKSPACE_ID"),
-                request.user.username,
-            )
 
 
 # Drop-in replacements
