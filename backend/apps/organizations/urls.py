@@ -8,6 +8,8 @@ from .views import (
     TenantDetailView,
     TenantDeleteView,
     TenantToggleStatusView,
+    WorkspaceListCreateView,
+    WorkspaceSwitchView,
 )
 
 router = DefaultRouter()
@@ -22,7 +24,8 @@ urlpatterns = [
     path("overview/<int:org_id>/", TenantDetailView.as_view(), name="tenant-detail"),
     path("overview/<int:org_id>/toggle-status/", TenantToggleStatusView.as_view(), name="tenant-toggle-status"),
     path("overview/<int:org_id>/delete/", TenantDeleteView.as_view(), name="tenant-delete"),
-
+    path("workspaces/", WorkspaceListCreateView.as_view(), name="workspace-list-create"),
+    path("workspaces/<int:workspace_id>/switch/", WorkspaceSwitchView.as_view(), name="workspace-switch"),
     # Admin CRUD for organizations
     path("", include(router.urls)),
 ]

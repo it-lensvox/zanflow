@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import Organization
+from .models import Organization, WorkspaceMembership, Workspace
 from .serializers import OrganizationSerializer, TenantSignupSerializer
 from .services import TenantOnboardingService
 from .throttles import GlobalSignupDailyThrottle
@@ -466,3 +466,93 @@ class TenantToggleStatusView(APIView):
                 "message": f"'{org.name}' has been reactivated.",
                 "is_active": True,
             })
+        
+class IsAdminOrManager(permissions.BasePermission):
+    """Only workspace admins and managers can create workspaces."""
+    def has_permission(self, request, view):
+        return request.user.role in ("admin", "manager")
+
+
+class WorkspaceListCreateView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        """List all workspaces the user belongs to."""
+        memberships = WorkspaceMembership.objects.filter(
+            user=request.user,
+            workspace__organization=request.user.organization,
+        ).select_related("workspace")
+
+        data = [
+            {
+                "id": m.workspace.id,
+                "name": m.workspace.name,
+                "slug": m.workspace.slug,
+                "role": m.role,
+                "is_default": m.workspace.is_default,
+                "is_active": m.workspace.is_active,
+            }
+            for m in memberships
+        ]
+        return Response(data)
+
+    def post(self, request):
+        """Create a new workspace (admin/manager only)."""
+        if request.user.role not in ("admin", "manager"):
+            return Response(
+                {"detail": "Only admins and managers can create workspaces."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        name = request.data.get("name")
+        if not name:
+            return Response(
+                {"detail": "Workspace name is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        workspace = Workspace.objects.create(
+            organization=request.user.organization,
+            name=name,
+            created_by=request.user,
+        )
+
+        # Creator becomes admin of the workspace
+        WorkspaceMembership.objects.create(
+            user=request.user,
+            workspace=workspace,
+            role="admin",
+        )
+
+        return Response(
+            {
+                "id": workspace.id,
+                "name": workspace.name,
+                "slug": workspace.slug,
+                "message": "Workspace created successfully.",
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class WorkspaceSwitchView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, workspace_id):
+        """Validate user can switch to this workspace. Frontend stores the ID."""
+        is_member = WorkspaceMembership.objects.filter(
+            user=request.user,
+            workspace_id=workspace_id,
+            workspace__organization=request.user.organization,
+        ).exists()
+
+        if not is_member:
+            return Response(
+                {"detail": "You are not a member of this workspace."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        return Response({
+            "workspace_id": workspace_id,
+            "message": "Switched successfully. Send X-Workspace-ID header in future requests.",
+        })

@@ -7,6 +7,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 import dj_database_url
 from decouple import config
+from corsheaders.defaults import default_headers
 
 # Build paths
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -162,12 +163,15 @@ CORS_ALLOWED_ORIGINS = config(
 ).split(",")
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = config("CORS_ALLOW_ALL", default=True, cast=bool)  # For development
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    "x-workspace-id",
+]
 STATIC_API_TOKEN = config("STATIC_API_TOKEN", default=None)
 # Django REST Framework
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "apps.users.auth.StaticTokenAuthentication",
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "apps.organizations.authentication.WorkspaceStaticTokenAuthentication",  # ✅ NEW
+        "apps.organizations.authentication.WorkspaceJWTAuthentication",          # ✅ NEW
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",

@@ -1,29 +1,42 @@
 import logging
-from .context import set_current_organization, clear_current_organization
+from .context import (
+    set_current_organization,
+    clear_current_organization,
+    set_current_workspace,
+    clear_current_workspace,
+)
 
 logger = logging.getLogger(__name__)
 
+
 class TenantMiddleware:
     """
-    Original Middleware: Scopes the database context to the user's single organization.
+    Django Middleware for tenant context.
+    
+    For ASGI/Daphne: Thread-locals set here may not persist to the view
+    thread. The real workspace filtering for DRF views happens via
+    WorkspaceFilterMixin which reads directly from request.META.
+    
+    This middleware still handles:
+      - Session-authenticated users (Django admin)
+      - Cleanup between requests
     """
+
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
-        # 1. Always clear the context at the start to prevent data leakage between threads
         clear_current_organization()
+        clear_current_workspace()
 
-        # 2. If the user is logged in and has an organization, set the context
-        if request.user.is_authenticated:
-            # Under the original setup, the User model has a direct organization_id ForeignKey
-            if getattr(request.user, 'organization_id', None):
-                set_current_organization(request.user.organization_id)
+        if hasattr(request, 'user') and request.user.is_authenticated:
+            org_id = getattr(request.user, 'organization_id', None)
+            if org_id:
+                set_current_organization(org_id)
 
-        # 3. Continue processing the request
         response = self.get_response(request)
-        
-        # 4. Clean up after the request finishes
+
         clear_current_organization()
-        
+        clear_current_workspace()
+
         return response
