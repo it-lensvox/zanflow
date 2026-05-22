@@ -481,7 +481,7 @@ class WorkspaceListCreateView(APIView):
         memberships = WorkspaceMembership.objects.filter(
             user=request.user,
             workspace__organization=request.user.organization,
-        ).select_related("workspace")
+        ).select_related("workspace", "workspace__created_by")
 
         data = [
             {
@@ -491,6 +491,7 @@ class WorkspaceListCreateView(APIView):
                 "role": m.role,
                 "is_default": m.workspace.is_default,
                 "is_active": m.workspace.is_active,
+                "created_by": m.workspace.created_by_id,
             }
             for m in memberships
         ]
@@ -529,6 +530,7 @@ class WorkspaceListCreateView(APIView):
                 "id": workspace.id,
                 "name": workspace.name,
                 "slug": workspace.slug,
+                "created_by": workspace.created_by_id,
                 "message": "Workspace created successfully.",
             },
             status=status.HTTP_201_CREATED,
@@ -555,4 +557,96 @@ class WorkspaceSwitchView(APIView):
         return Response({
             "workspace_id": workspace_id,
             "message": "Switched successfully. Send X-Workspace-ID header in future requests.",
+        })
+
+
+class WorkspaceDeleteView(APIView):
+    """
+    Delete a workspace permanently.
+
+    DELETE /api/v1/organizations/workspaces/<workspace_id>/delete/
+
+    Rules:
+      - Only the person who CREATED the workspace can delete it.
+      - The default workspace cannot be deleted.
+      - All data inside the workspace (projects, tasks, teams, etc.) will be permanently deleted.
+      - Requires confirmation: {"confirm": "DELETE"}
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, workspace_id):
+        # 1. Find the workspace
+        try:
+            workspace = Workspace.objects.get(
+                id=workspace_id,
+                organization=request.user.organization,
+            )
+        except Workspace.DoesNotExist:
+            return Response(
+                {"detail": "Workspace not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # 2. Cannot delete the default workspace
+        if workspace.is_default:
+            return Response(
+                {"detail": "The default workspace cannot be deleted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 3. Only the creator can delete
+        if workspace.created_by != request.user:
+            return Response(
+                {"detail": "Only the person who created this workspace can delete it."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # 4. Require confirmation
+        confirm = request.data.get("confirm")
+        if confirm != "DELETE":
+            return Response(
+                {
+                    "detail": 'This action is irreversible. Send {"confirm": "DELETE"} to proceed.',
+                    "workspace": {
+                        "id": workspace.id,
+                        "name": workspace.name,
+                    },
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 5. Delete all workspace-scoped data
+        from django.apps import apps
+        from .models import TenantModel
+
+        workspace_name = workspace.name
+        summary = {"workspace": workspace_name, "deleted": {}}
+
+        for model in apps.get_models():
+            if (
+                issubclass(model, TenantModel)
+                and not model._meta.abstract
+                and model is not TenantModel
+            ):
+                label = f"{model._meta.app_label}.{model.__name__}"
+                count, _ = model.original_objects.filter(workspace=workspace).delete()
+                if count > 0:
+                    summary["deleted"][label] = count
+
+        # Delete workspace memberships
+        mem_count, _ = WorkspaceMembership.objects.filter(workspace=workspace).delete()
+        summary["deleted"]["memberships"] = mem_count
+
+        # Delete the workspace itself
+        workspace.delete()
+
+        logger.info(
+            "Workspace deleted by creator: ws=%s, user=%s, summary=%s",
+            workspace_name, request.user.username, summary,
+        )
+
+        return Response({
+            "message": f"Workspace '{workspace_name}' has been permanently deleted.",
+            "summary": summary,
         })
