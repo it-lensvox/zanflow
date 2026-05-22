@@ -116,8 +116,11 @@ function TreePanel({ folders, onFolderClick, selectedFolder, selectedFolderId, i
           {hasC ? (
             <ChevronRightIcon className={`w-3 h-3 flex-shrink-0 transition-transform ${isO ? 'rotate-90' : ''}`} style={{ color: '#6b7280' }} />
           ) : <span className="w-3 flex-shrink-0" />}
-          {isO && hasC ? <FolderOpen className="w-4 h-4 flex-shrink-0" style={{ color: '#6b7280' }} /> : <Folder className="w-4 h-4 flex-shrink-0" style={{ color: '#6b7280' }} />}
-
+          {isO && hasC ? (
+            <FolderOpen className="w-4 h-4 flex-shrink-0" style={{ color: '#6b7280', fill: 'currentColor' }} />
+          ) : (
+            <Folder className="w-4 h-4 flex-shrink-0" style={{ color: '#6b7280', fill: 'currentColor' }} />
+          )}
           {isEditing ? (
             <input autoFocus value={editName} onChange={(e) => setEditName(e.target.value)}
               onBlur={commitRename} onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') { setEditingId(null); setEditName(''); } }}
@@ -216,23 +219,36 @@ function TreePanel({ folders, onFolderClick, selectedFolder, selectedFolderId, i
           {/* + New Folder button */}
           <button className="flex items-center gap-2 mt-4 px-2 py-2 text-sm font-medium rounded-md w-full"
             style={{ color: '#4169FF', background: 'none', border: 'none', cursor: 'pointer' }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#f3f4f6'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#f3f4f6'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             onClick={() => {
-              // Find the currently selected project to create subfolder under it
-              const findProject = (ff: TreeFolder[]): TreeFolder | undefined => {
+              // ✅ Find currently selected folder/project
+              const findSelected = (ff: TreeFolder[]): TreeFolder | undefined => {
                 for (const f of ff) {
-                  if (f.projectId && (f.name === selectedFolder || f.id === selectedFolder)) return f;
-                  if (f.children) { const r = findProject(f.children); if (r) return r; }
+                  // Check if this is the selected node
+                  if ((f.id && selectedFolderId === f.id) || (!f.id && selectedFolder === f.name)) {
+                    return f;
+                  }
+                  // Recursively check children
+                  if (f.children) {
+                    const r = findSelected(f.children);
+                    if (r) return r;
+                  }
                 }
                 return undefined;
               };
-              const proj = findProject(folders);
-              if (proj?.projectId) {
-                startCreateFolder(proj.projectId, proj.id || proj.name);
-              } else if (folders[0]?.children?.length) {
-                // Default: first project
-                const first = folders[0].children.find((c) => c.projectId);
-                if (first?.projectId) startCreateFolder(first.projectId, first.id || first.name);
+
+              const selected = findSelected(folders);
+
+              if (selected?.projectId) {
+                // ✅ Create folder under the selected project/folder
+                startCreateFolder(selected.projectId, selected.id || selected.name);
+              } else {
+                // ✅ Fallback: use first project
+                const firstProject = folders[0]?.children?.find((c) => c.projectId);
+                if (firstProject?.projectId) {
+                  startCreateFolder(firstProject.projectId, firstProject.id || firstProject.name);
+                }
               }
             }}>
             <Plus className="w-4 h-4" /> New Folder
@@ -806,6 +822,29 @@ function SidePreviewPanel({ doc, previewUrl, onClose, onOpenFull }: { doc: Docum
 
 // ---- DocumentInfoPanel ----
 function DocumentInfoPanel({ doc, onClose }: { doc: Document | null; onClose: () => void }) {
+  const panelRef = React.useRef<HTMLDivElement>(null);  // ✅ ADD THIS
+
+  // ✅ ADD THIS ENTIRE useEffect
+  React.useEffect(() => {
+    if (!doc) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+
+    // Small delay to prevent immediate closing
+    const timer = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 100);
+
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [doc, onClose]);
+  
   if (!doc) return null;
   const fmtD = (d?: string) => d ? new Date(d).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A';
   const rows: { icon: React.ReactNode; label: string; value: React.ReactNode }[] = [
@@ -817,7 +856,7 @@ function DocumentInfoPanel({ doc, onClose }: { doc: Document | null; onClose: ()
   if (doc.description) rows.splice(1, 0, { icon: <FileText className="w-4 h-4" style={{ color: '#6b7280' }} />, label: 'Description', value: doc.description });
   return (
     <div className="fixed inset-0 z-50 flex justify-end pointer-events-none">
-      <div className="pointer-events-auto h-full flex flex-col animate-in slide-in-from-right duration-300" style={{ width: 340, background: '#fff', borderLeft: '1px solid #e5e7eb', boxShadow: '0 25px 50px -12px rgba(0,0,0,.25)' }}>
+      <div ref={panelRef}  className="pointer-events-auto h-full flex flex-col animate-in slide-in-from-right duration-300" style={{ width: 340, background: '#fff', borderLeft: '1px solid #e5e7eb', boxShadow: '0 25px 50px -12px rgba(0,0,0,.25)' }}>
         <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
           <div className="flex items-center gap-2"><Info className="w-4 h-4" style={{ color: '#4169FF' }} /><span style={{ fontSize: 14, fontWeight: 600, color: '#1a1a1a' }}>Document Info</span></div>
           <button onClick={onClose} style={{ color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: 6 }}><X className="w-4 h-4" /></button>
@@ -997,10 +1036,34 @@ function TagSelectorModal({
   selectedCount: number;
   onConfirm: (tagIds: number[]) => void;
 }) {
+  const queryClient = useQueryClient();
+  // ✅ ADD THIS - Fetch labels directly in modal
+  const { data: freshLabels, refetch: refetchLabels } = useQuery({
+    queryKey: ['labels-modal'],
+    queryFn: async () => {
+      const token = localStorage.getItem('access_token');
+      const response = await fetch('http://192.168.1.164:8000/api/v1/documents/labels/', {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!response.ok) throw new Error('Failed to fetch labels');
+      const data = await response.json();
+      return data.results || data || [];
+    },
+    enabled: isOpen,  // Only fetch when modal is open
+    staleTime: 0,     // Always refetch
+  });
   const [selectedTags, setSelectedTags] = useState<number[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);  // ✅ ADD THIS
   const [successMessage, setSuccessMessage] = useState('');  // ✅ ADD THIS
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newLabelName, setNewLabelName] = useState('');
+  const [newLabelColor, setNewLabelColor] = useState('#3B82F6'); // Default blue
+  const [isCreating, setIsCreating] = useState(false);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -1013,10 +1076,11 @@ function TagSelectorModal({
 
   if (!isOpen) return null;
 
-  const filteredTags = availableTags.filter((tag) =>
+  const labelsToUse: any[] = freshLabels || availableTags || [];
+
+  const filteredTags = labelsToUse.filter((tag: any) =>
     tag.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
   const toggleTag = (tagId: number) => {
     setSelectedTags((prev) =>
       prev.includes(tagId)
@@ -1024,7 +1088,77 @@ function TagSelectorModal({
         : [...prev, tagId]
     );
   };
+  const handleCreateLabel = async () => {
+    if (!newLabelName.trim()) {
+      alert('Please enter a label name');
+      return;
+    }
 
+    setIsCreating(true);
+    try {
+      const token = localStorage.getItem('access_token');
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const projectIdFromUrl = urlParams.get('project');
+      const currentProjectId = projectIdFromUrl ? Number(projectIdFromUrl) : 154;
+
+      console.log('🔄 Creating label:', {
+        project: currentProjectId,
+        name: newLabelName.trim(),
+        color: newLabelColor
+      });
+
+      const response = await fetch('http://192.168.1.164:8000/api/v1/documents/labels/', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          project: currentProjectId,
+          name: newLabelName.trim(),
+          color: newLabelColor
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('❌ Backend error details:', errorData);
+
+        let errorMessage = 'Failed to create label';
+        if (errorData.name && Array.isArray(errorData.name)) {
+          errorMessage = errorData.name[0];
+        } else if (errorData.detail) {
+          errorMessage = errorData.detail;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const newLabel = await response.json();
+      console.log('✅ Label created:', newLabel);
+
+      // ✅ Refetch both queries
+      await refetchLabels();
+      await queryClient.invalidateQueries({ queryKey: ['labels'] });
+
+      // ✅ Small delay for state to update
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      // Reset form
+      setNewLabelName('');
+      setNewLabelColor('#3B82F6');
+      setShowCreateForm(false);
+
+      alert(`Label "${newLabel.name}" created successfully! You can now select it.`);
+
+    } catch (error: any) {
+      console.error('Failed to create label:', error);
+      alert(error.message || 'Failed to create label');
+    } finally {
+      setIsCreating(false);
+    }
+  };
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
@@ -1077,6 +1211,78 @@ function TagSelectorModal({
               onBlur={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
             />
           </div>
+          {/* ✅ ADD THIS: Create New Label Button */}
+          <button
+            onClick={() => setShowCreateForm(!showCreateForm)}
+            className="w-full mb-4 py-2 px-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-500 hover:text-blue-500 transition-colors flex items-center justify-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Create New Label
+          </button>
+
+          {/* ✅ ADD THIS: Create Label Form */}
+          {showCreateForm && (
+            <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Label Name
+                  </label>
+                  <input
+                    type="text"
+                    value={newLabelName}
+                    onChange={(e) => setNewLabelName(e.target.value)}
+                    placeholder="e.g., Review, Contract, Legal"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Color
+                  </label>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="color"
+                      value={newLabelColor}
+                      onChange={(e) => setNewLabelColor(e.target.value)}
+                      className="w-12 h-10 rounded cursor-pointer"
+                    />
+                    <input
+                      type="text"
+                      value={newLabelColor}
+                      onChange={(e) => setNewLabelColor(e.target.value)}
+                      placeholder="#3B82F6"
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleCreateLabel}
+                    disabled={isCreating || !newLabelName.trim()}
+                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isCreating ? 'Creating...' : 'Create'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowCreateForm(false);
+                      setNewLabelName('');
+                      setNewLabelColor('#3B82F6');
+                    }}
+                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Existing Available Tags list */}
+          <div className="text-sm font-semibold text-gray-700 mb-2">AVAILABLE TAGS</div>
 
           {/* Success Message */}
           {successMessage && (
@@ -1121,7 +1327,7 @@ function TagSelectorModal({
               </p>
               <div className="flex flex-wrap gap-2">
                 {selectedTags.map((tagId) => {
-                  const tag = availableTags.find((t) => t.id === tagId);
+                  const tag = labelsToUse.find((t) => t.id === tagId);  // ✅ Use labelsToUse
                   if (!tag) return null;
                   return (
                     <span
@@ -1332,13 +1538,13 @@ export function Documents() {
   const { data: tagsData } = useQuery({
     queryKey: ['labels'],
     queryFn: async () => {
-      const token = localStorage.getItem('access_token');  // ✅ ADD THIS LINE
+      const token = localStorage.getItem('access_token');
 
       const response = await fetch('http://192.168.1.164:8000/api/v1/documents/labels/', {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`  // ✅ ADD THIS LINE
+          'Authorization': `Bearer ${token}`
         }
       });
 
@@ -1347,9 +1553,12 @@ export function Documents() {
       }
 
       const data = await response.json();
+      console.log('✅ Parent loaded labels:', data.results?.length || data.length);
       return data.results || data || [];
     },
-    staleTime: 60000,
+    staleTime: 0,  // ✅ CHANGED - Always fetch fresh
+    refetchOnMount: 'always',  // ✅ ADDED
+    refetchOnWindowFocus: true,  // ✅ ADDED
   });
 
   React.useEffect(() => {
@@ -1721,14 +1930,14 @@ export function Documents() {
     }
 
     try {
-      const token = localStorage.getItem('access_token');  // ✅ ADD THIS LINE
+      const token = localStorage.getItem('access_token');
 
       const response = await fetch('http://192.168.1.164:8000/api/v1/documents/bulk-add-labels/', {
         method: 'POST',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`  // ✅ ADD THIS LINE
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           document_ids: documentIds,
@@ -1749,11 +1958,12 @@ export function Documents() {
       queryClient.invalidateQueries({ queryKey: ['documents'] });
       queryClient.invalidateQueries({ queryKey: ['documents-tree-counts'] });
 
-      // const message = result.skipped_count
-      //   ? `Successfully added tags to ${result.updated_count} document(s). ${result.skipped_count} skipped due to permissions.`
-      //   : `Successfully added tags to ${result.updated_count} document(s)`;
+      // ✅ UNCOMMENT THIS - Show success message
+      const message = result.skipped_count
+        ? `Successfully added tags to ${result.updated_count} document(s). ${result.skipped_count} skipped due to permissions.`
+        : `Successfully added tags to ${result.updated_count} document(s)`;
 
-      // alert(message);
+      alert(message);
     } catch (error: any) {
       console.error('Bulk add tags failed:', error);
       alert(error.message || 'Failed to add tags. Please try again.');

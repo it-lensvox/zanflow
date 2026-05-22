@@ -1,5 +1,74 @@
 import React, { useState } from 'react';
-import { FileText, Trash2, CheckCircle, Clock, File, Info, Share2, Folder } from 'lucide-react';
+// ✅ Add this helper function at the top of the file
+import { 
+  FaFilePdf, 
+  FaFileWord, 
+  FaFileExcel, 
+  FaFilePowerpoint,
+  FaFileImage,
+  FaFileVideo,
+  FaFileCode,
+  FaFileArchive,
+  FaFile
+} from 'react-icons/fa';
+import { 
+  FileText, 
+  Folder, 
+  Info, 
+  Share2, 
+  Trash2,
+  File,
+  Clock,
+  CheckCircle
+} from 'lucide-react';
+
+const getFileIcon = (fileName: string) => {
+  const ext = fileName?.split('.').pop()?.toLowerCase() || '';
+  
+  const iconMap: Record<string, { Icon: any; color: string }> = {
+    // PDF
+    'pdf': { Icon: FaFilePdf, color: '#EF4444' },
+    
+    // Word
+    'doc': { Icon: FaFileWord, color: '#2563EB' },
+    'docx': { Icon: FaFileWord, color: '#2563EB' },
+    
+    // Excel
+    'xls': { Icon: FaFileExcel, color: '#16A34A' },
+    'xlsx': { Icon: FaFileExcel, color: '#16A34A' },
+    'csv': { Icon: FaFileExcel, color: '#16A34A' },
+    
+    // PowerPoint
+    'ppt': { Icon: FaFilePowerpoint, color: '#EA580C' },
+    'pptx': { Icon: FaFilePowerpoint, color: '#EA580C' },
+    
+    // Images
+    'png': { Icon: FaFileImage, color: '#7C3AED' },
+    'jpg': { Icon: FaFileImage, color: '#7C3AED' },
+    'jpeg': { Icon: FaFileImage, color: '#7C3AED' },
+    'gif': { Icon: FaFileImage, color: '#7C3AED' },
+    'svg': { Icon: FaFileImage, color: '#7C3AED' },
+    
+    // Videos
+    'mp4': { Icon: FaFileVideo, color: '#EC4899' },
+    'mov': { Icon: FaFileVideo, color: '#EC4899' },
+    'avi': { Icon: FaFileVideo, color: '#EC4899' },
+    
+    // Code
+    'js': { Icon: FaFileCode, color: '#F59E0B' },
+    'ts': { Icon: FaFileCode, color: '#2563EB' },
+    'jsx': { Icon: FaFileCode, color: '#0891B2' },
+    'tsx': { Icon: FaFileCode, color: '#0891B2' },
+    'py': { Icon: FaFileCode, color: '#3B82F6' },
+    'json': { Icon: FaFileCode, color: '#F59E0B' },
+    
+    // Archives
+    'zip': { Icon: FaFileArchive, color: '#F59E0B' },
+    'rar': { Icon: FaFileArchive, color: '#F59E0B' },
+  };
+  
+  return iconMap[ext] || { Icon: FaFile, color: '#6B7280' };
+};
 import { TablePopover } from '@/components/common';
 import { formatRelativeTime } from '@/lib/utils';
 import type { Document, DocumentStatus } from '@/types';
@@ -126,20 +195,26 @@ export const createDocumentsTableColumns = ({ onDeleteClick, onInfoClick, onShar
     {
       key: 'name',
       label: <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Document</span>,
+      width: '350px',
       render: (doc: Document) => {
         const iconColor = getDocIconColor(doc.name);
         const ext = doc.name?.split('.').pop()?.toUpperCase() || '';
         return (
           <div className="flex items-center justify-between w-full group/cell">
             <div className="flex items-center gap-2.5 min-w-0 pr-2">
-              {/* Colored doc icon matching HTML */}
-              <div className="rounded flex items-center justify-center text-white flex-shrink-0"
-                style={{ width: 32, height: 40, background: iconColor, fontSize: 12, fontWeight: 600 }}>
-                <FileText className="w-4 h-4" />
-              </div>
+              {/* Colored doc icon matching HTML exactly */}
+              {(() => {
+                const { Icon, color } = getFileIcon(doc.name || doc.original_file_name || '');
+                return (
+                  <div className="flex items-center justify-center text-white flex-shrink-0"
+                    style={{ width: 32, height: 40, background: color, fontSize: 14, fontWeight: 600, borderRadius: 4 }}>
+                    <Icon className="w-[18px] h-[18px]" style={{ strokeWidth: 2 }} />
+                  </div>
+                );
+              })()}
               <div className="flex flex-col min-w-0">
                 <span className="truncate" style={{ fontWeight: 500, fontSize: 14, color: '#1a1a1a' }} title={doc.name}>{doc.name}</span>
-                <span style={{ fontSize: 12, color: '#6b7280' }}>{doc.file_size ? `${(doc.file_size / (1024*1024)).toFixed(1)} MB` : ''}</span>
+                <span style={{ fontSize: 12, color: '#6b7280' }}>{doc.file_size ? `${(doc.file_size / (1024 * 1024)).toFixed(1)} MB` : ''}</span>
               </div>
             </div>
             <div className="opacity-0 group-hover/cell:opacity-100 transition-all duration-200 flex items-center gap-0.5 flex-shrink-0">
@@ -157,7 +232,8 @@ export const createDocumentsTableColumns = ({ onDeleteClick, onInfoClick, onShar
       width: '140px',
       render: (doc: Document) => (
         <span className="inline-flex items-center gap-1.5 rounded-md" style={{ padding: '4px 10px', background: '#EEF2FF', color: '#4F46E5', fontSize: 13, border: '1px solid #C7D2FE' }}>
-          <Folder className="w-3 h-3" />{doc.project_name || 'General'}
+          <Folder className="w-3 h-3" style={{ fill: '#4F46E5', stroke: 'none' }} />
+          {doc.project_name || 'General'}
         </span>
       ),
     },
@@ -173,10 +249,48 @@ export const createDocumentsTableColumns = ({ onDeleteClick, onInfoClick, onShar
         return (
           <div className="flex flex-wrap gap-1.5">
             {visible.map((l) => {
-              const ts = getTagStyle(l.name);
-              return <span key={l.id} className="inline-flex rounded-md" style={{ padding: '3px 10px', fontSize: 12, fontWeight: 500, background: ts.bg, color: ts.color, border: `1px solid ${ts.border}` }}>{l.name}</span>;
-            })}
-            {extra > 0 && <span className="rounded-md" style={{ padding: '3px 8px', fontSize: 12, fontWeight: 500, background: '#F3F4F6', color: '#6B7280', border: '1px solid #D1D5DB' }}>+{extra}</span>}
+  const tagColor = l.color || '#6B7280';
+  
+  // Convert hex to rgba with 10% opacity
+  const hexToRgba = (hex: string) => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, 0.1)`;
+  };
+  
+  return (
+    <span
+      key={l.id}
+      className="inline-flex rounded-full"
+      style={{
+        padding: '4px 12px',
+        fontSize: 11,
+        fontWeight: 500,
+        background: hexToRgba(tagColor),
+        color: tagColor,
+        border: `1px solid ${tagColor}`
+      }}
+    >
+      {l.name}
+    </span>
+  );
+})}
+            {extra > 0 && (
+              <span
+                className="rounded-full"
+                style={{
+                  padding: '4px 10px',
+                  fontSize: 11,
+                  fontWeight: 500,
+                  background: 'transparent',
+                  color: '#6B7280',
+                  border: '1px solid #D1D5DB'
+                }}
+              >
+                +{extra}
+              </span>
+            )}
           </div>
         );
       },
@@ -198,7 +312,7 @@ export const createDocumentsTableColumns = ({ onDeleteClick, onInfoClick, onShar
       label: 'Owner',
       render: (doc: Document) => {
         const ownerName = doc.created_by?.full_name || doc.created_by?.username || 'System';
-        
+
         // Get initials (first letter of first name + first letter of last name)
         const initials = ownerName
           .split(' ')
@@ -206,7 +320,7 @@ export const createDocumentsTableColumns = ({ onDeleteClick, onInfoClick, onShar
           .join('')
           .toUpperCase()
           .slice(0, 2) || 'SY';
-        
+
         // Color palette matching your reference image
         const avatarColors = [
           '#7C3AED', // Purple (RS)
@@ -220,14 +334,14 @@ export const createDocumentsTableColumns = ({ onDeleteClick, onInfoClick, onShar
           '#14B8A6', // Teal
           '#6366F1', // Indigo
         ];
-        
+
         // Generate consistent color based on owner name
         const colorIndex = ownerName
           .split('')
           .reduce((acc, char) => acc + char.charCodeAt(0), 0) % avatarColors.length;
-        
+
         const backgroundColor = avatarColors[colorIndex];
-        
+
         return (
           <div className="flex items-center justify-center">
             <div

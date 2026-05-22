@@ -80,7 +80,7 @@ export const MyTask: React.FC = () => {
 
     sanitiseTaskCache(queryClient);
     const [dateField, setDateField] = useState<'end_date' | 'start_date' | 'created_at'>('end_date');
-    const [personField, setPersonField] = useState<'assigned_to' | 'created_by' | 'updated_by'>('updated_by');
+    const [personField, setPersonField] = useState<'assigned_to' | 'created_by' | 'updated_by'>('assigned_to');
     const [showPersonFieldDropdown, setShowPersonFieldDropdown] = useState(false);
     const personTriggerRef = React.useRef<HTMLButtonElement>(null);
     const [showDateFieldDropdown, setShowDateFieldDropdown] = useState(false);
@@ -89,6 +89,39 @@ export const MyTask: React.FC = () => {
     const [showAITaskModal, setShowAITaskModal] = useState(false);
     const [isInlineCreating, setIsInlineCreating] = useState(false);
     const activeFilter = location.pathname.split('/').filter(p => p)[1]?.toUpperCase() || 'ALL';
+
+    useEffect(() => {
+        if (!showPersonFieldDropdown) return;
+
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as Node;
+
+            // Don't close if clicking on the trigger button
+            if (personTriggerRef.current?.contains(target)) {
+                return;
+            }
+
+            // Don't close if clicking inside the dropdown portal
+            const dropdownElement = document.querySelector('[data-person-dropdown="true"]');
+            if (dropdownElement?.contains(target)) {
+                return;
+            }
+
+            // Close dropdown
+            setShowPersonFieldDropdown(false);
+            setDropdownPos(null);
+        };
+
+        // Add listener with a slight delay
+        const timeoutId = setTimeout(() => {
+            document.addEventListener('mousedown', handleClickOutside);
+        }, 0);
+
+        return () => {
+            clearTimeout(timeoutId);
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showPersonFieldDropdown]);
 
     const { data: usersData } = useQuery({
         queryKey: ['all-users'],
@@ -651,6 +684,7 @@ export const MyTask: React.FC = () => {
             {/* Person Field Dropdown */}
             {showPersonFieldDropdown && dropdownPos && createPortal(
                 <div
+                    data-person-dropdown="true" // ✅ ADD THIS
                     style={{ position: 'absolute', top: dropdownPos.top, left: dropdownPos.left, zIndex: 9999 }}
                     className="bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[140px]"
                     onMouseDown={(e) => e.stopPropagation()}
