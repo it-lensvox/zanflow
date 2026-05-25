@@ -10,6 +10,7 @@ import {
   Bookmark, Layers, Clock, Sparkles, HelpCircle, ExternalLink, ZoomIn, ZoomOut,
   MessageSquare, Pencil
 } from 'lucide-react';
+import { API_URL } from '@/services/api';
 import { Button, Card, CardContent, Input } from '@/components/common';
 import { documentsApi, projectsApi, usersApi } from '@/services/api';
 import type { Document, Project, DocumentStatus } from '@/types';
@@ -1042,7 +1043,7 @@ function TagSelectorModal({
     queryKey: ['labels-modal'],
     queryFn: async () => {
       const token = localStorage.getItem('access_token');
-      const response = await fetch('http://192.168.1.164:8000/api/v1/documents/labels/', {
+      const response = await fetch(`${API_URL}/documents/labels/`, {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
@@ -1108,7 +1109,7 @@ function TagSelectorModal({
         color: newLabelColor
       });
 
-      const response = await fetch('http://192.168.1.164:8000/api/v1/documents/labels/', {
+      const response = await fetch(`${API_URL}/documents/labels/`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -1540,7 +1541,7 @@ export function Documents() {
     queryFn: async () => {
       const token = localStorage.getItem('access_token');
 
-      const response = await fetch('http://192.168.1.164:8000/api/v1/documents/labels/', {
+      const response = await fetch('${API_URL}/documents/labels/', {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
@@ -1932,7 +1933,7 @@ export function Documents() {
     try {
       const token = localStorage.getItem('access_token');
 
-      const response = await fetch('http://192.168.1.164:8000/api/v1/documents/bulk-add-labels/', {
+      const response = await fetch('${API_URL}/documents/bulk-add-labels/', {
         method: 'POST',
         credentials: 'include',
         headers: {

@@ -1,23 +1,24 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  NotebookPen, Plus, FolderPlus, Maximize2, X, Folder, FileText, MoreVertical, Paperclip, Loader2, Trash2, Bold, Italic, List, ListOrdered, Pencil
+  NotebookPen, Plus, FolderKanban, ChevronRight, ChevronDown, FolderPlus, Maximize2, X, Folder, FileText, MoreVertical, Paperclip, Loader2, Trash2, Bold, Italic, List, ListOrdered, Pencil
 } from 'lucide-react';
 import { cn, formatRelativeTime } from '@/lib/utils';
 import { quickNotesApi, projectsApi, authApi, usersApi } from '@/services/api';
 import type { QuickNote, QuickNoteFolder } from '@/types';
 import DeleteModal from '@/components/common/Deletemodal';
-import { DocumentPreview } from '@/components/common/DocumentPreview'; 
+import { DocumentPreview } from '@/components/common/DocumentPreview';
 
 // UI State model
 
 export interface QuickNotesState {
   folders: QuickNoteFolder[];
   notes: QuickNote[];
-  selectedFolderId: number | 'all';
+  projects: any[];
+  selectedFolderId: number | 'all' | `project-${number}`;
   selectedNoteId: number | 'pending' | null;
   isLoading: boolean;
-  pendingNote: { folderId: number | null } | null;
+  pendingNote: { folderId: number | null; projectId?: number | null } | null;  // ✅ ADD projectId
   currentUserId: number | null;
   users: import('@/types').User[];
 }
@@ -26,6 +27,7 @@ function getDefaultState(): QuickNotesState {
   return {
     folders: [],
     notes: [],
+    projects: [],
     selectedFolderId: 'all',
     selectedNoteId: null,
     isLoading: true,
@@ -38,26 +40,26 @@ function getDefaultState(): QuickNotesState {
 export function useQuickNotes() {
   const [state, setState] = useState<QuickNotesState>(getDefaultState);
 
-// Load folders + notes from backend on mount
-useEffect(() => {
-  let cancelled = false;
-  async function load() {
-    try {
-      const [folders, notesResp, currentUser, usersData] = await Promise.all([
-        quickNotesApi.getFolders(),
-        quickNotesApi.getNotes(),
-        authApi.getMe(),
-        usersApi.listAll().catch(() => [])
-      ]);
-      if (cancelled) return;
-      setState((prev) => ({
-        ...prev,
-        folders,
-        notes: notesResp.results,
-        isLoading: false,
-        currentUserId: currentUser.id,
-        users: usersData,
-      }));
+  // Load folders + notes from backend on mount
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const [folders, notesResp, currentUser, usersData] = await Promise.all([
+          quickNotesApi.getFolders(),
+          quickNotesApi.getNotes(),
+          authApi.getMe(),
+          usersApi.listAll().catch(() => [])
+        ]);
+        if (cancelled) return;
+        setState((prev) => ({
+          ...prev,
+          folders,
+          notes: notesResp.results,
+          isLoading: false,
+          currentUserId: currentUser.id,
+          users: usersData,
+        }));
       } catch {
         if (!cancelled) setState((prev) => ({ ...prev, isLoading: false }));
       }
@@ -66,10 +68,18 @@ useEffect(() => {
     return () => { cancelled = true; };
   }, []);
 
-  const getNotesForFolder = (folderId: number | 'all'): QuickNote[] => {
+  const getNotesForFolder = (folderId: number | 'all' | `project-${number}`): QuickNote[] => {
     const sorted = [...state.notes].sort(
       (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
     );
+
+    // Handle project filter
+    if (typeof folderId === 'string' && folderId.startsWith('project-')) {
+      const projectId = parseInt(folderId.replace('project-', ''));
+      return sorted.filter((n) => n.project === projectId);
+    }
+
+    // Handle 'all' and regular folders
     if (folderId === 'all') return sorted;
     return sorted.filter((n) => n.folder === folderId);
   };
@@ -78,12 +88,27 @@ useEffect(() => {
     note.title && note.title.trim() ? note.title : 'Untitled';
 
   // "New Note" click — just marks a pending note, no API call yet
-  const createNote = (folderId: number | 'all'): void => {
-    const targetFolder = folderId === 'all' ? null : folderId;
+  // "New Note" click — just marks a pending note, no API call yet
+  const createNote = (folderId: number | 'all' | `project-${number}`): void => {
+    let targetFolder: number | null = null;
+    let targetProject: number | null = null;
+    
+    if (typeof folderId === 'string' && folderId.startsWith('project-')) {
+      // Extract project ID from string like "project-155"
+      targetProject = parseInt(folderId.replace('project-', ''));
+      targetFolder = null;
+    } else if (folderId === 'all') {
+      targetFolder = null;
+      targetProject = null;
+    } else {
+      targetFolder = folderId;
+      targetProject = null;
+    }
+    
     setState((prev) => ({
       ...prev,
-      pendingNote: { folderId: targetFolder },
-      selectedNoteId: null, 
+      pendingNote: { folderId: targetFolder, projectId: targetProject },
+      selectedNoteId: null,
     }));
   };
 
@@ -94,8 +119,14 @@ useEffect(() => {
         setState((prev) => { resolve(prev); return prev; });
       });
       const targetFolder = currentState.pendingNote?.folderId ?? null;
+      const targetProject = currentState.pendingNote?.projectId ?? null;
+      
       try {
-        const newNote = await quickNotesApi.createNote({ content, folder: targetFolder });
+        const newNote = await quickNotesApi.createNote({ 
+          content, 
+          folder: targetFolder,
+          project: targetProject
+        });
         setState((prev) => ({
           ...prev,
           notes: [...prev.notes, newNote],
@@ -107,14 +138,15 @@ useEffect(() => {
       }
       return;
     }
-
-    // Normal update for existing note
+  
+    // ✅ ADD THIS BACK - Normal update for existing note (optimistic update)
     setState((prev) => ({
       ...prev,
       notes: prev.notes.map((n) =>
         n.id === id ? { ...n, content, updated_at: new Date().toISOString() } : n,
       ),
     }));
+    
     try {
       const updated = await quickNotesApi.updateNote(id, { content });
       setState((prev) => ({
@@ -191,8 +223,23 @@ useEffect(() => {
     }
   };
 
-  const selectFolder = (folderId: number | 'all'): void => {
+  const selectFolder = (folderId: number | 'all' | `project-${number}`): void => {
     setState((prev) => {
+      // Handle project selection
+      if (typeof folderId === 'string' && folderId.startsWith('project-')) {
+        const projectId = parseInt(folderId.replace('project-', ''));
+        const projectNotes = [...prev.notes]
+          .filter((n) => n.project === projectId)
+          .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+
+        return {
+          ...prev,
+          selectedFolderId: folderId,
+          selectedNoteId: projectNotes[0]?.id ?? null
+        };
+      }
+
+      // Handle regular folder selection (existing logic)
       const notes =
         folderId === 'all'
           ? [...prev.notes].sort(
@@ -201,6 +248,7 @@ useEffect(() => {
           : [...prev.notes]
             .filter((n) => n.folder === folderId)
             .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+
       return { ...prev, selectedFolderId: folderId, selectedNoteId: notes[0]?.id ?? null };
     });
   };
@@ -290,8 +338,8 @@ function ToolbarBtn({
 
 interface FolderSidebarProps {
   state: QuickNotesState;
-  getNotesForFolder: (folderId: number | 'all') => QuickNote[];
-  onSelectFolder: (folderId: number | 'all') => void;
+  getNotesForFolder: (folderId: number | 'all' | `project-${number}`) => QuickNote[]; // ✅ ADD project type
+  onSelectFolder: (folderId: number | 'all' | `project-${number}`) => void;
   onCreateFolder: (name: string) => void;
   onRenameFolder: (folderId: number, newName: string) => void;
   onDeleteFolder: (folderId: number) => void;
@@ -320,6 +368,33 @@ export function FolderSidebar({
   const renameInputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
+  const [showAllProjects, setShowAllProjects] = useState(false);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [projectsError, setProjectsError] = useState<string | null>(null);
+
+  // ADD THIS EFFECT TO FETCH PROJECTS:
+  useEffect(() => {
+    if (showAllProjects && projects.length === 0) {
+      fetchProjects();
+    }
+  }, [showAllProjects]);
+
+  // ADD THIS FUNCTION TO FETCH PROJECTS:
+  const fetchProjects = async () => {
+    setLoadingProjects(true);
+    setProjectsError(null);
+    try {
+      const response = await projectsApi.list({ disable_pagination: true } as any);
+      const projectsList = response.results || (response as any);
+      setProjects(projectsList);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      setProjectsError('Failed to load projects');
+    } finally {
+      setLoadingProjects(false);
+    }
+  };
 
   useEffect(() => {
     if (triggerFolderCreate) {
@@ -488,6 +563,81 @@ export function FolderSidebar({
           );
         })}
 
+        {/* ADD THIS NEW SECTION - ALL PROJECTS DROPDOWN */}
+        <div className="pt-2 border-t border-border mt-2">
+          <button
+            onClick={() => setShowAllProjects(!showAllProjects)}
+            className={cn(
+              'w-full flex items-center justify-between gap-2.5 px-3 py-2 rounded-lg text-left transition-colors',
+              'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+            )}
+          >
+            <div className="flex items-center gap-2.5">
+              <FolderKanban className="h-4 w-4 shrink-0 text-purple-500" />
+              <span className="flex-1 truncate text-xs font-medium">All Projects</span>
+            </div>
+            {showAllProjects ? (
+              <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+            ) : (
+              <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+            )}
+          </button>
+
+          {/* Projects Dropdown List */}
+          {showAllProjects && (
+            <div className="ml-6 mt-1 space-y-0.5 animate-in fade-in slide-in-from-top-1 duration-150">
+              {loadingProjects ? (
+                <div className="px-3 py-2 text-[10px] text-muted-foreground">
+                  Loading projects...
+                </div>
+              ) : projectsError ? (
+                <div className="px-3 py-2 text-[10px] text-destructive">
+                  {projectsError}
+                </div>
+              ) : projects.length === 0 ? (
+                <div className="px-3 py-2 text-[10px] text-muted-foreground">
+                  No projects found
+                </div>
+              ) : (
+                projects
+                  .filter(p => p.is_active)
+                  .map((project) => (
+                    <button
+                      key={project.id}
+                      onClick={() => {
+                        console.log('Selected project:', project);
+                        // Now this will work without type errors
+                        onSelectFolder(`project-${project.id}` as `project-${number}`);
+                      }}
+                      className={cn(
+                        'w-full text-left px-3 py-2 rounded-lg transition-colors group',
+                        state.selectedFolderId === `project-${project.id}`
+                          ? 'bg-primary/10 text-primary font-semibold'
+                          : 'hover:bg-accent text-foreground'
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium truncate">
+                          {project.name}
+                        </span>
+                        {project.task_type && (
+                          <span className="text-[9px] text-muted-foreground ml-2 shrink-0">
+                            {project.task_type}
+                          </span>
+                        )}
+                      </div>
+                      {project.description && (
+                        <p className="text-[10px] text-muted-foreground truncate mt-0.5">
+                          {project.description}
+                        </p>
+                      )}
+                    </button>
+                  ))
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Delete confirmation modal for folders */}
         <DeleteModal
           isOpen={!!deleteTarget}
@@ -572,7 +722,7 @@ function AttachProjectModal({
                 <p className="text-sm font-semibold text-foreground">{currentProject.name}</p>
               </div>
             )}
-            
+
             <div>
               <p className="text-xs text-muted-foreground font-medium mb-2 uppercase tracking-wider">
                 {currentProject ? 'Change to another project' : 'Select a project'}
@@ -784,7 +934,7 @@ export function NotesList({
                     >
                       Rename
                     </button>
-                    
+
                     {/* Only show Attach to Project if the current user is the creator */}
                     {note.user === state.currentUserId && (
                       <button
@@ -809,7 +959,7 @@ export function NotesList({
             );
           })
         )}
-   </div>
+      </div>
 
       {/* Attach Project Modal */}
       <AttachProjectModal
@@ -994,7 +1144,7 @@ export function NoteEditor({
     const newValue = value.substring(0, selectionStart) + replacement + value.substring(selectionEnd);
 
     setLocalContent(newValue);
-    
+
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       onUpdateNote(isPending ? 'pending' : selectedNote!.id, newValue);
@@ -1014,7 +1164,7 @@ export function NoteEditor({
 
   const confirmDeleteAttachment = async () => {
     if (!selectedNote || !attachmentToDelete) return;
-    
+
     try {
       setIsDeleting(true);
       await quickNotesApi.deleteAttachment(attachmentToDelete.id);
@@ -1033,7 +1183,7 @@ export function NoteEditor({
 
     try {
       setIsUploading(true);
-      const uploadPromises = files.map(file => 
+      const uploadPromises = files.map(file =>
         quickNotesApi.uploadAttachment(selectedNote.id, file)
       );
       const newAttachments = await Promise.all(uploadPromises);
@@ -1129,7 +1279,7 @@ export function NoteEditor({
               </span>
             )}
           </div>
-          </div>
+        </div>
         {selectedNote && !isPending && !isReadOnly && (
           <div className="shrink-0 ml-4 flex items-center">
             <input
@@ -1152,10 +1302,10 @@ export function NoteEditor({
                 <Paperclip className="h-4 w-4" />
               )}
             </button>
-            </div>
+          </div>
         )}
       </div>
-      
+
       {/* Editor Toolbar */}
       {!isReadOnly && (
         <div className="px-8 py-2 border-b border-border flex items-center gap-1 bg-muted/30 shrink-0">
@@ -1202,7 +1352,7 @@ export function NoteEditor({
                     <p className="text-[10px] text-muted-foreground mt-1">
                       {new Date(attachment.created_at).toLocaleDateString()}
                     </p>
-                    </div>
+                  </div>
                 </button>
                 {!isReadOnly && (
                   <button
@@ -1218,7 +1368,7 @@ export function NoteEditor({
           </div>
         )}
 
-{previewAttachment && (
+        {previewAttachment && (
           <DocumentPreview
             url={previewAttachment.file}
             fileName={previewAttachment.filename}
@@ -1247,7 +1397,7 @@ interface QuickNotesContentProps {
   onCreateFolder: (name: string) => void;
   onRenameFolder: (folderId: number, newName: string) => void;
   onDeleteFolder: (folderId: number) => void;
-  onSelectFolder: (folderId: number | 'all') => void;
+  onSelectFolder: (folderId: number | 'all' | `project-${number}`) => void; // UPDATE THIS
   onSelectNote: (noteId: number) => void;
   onUpdateNote: (id: number | 'pending', content: string) => void;
   onRenameNote: (noteId: number, newTitle: string) => void;
@@ -1256,7 +1406,7 @@ interface QuickNotesContentProps {
   onRemoveAttachment: (noteId: number, attachmentId: number) => void;
   onAttachToProject: (noteId: number, projectId: number | null) => void;
   state: QuickNotesState;
-  getNotesForFolder: (folderId: number | 'all') => QuickNote[];
+  getNotesForFolder: (folderId: number | 'all' | `project-${number}`) => QuickNote[]; // UPDATE THIS
   getNoteTitle: (note: QuickNote) => string;
   triggerFolderCreate?: boolean;
   onAcknowledgeFolderCreate?: () => void;
@@ -1569,7 +1719,7 @@ export function QuickNotes() {
         title="Quick Notes (drag to reposition)"
         style={{ left: fabPos.x, top: fabPos.y }}
         className={cn(
-         'fixed z-[60] flex h-12 w-12 items-center justify-center rounded-full',
+          'fixed z-[60] flex h-12 w-12 items-center justify-center rounded-full',
           'bg-primary text-primary-foreground shadow-lg',
           'hover:opacity-90 transition-opacity duration-200',
           'focus:outline-none cursor-grab active:cursor-grabbing select-none',
@@ -1580,7 +1730,7 @@ export function QuickNotes() {
 
       {/* Mini window */}
       {isMiniOpen && (
-          <div style={{ position: 'fixed', left: miniLeft, top: miniTop, zIndex: 60 }}>
+        <div style={{ position: 'fixed', left: miniLeft, top: miniTop, zIndex: 60 }}>
           <MiniWindow
             selectedNote={selectedNote}
             isReadOnly={selectedNote ? (state.folders.find(f => f.id === selectedNote.folder)?.name === 'Team Member Updates' || getNoteTitle(selectedNote) === 'Team Member Updates') : false}

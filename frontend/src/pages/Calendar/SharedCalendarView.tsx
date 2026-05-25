@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Calendar, Clock, Video, Loader2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import axios from 'axios';
+import { API_URL } from '@/services/api';
 
 interface PublicEvent {
     id: number;
@@ -31,7 +32,7 @@ export const SharedCalendarView: React.FC = () => {
             try {
                 // IMPORTANT: No auth header for public endpoint
                 const response = await axios.get(
-                    `http://192.168.1.164:8000/api/v1/daily-updates/shared-calendar/${token}/`
+                    `${API_URL}/daily-updates/shared-calendar/${token}/`
                 );
                 
                 setEvents(response.data.events || []);
