@@ -80,7 +80,7 @@ export function useProjectDetails() {
 
     // ─── Date Filter State 
     const [dateField, setDateField] = useState<'end_date' | 'start_date' | 'created_at'>('end_date');
-    const [personField, setPersonField] = useState<'assigned_to' | 'created_by' | 'updated_by'>('updated_by');
+    const [personField, setPersonField] = useState<'assigned_to' | 'created_by' | 'updated_by'>('assigned_to');
     const [showPersonFieldDropdown, setShowPersonFieldDropdown] = useState(false);
     const personTriggerRef = useRef<HTMLButtonElement>(null);
     const [showDateFieldDropdown, setShowDateFieldDropdown] = useState(false);
@@ -309,6 +309,31 @@ export function useProjectDetails() {
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
     }, [showDateFieldDropdown]);
+
+    // Add this in your hook where you manage showPersonFieldDropdown state
+useEffect(() => {
+  if (!showPersonFieldDropdown) return;
+
+  const handleClickOutside = (event: MouseEvent) => {
+    // Don't close if clicking on the trigger button
+    if (personTriggerRef.current?.contains(event.target as Node)) {
+      return;
+    }
+    
+    // Close dropdown
+    setShowPersonFieldDropdown(false);
+  };
+
+  // Add listener after a small delay to avoid immediate closing
+  const timeoutId = setTimeout(() => {
+    document.addEventListener('mousedown', handleClickOutside);
+  }, 0);
+
+  return () => {
+    clearTimeout(timeoutId);
+    document.removeEventListener('mousedown', handleClickOutside);
+  };
+}, [showPersonFieldDropdown]);
 
     // Real-time task sync via WebSocket notification 
     useEffect(() => {

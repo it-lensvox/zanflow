@@ -14,7 +14,6 @@ import type {
 export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.164:8000/api/v1';
 const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://192.168.1.164:8000/ws/gateway';
 const WS_AI_BOT_URL = (import.meta as any).env.VITE_WS_AI_BOT_URL || 'ws://192.168.1.164:8000/ws/ai-bot/';
-
 // export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://zanflow.lensvox.com/api/v1';
 export const api = axios.create({
   baseURL: API_URL,
@@ -25,6 +24,72 @@ export const api = axios.create({
 
 // Token management
 const TOKEN_KEY = 'zanflow_tokens';
+
+api.interceptors.request.use(
+  (config: InternalAxiosRequestConfig) => {
+    // Add Authorization header
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    // ✅ Add X-Workspace-ID header
+    const workspaceId = localStorage.getItem('active_workspace_id');
+    if (workspaceId) {
+      config.headers['X-Workspace-ID'] = workspaceId;
+    }
+
+    console.log('🌐 API Request:', {
+      method: config.method?.toUpperCase(),
+      url: config.url,
+      workspaceId: config.headers['X-Workspace-ID'],
+      hasAuth: !!token,
+    });
+
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// ✅ Response interceptor for token refresh
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+
+    // If 401 and not already retrying, try to refresh token
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      try {
+        const refreshToken = localStorage.getItem('refresh_token');
+        if (!refreshToken) {
+          throw new Error('No refresh token');
+        }
+
+        const response = await axios.post(`${API_URL}/auth/token/refresh/`, {
+          refresh: refreshToken
+        });
+
+        const { access } = response.data;
+        localStorage.setItem('access_token', access);
+
+        // Retry original request with new token
+        originalRequest.headers['Authorization'] = `Bearer ${access}`;
+        return api(originalRequest);
+      } catch (refreshError) {
+        // Refresh failed, redirect to login
+        localStorage.clear();
+        window.location.href = '/login';
+        return Promise.reject(refreshError);
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
 
 export const getTokens = (): AuthTokens | null => {
   const tokens = localStorage.getItem(TOKEN_KEY);
@@ -42,71 +107,6 @@ export const clearTokens = (): void => {
 // Token refresh mutex
 let isRefreshing = false;
 let refreshPromise: Promise<AuthTokens> | null = null;
-
-// Request interceptor to add auth token
-api.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    const tokens = getTokens();
-    if (tokens?.access) {
-      config.headers.Authorization = `Bearer ${tokens.access}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-// Response interceptor for token refresh with mutex to prevent race conditions
-api.interceptors.response.use(
-  (response) => response,
-  async (error: AxiosError) => {
-    const originalRequest = error.config as InternalAxiosRequestConfig & {
-      _retry?: boolean;
-    };
-
-    // Handle both 401 (Unauthorized) and 403 (Forbidden) for token refresh
-    if ((error.response?.status === 401 || error.response?.status === 403) && !originalRequest._retry) {
-      originalRequest._retry = true;
-
-      const tokens = getTokens();
-      if (tokens?.refresh) {
-        if (!isRefreshing) {
-          isRefreshing = true;
-          refreshPromise = axios
-            .post<AuthTokens>(`${API_URL}/auth/refresh/`, {
-              refresh: tokens.refresh,
-            })
-            .then((res) => {
-              const newTokens = res.data;
-              setTokens(newTokens);
-              api.defaults.headers.common['Authorization'] = `Bearer ${newTokens.access}`;
-              return newTokens;
-            })
-            .catch((refreshError) => {
-              clearTokens();
-              window.dispatchEvent(new CustomEvent('auth:token-expired'));
-              throw refreshError;
-            })
-            .finally(() => {
-              isRefreshing = false;
-              refreshPromise = null;
-            });
-        }
-
-        try {
-          const newTokens = await refreshPromise!;
-          originalRequest.headers.Authorization = `Bearer ${newTokens.access}`;
-          return api(originalRequest);
-        } catch {
-          return Promise.reject(error);
-        }
-      } else {
-        clearTokens();
-        window.dispatchEvent(new CustomEvent('auth:token-expired'));
-      }
-    }
-    return Promise.reject(error);
-  }
-);
 
 // Auth API
 export const authApi = {
@@ -355,41 +355,41 @@ export const documentsApi = {
     const response = await api.get('/documents/folders/', { params });
     return response.data;
   },
- 
+
   // Create a new folder under a project
   createFolder: async (data: { project: number; name: string; parent?: string | null }) => {
     const response = await api.post('/documents/folders/', data);
     return response.data;
   },
- 
+
   // Rename a folder
   renameFolder: async (folderId: string, name: string) => {
     const response = await api.patch(`/documents/folders/${folderId}/`, { name });
     return response.data;
   },
- 
+
   // Delete a folder
   deleteFolder: async (folderId: string) => {
     await api.delete(`/documents/folders/${folderId}/`);
   },
 
-  getActivity: (documentId: string) => 
+  getActivity: (documentId: string) =>
     api.get(`/documents/${documentId}/activity/`),
-  
-  getComments: (documentId: string) => 
+
+  getComments: (documentId: string) =>
     api.get(`/documents/${documentId}/comments/`),
-  
+
   addComment: async (documentId: string, content: string, mentions: number[] = []) => {
     const response = await api.post(  // ✅ Correct - matches your other methods
       `/documents/${documentId}/comments/`,
-      { 
+      {
         content,
         mentions
       }
     );
     return response.data;
   },
-  
+
   deleteComment: (documentId: string, commentId: number) =>
     api.delete(`/documents/${documentId}/comments/${commentId}/`),
 
@@ -850,7 +850,7 @@ export const chatApi = {
 export class GatewayWebSocketService {
   private ws: WebSocket | null = null;
   private messageCallbacks: Set<(msg: GatewayIncomingMessage) => void> = new Set();
- private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+  private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private userId: number | null = null;
@@ -1553,7 +1553,7 @@ export const eventApi = {
     const response = await api.get(`/daily-updates/events/${eventId}/export/`, {
       responseType: 'blob',
     });
-    
+
     // Create download link
     const blob = new Blob([response.data], { type: 'text/calendar' });
     const url = window.URL.createObjectURL(blob);
@@ -1570,7 +1570,7 @@ export const eventApi = {
     const response = await api.get('/daily-updates/events/export-all/', {
       responseType: 'blob',
     });
-    
+
     // Create download link
     const blob = new Blob([response.data], { type: 'text/calendar' });
     const url = window.URL.createObjectURL(blob);
@@ -1644,39 +1644,39 @@ export const eventApi = {
 export const dyuksaAI = {
   // Send a natural language scheduling request to the AI
   chat: async (message: string): Promise<{
-      action?: 'create_event' | 'show_slots' | 'clarify';
-      data?: {
-          event_type?: string;
-          title?: string;
-          attendee_ids?: number[];
-          attendee_names?: string[];
-          target_date?: string;
-          duration_minutes?: number;
-          available_slots?: string[];
-      };
-      reply: string;
+    action?: 'create_event' | 'show_slots' | 'clarify';
+    data?: {
+      event_type?: string;
+      title?: string;
+      attendee_ids?: number[];
+      attendee_names?: string[];
+      target_date?: string;
+      duration_minutes?: number;
+      available_slots?: string[];
+    };
+    reply: string;
   }> => {
-      const { data } = await api.post('/task-ai/chat/agent/', { message });
-      return data;
+    const { data } = await api.post('/task-ai/chat/agent/', { message });
+    return data;
   },
 };
 
 // Add to your api.ts exports
 export const calendarShareApi = {
   list: async () => {
-      const response = await api.get('/daily-updates/calendar-shares/');
-      return Array.isArray(response.data) ? response.data : (response.data.results || []);
+    const response = await api.get('/daily-updates/calendar-shares/');
+    return Array.isArray(response.data) ? response.data : (response.data.results || []);
   },
   create: async (data: { shared_with: number; permission: 'view' | 'edit' | 'full' }) => {
-      const response = await api.post('/daily-updates/calendar-shares/', data);
-      return response.data;
+    const response = await api.post('/daily-updates/calendar-shares/', data);
+    return response.data;
   },
   update: async (shareId: number, data: { permission: 'view' | 'edit' | 'full' }) => {
-      const response = await api.patch(`/daily-updates/calendar-shares/${shareId}/`, data);
-      return response.data;
+    const response = await api.patch(`/daily-updates/calendar-shares/${shareId}/`, data);
+    return response.data;
   },
   delete: async (shareId: number) => {
-      await api.delete(`/daily-updates/calendar-shares/${shareId}/`);
+    await api.delete(`/daily-updates/calendar-shares/${shareId}/`);
   },
 };
 
@@ -1685,28 +1685,255 @@ export const calendarShareApi = {
 // ═══════════════════════════════════════════════════════════════════════
 
 export const calendarLinkApi = {
-    list: async () => {
-        const response = await api.get('/daily-updates/calendar-links/');
-        return Array.isArray(response.data) ? response.data : (response.data.results || []);
-    },
-    create: async (expiresAt?: string) => {
-        const payload = expiresAt ? { expires_at: expiresAt } : {};
-        const response = await api.post('/daily-updates/calendar-links/', payload);
-        return response.data;
-    },
-    delete: async (linkId: number) => {
-        await api.delete(`/daily-updates/calendar-links/${linkId}/`);
-    },
-    // Public endpoint - no auth required
-    getPublicCalendar: async (token: string) => {
-        const response = await api.get(`/daily-updates/shared-calendar/${token}/`, {
-            headers: {
-                // Remove auth header for public endpoint
-                Authorization: undefined
-            }
-        });
-        return response.data;
-    },
+  list: async () => {
+    const response = await api.get('/daily-updates/calendar-links/');
+    return Array.isArray(response.data) ? response.data : (response.data.results || []);
+  },
+  create: async (expiresAt?: string) => {
+    const payload = expiresAt ? { expires_at: expiresAt } : {};
+    const response = await api.post('/daily-updates/calendar-links/', payload);
+    return response.data;
+  },
+  delete: async (linkId: number) => {
+    await api.delete(`/daily-updates/calendar-links/${linkId}/`);
+  },
+  // Public endpoint - no auth required
+  getPublicCalendar: async (token: string) => {
+    const response = await api.get(`/daily-updates/shared-calendar/${token}/`, {
+      headers: {
+        // Remove auth header for public endpoint
+        Authorization: undefined
+      }
+    });
+    return response.data;
+  },
+};
+
+interface Workspace {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string;
+  is_default: boolean;
+  is_active: boolean;
+  member_count: number;
+  role: 'admin' | 'manager' | 'member';
+  created_by?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface WorkspacesResponse {
+  active_workspace_id: number;
+  workspaces: Workspace[];
+}
+
+export const workspaceApi = {
+  getActiveWorkspaceId: (): number | null => {
+    const id = localStorage.getItem('active_workspace_id');
+    return id ? parseInt(id) : null;
+  },
+
+  async deleteWorkspace(workspaceId: number) {
+    const token = localStorage.getItem('access_token');
+
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await fetch(`${API_URL}/organizations/workspaces/${workspaceId}/delete/`, {
+      method: 'DELETE',
+      credentials: 'include',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ confirm: 'DELETE' })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      
+      if (response.status === 403) {
+        throw new Error('Only the person who created this workspace can delete it.');
+      }
+      
+      if (response.status === 400) {
+        throw new Error(errorData.message || 'Cannot delete workspace');
+      }
+
+      throw new Error('Failed to delete workspace');
+    }
+
+    return response.json();
+  },
+  // 1️⃣ LIST MY WORKSPACES
+  async getWorkspaces() {
+    const token = localStorage.getItem('access_token');
+
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await fetch(`${API_URL}/organizations/workspaces/`, {
+      credentials: 'include',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch workspaces');
+    }
+
+    const data = await response.json();
+    console.log('✅ Raw backend response:', data);
+
+    // ✅ Handle both response formats (array or object)
+    let normalizedData;
+
+    if (Array.isArray(data)) {
+      console.log('⚠️ Backend returned array, normalizing...');
+
+      const storedId = localStorage.getItem('active_workspace_id');
+      const storedIdNum = storedId ? parseInt(storedId) : null;
+
+      // ✅ Validate stored ID exists in workspace list
+      const storedExists = storedIdNum && data.some(w => w.id === storedIdNum);
+
+      // ✅ Choose active workspace
+      let activeId;
+      if (storedExists) {
+        activeId = storedIdNum;
+      } else {
+        // Use default workspace or first workspace
+        const defaultWorkspace = data.find(w => w.is_default);
+        activeId = defaultWorkspace?.id || data[0]?.id;
+
+        if (storedIdNum && !storedExists) {
+          console.log(`⚠️ Stored workspace ${storedIdNum} not found, using ${activeId}`);
+        }
+      }
+
+      // ✅ Update localStorage if needed
+      if (activeId && activeId !== storedIdNum) {
+        localStorage.setItem('active_workspace_id', String(activeId));
+        console.log(`🔄 Updated workspace ID from ${storedIdNum} to ${activeId}`);
+      }
+
+      normalizedData = {
+        active_workspace_id: activeId,
+        workspaces: data
+      };
+    } else {
+      // Backend returned proper object format
+      normalizedData = data;
+
+      // Still validate and update if needed
+      const storedId = localStorage.getItem('active_workspace_id');
+      if (data.active_workspace_id && storedId !== String(data.active_workspace_id)) {
+        localStorage.setItem('active_workspace_id', String(data.active_workspace_id));
+        console.log(`🔄 Updated workspace ID to ${data.active_workspace_id}`);
+      }
+    }
+
+    console.log('✅ Normalized data:', normalizedData);
+
+    return normalizedData;
+  },
+
+  // 2️⃣ CREATE NEW WORKSPACE
+  async createWorkspace(name: string, description?: string) {
+    const token = localStorage.getItem('access_token');
+
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await fetch(`${API_URL}/organizations/workspaces/`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ name, description })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+
+      if (response.status === 403) {
+        throw new Error('Only admins and managers can create workspaces');
+      }
+
+      throw new Error(errorData.detail || errorData.name?.[0] || 'Failed to create workspace');
+    }
+
+    return response.json();
+  },
+
+  // 3️⃣ SWITCH WORKSPACE
+async switchWorkspace(workspaceId: number) {
+  const token = localStorage.getItem('access_token');
+
+  if (!token) {
+    throw new Error('Not authenticated');
+  }
+
+  const response = await fetch(`${API_URL}/organizations/workspaces/${workspaceId}/switch/`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to switch workspace');
+  }
+
+  const data = await response.json();
+
+  // ✅ 1. Update localStorage
+  localStorage.setItem('active_workspace_id', String(workspaceId));
+  
+  // ✅ 2. Update axios default header immediately
+  api.defaults.headers.common['X-Workspace-ID'] = String(workspaceId);
+  
+  console.log(`✅ Workspace switched to ${workspaceId}, axios header updated`);
+
+  return data;
+},
+
+  // 4️⃣ GET WORKSPACE DETAILS (✅ YOU REMOVED THIS - KEEP IT!)
+  async getWorkspaceDetails(workspaceId: number) {
+    const token = localStorage.getItem('access_token');
+
+    const response = await fetch(`${API_URL}/organizations/workspaces/${workspaceId}/`, {
+      credentials: 'include',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch workspace details');
+    }
+
+    return response.json();
+  },
+
+  // Helper methods
+  setActiveWorkspace(workspaceId: number): void {
+    localStorage.setItem('active_workspace_id', String(workspaceId));
+  },
+
+  clearActiveWorkspace(): void {
+    localStorage.removeItem('active_workspace_id');
+  }
 };
 
 

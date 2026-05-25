@@ -7,11 +7,13 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
-import { projectsApi, teamsApi, chatApi } from '@/services/api';
+import { projectsApi, teamsApi, chatApi, workspaceApi } from '@/services/api';
 import type { ChatRoomListItem } from '@/types';
 import type { Project } from '@/types';
 import { getProjectTypeColor } from '@/lib/utils';
 import { useNotifications } from '@/hooks/useNotifications';
+import { CreateWorkspaceModal } from '@/components/Modals/CreateWorkspaceModal';
+import { WorkspaceSwitcher } from '@/components/Modals/WorkspaceSwitcher';
 import {
   Dialog,
   DialogContent,
@@ -22,6 +24,21 @@ import {
 } from '@/components/common/diaog';
 
 const ADMIN_ROLES = ['admin', 'manager', 'annotator', 'superuser'];
+
+// ✅ Add Workspace interface
+interface Workspace {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string;
+  is_default: boolean;
+  is_active: boolean;
+  member_count: number;
+  role: 'admin' | 'manager' | 'member';
+  created_by?: number;
+  created_at: string;
+  updated_at: string;
+}
 
 // Favourite Projects within the accordion
 const FavouriteProjectsAccordion = ({ projects }: { projects: Project[] }) => {
@@ -43,7 +60,7 @@ const FavouriteProjectsAccordion = ({ projects }: { projects: Project[] }) => {
           key={project.id}
           to={`/projects/${project.id}`}
           className={({ isActive }) =>
-            cn('flex items-center gap-3 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors group relative pr-8', // Added group, relative, and padding-right
+            cn('flex items-center gap-3 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors group relative pr-8',
               isActive ? 'bg-primary/10 text-primary font-semibold' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground')
           }
         >
@@ -52,7 +69,6 @@ const FavouriteProjectsAccordion = ({ projects }: { projects: Project[] }) => {
           </div>
           <span className="truncate">{project.name}</span>
 
-          {/* Create Task */}
           <div
             role="button"
             className="absolute right-2 p-0.5 rounded-md hover:bg-background/50 hover:text-primary text-muted-foreground opacity-0 group-hover:opacity-100 transition-all"
@@ -71,7 +87,6 @@ const FavouriteProjectsAccordion = ({ projects }: { projects: Project[] }) => {
   );
 };
 
-
 export function Sidebar() {
   const { user, logout } = useAuth();
   const location = useLocation();
@@ -79,26 +94,23 @@ export function Sidebar() {
   const { unreadCount } = useNotifications();
   const [chatUnreadCount, setChatUnreadCount] = useState<number>(0);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] = useState(false);
 
   // Collapsible Logic
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [isHovered, setIsHovered] = useState(false);
   const isExpanded = !isCollapsed || isHovered;
 
-  // Ref to track pending single-click timer
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleLogoClick = useCallback(() => {
     if (clickTimerRef.current) {
-      // Second click arrived before timer fired → double-click → toggle sidebar
       clearTimeout(clickTimerRef.current);
       clickTimerRef.current = null;
       setIsCollapsed(prev => !prev);
     } else {
-      // First click → wait to see if a second click arrives
       clickTimerRef.current = setTimeout(() => {
         clickTimerRef.current = null;
-        // Single click → navigate to dashboard
         navigate('/dashboard');
       }, 250);
     }
@@ -121,21 +133,70 @@ export function Sidebar() {
   const isAdminOpen = activeAccordion === 'admin';
   const isChatsOpen = activeAccordion === 'chats';
 
-  // Teams sub-accordion
   const [isTeamsOpen, setIsTeamsOpen] = useState(location.pathname.startsWith('/admin/teams'));
   const [activeSection, setActiveSection] = useState<'chats' | 'projects' | 'teams' | 'unread' | null>(null);
   const toggleSection = (section: 'chats' | 'projects' | 'teams' | 'unread') =>
     setActiveSection(prev => (prev === section ? null : section));
 
+  // ✅ Fetch workspaces
+  const { data: workspacesData } = useQuery({
+    queryKey: ['workspaces'],
+    queryFn: workspaceApi.getWorkspaces,
+  });
+
+  // ✅ Get active workspace with fallback
+  const storedWorkspaceId = workspaceApi.getActiveWorkspaceId();
+
+  const activeWorkspace = useMemo(() => {
+    if (!workspacesData?.workspaces) return undefined;
+
+    // Try 1: Find by active_workspace_id from response
+    let workspace = workspacesData.workspaces.find(
+      (w: Workspace) => w.id === workspacesData.active_workspace_id
+    );
+
+    // Try 2: Find by localStorage ID
+    if (!workspace && storedWorkspaceId) {
+      workspace = workspacesData.workspaces.find(
+        (w: Workspace) => w.id === storedWorkspaceId
+      );
+    }
+
+    // Try 3: Find default workspace
+    if (!workspace) {
+      workspace = workspacesData.workspaces.find((w: Workspace) => w.is_default);
+    }
+
+    // Try 4: Use first workspace
+    if (!workspace) {
+      workspace = workspacesData.workspaces[0];
+    }
+
+    // ✅ Update localStorage if we found a different workspace
+    if (workspace && workspace.id !== storedWorkspaceId) {
+      console.log(`🔄 Updating stored workspace from ${storedWorkspaceId} to ${workspace.id}`);
+      localStorage.setItem('active_workspace_id', String(workspace.id));
+    }
+
+    return workspace;
+  }, [workspacesData, storedWorkspaceId]);
+
+  // ✅ Debug log
+  console.log('🔍 Active Workspace Debug:', {
+    workspacesData,
+    storedWorkspaceId,
+    activeWorkspace,
+    allWorkspaces: workspacesData?.workspaces,
+  });
+
   const { data: allRoomsData } = useQuery<ChatRoomListItem[]>({
     queryKey: ['sidebar-all-chat-rooms'],
     queryFn: () => chatApi.getAllRooms(),
-    staleTime: 0,             
-    refetchOnMount: true, 
+    staleTime: 0,
+    refetchOnMount: true,
     enabled: isExpanded,
   });
 
-  // Derive typed sub-lists from the single response
   const sidebarPrivateRooms = useMemo<ChatRoomListItem[]>(() =>
     (allRoomsData || []).filter(r => r.room_type === 'private'),
     [allRoomsData]
@@ -152,8 +213,10 @@ export function Sidebar() {
     (allRoomsData || []).filter(r => r.unread_count > 0 && r.room_type !== 'thread'),
     [allRoomsData]
   );
+
   const showAdmin = user?.role && ADMIN_ROLES.includes(user.role);
   const isSuperuser = !!user?.is_superuser;
+
   const { data: projectsData } = useQuery({
     queryKey: ['projects'],
     queryFn: () => projectsApi.list(),
@@ -178,7 +241,6 @@ export function Sidebar() {
     return [];
   }, [teamsData]);
 
-  // Fetch initial chat unread count and subscribe to real-time updates
   useEffect(() => {
     const fetchInitialUnread = async () => {
       try {
@@ -186,12 +248,10 @@ export function Sidebar() {
         const data = await chatApi.getUnreadCount();
         setChatUnreadCount(data.total_unread);
 
-        // Connect notification socket if not already connected
         if (!notificationSocket.isConnected()) {
           notificationSocket.connect();
         }
 
-        // Subscribe to chat unread updates
         const unsubscribe = notificationSocket.onChatUnreadUpdate((updateData) => {
           const activeRoomId = (window as any).__activeTeamChatRoomId as string | undefined;
           const roomUnread = updateData.room_unread || 0;
@@ -212,7 +272,6 @@ export function Sidebar() {
     fetchInitialUnread();
   }, []);
 
-
   return (
     <div
       className={cn(
@@ -222,7 +281,7 @@ export function Sidebar() {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* "D" Toggle Button */}
+      {/* Logo */}
       <div className="flex h-16 items-center px-4 border-b">
         <button
           onClick={handleLogoClick}
@@ -244,6 +303,8 @@ export function Sidebar() {
           </span>
         )}
       </div>
+
+      
 
       <nav className="flex-1 space-y-2 px-3 py-4 overflow-y-auto overflow-x-hidden">
         {/* Dashboard */}
@@ -448,290 +509,6 @@ export function Sidebar() {
             )}
           </div>
         )}
-        {/* ── Team Chat Accordion */}
-        <div className="space-y-1">
-          {/* Header row */}
-          <div
-            className={cn(
-              'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors cursor-pointer',
-              location.pathname.startsWith('/team-chat')
-                ? 'bg-primary/10 text-primary'
-                : 'text-muted-foreground hover:bg-accent',
-              !isExpanded && 'justify-center px-0'
-            )}
-            onClick={() => {
-              navigate('/team-chat');
-              if (isExpanded) toggleAccordion('chats');
-            }}
-          >
-            <div className="relative shrink-0">
-              <MessageSquare className="h-5 w-5" />
-              {chatUnreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                  {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
-                </span>
-              )}
-            </div>
-            {isExpanded && (
-              <>
-                <span className="flex-1">Chats</span>
-                <div
-                  className="p-0.5 hover:bg-primary/20 rounded"
-                  onClick={(e) => { e.stopPropagation(); toggleAccordion('chats'); }}
-                >
-                  {isChatsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Sub-sections */}
-          {isExpanded && isChatsOpen && (
-            <div className="ml-4 border-l pl-2 space-y-1 animate-in slide-in-from-left-2">
-
-              {/* ── 1. Chats */}
-              <div className="space-y-0.5">
-                <div
-                  className={cn(
-                    'flex items-center justify-between rounded-lg px-3 py-1.5 text-xs font-medium cursor-pointer hover:bg-accent',
-                    location.pathname === '/team-chat' || location.pathname === '/team-chat/chat'
-                      ? 'text-primary bg-primary/5'
-                      : 'text-muted-foreground'
-                  )}
-                  onClick={() => { navigate('/team-chat/chat'); toggleSection('chats'); }}
-                >
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="h-3.5 w-3.5" />
-                    <span>Chats</span>
-                  </div>
-                  <div className="p-0.5 hover:bg-primary/20 rounded">
-                    {activeSection === 'chats' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                  </div>
-                </div>
-
-                {activeSection === 'chats' && (
-                  <div className="ml-2 space-y-0.5">
-                    {sidebarPrivateRooms.filter(r => r.is_favourite).length === 0 ? (
-                      <p className="px-3 py-2 text-[11px] text-muted-foreground italic">No favourite chats yet</p>
-                    ) : (
-                      sidebarPrivateRooms
-                        .filter(r => r.is_favourite)
-                        .map(room => {
-                          const displayName = room.name.startsWith('Chat: ')
-                            ? room.name.replace('Chat: ', '').split(' & ').find(n => n !== user?.username) ?? room.name
-                            : room.name;
-                          const initials = displayName.charAt(0).toUpperCase();
-                          return (
-                            <div
-                              key={room.id}
-                              onClick={() => navigate(`/team-chat/chat/${room.id}`)}
-                              className="flex items-center gap-2 rounded-lg px-3 py-1 text-[11px] text-muted-foreground hover:text-primary cursor-pointer group"
-                            >
-                              <div className="relative shrink-0">
-                                <div className="h-5 w-5 rounded-full bg-blue-100 flex items-center justify-center text-[10px] font-semibold text-blue-700">
-                                  {initials}
-                                </div>
-                              </div>
-                              <span className="truncate flex-1">{displayName}</span>
-                              {room.unread_count > 0 && (
-                                <span className="h-4 min-w-[16px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center shrink-0">
-                                  {room.unread_count > 9 ? '9+' : room.unread_count}
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* ── 2. Projects ── */}
-              <div className="space-y-0.5">
-                <div
-                  className={cn(
-                    'flex items-center justify-between rounded-lg px-3 py-1.5 text-xs font-medium cursor-pointer hover:bg-accent',
-                    location.pathname === '/team-chat/project'
-                      ? 'text-primary bg-primary/5'
-                      : 'text-muted-foreground'
-                  )}
-                  onClick={() => { navigate('/team-chat/project'); toggleSection('projects'); }}
-                >
-                  <div className="flex items-center gap-2">
-                    <FolderKanban className="h-3.5 w-3.5" />
-                    <span>Projects</span>
-                  </div>
-                  <div className="p-0.5 hover:bg-primary/20 rounded">
-                    {activeSection === 'projects' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                  </div>
-                </div>
-
-                {activeSection === 'projects' && (
-                  <div className="ml-2 space-y-0.5">
-                    {sidebarProjectRooms.filter(r => r.is_favourite).length === 0 ? (
-                      <p className="px-3 py-2 text-[11px] text-muted-foreground italic">No favourite project chats yet</p>
-                    ) : (
-                      sidebarProjectRooms
-                        .filter(r => r.is_favourite)
-                        .map(room => (
-                          <div
-                            key={room.id}
-                            onClick={() => {
-                              if (room.project) {
-                                navigate(`/team-chat/${room.project}/${room.id}`);
-                              } else {
-                                navigate('/team-chat/project');
-                              }
-                            }}
-                            className="flex items-center gap-2 rounded-lg px-3 py-1 text-[11px] text-muted-foreground hover:text-primary cursor-pointer"
-                          >
-                            <div className="relative shrink-0">
-                              <div className="h-5 w-5 rounded bg-purple-100 flex items-center justify-center text-[10px] font-semibold text-purple-700">
-                                {room.name.charAt(0).toUpperCase()}
-                              </div>
-                            </div>
-                            <span className="truncate flex-1">{room.name}</span>
-                            {room.unread_count > 0 && (
-                              <span className="h-4 min-w-[16px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center shrink-0">
-                                {room.unread_count > 9 ? '9+' : room.unread_count}
-                              </span>
-                            )}
-                          </div>
-                        ))
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* ── 3. Teams ── */}
-              <div className="space-y-0.5">
-                <div
-                  className={cn(
-                    'flex items-center justify-between rounded-lg px-3 py-1.5 text-xs font-medium cursor-pointer hover:bg-accent',
-                    location.pathname === '/team-chat/teams'
-                      ? 'text-primary bg-primary/5'
-                      : 'text-muted-foreground'
-                  )}
-                  onClick={() => { navigate('/team-chat/teams'); toggleSection('teams'); }}
-                >
-                  <div className="flex items-center gap-2">
-                    <Users className="h-3.5 w-3.5" />
-                    <span>Teams</span>
-                  </div>
-                  <div className="p-0.5 hover:bg-primary/20 rounded">
-                    {activeSection === 'teams' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                  </div>
-                </div>
-
-                {activeSection === 'teams' && (
-                  <div className="ml-2 space-y-0.5">
-                    {sidebarTeamRooms.filter(r => r.is_favourite).length === 0 ? (
-                      <p className="px-3 py-2 text-[11px] text-muted-foreground italic">No favourite team chats yet</p>
-                    ) : (
-                      sidebarTeamRooms
-                        .filter(r => r.is_favourite)
-                        .map(room => (
-                          <div
-                            key={room.id}
-                            onClick={() => navigate(`/team-chat/teams/${room.id}`)}
-                            className="flex items-center gap-2 rounded-lg px-3 py-1 text-[11px] text-muted-foreground hover:text-primary cursor-pointer"
-                          >
-                            <div className="relative shrink-0">
-                              <div className="h-5 w-5 rounded bg-green-100 flex items-center justify-center text-[10px] font-semibold text-green-700">
-                                {room.name.charAt(0).toUpperCase()}
-                              </div>
-                            </div>
-                            <span className="truncate flex-1">{room.name}</span>
-                            {room.unread_count > 0 && (
-                              <span className="h-4 min-w-[16px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center shrink-0">
-                                {room.unread_count > 9 ? '9+' : room.unread_count}
-                              </span>
-                            )}
-                          </div>
-                        ))
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* ── 4. Unread ── */}
-              <div className="space-y-0.5">
-                <div
-                  className={cn(
-                    'flex items-center justify-between rounded-lg px-3 py-1.5 text-xs font-medium cursor-pointer hover:bg-accent',
-                    location.pathname === '/team-chat/unread'
-                      ? 'text-primary bg-primary/5'
-                      : 'text-muted-foreground'
-                  )}
-                  onClick={() => { navigate('/team-chat/unread'); toggleSection('unread'); }}
-                >
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="h-3.5 w-3.5" />
-                    <span>Unread</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {chatUnreadCount > 0 && (
-                      <span className="h-4 min-w-[16px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
-                        {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
-                      </span>
-                    )}
-                    <div className="p-0.5 hover:bg-primary/20 rounded">
-                      {activeSection === 'unread' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                    </div>
-                  </div>
-                </div>
-
-                {activeSection === 'unread' && (
-                  <div className="ml-2 space-y-0.5">
-                    {sidebarUnreadRooms.length === 0 ? (
-                      <p className="px-3 py-2 text-[11px] text-muted-foreground italic">No unread messages</p>
-                    ) : (
-                      sidebarUnreadRooms.map(room => {
-                        const avatarColor =
-                          room.room_type === 'project' ? 'bg-purple-100 text-purple-700 rounded' :
-                            room.room_type === 'team' ? 'bg-green-100 text-green-700 rounded' :
-                              'bg-blue-100 text-blue-700 rounded-full';
-
-                        const handleUnreadClick = () => {
-                          if (room.room_type === 'project' && room.project) {
-                            navigate(`/team-chat/${room.project}/${room.id}`);
-                          } else if (room.room_type === 'team') {
-                            navigate(`/team-chat/teams/${room.id}`);
-                          } else {
-                            navigate(`/team-chat/chat/${room.id}`);
-                          }
-                        };
-
-                        return (
-                          <div
-                            key={room.id}
-                            onClick={handleUnreadClick}
-                            className="flex items-center gap-2 rounded-lg px-3 py-1 text-[11px] text-muted-foreground hover:text-primary cursor-pointer"
-                          >
-                            <div className={cn('h-5 w-5 flex items-center justify-center text-[10px] font-semibold shrink-0', avatarColor)}>
-                              {room.name.charAt(0).toUpperCase()}
-                            </div>
-                            <span className="truncate flex-1">
-                              {room.room_type === 'private'
-                                ? room.name.startsWith('Chat: ')
-                                  ? room.name.replace('Chat: ', '').split(' & ').find(n => n !== user?.username) ?? room.name
-                                  : room.name
-                                : room.name}
-                            </span>
-                            <span className="h-4 min-w-[16px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center shrink-0">
-                              {room.unread_count > 9 ? '9+' : room.unread_count}
-                            </span>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                )}
-              </div>
-
-            </div>
-          )}
-        </div>
       </nav>
 
       {/* Profile & Footer */}
@@ -756,22 +533,49 @@ export function Sidebar() {
           )}
         </div>
 
+        {/* ✅ Workspace Section - Only visible when expanded */}
+{isExpanded && (
+  <div className="border-b px-4 py-3">
+    <WorkspaceSwitcher onCreateWorkspace={() => setShowCreateWorkspaceModal(true)} />
+  </div>
+)}
+
+        {/* ✅ New Workspace Button - Only for admin/manager */}
         {isExpanded && (
-          <div className="mt-4 flex gap-2 animate-in fade-in slide-in-from-bottom-2">
-            <button onClick={() => navigate('/settings')} className="flex flex-1 items-center justify-center gap-2 rounded-lg border p-2 text-muted-foreground hover:bg-accent">
-              <Settings className="h-4 w-4" /> Settings
-            </button>
-            <button
-              onClick={() => setShowLogoutDialog(true)}
-              className="flex flex-1 items-center justify-center gap-2 rounded-lg border p-2 text-muted-foreground hover:bg-accent text-destructive"
-            >
-              <LogOut className="h-4 w-4" /> Logout
-            </button>
+          <div className="mt-4 space-y-2 animate-in fade-in slide-in-from-bottom-2">
+            {console.log('🔍 Button Debug:', {
+              activeWorkspace,
+              role: activeWorkspace?.role,
+              includes: activeWorkspace && ['admin', 'manager'].includes(activeWorkspace.role),
+            })}
+            {activeWorkspace && ['admin', 'manager'].includes(activeWorkspace.role) && (
+              <button
+                onClick={() => setShowCreateWorkspaceModal(true)}
+                className="flex w-full items-center justify-center gap-2 rounded-lg border p-2 text-white bg-black hover:bg-gray-600 transition-colors"
+              >
+                <Plus className="h-4 w-4" /> New Workspace
+              </button>
+            )}
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => navigate('/settings')}
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg border p-2 text-muted-foreground hover:bg-accent"
+              >
+                <Settings className="h-4 w-4" /> Settings
+              </button>
+              <button
+                onClick={() => setShowLogoutDialog(true)}
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg border p-2 text-muted-foreground hover:bg-accent text-destructive"
+              >
+                <LogOut className="h-4 w-4" /> Logout
+              </button>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Logout Confirmation Dialog */}
+      {/* Logout Dialog */}
       <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -799,6 +603,12 @@ export function Sidebar() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ✅ Create Workspace Modal */}
+      <CreateWorkspaceModal
+        isOpen={showCreateWorkspaceModal}
+        onClose={() => setShowCreateWorkspaceModal(false)}
+      />
     </div>
   );
 }

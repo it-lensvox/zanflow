@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button, Input, Card, CardHeader, CardTitle, CardContent } from '@/components/common';
 import { getCredentials } from '@/services/authStorage';
 import { authApi } from '@/services/api';
+import { API_URL } from '@/services/api';
 
 // Toast Notification Component
 function Toast({ message, type, onClose }: { message: string; type: 'success' | 'error'; onClose: () => void }) {
@@ -131,12 +132,73 @@ export function Login() {
     e.preventDefault();
     setError('');
     setIsLoading(true);
-
+  
     try {
-      queryClient.clear();
-      await login(username, password);
-    } catch {
-      setError('Invalid username or password');
+      const response = await fetch(`${API_URL}/auth/login/`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: username,
+          password: password
+        })
+      });
+  
+      const data = await response.json();
+      
+      if (response.ok && data.access) {
+        // ✅ Save tokens
+        localStorage.setItem('access_token', data.access);
+        localStorage.setItem('refresh_token', data.refresh);
+        
+        console.log('✅ Login successful! Token saved.');
+        
+        // ✅ FETCH WORKSPACES AND SET DEFAULT (NEW)
+        try {
+          const workspacesResponse = await fetch(`${API_URL}/organizations/workspaces/`, {
+            credentials: 'include',
+            headers: {
+              'Authorization': `Bearer ${data.access}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          if (workspacesResponse.ok) {
+            const workspacesData = await workspacesResponse.json();
+            
+            // Set active workspace ID from response
+            if (workspacesData.active_workspace_id) {
+              localStorage.setItem('active_workspace_id', String(workspacesData.active_workspace_id));
+              console.log('✅ Active workspace set:', workspacesData.active_workspace_id);
+            } else {
+              // Fallback to default workspace
+              const defaultWorkspace = workspacesData.workspaces?.find((w: any) => w.is_default);
+              if (defaultWorkspace) {
+                localStorage.setItem('active_workspace_id', String(defaultWorkspace.id));
+                console.log('✅ Default workspace set:', defaultWorkspace.id);
+              }
+            }
+          }
+        } catch (wsError) {
+          console.warn('Could not fetch workspaces, will load on dashboard:', wsError);
+        }
+        
+        // ✅ KEEP THIS - Use the proper login function that sets the user
+        try {
+          await login(username, password);
+          // login() already navigates to '/', so no need to navigate again
+        } catch (err) {
+          console.error('Failed to fetch user data:', err);
+          // If user fetch fails, still redirect
+          queryClient.clear();
+          window.location.href = '/dashboard';
+        }
+      } else {
+        setError(data.detail || 'Invalid username or password');
+      }
+    } catch (err: any) {
+      console.error('Login error:', err);
+      setError('Network error. Please try again.');
     } finally {
       setIsLoading(false);
     }

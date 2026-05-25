@@ -1,10 +1,10 @@
 const CREDENTIALS_KEY = 'auth_credentials';
 
 export const saveCredentials = (username: string, password: string) => {
-  console.log('[AuthStorage] Saving credentials:', {
-    username,
-    password,
-  });
+  // console.log('[AuthStorage] Saving credentials:', {
+  //   username,
+  //   password,
+  // });
 
   localStorage.setItem(
     CREDENTIALS_KEY,
