@@ -12,7 +12,7 @@ from django.db import models
 from django.utils.text import slugify
 
 from .context import get_current_organization
-
+from django.conf import settings
 
 # ---------------------------------------------------------------------------
 # Organization (the tenant)
@@ -110,3 +110,36 @@ class TenantModel(models.Model):
             if org_id is not None:
                 self.organization_id = org_id
         super().save(*args, **kwargs)
+
+class OrganizationMember(models.Model):
+    """
+    Bridge table connecting a User to an Organization.
+    This replaces the direct ForeignKey on the User model.
+    """
+    ROLE_CHOICES = (
+        ("admin", "Admin"),
+        ("manager", "Manager"),
+        ("annotator", "Annotator"), # Or whatever your base roles are
+    )
+
+    organization = models.ForeignKey(
+        "organizations.Organization", 
+        on_delete=models.CASCADE, 
+        related_name="memberships"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name="workspace_memberships"
+    )
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="annotator")
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        # A user can only have one membership record per organization
+        unique_together = ("organization", "user")
+        verbose_name = "Organization Member"
+        verbose_name_plural = "Organization Members"
+
+    def __str__(self):
+        return f"{self.user.username} - {self.organization.name} ({self.role})"

@@ -6,8 +6,10 @@ from django.utils import timezone
 from rest_framework import serializers
 from django.utils import timezone
 from apps.users.serializers import UserMinimalSerializer
-from .models import Document, DocumentComment, GTVersion
-
+from .models import Document, DocumentComment, GTVersion, Folder, Label
+from apps.projects.models import Label
+from django.contrib.auth import get_user_model
+User = get_user_model()
 def get_clean_unique_name(project_id, original_filename):
     """
     Checks if a file name exists in a project. 
@@ -114,37 +116,66 @@ class DocumentCommentSerializer(serializers.ModelSerializer):
     """
     Serializer for DocumentComment.
     """
-    created_by = UserMinimalSerializer(read_only=True)
-    replies = serializers.SerializerMethodField()
+    user = serializers.SerializerMethodField()
+    parent_id = serializers.PrimaryKeyRelatedField(
+        source='parent', 
+        queryset=DocumentComment.objects.all(), 
+        required=False, 
+        allow_null=True
+    )
+    replies_count = serializers.SerializerMethodField()
     
+    mentions = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=User.objects.all(),
+        required=False
+    )
+
     class Meta:
         model = DocumentComment
         fields = [
-            "id", "content", "field_reference", "parent",
-            "is_resolved", "created_by", "created_at", "replies",
+            "id", "content", "user", "created_at", "updated_at", 
+            "parent_id", "replies_count", "is_resolved", "mentions"
         ]
-        read_only_fields = ["id", "created_by", "created_at"]
+        read_only_fields = ["id", "created_at", "updated_at", "is_resolved"]
     
-    def get_replies(self, obj):
-        if obj.replies.exists():
-            return DocumentCommentSerializer(obj.replies.all(), many=True).data
-        return []
+    def get_user(self, obj):
+        user = obj.created_by
+        if not user:
+            return None
+        return {
+            "id": user.id,
+            "full_name": f"{user.first_name} {user.last_name}".strip() or user.username,
+            "email": user.email,
+            "avatar_color": getattr(user, 'avatar_color', "#4169FF") # Default fallback color
+        }
+        
+    def get_replies_count(self, obj):
+        return obj.replies.count()
 
 
+# ============ NEW SERIALIZER ============
+class LabelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Label
+        fields = ["id", "name", "color"]
+
+# ============ UPDATE DOCUMENT SERIALIZER ============
 class DocumentSerializer(serializers.ModelSerializer):
     created_by = UserMinimalSerializer(read_only=True)
-    
+    labels = LabelSerializer(many=True, read_only=True) # ADD THIS
+
     class Meta:
         model = Document
         fields = [
             "id", "project", "name", "description",
             "source_file", "source_file_url", "file_type", "file_size",
-            "metadata", "status", "created_by", "created_at", "updated_at"
+            "metadata", "status", "created_by", "created_at", "updated_at",
+            "labels" # ADD THIS
         ]
         read_only_fields = [
-            "id", "file_size", "created_by", "created_at", "updated_at"
+            "id", "file_size", "created_by", "created_at", "updated_at", "labels"
         ]
-
 
 class DocumentDetailSerializer(DocumentSerializer):
     """
@@ -174,7 +205,21 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
         user = self.context["request"].user
         source_file = validated_data.get("source_file")
         project = validated_data.get("project")
-        
+        task = validated_data.get("task")
+
+        # ============ NEW: SMART FOLDER ROUTING ============
+        # If this document belongs to a task, put it in the system Tasks folder
+        if task and project and not validated_data.get("folder"):
+            tasks_folder = Folder.objects.filter(
+                project=project,
+                name="Tasks",
+                is_system_generated=True
+            ).first()
+            
+            if tasks_folder:
+                validated_data["folder"] = tasks_folder
+        # ===================================================
+
         # Existing clean name logic
         original_name = validated_data.get("name")
         if not original_name and source_file:
@@ -193,7 +238,7 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
         # ============ NEW: Trigger PDF conversion in background ============
         if source_file:
             from .services import generate_document_preview, needs_pdf_conversion
-            
+         
             if needs_pdf_conversion(source_file.name):
                 # Run conversion synchronously
                 # Note: This adds 5-30 seconds to upload time
@@ -210,7 +255,7 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
                 document.preview_status = Document.PreviewStatus.NOT_NEEDED
                 document.save(update_fields=['preview_status'])
         # ===================================================================
-        
+        document = Document.objects.create(created_by=user, **validated_data)
         return document
 
 
@@ -263,3 +308,27 @@ class DocumentShareSerializer(serializers.Serializer):
             })
             
         return data
+    
+class FolderSerializer(serializers.ModelSerializer):
+    document_count = serializers.SerializerMethodField()
+    folder_count = serializers.SerializerMethodField() # <-- NEW
+
+    class Meta:
+        model = Folder
+        fields = [
+            'id', 'project', 'parent', 'name', 'is_system_generated', 
+            'created_at', 'document_count', 'folder_count'
+        ]
+        read_only_fields = ['id', 'is_system_generated', 'created_at']
+
+    def get_document_count(self, obj):
+        # Grabs the direct document count from the DB annotation
+        if hasattr(obj, 'annotated_doc_count'):
+            return obj.annotated_doc_count
+        return obj.documents.count()
+
+    def get_folder_count(self, obj):
+        # Grabs the direct subfolder count from the DB annotation
+        if hasattr(obj, 'annotated_folder_count'):
+            return obj.annotated_folder_count
+        return obj.subfolders.count()
