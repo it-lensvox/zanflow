@@ -158,7 +158,7 @@ class DocumentCommentSerializer(serializers.ModelSerializer):
 class LabelSerializer(serializers.ModelSerializer):
     class Meta:
         model = Label
-        fields = ["id", "name", "color"]
+        fields = ["id", "project","name", "color"]
 
 # ============ UPDATE DOCUMENT SERIALIZER ============
 class DocumentSerializer(serializers.ModelSerializer):

@@ -1,7 +1,11 @@
 from rest_framework import serializers
 
-from .models import Organization
+from .models import Organization, Workspace, WorkspaceMembership
 
+
+# ---------------------------------------------------------------------------
+# Organization Serializers (existing)
+# ---------------------------------------------------------------------------
 
 class OrganizationSerializer(serializers.ModelSerializer):
     class Meta:
@@ -58,3 +62,103 @@ class TenantSignupSerializer(serializers.Serializer):
                 {"password_confirm": "Passwords do not match."}
             )
         return data
+
+
+# ---------------------------------------------------------------------------
+# Workspace Serializers (new)
+# ---------------------------------------------------------------------------
+
+class WorkspaceSerializer(serializers.ModelSerializer):
+    """Read serializer for workspace details."""
+    member_count = serializers.SerializerMethodField()
+    my_role = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Workspace
+        fields = (
+            "id", "name", "slug", "description",
+            "is_default", "is_active",
+            "member_count", "my_role",
+            "created_at", "updated_at",
+        )
+        read_only_fields = (
+            "id", "slug", "is_default",
+            "created_at", "updated_at",
+        )
+
+    def get_member_count(self, obj):
+        return obj.memberships.count()
+
+    def get_my_role(self, obj):
+        """Return the current user's role in this workspace."""
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            membership = obj.memberships.filter(user=request.user).first()
+            return membership.role if membership else None
+        return None
+
+
+class WorkspaceCreateSerializer(serializers.Serializer):
+    """Serializer for creating a new workspace."""
+    name = serializers.CharField(
+        max_length=255,
+        help_text="Name of the workspace",
+    )
+    description = serializers.CharField(
+        required=False,
+        default="",
+        help_text="Optional description for the workspace",
+    )
+
+    def validate_name(self, value):
+        """Check that workspace name is unique within the organization."""
+        request = self.context.get("request")
+        if request:
+            org = request.user.organization
+            if Workspace.objects.filter(
+                organization=org, name__iexact=value.strip()
+            ).exists():
+                raise serializers.ValidationError(
+                    "A workspace with this name already exists in your organization."
+                )
+        return value.strip()
+
+
+class WorkspaceMemberSerializer(serializers.ModelSerializer):
+    """Read serializer for workspace membership details."""
+    user_id = serializers.IntegerField(source="user.id", read_only=True)
+    username = serializers.CharField(source="user.username", read_only=True)
+    email = serializers.EmailField(source="user.email", read_only=True)
+
+    class Meta:
+        model = WorkspaceMembership
+        fields = ("id", "user_id", "username", "email", "role", "joined_at")
+        read_only_fields = ("id", "user_id", "username", "email", "joined_at")
+
+
+class WorkspaceAddMemberSerializer(serializers.Serializer):
+    """Serializer for adding a member to a workspace."""
+    user_id = serializers.IntegerField(help_text="ID of the user to add")
+    role = serializers.ChoiceField(
+        choices=WorkspaceMembership.ROLE_CHOICES,
+        default="member",
+        help_text="Role of the user in this workspace",
+    )
+
+    def validate_user_id(self, value):
+        """Check the user exists and belongs to the same organization."""
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        request = self.context.get("request")
+
+        try:
+            user = User.objects.get(id=value)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("User not found.")
+
+        if request and user.organization_id != request.user.organization_id:
+            raise serializers.ValidationError(
+                "User does not belong to your organization."
+            )
+
+        return value

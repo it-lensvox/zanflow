@@ -14,6 +14,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.pagination import PageNumberPagination
 from rest_framework import serializers
 from apps.users.auth import StaticTokenAuthentication
+from apps.organizations.mixins import WorkspaceAPIView, WorkspaceListCreateAPIView
 # Ensure this import matches your project structure
 from apps.users.models import User
 from apps.groundtruth.models import Document
@@ -26,7 +27,7 @@ from apps.notification.services import (
     notify_task_comment,
     notify_task_assignees_added
 )
-class AllUsersListView(APIView):
+class AllUsersListView(WorkspaceAPIView):
     authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
@@ -47,13 +48,14 @@ class AllUsersListView(APIView):
             "users": serializer.data
         }, status=status.HTTP_200_OK)
 
-class TaskListCreateView(APIView):
+class TaskListCreateView(WorkspaceAPIView):
     authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
     permission_classes = [IsAuthenticated]
     parser_classes = (MultiPartParser, FormParser)
 
     def get(self, request):
         user = self.request.user
+
         queryset = Task.objects.all()
 
         tasks = queryset.filter(
@@ -113,7 +115,7 @@ class TaskListCreateView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class TaskRetrieveUpdateView(APIView):
+class TaskRetrieveUpdateView(WorkspaceAPIView):
     authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
@@ -191,101 +193,56 @@ class TaskRetrieveUpdateView(APIView):
             # ================================================================
             new_assignee_ids = set(updated_task.assigned_to.values_list('id', flat=True))
             added_assignee_ids = new_assignee_ids - old_assignee_ids
-            
             if added_assignee_ids:
-                # Fetch only the users who were just added
-                added_users = list(updated_task.assigned_to.filter(id__in=added_assignee_ids))
+                new_users = User.objects.filter(id__in=added_assignee_ids)
                 notify_task_assignees_added(
                     task=updated_task,
-                    actor=request.user,
-                    new_assignees=added_users
+                    new_assignees=list(new_users),
+                    actor=request.user
                 )
-            # ================================================================
-
+            
             return Response({
                 "message": "Task updated successfully",
-                "task": serializer.data
+                "task": TaskSerializer(updated_task, context={'request': request}).data
             }, status=status.HTTP_200_OK)
-            
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def delete(self, request, task_id): 
-        task = get_object_or_404(Task, id=task_id)
-
-        if not request.user.is_manager:
-             return Response(
-                {"detail": "You do not have permission to delete tasks."},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
-        task.delete()
-        return Response({
-            "message": "Task deleted successfully"
-        }, status=status.HTTP_204_NO_CONTENT)
-    def delete(self, request, task_id): 
-        task = get_object_or_404(Task, id=task_id)
-
-        # STRICT CHECK: Only the user who created the task (assigned_by) can delete it.
-        # Note: If you want Superusers to also be able to delete, use:
-        # if task.assigned_by != request.user and not request.user.is_superuser:
-        if task.assigned_by != request.user:
-             return Response(
-                {"detail": "You do not have permission to delete this task. Only the creator can delete it."},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
-        task.delete()
-        return Response({
-            "message": "Task deleted successfully"
-        }, status=status.HTTP_204_NO_CONTENT)
-
-# --- CORRECTED PERFORMANCE VIEW ---
-class UserPerformanceView(APIView):
-    """
-    GET: Retrieve detailed performance metrics for a specific user.
-    Only accessible by Admins and Managers.
-    """
+class UserPerformanceView(WorkspaceAPIView):
     authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request, user_id):
-        # 1. Permission Check
-        if not request.user.is_manager:
-            return Response(
-                {"detail": "You do not have permission to view team performance."},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
-        # 2. Get the target user
-        target_user = get_object_or_404(User, id=user_id)
-        
-        # 3. Get all tasks assigned to this user
-        user_tasks = Task.objects.filter(assigned_to=target_user)
-        
-        # 4. Calculate Metrics
-        total_tasks = user_tasks.count()
-        
-        # FIX: Used '__iexact' to match status regardless of case (pending vs PENDING)
+        user = get_object_or_404(User, id=user_id)
+
+        user_serializer = UserManagementSerializer(user)
+
+        tasks = Task.objects.filter(
+            Q(assigned_to=user) | Q(assigned_by=user)
+        ).distinct()
+
+        total_tasks = tasks.count()
+        completed_tasks = tasks.filter(status='completed').count()
+        in_progress_tasks = tasks.filter(status='in_progress').count()
+        pending_tasks = tasks.filter(status='pending').count()
+        overdue_tasks = tasks.filter(status='overdue').count()
+
         metrics = {
-            "total": total_tasks,
-            "pending": user_tasks.filter(status__iexact='pending').count(),
-            "in_progress": user_tasks.filter(status__iexact='in_progress').count(),
-            "completed": user_tasks.filter(status__iexact='completed').count(),
-            "deployed": user_tasks.filter(status__iexact='deployed').count(),
-            "deferred": user_tasks.filter(status__iexact='deferred').count(),
-            "Backlog": user_tasks.filter(status__iexact='Backlog').count(),
+            "total_tasks": total_tasks,
+            "completed_tasks": completed_tasks,
+            "in_progress_tasks": in_progress_tasks,
+            "pending_tasks": pending_tasks,
+            "overdue_tasks": overdue_tasks,
+            "completion_rate": round((completed_tasks / total_tasks * 100), 2) if total_tasks > 0 else 0,
         }
-        
-        # 5. Serialize the task list for detailed history
-        task_serializer = TaskSerializer(user_tasks, many=True)
-        user_serializer = UserManagementSerializer(target_user)
+
+        task_serializer = TaskSerializer(tasks, many=True, context={'request': request})
 
         return Response({
             "user": user_serializer.data,
             "performance_metrics": metrics,
             "task_history": task_serializer.data
         }, status=status.HTTP_200_OK)
-class TaskCommentListCreateView(ListCreateAPIView):
+class TaskCommentListCreateView(WorkspaceListCreateAPIView):
     serializer_class = TaskCommentSerializer
     authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
     permission_classes = [IsAuthenticated]
@@ -318,7 +275,7 @@ class TaskCommentListCreateView(ListCreateAPIView):
         # ====================================================================
         serializer.save(user=self.request.user, task=task)
 
-class TaskAttachmentDeleteView(APIView):
+class TaskAttachmentDeleteView(WorkspaceAPIView):
     authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
@@ -352,7 +309,7 @@ class TaskAttachmentDeleteView(APIView):
             status=status.HTTP_204_NO_CONTENT
         )
 
-class TaskPinToggleView(APIView):
+class TaskPinToggleView(WorkspaceAPIView):
     """
     POST: Toggles the pin status of a task for the requesting user.
     """
@@ -391,7 +348,7 @@ class TaskPinToggleView(APIView):
             "is_pinned": is_pinned
         }, status=status.HTTP_200_OK)
     
-class TaskBulkUploadView(APIView):
+class TaskBulkUploadView(WorkspaceAPIView):
     authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
     permission_classes = [IsAuthenticated]
     parser_classes = (MultiPartParser, FormParser)

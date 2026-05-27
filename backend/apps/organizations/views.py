@@ -6,12 +6,12 @@ from rest_framework import permissions, status, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.permissions import IsAuthenticated
-from .models import Organization, OrganizationMember
+
+from .models import Organization, WorkspaceMembership, Workspace
 from .serializers import OrganizationSerializer, TenantSignupSerializer
 from .services import TenantOnboardingService
 from .throttles import GlobalSignupDailyThrottle
-from django.db import transaction
+
 logger = logging.getLogger(__name__)
 
 
@@ -467,71 +467,186 @@ class TenantToggleStatusView(APIView):
                 "is_active": True,
             })
         
-class MyWorkspacesView(APIView):
-    """
-    Returns all workspaces the logged-in user is a member of.
-    """
-    permission_classes = [IsAuthenticated]
+class IsAdminOrManager(permissions.BasePermission):
+    """Only workspace admins and managers can create workspaces."""
+    def has_permission(self, request, view):
+        return request.user.role in ("admin", "manager")
+
+
+class WorkspaceListCreateView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        # Fetch memberships and join the organization data
-        memberships = OrganizationMember.objects.filter(
+        """List all workspaces the user belongs to."""
+        memberships = WorkspaceMembership.objects.filter(
             user=request.user,
-            organization__is_active=True
-        ).select_related("organization")
+            workspace__organization=request.user.organization,
+        ).select_related("workspace", "workspace__created_by")
 
-        data = []
-        for membership in memberships:
-            data.append({
-                "workspace_id": membership.organization.id,
-                "name": membership.organization.name,
-                "slug": membership.organization.slug,
-                "role": membership.role,  # Crucial so frontend knows if they can edit things!
-                "joined_at": membership.joined_at,
-            })
-
+        data = [
+            {
+                "id": m.workspace.id,
+                "name": m.workspace.name,
+                "slug": m.workspace.slug,
+                "role": m.role,
+                "is_default": m.workspace.is_default,
+                "is_active": m.workspace.is_active,
+                "created_by": m.workspace.created_by_id,
+            }
+            for m in memberships
+        ]
         return Response(data)
-    
-class CreateWorkspaceView(APIView):
-    """
-    Allows existing logged-in Admins or Managers to create a new workspace.
-    """
-    permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        # 1. Check Global Permissions
-        # Ensure the user has the system-level authority to create workspaces
-        if getattr(request.user, 'role', None) not in ["admin", "manager"]:
+        """Create a new workspace (admin/manager only)."""
+        if request.user.role not in ("admin", "manager"):
             return Response(
-                {"detail": "You do not have permission to create new workspaces."}, 
-                status=403
+                {"detail": "Only admins and managers can create workspaces."},
+                status=status.HTTP_403_FORBIDDEN,
             )
 
-        workspace_name = request.data.get("name")
-        if not workspace_name:
-            return Response({"detail": "Workspace name is required."}, status=400)
+        name = request.data.get("name")
+        if not name:
+            return Response(
+                {"detail": "Workspace name is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        # Ensure the name is unique (as per your Organization model rules)
-        if Organization.objects.filter(name__iexact=workspace_name).exists():
-             return Response({"detail": "A workspace with this name already exists."}, status=400)
+        workspace = Workspace.objects.create(
+            organization=request.user.organization,
+            name=name,
+            created_by=request.user,
+        )
 
-        # 2. Execute within an atomic transaction to ensure data integrity
-        with transaction.atomic():
-            # Create the new workspace (Organization)
-            new_org = Organization.objects.create(name=workspace_name)
+        # Creator becomes admin of the workspace
+        WorkspaceMembership.objects.create(
+            user=request.user,
+            workspace=workspace,
+            role="admin",
+        )
 
-            # 3. Link the creator to the new workspace as its 'admin'
-            OrganizationMember.objects.create(
-                organization=new_org,
-                user=request.user,
-                role="admin"  # The creator is always the admin of their new workspace
+        return Response(
+            {
+                "id": workspace.id,
+                "name": workspace.name,
+                "slug": workspace.slug,
+                "created_by": workspace.created_by_id,
+                "message": "Workspace created successfully.",
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class WorkspaceSwitchView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, workspace_id):
+        """Validate user can switch to this workspace. Frontend stores the ID."""
+        is_member = WorkspaceMembership.objects.filter(
+            user=request.user,
+            workspace_id=workspace_id,
+            workspace__organization=request.user.organization,
+        ).exists()
+
+        if not is_member:
+            return Response(
+                {"detail": "You are not a member of this workspace."},
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         return Response({
-            "message": "Workspace created successfully.",
-            "workspace": {
-                "id": new_org.id,
-                "name": new_org.name,
-                "slug": new_org.slug
-            }
-        }, status=201)
+            "workspace_id": workspace_id,
+            "message": "Switched successfully. Send X-Workspace-ID header in future requests.",
+        })
+
+
+class WorkspaceDeleteView(APIView):
+    """
+    Delete a workspace permanently.
+
+    DELETE /api/v1/organizations/workspaces/<workspace_id>/delete/
+
+    Rules:
+      - Only the person who CREATED the workspace can delete it.
+      - The default workspace cannot be deleted.
+      - All data inside the workspace (projects, tasks, teams, etc.) will be permanently deleted.
+      - Requires confirmation: {"confirm": "DELETE"}
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, workspace_id):
+        # 1. Find the workspace
+        try:
+            workspace = Workspace.objects.get(
+                id=workspace_id,
+                organization=request.user.organization,
+            )
+        except Workspace.DoesNotExist:
+            return Response(
+                {"detail": "Workspace not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # 2. Cannot delete the default workspace
+        if workspace.is_default:
+            return Response(
+                {"detail": "The default workspace cannot be deleted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 3. Only the creator can delete
+        if workspace.created_by != request.user:
+            return Response(
+                {"detail": "Only the person who created this workspace can delete it."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # 4. Require confirmation
+        confirm = request.data.get("confirm")
+        if confirm != "DELETE":
+            return Response(
+                {
+                    "detail": 'This action is irreversible. Send {"confirm": "DELETE"} to proceed.',
+                    "workspace": {
+                        "id": workspace.id,
+                        "name": workspace.name,
+                    },
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 5. Delete all workspace-scoped data
+        from django.apps import apps
+        from .models import TenantModel
+
+        workspace_name = workspace.name
+        summary = {"workspace": workspace_name, "deleted": {}}
+
+        for model in apps.get_models():
+            if (
+                issubclass(model, TenantModel)
+                and not model._meta.abstract
+                and model is not TenantModel
+            ):
+                label = f"{model._meta.app_label}.{model.__name__}"
+                count, _ = model.original_objects.filter(workspace=workspace).delete()
+                if count > 0:
+                    summary["deleted"][label] = count
+
+        # Delete workspace memberships
+        mem_count, _ = WorkspaceMembership.objects.filter(workspace=workspace).delete()
+        summary["deleted"]["memberships"] = mem_count
+
+        # Delete the workspace itself
+        workspace.delete()
+
+        logger.info(
+            "Workspace deleted by creator: ws=%s, user=%s, summary=%s",
+            workspace_name, request.user.username, summary,
+        )
+
+        return Response({
+            "message": f"Workspace '{workspace_name}' has been permanently deleted.",
+            "summary": summary,
+        })

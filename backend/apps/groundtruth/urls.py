@@ -38,7 +38,13 @@ urlpatterns = [
         }), 
         name="folder-detail"
     ),
-
+    path(
+        "bulk-add-labels/", 
+        views.DocumentViewSet.as_view({
+            'post': 'bulk_add_labels'
+        }), 
+        name="document-bulk-add-labels"
+    ),
     # ==========================================
     # DOCUMENTS (ViewSet Direct Mapping)
     # ==========================================

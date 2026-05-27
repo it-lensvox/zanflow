@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Optional
 from django.contrib.auth import get_user_model
 from django.db import transaction
 
-from apps.organizations.models import Organization
+from apps.organizations.models import Organization, Workspace, WorkspaceMembership
 
 if TYPE_CHECKING:
     from apps.users.models import User
@@ -83,7 +83,18 @@ class TenantOnboardingService:
         admin_user.role = "admin"
         admin_user.is_staff = True
         admin_user.save(update_fields=["role", "is_staff"])
-
+        # Create the default workspace
+        default_ws = Workspace.objects.create(
+            organization=org,
+            name=name,
+            is_default=True,
+            created_by=admin_user,
+        )
+        WorkspaceMembership.objects.create(
+            user=admin_user,
+            workspace=default_ws,
+            role="admin",
+        )
         logger.info(
             "Tenant provisioned: org=%s (ID=%s), admin=%s",
             org.name, org.id, admin_user.username,
