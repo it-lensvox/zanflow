@@ -10,7 +10,9 @@ export function Profile() {
   const { user } = useAuth();
 
   // Profile image (local only for now)
-  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [profileImage, setProfileImage] = useState<string | null>((user as any)?.avatar || null);
+const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+const [avatarError, setAvatarError] = useState<string | null>(null);
 
   // Projects
   const [projects, setProjects] = useState<any[]>([]);
@@ -35,6 +37,9 @@ export function Profile() {
         const data = await authApi.getMe();
         setTempSkills(data.skills || []);
         setOriginalSkills(data.skills || []);
+        if (data.avatar) {
+          setProfileImage(data.avatar); 
+        }
       } catch (error) {
         console.error('Failed to fetch user data:', error);
       }
@@ -64,13 +69,22 @@ export function Profile() {
   }, [user?.id]);
 
   // Profile image 
-  const handleProfileImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleProfileImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => setProfileImage(reader.result as string);
-      reader.readAsDataURL(file);
-    }
+    if (!file) return;
+  
+    // Instant local preview
+    const reader = new FileReader();
+    reader.onloadend = () => setProfileImage(reader.result as string);
+    reader.readAsDataURL(file);
+  
+    // Upload to S3 via backend
+    setIsUploadingAvatar(true);
+    const formData = new FormData();
+    formData.append('avatar', file);
+    const updatedUser = await authApi.updateProfile(formData); // ✅ PATCH /me/
+    if (updatedUser?.avatar) setProfileImage(updatedUser.avatar); // ✅ use S3 URL
+    setIsUploadingAvatar(false);
   };
 
   // Certificate upload

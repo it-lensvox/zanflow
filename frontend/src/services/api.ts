@@ -146,8 +146,19 @@ export const authApi = {
     return response.data;
   },
 
-  // Update profile fields (first_name, last_name)
-  updateProfile: async (data: { first_name?: string; last_name?: string }) => {
+  // Update profile fields (first_name, last_name, avatar)
+  updateProfile: async (data: FormData | { first_name?: string; last_name?: string }) => {
+    const isFormData = data instanceof FormData;
+  
+    if (isFormData) {
+      // ✅ Let browser auto-set Content-Type with boundary for multipart
+      const response = await api.patch('/auth/me/', data, {
+        headers: { 'Content-Type': undefined },
+      });
+      return response.data;
+    }
+  
+    // ✅ JSON for name/text updates
     const response = await api.patch('/auth/me/', data);
     return response.data;
   },

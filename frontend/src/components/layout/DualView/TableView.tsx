@@ -33,6 +33,7 @@ export interface TableViewProps<T> {
   className?: string;
   rowClassName?: (item: T) => string;
   maxHeight?: string | number;
+  rowProps?: (item: T) => React.HTMLAttributes<HTMLTableRowElement>;  // ✅ ADD THIS LINE
 }
 
 export function TableView<T>({
@@ -47,6 +48,7 @@ export function TableView<T>({
   className = '',
   rowClassName,
   maxHeight = '70vh',
+  rowProps,  // ✅ ADD THIS LINE
 }: TableViewProps<T>) {
   return (
     <div 
@@ -103,24 +105,31 @@ export function TableView<T>({
       <div className="flex-1 min-h-0 overflow-auto scrollbar-hide">
         <table className="w-full border-collapse table-fixed">
           <tbody>
-            {data.map((item, index) => (
-              <tr
-                key={rowKey(item)}
-                onClick={() => onRowClick?.(item)}
-                onMouseEnter={() => onRowMouseEnter?.(item)}
-                className={`group border-b border-[#f4f5f7] last:border-b-0 hover:bg-[#f4f5f7] transition-colors cursor-pointer relative hover:z-[50] ${rowClassName ? rowClassName(item) : ''}`}
-              >
-                {columns.map((column) => (
-                  <td
-                    key={column.key}
-                    className={`py-2 px-3 h-12 align-middle text-[13px] border-r border-[#f4f5f7] group-hover:border-r-[#dfe1e6] last:border-r-0 relative ${column.className || ''}`}
-                    style={column.width ? { width: column.width } : undefined}
-                  >
-                    {column.render ? column.render(item, index) : (item as any)[column.key]}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            {data.map((item, index) => {
+              // ✅ GET CUSTOM ROW PROPS IF PROVIDED
+              const customRowProps = rowProps ? rowProps(item) : {};
+              const customClassName = customRowProps.className || '';
+              
+              return (
+                <tr
+                  key={rowKey(item)}
+                  onClick={() => onRowClick?.(item)}
+                  onMouseEnter={() => onRowMouseEnter?.(item)}
+                  {...customRowProps}  // ✅ SPREAD CUSTOM PROPS (includes drag handlers)
+                  className={`group border-b border-[#f4f5f7] last:border-b-0 hover:bg-[#f4f5f7] transition-colors cursor-pointer relative hover:z-[50] ${rowClassName ? rowClassName(item) : ''} ${customClassName}`}
+                >
+                  {columns.map((column) => (
+                    <td
+                      key={column.key}
+                      className={`py-2 px-3 h-12 align-middle text-[13px] border-r border-[#f4f5f7] group-hover:border-r-[#dfe1e6] last:border-r-0 relative ${column.className || ''}`}
+                      style={column.width ? { width: column.width } : undefined}
+                    >
+                      {column.render ? column.render(item, index) : (item as any)[column.key]}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

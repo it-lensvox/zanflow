@@ -218,6 +218,9 @@ export function useTeamChat() {
     if (urlRoomId && !urlProjectId && privateRoomsData && privateRoomsData.length > 0) {
       const matchedRoom = (privateRoomsData as any[]).find((room: any) => room.id === urlRoomId);
       if (matchedRoom) {
+        // Prevent unnecessary re-selection
+        if (activeRoom?.id === matchedRoom.id) return;
+
         setSelectedTeamRoom(null);
         setSelectedProjectRoom(null);
 
@@ -244,6 +247,12 @@ export function useTeamChat() {
           });
           roomUserMapRef.current.set(matchedRoom.id, otherUserId);
         }
+
+        // ✅ FIX: Prefetch messages immediately after setting activeRoom
+        queryClient.prefetchQuery({
+          queryKey: ['chat-messages', matchedRoom.id],
+          queryFn: () => chatApi.getRoomMessages(matchedRoom.id),
+        });
 
         queryClient.prefetchQuery({
           queryKey: ['chat-room-details', matchedRoom.id],
@@ -671,12 +680,28 @@ export function useTeamChat() {
 
   // ─── 4. Fetch Messages 
   const { data: messagesData, isLoading: isLoadingMessages } = useQuery({
-    queryKey: ['chat-messages', activeRoom?.id || selectedProjectRoom?.id || selectedTeamRoom?.id],
+    queryKey: ['chat-messages', activeRoom?.id || selectedProjectRoom?.id || selectedTeamRoom?.id || urlRoomId],
     queryFn: async () => {
-      const roomId = activeRoom?.id || selectedProjectRoom?.id || selectedTeamRoom?.id;
-      if (!roomId) return Promise.resolve({ messages: [], count: 0, has_more: false });
+      // ✅ FIX: Check URL roomId as fallback
+      const roomId = activeRoom?.id || selectedProjectRoom?.id || selectedTeamRoom?.id || urlRoomId;
+      
+      console.log('🔍 [MESSAGES QUERY] Fetching messages:', {
+        roomId,
+        activeRoomId: activeRoom?.id,
+        selectedProjectRoomId: selectedProjectRoom?.id,
+        selectedTeamRoomId: selectedTeamRoom?.id,
+        urlRoomId,
+      });
+      
+      if (!roomId) {
+        console.warn('⚠️ [MESSAGES QUERY] No roomId available, returning empty');
+        return Promise.resolve({ messages: [], count: 0, has_more: false });
+      }
 
+      console.log('✅ [MESSAGES QUERY] Fetching from API:', roomId);
       const messages = await chatApi.getRoomMessages(roomId);
+      console.log('✅ [MESSAGES QUERY] Received messages:', messages.messages.length);
+      
       try {
         await chatApi.markAsRead(roomId);
         queryClient.invalidateQueries({ queryKey: ['chat-unread-counts'] });
@@ -710,11 +735,25 @@ export function useTeamChat() {
 
       return messages;
     },
-    enabled: !!(activeRoom || selectedProjectRoom || selectedTeamRoom),
-    staleTime: Infinity,
+    // ✅ FIX: Enable query if urlRoomId is present
+    enabled: !!(activeRoom || selectedProjectRoom || selectedTeamRoom || urlRoomId),
+    // ✅ FIX: Remove staleTime: Infinity to allow refetching
+    staleTime: 0,
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
     refetchOnWindowFocus: false,
     refetchOnMount: true,
   });
+
+  // Debug log to see query state
+  useEffect(() => {
+    console.log('🔍 [MESSAGES STATE]', {
+      messagesCount: messagesData?.messages.length || 0,
+      isLoading: isLoadingMessages,
+      activeRoomId: activeRoom?.id,
+      urlRoomId,
+      enabled: !!(activeRoom || selectedProjectRoom || selectedTeamRoom || urlRoomId),
+    });
+  }, [messagesData, isLoadingMessages, activeRoom?.id, urlRoomId]);
 
   // ─── 5. Clear unread on room open 
   useEffect(() => {
@@ -732,7 +771,7 @@ export function useTeamChat() {
       ...m,
       optimisticStatus: 'sent' as const,
     }));
-    const currentRoomId = activeRoom?.id || selectedProjectRoom?.id || selectedTeamRoom?.id;
+    const currentRoomId = activeRoom?.id || selectedProjectRoom?.id || selectedTeamRoom?.id || urlRoomId;
     const confirmedIds = new Set(confirmedMessages.map(m => String(m.id)));
     const pendingOptimistic = optimisticMessages.filter(om =>
       om.room === currentRoomId && !confirmedIds.has(String(om.id))
@@ -740,11 +779,11 @@ export function useTeamChat() {
     return [...confirmedMessages, ...pendingOptimistic].sort((a, b) =>
       new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     );
-  }, [messagesData?.messages, optimisticMessages, activeRoom?.id, selectedProjectRoom?.id, selectedTeamRoom?.id]);
+  }, [messagesData?.messages, optimisticMessages, activeRoom?.id, selectedProjectRoom?.id, selectedTeamRoom?.id, urlRoomId]);
 
   // Load More (Pagination) 
   const handleLoadMore = async () => {
-    const roomId = activeRoom?.id || selectedProjectRoom?.id || selectedTeamRoom?.id;
+    const roomId = activeRoom?.id || selectedProjectRoom?.id || selectedTeamRoom?.id || urlRoomId;
     if (!roomId || !messagesData?.has_more || isFetchingMore || !messagesData.messages.length) return;
 
     const sortedMessages = [...messagesData.messages].sort((a, b) =>
@@ -968,21 +1007,28 @@ export function useTeamChat() {
 
     const existingRoomId = userRoomMap.get(userId);
     if (existingRoomId) {
-      // Room already known — navigate directly with roomId
+      // ✅ FIX: Room already exists - fetch it and set as active BEFORE navigating
+      queryClient.fetchQuery({
+        queryKey: ['chat-room', existingRoomId],
+        queryFn: () => chatApi.getRoomDetails(existingRoomId),
+      }).then((roomData) => {
+        setActiveRoom(roomData);
+        activeRoomRef.current = roomData;
+        (window as any).__activeTeamChatRoomId = roomData.id;
+      });
+      
       navigate(`/team-chat/chat/${existingRoomId}`);
+      
       setUnreadCounts(prev => {
         const newMap = new Map(prev);
         newMap.set(existingRoomId, 0);
         return newMap;
       });
     } else {
-      // Room not yet created — navigate to base, mutation will update URL after creation
+      // ✅ Room doesn't exist yet - create it (onSuccess will set activeRoom)
       navigate('/team-chat/chat');
+      createRoomMutation.mutate(userId);
     }
-
-    setActiveRoom(null);
-    activeRoomRef.current = null;
-    createRoomMutation.mutate(userId);
   };
 
   const handleProjectClick = async (projectRoom: ProjectChatRoom) => {
@@ -1199,7 +1245,7 @@ export function useTeamChat() {
     const hasFiles = selectedFiles.length > 0;
     if (!content && !hasFiles) return;
 
-    const roomId = selectedProjectRoom?.id || selectedTeamRoom?.id || activeRoom?.id;
+    const roomId = selectedProjectRoom?.id || selectedTeamRoom?.id || activeRoom?.id || urlRoomId;
 
     if (hasFiles && roomId) {
       const tempIds: string[] = [];

@@ -229,8 +229,8 @@ export function WorkspaceSwitcher({ onCreateWorkspace }: WorkspaceSwitcherProps)
                           )}
                         </button>
 
-                        {/* Delete Button - Only for creator and non-default */}
-                        {canDelete && (
+                        
+                        {/* {canDelete && (
                           <button
                             onClick={(e) => handleDeleteClick(workspace, e)}
                             className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-600 transition-all"
@@ -238,7 +238,7 @@ export function WorkspaceSwitcher({ onCreateWorkspace }: WorkspaceSwitcherProps)
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
-                        )}
+                        )} */}
                       </div>
                     );
                   })}

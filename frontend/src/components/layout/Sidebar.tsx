@@ -304,7 +304,7 @@ export function Sidebar() {
         )}
       </div>
 
-      
+
 
       <nav className="flex-1 space-y-2 px-3 py-4 overflow-y-auto overflow-x-hidden">
         {/* Dashboard */}
@@ -415,6 +415,7 @@ export function Sidebar() {
         {[
           { name: 'Documents', href: '/documents', icon: FileText },
           { name: 'Calendar', href: '/calendar', icon: Calendar },
+          { name: 'Team Chat', href: '/team-chat', icon: MessageSquare, badge: chatUnreadCount }, // ✅ Badge with count
           { name: 'Quick Notes', href: '/quick-notes', icon: NotebookPen },
         ].map((item) => (
           <NavLink
@@ -428,6 +429,12 @@ export function Sidebar() {
           >
             <div className="relative">
               <item.icon className="h-5 w-5 shrink-0" />
+              {/* ✅ ONLY SHOW BADGE WHEN COUNT > 0 */}
+              {item.badge !== undefined && item.badge > 0 && (
+                <span className="absolute -top-1 -right-1 h-4 min-w-[16px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                  {item.badge > 99 ? '99+' : item.badge}
+                </span>
+              )}
             </div>
             {isExpanded && <span>{item.name}</span>}
           </NavLink>
@@ -515,11 +522,19 @@ export function Sidebar() {
       <div className="border-t p-4">
         <div className={cn("flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-accent cursor-pointer", !isExpanded && "justify-center px-0")} onClick={() => navigate('/profile')}>
           <div className="relative shrink-0 h-9 w-9">
-            <div className={cn("flex h-9 w-9 items-center justify-center rounded-full text-primary-foreground font-bold",
+            <div className={cn("flex h-9 w-9 items-center justify-center rounded-full text-primary-foreground font-bold overflow-hidden",
               !isCollapsed
                 ? "bg-indigo-300 text-white"
                 : "bg-primary text-primary-foreground hover:opacity-90")}>
-              {user?.username?.charAt(0).toUpperCase()}
+              {(user as any)?.avatar ? (
+                <img
+                  src={(user as any).avatar}
+                  alt="Profile"
+                  className="w-full h-full object-cover rounded-full"
+                />
+              ) : (
+                user?.username?.charAt(0).toUpperCase()
+              )}
             </div>
             {user?.is_active && (
               <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-card" />
@@ -534,11 +549,11 @@ export function Sidebar() {
         </div>
 
         {/* ✅ Workspace Section - Only visible when expanded */}
-{isExpanded && (
-  <div className="border-b px-4 py-3">
-    <WorkspaceSwitcher onCreateWorkspace={() => setShowCreateWorkspaceModal(true)} />
-  </div>
-)}
+        {isExpanded && (
+          <div className="border-b px-4 py-3">
+            <WorkspaceSwitcher onCreateWorkspace={() => setShowCreateWorkspaceModal(true)} />
+          </div>
+        )}
 
         {/* ✅ New Workspace Button - Only for admin/manager */}
         {isExpanded && (
