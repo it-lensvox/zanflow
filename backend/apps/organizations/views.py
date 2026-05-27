@@ -498,12 +498,34 @@ class WorkspaceListCreateView(APIView):
         return Response(data)
 
     def post(self, request):
-        """Create a new workspace (admin/manager only)."""
+        """
+        Create a new workspace (admin/manager only).
+        Optionally add members during creation.
+
+        Body:
+        {
+            "name": "Marketing Team",
+            "description": "Optional description",
+            "members": [
+                {"user_id": 5, "role": "member"},
+                {"user_id": 8, "role": "manager"},
+                {"user_id": 12}
+            ]
+        }
+
+        Notes:
+        - "members" is optional. If not provided, only the creator is added.
+        - "role" in each member is optional, defaults to "member".
+        - The creator is always added as "admin" automatically.
+        - Users must belong to the same organization.
+        """
         if request.user.role not in ("admin", "manager"):
             return Response(
                 {"detail": "Only admins and managers can create workspaces."},
                 status=status.HTTP_403_FORBIDDEN,
             )
+
+        User = get_user_model()
 
         name = request.data.get("name")
         if not name:
@@ -512,9 +534,12 @@ class WorkspaceListCreateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        description = request.data.get("description", "")
+
         workspace = Workspace.objects.create(
             organization=request.user.organization,
             name=name,
+            description=description,
             created_by=request.user,
         )
 
@@ -525,16 +550,70 @@ class WorkspaceListCreateView(APIView):
             role="admin",
         )
 
-        return Response(
-            {
-                "id": workspace.id,
-                "name": workspace.name,
-                "slug": workspace.slug,
-                "created_by": workspace.created_by_id,
-                "message": "Workspace created successfully.",
-            },
-            status=status.HTTP_201_CREATED,
-        )
+        # Add members if provided
+        members_data = request.data.get("members", [])
+        added_members = []
+        skipped_members = []
+
+        if isinstance(members_data, list):
+            for member in members_data:
+                # Support both {"user_id": 5, "role": "member"} and just {"user_id": 5}
+                if isinstance(member, dict):
+                    user_id = member.get("user_id")
+                    role = member.get("role", "member")
+                elif isinstance(member, int):
+                    user_id = member
+                    role = "member"
+                else:
+                    continue
+
+                # Skip the creator (already added as admin)
+                if user_id == request.user.id:
+                    continue
+
+                # Validate role
+                if role not in ("admin", "manager", "member"):
+                    role = "member"
+
+                try:
+                    target_user = User.objects.get(
+                        id=user_id,
+                        organization=request.user.organization,
+                    )
+                    WorkspaceMembership.objects.create(
+                        user=target_user,
+                        workspace=workspace,
+                        role=role,
+                    )
+                    added_members.append({
+                        "user_id": target_user.id,
+                        "username": target_user.username,
+                        "role": role,
+                    })
+                except User.DoesNotExist:
+                    skipped_members.append({
+                        "user_id": user_id,
+                        "reason": "User not found or not in your organization.",
+                    })
+                except Exception:
+                    skipped_members.append({
+                        "user_id": user_id,
+                        "reason": "Already a member or invalid data.",
+                    })
+
+        response_data = {
+            "id": workspace.id,
+            "name": workspace.name,
+            "slug": workspace.slug,
+            "created_by": workspace.created_by_id,
+            "members_added": added_members,
+            "message": "Workspace created successfully.",
+        }
+
+        if skipped_members:
+            response_data["members_skipped"] = skipped_members
+
+        return Response(response_data, status=status.HTTP_201_CREATED)
 
 
 class WorkspaceSwitchView(APIView):
