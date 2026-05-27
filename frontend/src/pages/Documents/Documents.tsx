@@ -54,22 +54,46 @@ interface TreeFolder {
   children?: TreeFolder[];
 }
 // ---- TreePanel (collapsible, inline create + rename) ----
-function TreePanel({ folders, onFolderClick, selectedFolder, selectedFolderId, isOpen, onToggle, onCreateFolder, onRenameFolder }: {
+function TreePanel({
+  folders,
+  onFolderClick,
+  selectedFolder,
+  selectedFolderId,
+  isOpen,
+  onToggle,
+  onCreateFolder,
+  onRenameFolder,
+  onDeleteFolder,
+  selectedDocs,
+  setSelectedDocs,
+  setMoveConfirmModal,
+  setToast, // ✅ ADD THIS
+}: {
   folders: TreeFolder[];
   onFolderClick: (name: string, folderId?: string, projectId?: number) => void;
   selectedFolder: string;
-  selectedFolderId: string | null;  // ✅ ADD THIS
+  selectedFolderId: string | null;
   isOpen: boolean;
   onToggle: () => void;
   onCreateFolder: (projectId: number, parentId: string | null, name: string) => void;
   onRenameFolder: (folderId: string, newName: string) => void;
+  onDeleteFolder: (folderId: string) => void;
+  selectedDocs: Set<string>;        // ✅ ADD THIS
+  setSelectedDocs: (docs: Set<string>) => void;  // ✅ ADD THIS
+  setMoveConfirmModal: (modal: any) => void;
+  setToast: (toast: any) => void;
 }) {
+  const queryClient = useQueryClient();  // ✅ Make sure this is here
   const [openNodes, setOpenNodes] = useState<Record<string, boolean>>({ 'All Documents': true });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   // New folder inline state: which project node to show the input under
   const [creatingUnder, setCreatingUnder] = useState<{ projectId: number; nodeKey: string } | null>(null);
+  const [deleteFolderConfirm, setDeleteFolderConfirm] = useState<{ id: string; name: string } | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
+  const [dragHoverTimer, setDragHoverTimer] = useState<NodeJS.Timeout | null>(null);
+  const [autoOpenedNodes, setAutoOpenedNodes] = useState<Set<string>>(new Set());
+  const [isDragging, setIsDragging] = useState(false);
 
   const toggleNode = (n: string) => setOpenNodes((p) => ({ ...p, [n]: !p[n] }));
 
@@ -97,6 +121,42 @@ function TreePanel({ folders, onFolderClick, selectedFolder, selectedFolderId, i
     setCreatingUnder(null); setNewFolderName('');
   };
 
+
+  // ✅ ADD THIS - Reset auto-opened folders when drag ends globally
+  React.useEffect(() => {
+    const handleDragEnd = () => {
+      if (isDragging) {
+        setIsDragging(false);
+        // Close all auto-opened folders
+        setOpenNodes((prev) => {
+          const next = { ...prev };
+          autoOpenedNodes.forEach((nodeKey) => {
+            delete next[nodeKey];
+          });
+          return next;
+        });
+        setAutoOpenedNodes(new Set());
+      }
+    };
+
+    document.addEventListener('dragend', handleDragEnd);
+    document.addEventListener('drop', handleDragEnd);
+
+    return () => {
+      document.removeEventListener('dragend', handleDragEnd);
+      document.removeEventListener('drop', handleDragEnd);
+    };
+  }, [isDragging, autoOpenedNodes]);
+
+  // ✅ ADD THIS - Cleanup timer on unmount
+  React.useEffect(() => {
+    return () => {
+      if (dragHoverTimer) {
+        clearTimeout(dragHoverTimer);
+      }
+    };
+  }, [dragHoverTimer]);
+
   const renderFolder = (f: TreeFolder, depth = 0): React.ReactNode => {
     const nodeKey = f.id || f.name;
     const isO = openNodes[nodeKey] ?? false;
@@ -113,6 +173,138 @@ function TreePanel({ folders, onFolderClick, selectedFolder, selectedFolderId, i
           onMouseEnter={(e) => { if (!isSel) e.currentTarget.style.background = '#f3f4f6'; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = isSel ? '#EEF2FF' : 'transparent'; }}
           onClick={() => { if (hasC) toggleNode(nodeKey); onFolderClick(f.name, f.id, f.projectId); }}
+
+          // ✅ UPDATE DRAG HANDLERS
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = 'move';
+
+            if (!isDragging) {
+              setIsDragging(true);
+            }
+
+            // Visual feedback
+            e.currentTarget.style.background = '#D1FAE5';
+            e.currentTarget.style.borderLeft = '3px solid #10B981';
+
+            // ✅ AUTO-EXPAND: If folder has children and is closed, open it after 800ms hover
+            if (hasC && !isO && !dragHoverTimer) {
+              const timer = setTimeout(() => {
+                setOpenNodes((prev) => ({ ...prev, [nodeKey]: true }));
+                setAutoOpenedNodes((prev) => new Set(prev).add(nodeKey));
+              }, 800);
+
+              setDragHoverTimer(timer);
+            }
+          }}
+          onDragLeave={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            // Check if we're leaving the folder entirely (not just entering a child)
+            const rect = e.currentTarget.getBoundingClientRect();
+            const x = e.clientX;
+            const y = e.clientY;
+
+            const isLeavingFolder = (
+              x < rect.left ||
+              x > rect.right ||
+              y < rect.top ||
+              y > rect.bottom
+            );
+
+            // Remove visual feedback
+            e.currentTarget.style.background = isSel ? '#EEF2FF' : 'transparent';
+            e.currentTarget.style.borderLeft = 'none';
+
+            // Cancel auto-expand timer
+            if (dragHoverTimer) {
+              clearTimeout(dragHoverTimer);
+              setDragHoverTimer(null);
+            }
+
+            // ✅ AUTO-CLOSE: Close this folder and all its children if they were auto-opened
+            if (isLeavingFolder && autoOpenedNodes.has(nodeKey)) {
+              setTimeout(() => {
+                setOpenNodes((prev) => {
+                  const next = { ...prev };
+
+                  // Close this node
+                  delete next[nodeKey];
+
+                  // Also close any child nodes that were auto-opened
+                  const closeChildNodes = (folder: TreeFolder) => {
+                    const childKey = folder.id || folder.name;
+                    if (autoOpenedNodes.has(childKey)) {
+                      delete next[childKey];
+                    }
+                    folder.children?.forEach(closeChildNodes);
+                  };
+
+                  if (f.children) {
+                    f.children.forEach(closeChildNodes);
+                  }
+
+                  return next;
+                });
+
+                // Clear auto-opened tracking
+                setAutoOpenedNodes((prev) => {
+                  const next = new Set(prev);
+                  next.delete(nodeKey);
+                  return next;
+                });
+              }, 100);
+            }
+          }}
+          onDrop={async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            // ✅ CLEAR TIMER on drop
+            if (dragHoverTimer) {
+              clearTimeout(dragHoverTimer);
+              setDragHoverTimer(null);
+            }
+
+            // ✅ RESET drag state
+            setIsDragging(false);
+            setAutoOpenedNodes(new Set());
+
+            // Remove visual feedback
+            e.currentTarget.style.background = isSel ? '#EEF2FF' : 'transparent';
+            e.currentTarget.style.borderLeft = 'none';
+
+            // Get dragged document IDs
+            const documentIdsJson = e.dataTransfer.getData('documentIds');
+            if (!documentIdsJson) return;
+
+            const documentIds: string[] = JSON.parse(documentIdsJson);
+
+            // Determine target project and folder
+            const targetProjectId = f.projectId;
+            const targetFolderId = f.id;
+
+            if (!targetProjectId) {
+              setToast({
+                isOpen: true,
+                type: 'error',
+                message: 'Cannot move documents to "All Documents". Please select a specific project or folder.',
+              });
+              return;
+            }
+
+            // Show confirmation modal
+            const targetName = f.id ? f.name : `${f.name} (root)`;
+            setMoveConfirmModal({
+              isOpen: true,
+              documentIds,
+              targetName,
+              targetProjectId,
+              targetFolderId: targetFolderId || null,
+            });
+          }}
         >
           {hasC ? (
             <ChevronRightIcon className={`w-3 h-3 flex-shrink-0 transition-transform ${isO ? 'rotate-90' : ''}`} style={{ color: '#6b7280' }} />
@@ -152,11 +344,21 @@ function TreePanel({ folders, onFolderClick, selectedFolder, selectedFolderId, i
           </div>
           {/* Rename pencil icon on hover */}
           {f.id && !f.isSystemGenerated && !isEditing && (
-            <button className="opacity-0 group-hover/folder:opacity-100 p-0.5 rounded"
-              style={{ color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer' }}
-              onClick={(e) => { e.stopPropagation(); startRename(f.id!, f.name); }} title="Rename folder">
-              <Pencil className="w-3 h-3" />
-            </button>
+            <>
+              <button className="opacity-0 group-hover/folder:opacity-100 p-0.5 rounded"
+                style={{ color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer' }}
+                onClick={(e) => { e.stopPropagation(); startRename(f.id!, f.name); }} title="Rename folder">
+                <Pencil className="w-3 h-3" />
+              </button>
+              <button className="opacity-0 group-hover/folder:opacity-100 p-0.5 rounded"
+                style={{ color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer' }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDeleteFolderConfirm({ id: f.id!, name: f.name });
+                }} title="Delete folder">
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </>
           )}
         </div>
 
@@ -257,6 +459,43 @@ function TreePanel({ folders, onFolderClick, selectedFolder, selectedFolderId, i
           {/* <button style={{ color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: 4, marginTop: 4 }}><Settings className="w-4 h-4" /></button> */}
         </div>
       )}
+      {/* Delete Folder Confirmation Modal */}
+{deleteFolderConfirm && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+      onClick={() => setDeleteFolderConfirm(null)} />
+    <div className="relative w-full max-w-[400px] rounded-xl shadow-2xl bg-white border border-gray-200 p-6">
+      <div className="flex flex-col items-center text-center space-y-4">
+        <div className="p-3 rounded-full" style={{ background: '#FEE2E2' }}>
+          <Trash2 className="h-6 w-6" style={{ color: '#EF4444' }} />
+        </div>
+        <div className="space-y-1">
+          <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1a1a1a' }}>Delete Folder</h3>
+          <p style={{ fontSize: 14, color: '#6b7280' }}>
+            Are you sure you want to delete <strong style={{ color: '#1a1a1a' }}>"{deleteFolderConfirm.name}"</strong>? This cannot be undone.
+          </p>
+        </div>
+        <div className="flex w-full gap-3 pt-2">
+          <button
+            className="flex-1 py-2.5 rounded-lg font-semibold"
+            style={{ background: '#fff', color: '#1a1a1a', border: '1px solid #e5e7eb', cursor: 'pointer', fontSize: 14 }}
+            onClick={() => setDeleteFolderConfirm(null)}>
+            Cancel
+          </button>
+          <button
+            className="flex-1 py-2.5 rounded-lg font-semibold"
+            style={{ background: '#EF4444', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 14 }}
+            onClick={() => {
+              onDeleteFolder(deleteFolderConfirm.id);
+              setDeleteFolderConfirm(null);
+            }}>
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 }
@@ -845,7 +1084,7 @@ function DocumentInfoPanel({ doc, onClose }: { doc: Document | null; onClose: ()
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [doc, onClose]);
-  
+
   if (!doc) return null;
   const fmtD = (d?: string) => d ? new Date(d).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A';
   const rows: { icon: React.ReactNode; label: string; value: React.ReactNode }[] = [
@@ -857,7 +1096,7 @@ function DocumentInfoPanel({ doc, onClose }: { doc: Document | null; onClose: ()
   if (doc.description) rows.splice(1, 0, { icon: <FileText className="w-4 h-4" style={{ color: '#6b7280' }} />, label: 'Description', value: doc.description });
   return (
     <div className="fixed inset-0 z-50 flex justify-end pointer-events-none">
-      <div ref={panelRef}  className="pointer-events-auto h-full flex flex-col animate-in slide-in-from-right duration-300" style={{ width: 340, background: '#fff', borderLeft: '1px solid #e5e7eb', boxShadow: '0 25px 50px -12px rgba(0,0,0,.25)' }}>
+      <div ref={panelRef} className="pointer-events-auto h-full flex flex-col animate-in slide-in-from-right duration-300" style={{ width: 340, background: '#fff', borderLeft: '1px solid #e5e7eb', boxShadow: '0 25px 50px -12px rgba(0,0,0,.25)' }}>
         <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>
           <div className="flex items-center gap-2"><Info className="w-4 h-4" style={{ color: '#4169FF' }} /><span style={{ fontSize: 14, fontWeight: 600, color: '#1a1a1a' }}>Document Info</span></div>
           <button onClick={onClose} style={{ color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: 6 }}><X className="w-4 h-4" /></button>
@@ -1494,6 +1733,175 @@ function TagSelectorModal({
   );
 }
 
+// ---- MoveConfirmationModal ----
+function MoveConfirmationModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  documentCount,
+  targetName,
+  isMoving,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  documentCount: number;
+  targetName: string;
+  isMoving: boolean;
+}) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-background/60 backdrop-blur-md" onClick={onClose} />
+      <Card className="relative w-full max-w-[450px] shadow-2xl animate-in fade-in zoom-in duration-300">
+        <CardContent className="p-8">
+          <div className="flex flex-col items-center text-center space-y-4">
+            <div className="p-3 rounded-full" style={{ background: '#DBEAFE' }}>
+              <Move className="h-6 w-6" style={{ color: '#2563EB' }} />
+            </div>
+            <div className="space-y-2">
+              <h3 style={{ fontSize: 20, fontWeight: 700, color: '#1a1a1a' }}>
+                Move {documentCount} Document{documentCount !== 1 ? 's' : ''}?
+              </h3>
+              <p style={{ fontSize: 14, color: '#6b7280' }}>
+                Moving to: <strong style={{ color: '#4169FF' }}>{targetName}</strong>
+              </p>
+            </div>
+            <div className="flex w-full gap-4 pt-4">
+              <button
+                className="flex-1 py-2.5 rounded-lg font-semibold"
+                style={{ background: '#fff', color: '#1a1a1a', border: '1px solid #e5e7eb', cursor: 'pointer' }}
+                onClick={onClose}
+                disabled={isMoving}
+              >
+                Cancel
+              </button>
+              <button
+                className="flex-1 py-2.5 rounded-lg font-semibold flex items-center justify-center gap-2"
+                style={{
+                  background: isMoving ? '#a5b4fc' : '#4169FF',
+                  color: '#fff',
+                  border: 'none',
+                  cursor: isMoving ? 'not-allowed' : 'pointer'
+                }}
+                onClick={onConfirm}
+                disabled={isMoving}
+              >
+                {isMoving ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Moving...
+                  </>
+                ) : (
+                  <>
+                    <Move className="w-4 h-4" />
+                    Move
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ---- Toast Notification ----
+function Toast({
+  isOpen,
+  type,
+  message,
+  onClose,
+}: {
+  isOpen: boolean;
+  type: 'success' | 'error';
+  message: string;
+  onClose: () => void;
+}) {
+  React.useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => {
+        onClose();
+      }, 4000); // Auto-close after 4 seconds
+
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed top-4 right-4 z-[100] animate-in slide-in-from-top duration-300">
+      <div
+        className="flex items-center gap-3 rounded-lg shadow-2xl"
+        style={{
+          padding: '16px 20px',
+          background: '#fff',
+          border: `1px solid ${type === 'success' ? '#10B981' : '#EF4444'}`,
+          minWidth: 320,
+          maxWidth: 500,
+        }}
+      >
+        {/* Icon */}
+        <div
+          className="rounded-full flex items-center justify-center flex-shrink-0"
+          style={{
+            width: 32,
+            height: 32,
+            background: type === 'success' ? '#D1FAE5' : '#FEE2E2',
+          }}
+        >
+          {type === 'success' ? (
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="#10B981"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+          ) : (
+            <X className="w-5 h-5" style={{ color: '#EF4444' }} />
+          )}
+        </div>
+
+        {/* Message */}
+        <p
+          className="flex-1"
+          style={{
+            fontSize: 14,
+            fontWeight: 500,
+            color: '#1a1a1a',
+          }}
+        >
+          {message}
+        </p>
+
+        {/* Close Button */}
+        <button
+          onClick={onClose}
+          style={{
+            color: '#6b7280',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 4,
+          }}
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ========== MAIN COMPONENT ==========
 export function Documents() {
   const queryClient = useQueryClient();
@@ -1522,6 +1930,19 @@ export function Documents() {
   const [newDocContent, setNewDocContent] = useState('');
   const [newDocFormat, setNewDocFormat] = useState('txt');
   const [customFormat, setCustomFormat] = useState('');
+  const [moveConfirmModal, setMoveConfirmModal] = useState<{
+    isOpen: boolean;
+    documentIds: string[];
+    targetName: string;
+    targetProjectId: number;
+    targetFolderId: string | null;
+  } | null>(null);
+
+  const [toast, setToast] = useState<{
+    isOpen: boolean;
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
 
   const { viewMode, setViewMode } = useViewMode({ defaultMode: 'table' });
   const projectFilter = searchParams.get('project') || '';
@@ -2134,6 +2555,27 @@ export function Documents() {
             onToggle={() => setIsTreeOpen((p) => !p)}
             onCreateFolder={handleCreateFolder}
             onRenameFolder={handleRenameFolder}
+            onDeleteFolder={async (folderId) => {
+              try {
+                await documentsApi.deleteFolder(folderId);
+                // Refresh folders
+                queryClient.invalidateQueries({ queryKey: ['document-folders'] });
+                queryClient.invalidateQueries({ queryKey: ['documents'] });
+                queryClient.invalidateQueries({ queryKey: ['documents-tree-counts'] });
+                setToast({ isOpen: true, type: 'success', message: 'Folder deleted successfully' });
+              } catch (error: any) {
+                // Handle 403 - system folder
+                if (error?.response?.status === 403) {
+                  setToast({ isOpen: true, type: 'error', message: 'Cannot delete system folders.' });
+                } else {
+                  setToast({ isOpen: true, type: 'error', message: 'Failed to delete folder. Please try again.' });
+                }
+              }
+            }}
+            selectedDocs={selectedDocs}              // ✅ ADD THIS
+            setSelectedDocs={setSelectedDocs}
+            setMoveConfirmModal={setMoveConfirmModal}
+            setToast={setToast}
           />
 
           <div className="flex-1 flex flex-col overflow-hidden">
@@ -2192,7 +2634,6 @@ export function Documents() {
                       </div>
                     ),
                     emptyState,
-                    gridClassName: 'grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
                   }}
                   tableProps={{
                     data: displayedDocuments,
@@ -2200,7 +2641,50 @@ export function Documents() {
                     rowKey: (d: Document) => d.id,
                     onRowClick: (d: Document) => handleDocumentClick(d),
                     emptyState,
-                    rowClassName: (d: Document) => `group ${selectedDocs.has(d.id) ? 'bg-[#EEF2FF]' : ''}`
+
+                    // ✅ ADD THIS
+                    rowProps: (doc: Document) => ({
+                      draggable: selectedDocs.has(doc.id),
+                      className: selectedDocs.has(doc.id) ? 'cursor-grab active:cursor-grabbing' : '',
+                      style: {
+                        opacity: selectedDocs.has(doc.id) ? 0.95 : 1,
+                      },
+                      onDragStart: (e: React.DragEvent) => {
+                        e.stopPropagation();
+
+                        // If dragging a non-selected doc, select it first
+                        if (!selectedDocs.has(doc.id)) {
+                          setSelectedDocs(new Set([doc.id]));
+                          e.dataTransfer.setData('documentIds', JSON.stringify([doc.id]));
+                        } else {
+                          // Dragging selected doc(s)
+                          e.dataTransfer.setData('documentIds', JSON.stringify(Array.from(selectedDocs)));
+                        }
+
+                        e.dataTransfer.effectAllowed = 'move';
+
+                        // Visual feedback - custom drag image
+                        const dragImage = document.createElement('div');
+                        dragImage.style.cssText = `
+                          position: absolute;
+                          top: -1000px;
+                          padding: 12px 20px;
+                          background: #4169FF;
+                          color: white;
+                          border-radius: 8px;
+                          font-size: 14px;
+                          font-weight: 600;
+                          box-shadow: 0 4px 12px rgba(65, 105, 255, 0.3);
+                        `;
+                        dragImage.textContent = `Moving ${selectedDocs.size} document${selectedDocs.size > 1 ? 's' : ''}`;
+                        document.body.appendChild(dragImage);
+                        e.dataTransfer.setDragImage(dragImage, 0, 0);
+                        setTimeout(() => document.body.removeChild(dragImage), 0);
+                      },
+                      onDragEnd: (e: React.DragEvent) => {
+                        e.stopPropagation();
+                      },
+                    })
                   }}
                 />
               )}
@@ -2244,7 +2728,54 @@ export function Documents() {
       <DocumentInfoPanel doc={infoDoc} onClose={() => setInfoDoc(null)} />
       {previewDoc && <DocumentPreview url={previewDoc.url} fileName={previewDoc.fileName} fileType={previewDoc.fileType} onClose={() => setPreviewDoc(null)} />}
       <DocumentShareModal isOpen={!!shareDoc} onClose={() => setShareDoc(null)} document={shareDoc} />
+      {/* Move Confirmation Modal */}
+      {moveConfirmModal && (
+        <MoveConfirmationModal
+          isOpen={moveConfirmModal.isOpen}
+          onClose={() => setMoveConfirmModal(null)}
+          documentCount={moveConfirmModal.documentIds.length}
+          targetName={moveConfirmModal.targetName}
+          isMoving={false}
+          onConfirm={async () => {
+            try {
+              // Move documents
+              for (const docId of moveConfirmModal.documentIds) {
+                await documentsApi.update(docId, {
+                  project: moveConfirmModal.targetProjectId,
+                  folder: moveConfirmModal.targetFolderId || null
+                } as any);
+              }
 
+              // Clear selection and refresh
+              setSelectedDocs(new Set());
+              queryClient.invalidateQueries({ queryKey: ['documents'] });
+              queryClient.invalidateQueries({ queryKey: ['document-folders'] });
+              queryClient.invalidateQueries({ queryKey: ['documents-tree-counts'] });
+
+              // Close modal
+              setMoveConfirmModal(null);
+
+              // ✅ SHOW SUCCESS TOAST INSTEAD OF ALERT
+              setToast({
+                isOpen: true,
+                type: 'success',
+                message: `Successfully moved ${moveConfirmModal.documentIds.length} document${moveConfirmModal.documentIds.length > 1 ? 's' : ''} to "${moveConfirmModal.targetName}"`,
+              });
+            } catch (error: any) {
+              console.error('Failed to move documents:', error);
+
+              // ✅ SHOW ERROR TOAST INSTEAD OF ALERT
+              setToast({
+                isOpen: true,
+                type: 'error',
+                message: error.response?.data?.detail || 'Failed to move documents',
+              });
+
+              setMoveConfirmModal(null);
+            }
+          }}
+        />
+      )}
       {/* Tag Selector Modal */}
       <TagSelectorModal
         isOpen={showTagSelector}
@@ -2549,6 +3080,14 @@ export function Documents() {
             </div>
           </div>
         </div>
+      )}
+      {toast && (
+        <Toast
+          isOpen={toast.isOpen}
+          type={toast.type}
+          message={toast.message}
+          onClose={() => setToast(null)}
+        />
       )}
     </div>
   );
