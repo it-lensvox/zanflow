@@ -149,7 +149,7 @@ export const authApi = {
   // Update profile fields (first_name, last_name, avatar)
   updateProfile: async (data: FormData | { first_name?: string; last_name?: string }) => {
     const isFormData = data instanceof FormData;
-  
+
     if (isFormData) {
       // ✅ Let browser auto-set Content-Type with boundary for multipart
       const response = await api.patch('/auth/me/', data, {
@@ -157,7 +157,7 @@ export const authApi = {
       });
       return response.data;
     }
-  
+
     // ✅ JSON for name/text updates
     const response = await api.patch('/auth/me/', data);
     return response.data;
@@ -1764,11 +1764,11 @@ export const workspaceApi = {
 
     if (!response.ok) {
       const errorData = await response.json();
-      
+
       if (response.status === 403) {
         throw new Error('Only the person who created this workspace can delete it.');
       }
-      
+
       if (response.status === 400) {
         throw new Error(errorData.message || 'Cannot delete workspace');
       }
@@ -1855,7 +1855,7 @@ export const workspaceApi = {
   },
 
   // 2️⃣ CREATE NEW WORKSPACE
-  async createWorkspace(name: string, description?: string) {
+  async createWorkspace(name: string, description?: string, members?: { user_id: number; role: string }[]) {
     const token = localStorage.getItem('access_token');
 
     if (!token) {
@@ -1869,7 +1869,11 @@ export const workspaceApi = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify({ name, description })
+      body: JSON.stringify({
+        name,
+        ...(description && { description }),
+        ...(members && members.length > 0 && { members }),
+      })
     });
 
     if (!response.ok) {
@@ -1886,38 +1890,38 @@ export const workspaceApi = {
   },
 
   // 3️⃣ SWITCH WORKSPACE
-async switchWorkspace(workspaceId: number) {
-  const token = localStorage.getItem('access_token');
+  async switchWorkspace(workspaceId: number) {
+    const token = localStorage.getItem('access_token');
 
-  if (!token) {
-    throw new Error('Not authenticated');
-  }
-
-  const response = await fetch(`${API_URL}/organizations/workspaces/${workspaceId}/switch/`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
+    if (!token) {
+      throw new Error('Not authenticated');
     }
-  });
 
-  if (!response.ok) {
-    throw new Error('Failed to switch workspace');
-  }
+    const response = await fetch(`${API_URL}/organizations/workspaces/${workspaceId}/switch/`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
 
-  const data = await response.json();
+    if (!response.ok) {
+      throw new Error('Failed to switch workspace');
+    }
 
-  // ✅ 1. Update localStorage
-  localStorage.setItem('active_workspace_id', String(workspaceId));
-  
-  // ✅ 2. Update axios default header immediately
-  api.defaults.headers.common['X-Workspace-ID'] = String(workspaceId);
-  
-  console.log(`✅ Workspace switched to ${workspaceId}, axios header updated`);
+    const data = await response.json();
 
-  return data;
-},
+    // ✅ 1. Update localStorage
+    localStorage.setItem('active_workspace_id', String(workspaceId));
+
+    // ✅ 2. Update axios default header immediately
+    api.defaults.headers.common['X-Workspace-ID'] = String(workspaceId);
+
+    console.log(`✅ Workspace switched to ${workspaceId}, axios header updated`);
+
+    return data;
+  },
 
   // 4️⃣ GET WORKSPACE DETAILS (✅ YOU REMOVED THIS - KEEP IT!)
   async getWorkspaceDetails(workspaceId: number) {
