@@ -11,9 +11,9 @@ import type {
 //export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.164:8000/api/v1';
 //const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://192.168.1.164:8000/ws/gateway';
 //const WS_AI_BOT_URL = (import.meta as any).env.VITE_WS_AI_BOT_URL || 'ws://192.168.1.164:8000/ws/ai-bot/';
-export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.164:8000/api/v1';
-const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://192.168.1.164:8000/ws/gateway';
-const WS_AI_BOT_URL = (import.meta as any).env.VITE_WS_AI_BOT_URL || 'ws://192.168.1.164:8000/ws/ai-bot/';
+export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.220:8000/api/v1';
+const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://192.168.1.220:8000/ws/gateway';
+const WS_AI_BOT_URL = (import.meta as any).env.VITE_WS_AI_BOT_URL || 'ws://192.168.1.220:8000/ws/ai-bot/';
 // export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://zanflow.lensvox.com/api/v1';
 export const api = axios.create({
   baseURL: API_URL,
@@ -157,6 +157,9 @@ api.interceptors.response.use(
         // Update default header
         api.defaults.headers.common['Authorization'] = `Bearer ${access}`;
 
+        // Schedule next proactive refresh
+        scheduleProactiveRefresh();
+
         // Resolve all queued requests with new token
         processQueue(null, access);
 
@@ -190,6 +193,83 @@ export const clearTokens = (): void => {
   localStorage.removeItem(TOKEN_KEY);
 };
 
+// ═══════════════════════════════════════════════════════════════════
+// PROACTIVE TOKEN REFRESH
+// Refreshes the token BEFORE it expires so HTTP and WebSocket
+// never see an expired token. No more 403s, no WS disconnects.
+// ═══════════════════════════════════════════════════════════════════
+let proactiveRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+function decodeTokenExp(token: string): number | null {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.exp ? payload.exp * 1000 : null; // convert to ms
+  } catch {
+    return null;
+  }
+}
+
+function scheduleProactiveRefresh() {
+  // Clear any existing timer
+  if (proactiveRefreshTimer) {
+    clearTimeout(proactiveRefreshTimer);
+    proactiveRefreshTimer = null;
+  }
+
+  const accessToken = localStorage.getItem('access_token');
+  if (!accessToken) return;
+
+  const expMs = decodeTokenExp(accessToken);
+  if (!expMs) return;
+
+  // Refresh 2 minutes before expiry (or halfway if token lives < 4 min)
+  const now = Date.now();
+  const timeUntilExpiry = expMs - now;
+  const refreshIn = Math.max(timeUntilExpiry - 120000, timeUntilExpiry / 2, 5000);
+
+  console.log(`🔄 Token refresh scheduled in ${Math.round(refreshIn / 1000)}s`);
+
+  proactiveRefreshTimer = setTimeout(async () => {
+    try {
+      const refreshToken = localStorage.getItem('refresh_token');
+      if (!refreshToken) return;
+
+      const response = await axios.post(`${API_URL}/auth/refresh/`, {
+        refresh: refreshToken
+      });
+
+      const { access, refresh } = response.data;
+
+      // Update all token stores
+      localStorage.setItem('access_token', access);
+      if (refresh) {
+        localStorage.setItem('refresh_token', refresh);
+      }
+      setTokens({ access, refresh: refresh || refreshToken });
+      api.defaults.headers.common['Authorization'] = `Bearer ${access}`;
+
+      console.log('🔄 Token proactively refreshed');
+
+      // Schedule next refresh
+      scheduleProactiveRefresh();
+    } catch (error) {
+      console.warn('Proactive refresh failed, will retry on next API call');
+    }
+  }, refreshIn);
+}
+
+// Start the timer whenever tokens change
+export function startProactiveRefresh() {
+  scheduleProactiveRefresh();
+}
+
+export function stopProactiveRefresh() {
+  if (proactiveRefreshTimer) {
+    clearTimeout(proactiveRefreshTimer);
+    proactiveRefreshTimer = null;
+  }
+}
+
 // Auth API
 export const authApi = {
   login: async (username: string, password: string) => {
@@ -198,12 +278,18 @@ export const authApi = {
       password,
     });
     setTokens(response.data);
+    localStorage.setItem('access_token', response.data.access);
+    localStorage.setItem('refresh_token', response.data.refresh);
     api.defaults.headers.common['Authorization'] = `Bearer ${response.data.access}`;
+    startProactiveRefresh();
     return response.data;
   },
 
   logout: () => {
+    stopProactiveRefresh();
     clearTokens();
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
     delete api.defaults.headers.common['Authorization'];
   },
 
@@ -1928,5 +2014,9 @@ export const workspaceApi = {
   }
 };
 
+// ✅ Auto-start proactive refresh if user is already logged in (page reload)
+if (localStorage.getItem('access_token')) {
+  startProactiveRefresh();
+}
 
 export default api;
