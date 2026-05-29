@@ -53,15 +53,84 @@ api.interceptors.request.use(
   }
 );
 
-// ✅ Response interceptor for token refresh
+// ✅ Response interceptor for token refresh with queue
+// Only refreshes on ACTUAL auth failures, not permission errors
+let isRefreshingToken = false;
+let failedRequestsQueue: Array<{
+  resolve: (value: any) => void;
+  reject: (reason?: any) => void;
+}> = [];
+
+const processQueue = (error: any, token: string | null = null) => {
+  failedRequestsQueue.forEach(({ resolve, reject }) => {
+    if (error) {
+      reject(error);
+    } else {
+      resolve(token);
+    }
+  });
+  failedRequestsQueue = [];
+};
+
+// Check if a 403 is an auth issue (expired token) vs a permission issue
+const isAuthError = (error: any): boolean => {
+  const status = error.response?.status;
+  
+  // 401 is always an auth issue
+  if (status === 401) return true;
+  
+  // For 403, check the response body to distinguish auth vs permission
+  if (status === 403) {
+    const data = error.response?.data;
+    const detail = (data?.detail || '').toLowerCase();
+    const code = data?.code || '';
+    
+    // These indicate expired/missing token (should refresh)
+    if (
+      code === 'not_authenticated' ||
+      code === 'token_not_valid' ||
+      detail.includes('authentication credentials were not provided') ||
+      detail.includes('token not valid') ||
+      detail.includes('token is invalid or expired')
+    ) {
+      return true;
+    }
+    
+    // Everything else is a permission error (don't refresh)
+    // e.g. "Only admins can create workspaces", "You are not a member"
+    return false;
+  }
+  
+  return false;
+};
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    // If 401 and not already retrying, try to refresh token
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (isAuthError(error) && !originalRequest._retry) {
+      // Don't retry the refresh endpoint itself
+      if (originalRequest.url?.includes('/auth/refresh')) {
+        localStorage.clear();
+        window.location.href = '/login';
+        return Promise.reject(error);
+      }
+
       originalRequest._retry = true;
+
+      // If already refreshing, queue this request and wait
+      if (isRefreshingToken) {
+        return new Promise((resolve, reject) => {
+          failedRequestsQueue.push({ resolve, reject });
+        }).then((token) => {
+          originalRequest.headers['Authorization'] = `Bearer ${token}`;
+          return api(originalRequest);
+        });
+      }
+
+      // First failed request — start the refresh
+      isRefreshingToken = true;
 
       try {
         const refreshToken = localStorage.getItem('refresh_token');
@@ -69,21 +138,38 @@ api.interceptors.response.use(
           throw new Error('No refresh token');
         }
 
-        const response = await axios.post(`${API_URL}/auth/token/refresh/`, {
+        const response = await axios.post(`${API_URL}/auth/refresh/`, {
           refresh: refreshToken
         });
 
-        const { access } = response.data;
-        localStorage.setItem('access_token', access);
+        const { access, refresh } = response.data;
 
-        // Retry original request with new token
+        // ✅ Save to individual keys (used by axios interceptor)
+        localStorage.setItem('access_token', access);
+        if (refresh) {
+          localStorage.setItem('refresh_token', refresh);
+        }
+
+        // ✅ Save to zanflow_tokens (used by WebSockets and getTokens())
+        // This ensures WebSocket reconnection picks up the new token
+        setTokens({ access, refresh: refresh || refreshToken });
+
+        // Update default header
+        api.defaults.headers.common['Authorization'] = `Bearer ${access}`;
+
+        // Resolve all queued requests with new token
+        processQueue(null, access);
+
+        // Retry the original request
         originalRequest.headers['Authorization'] = `Bearer ${access}`;
         return api(originalRequest);
       } catch (refreshError) {
-        // Refresh failed, redirect to login
+        processQueue(refreshError, null);
         localStorage.clear();
         window.location.href = '/login';
         return Promise.reject(refreshError);
+      } finally {
+        isRefreshingToken = false;
       }
     }
 
@@ -103,10 +189,6 @@ export const setTokens = (tokens: AuthTokens): void => {
 export const clearTokens = (): void => {
   localStorage.removeItem(TOKEN_KEY);
 };
-
-// Token refresh mutex
-let isRefreshing = false;
-let refreshPromise: Promise<AuthTokens> | null = null;
 
 // Auth API
 export const authApi = {
@@ -874,14 +956,15 @@ export class GatewayWebSocketService {
       return;
     }
 
-    const tokens = getTokens();
-    if (!tokens?.access) {
+    // Read token from the same key the interceptor updates
+    const token = localStorage.getItem('access_token');
+    if (!token) {
       console.error("No access token available for Gateway WebSocket");
       return;
     }
 
     // New Gateway WebSocket URL
-    const wsUrl = `${WS_GATEWAY_URL}/?token=${tokens.access}`;
+    const wsUrl = `${WS_GATEWAY_URL}/?token=${token}`;
 
     this.ws = new WebSocket(wsUrl);
 
@@ -1030,15 +1113,15 @@ export class NotificationWebSocketService {
       return;
     }
 
-    const tokens = getTokens();
-    if (!tokens?.access) {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
       console.error('❌ No access token available for Notification WebSocket');
       return;
     }
 
     this.isConnecting = true;
 
-    const wsUrl = `${WS_GATEWAY_URL}/?token=${tokens.access}`;
+    const wsUrl = `${WS_GATEWAY_URL}/?token=${token}`;
 
     try {
       this.ws = new WebSocket(wsUrl);
@@ -1746,62 +1829,19 @@ export const workspaceApi = {
   },
 
   async deleteWorkspace(workspaceId: number) {
-    const token = localStorage.getItem('access_token');
-
-    if (!token) {
-      throw new Error('Not authenticated');
-    }
-
-    const response = await fetch(`${API_URL}/organizations/workspaces/${workspaceId}/delete/`, {
-      method: 'DELETE',
-      credentials: 'include',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ confirm: 'DELETE' })
+    const response = await api.delete(`/organizations/workspaces/${workspaceId}/delete/`, {
+      data: { confirm: 'DELETE' }
     });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-
-      if (response.status === 403) {
-        throw new Error('Only the person who created this workspace can delete it.');
-      }
-
-      if (response.status === 400) {
-        throw new Error(errorData.message || 'Cannot delete workspace');
-      }
-
-      throw new Error('Failed to delete workspace');
-    }
-
-    return response.json();
+    return response.data;
   },
+
   // 1️⃣ LIST MY WORKSPACES
   async getWorkspaces() {
-    const token = localStorage.getItem('access_token');
+    const response = await api.get('/organizations/workspaces/');
+    const data = response.data;
 
-    if (!token) {
-      throw new Error('Not authenticated');
-    }
-
-    const response = await fetch(`${API_URL}/organizations/workspaces/`, {
-      credentials: 'include',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch workspaces');
-    }
-
-    const data = await response.json();
     console.log('✅ Raw backend response:', data);
 
-    // ✅ Handle both response formats (array or object)
     let normalizedData;
 
     if (Array.isArray(data)) {
@@ -1810,16 +1850,13 @@ export const workspaceApi = {
       const storedId = localStorage.getItem('active_workspace_id');
       const storedIdNum = storedId ? parseInt(storedId) : null;
 
-      // ✅ Validate stored ID exists in workspace list
-      const storedExists = storedIdNum && data.some(w => w.id === storedIdNum);
+      const storedExists = storedIdNum && data.some((w: any) => w.id === storedIdNum);
 
-      // ✅ Choose active workspace
       let activeId;
       if (storedExists) {
         activeId = storedIdNum;
       } else {
-        // Use default workspace or first workspace
-        const defaultWorkspace = data.find(w => w.is_default);
+        const defaultWorkspace = data.find((w: any) => w.is_default);
         activeId = defaultWorkspace?.id || data[0]?.id;
 
         if (storedIdNum && !storedExists) {
@@ -1827,7 +1864,6 @@ export const workspaceApi = {
         }
       }
 
-      // ✅ Update localStorage if needed
       if (activeId && activeId !== storedIdNum) {
         localStorage.setItem('active_workspace_id', String(activeId));
         console.log(`🔄 Updated workspace ID from ${storedIdNum} to ${activeId}`);
@@ -1838,10 +1874,8 @@ export const workspaceApi = {
         workspaces: data
       };
     } else {
-      // Backend returned proper object format
       normalizedData = data;
 
-      // Still validate and update if needed
       const storedId = localStorage.getItem('active_workspace_id');
       if (data.active_workspace_id && storedId !== String(data.active_workspace_id)) {
         localStorage.setItem('active_workspace_id', String(data.active_workspace_id));
@@ -1850,67 +1884,23 @@ export const workspaceApi = {
     }
 
     console.log('✅ Normalized data:', normalizedData);
-
     return normalizedData;
   },
 
   // 2️⃣ CREATE NEW WORKSPACE
   async createWorkspace(name: string, description?: string, members?: { user_id: number; role: string }[]) {
-    const token = localStorage.getItem('access_token');
-
-    if (!token) {
-      throw new Error('Not authenticated');
-    }
-
-    const response = await fetch(`${API_URL}/organizations/workspaces/`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        name,
-        ...(description && { description }),
-        ...(members && members.length > 0 && { members }),
-      })
+    const response = await api.post('/organizations/workspaces/', {
+      name,
+      ...(description && { description }),
+      ...(members && members.length > 0 && { members }),
     });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-
-      if (response.status === 403) {
-        throw new Error('Only admins and managers can create workspaces');
-      }
-
-      throw new Error(errorData.detail || errorData.name?.[0] || 'Failed to create workspace');
-    }
-
-    return response.json();
+    return response.data;
   },
 
   // 3️⃣ SWITCH WORKSPACE
   async switchWorkspace(workspaceId: number) {
-    const token = localStorage.getItem('access_token');
-
-    if (!token) {
-      throw new Error('Not authenticated');
-    }
-
-    const response = await fetch(`${API_URL}/organizations/workspaces/${workspaceId}/switch/`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to switch workspace');
-    }
-
-    const data = await response.json();
+    const response = await api.post(`/organizations/workspaces/${workspaceId}/switch/`);
+    const data = response.data;
 
     // ✅ 1. Update localStorage
     localStorage.setItem('active_workspace_id', String(workspaceId));
@@ -1919,26 +1909,13 @@ export const workspaceApi = {
     api.defaults.headers.common['X-Workspace-ID'] = String(workspaceId);
 
     console.log(`✅ Workspace switched to ${workspaceId}, axios header updated`);
-
     return data;
   },
 
-  // 4️⃣ GET WORKSPACE DETAILS (✅ YOU REMOVED THIS - KEEP IT!)
+  // 4️⃣ GET WORKSPACE DETAILS
   async getWorkspaceDetails(workspaceId: number) {
-    const token = localStorage.getItem('access_token');
-
-    const response = await fetch(`${API_URL}/organizations/workspaces/${workspaceId}/`, {
-      credentials: 'include',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch workspace details');
-    }
-
-    return response.json();
+    const response = await api.get(`/organizations/workspaces/${workspaceId}/`);
+    return response.data;
   },
 
   // Helper methods

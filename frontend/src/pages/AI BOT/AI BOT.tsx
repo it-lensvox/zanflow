@@ -18,15 +18,12 @@ function clampAI(val: number, min: number, max: number) {
 }
 
 function getInitialAIBotPos(): { x: number; y: number } {
-  try {
-    const raw = localStorage.getItem(AIBOT_POS_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch { }
-  return {
-    x: window.innerWidth - AIBOT_FAB_SIZE - 24,
-    y: window.innerHeight - AIBOT_FAB_SIZE - 80,
-  };
-}
+    // ✅ Always default to bottom right corner
+    return {
+      x: window.innerWidth - AIBOT_FAB_SIZE - 24,
+      y: window.innerHeight - AIBOT_FAB_SIZE - 80,
+    };
+  }
 
 // Storage helpers
 

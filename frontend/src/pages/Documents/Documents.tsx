@@ -283,8 +283,17 @@ function TreePanel({
             const documentIds: string[] = JSON.parse(documentIdsJson);
 
             // Determine target project and folder
+            // Determine target project and folder
             const targetProjectId = f.projectId;
             const targetFolderId = f.id;
+
+            // ✅ DEBUG - remove after fix
+            console.log('🎯 Drop target debug:', {
+              folderName: f.name,
+              folderId: f.id,
+              projectId: f.projectId,
+              isSubfolder: !!f.id,
+            });
 
             if (!targetProjectId) {
               setToast({
@@ -460,42 +469,42 @@ function TreePanel({
         </div>
       )}
       {/* Delete Folder Confirmation Modal */}
-{deleteFolderConfirm && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-      onClick={() => setDeleteFolderConfirm(null)} />
-    <div className="relative w-full max-w-[400px] rounded-xl shadow-2xl bg-white border border-gray-200 p-6">
-      <div className="flex flex-col items-center text-center space-y-4">
-        <div className="p-3 rounded-full" style={{ background: '#FEE2E2' }}>
-          <Trash2 className="h-6 w-6" style={{ color: '#EF4444' }} />
+      {deleteFolderConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setDeleteFolderConfirm(null)} />
+          <div className="relative w-full max-w-[400px] rounded-xl shadow-2xl bg-white border border-gray-200 p-6">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="p-3 rounded-full" style={{ background: '#FEE2E2' }}>
+                <Trash2 className="h-6 w-6" style={{ color: '#EF4444' }} />
+              </div>
+              <div className="space-y-1">
+                <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1a1a1a' }}>Delete Folder</h3>
+                <p style={{ fontSize: 14, color: '#6b7280' }}>
+                  Are you sure you want to delete <strong style={{ color: '#1a1a1a' }}>"{deleteFolderConfirm.name}"</strong>? This cannot be undone.
+                </p>
+              </div>
+              <div className="flex w-full gap-3 pt-2">
+                <button
+                  className="flex-1 py-2.5 rounded-lg font-semibold"
+                  style={{ background: '#fff', color: '#1a1a1a', border: '1px solid #e5e7eb', cursor: 'pointer', fontSize: 14 }}
+                  onClick={() => setDeleteFolderConfirm(null)}>
+                  Cancel
+                </button>
+                <button
+                  className="flex-1 py-2.5 rounded-lg font-semibold"
+                  style={{ background: '#EF4444', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 14 }}
+                  onClick={() => {
+                    onDeleteFolder(deleteFolderConfirm.id);
+                    setDeleteFolderConfirm(null);
+                  }}>
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-        <div className="space-y-1">
-          <h3 style={{ fontSize: 18, fontWeight: 700, color: '#1a1a1a' }}>Delete Folder</h3>
-          <p style={{ fontSize: 14, color: '#6b7280' }}>
-            Are you sure you want to delete <strong style={{ color: '#1a1a1a' }}>"{deleteFolderConfirm.name}"</strong>? This cannot be undone.
-          </p>
-        </div>
-        <div className="flex w-full gap-3 pt-2">
-          <button
-            className="flex-1 py-2.5 rounded-lg font-semibold"
-            style={{ background: '#fff', color: '#1a1a1a', border: '1px solid #e5e7eb', cursor: 'pointer', fontSize: 14 }}
-            onClick={() => setDeleteFolderConfirm(null)}>
-            Cancel
-          </button>
-          <button
-            className="flex-1 py-2.5 rounded-lg font-semibold"
-            style={{ background: '#EF4444', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 14 }}
-            onClick={() => {
-              onDeleteFolder(deleteFolderConfirm.id);
-              setDeleteFolderConfirm(null);
-            }}>
-            Delete
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-)}
+      )}
     </div>
   );
 }
@@ -2218,23 +2227,32 @@ export function Documents() {
 
   const treeFolders: TreeFolder[] = (() => {
     const projectChildren: TreeFolder[] = projects.map((p) => {
-      const projectFolders = backendFolders
-        .filter((f) => f.project === p.id && f.parent === null)
-        .map((f) => {
-          const subfolderCount = backendFolders.filter(
-            (sub) => sub.parent === f.id
-          ).length;
-
-          return {
+      // AFTER ✅ — recursively build children with projectId
+      const buildChildren = (parentId: string, projectId: number): TreeFolder[] => {
+        return backendFolders
+          .filter((f) => f.parent === parentId)
+          .map((f) => ({
             id: f.id,
             name: f.name,
             count: f.document_count ?? 0,
-            folderCount: subfolderCount,
-            projectId: p.id,
+            folderCount: backendFolders.filter(sub => sub.parent === f.id).length,
+            projectId: projectId,  // ✅ pass projectId down to every child
             isSystemGenerated: f.is_system_generated || false,
-            children: [] as TreeFolder[],
-          };
-        });
+            children: buildChildren(f.id, projectId), // ✅ recursive
+          }));
+      };
+
+      const projectFolders = backendFolders
+        .filter((f) => f.project === p.id && f.parent === null)
+        .map((f) => ({
+          id: f.id,
+          name: f.name,
+          count: f.document_count ?? 0,
+          folderCount: backendFolders.filter(sub => sub.parent === f.id).length,
+          projectId: p.id,  // ✅ top-level folder has projectId
+          isSystemGenerated: f.is_system_generated || false,
+          children: buildChildren(f.id, p.id),  // ✅ children also get projectId
+        }));
 
       // ✅ CORRECT - Use allDocsForTree (not filtered by project)
       const projectDocCount = allDocsForTree.filter(
@@ -2644,7 +2662,7 @@ export function Documents() {
 
                     // ✅ ADD THIS
                     rowProps: (doc: Document) => ({
-                      draggable: selectedDocs.has(doc.id),
+                      draggable: true,
                       className: selectedDocs.has(doc.id) ? 'cursor-grab active:cursor-grabbing' : '',
                       style: {
                         opacity: selectedDocs.has(doc.id) ? 0.95 : 1,
@@ -2652,12 +2670,10 @@ export function Documents() {
                       onDragStart: (e: React.DragEvent) => {
                         e.stopPropagation();
 
-                        // If dragging a non-selected doc, select it first
                         if (!selectedDocs.has(doc.id)) {
-                          setSelectedDocs(new Set([doc.id]));
                           e.dataTransfer.setData('documentIds', JSON.stringify([doc.id]));
                         } else {
-                          // Dragging selected doc(s)
+                          // ✅ If doc IS selected, drag all selected docs together
                           e.dataTransfer.setData('documentIds', JSON.stringify(Array.from(selectedDocs)));
                         }
 
@@ -2676,7 +2692,8 @@ export function Documents() {
                           font-weight: 600;
                           box-shadow: 0 4px 12px rgba(65, 105, 255, 0.3);
                         `;
-                        dragImage.textContent = `Moving ${selectedDocs.size} document${selectedDocs.size > 1 ? 's' : ''}`;
+                        const dragCount = selectedDocs.has(doc.id) ? selectedDocs.size : 1;
+                        dragImage.textContent = `Moving ${dragCount} document${dragCount > 1 ? 's' : ''}`;
                         document.body.appendChild(dragImage);
                         e.dataTransfer.setDragImage(dragImage, 0, 0);
                         setTimeout(() => document.body.removeChild(dragImage), 0);
@@ -2740,6 +2757,13 @@ export function Documents() {
             try {
               // Move documents
               for (const docId of moveConfirmModal.documentIds) {
+                // ✅ DEBUG
+                console.log('📦 Moving document:', {
+                  docId,
+                  targetProject: moveConfirmModal.targetProjectId,
+                  targetFolder: moveConfirmModal.targetFolderId,
+                });
+                
                 await documentsApi.update(docId, {
                   project: moveConfirmModal.targetProjectId,
                   folder: moveConfirmModal.targetFolderId || null

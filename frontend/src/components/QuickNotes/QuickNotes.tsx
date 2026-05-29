@@ -1615,10 +1615,7 @@ function clamp(val: number, min: number, max: number) {
 }
 
 function getInitialFabPos(): { x: number; y: number } {
-  try {
-    const raw = localStorage.getItem(FAB_POS_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch { }
+  // ✅ Always default to bottom right corner
   return {
     x: window.innerWidth - FAB_SIZE - 24,
     y: window.innerHeight - FAB_SIZE - 132,
