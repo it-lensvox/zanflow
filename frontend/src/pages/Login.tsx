@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { Button, Input, Card, CardHeader, CardTitle, CardContent } from '@/components/common';
 import { getCredentials } from '@/services/authStorage';
-import { authApi } from '@/services/api';
+import { authApi, api } from '@/services/api';
 import { API_URL } from '@/services/api';
 
 // Toast Notification Component
@@ -153,30 +153,26 @@ export function Login() {
         
         console.log('✅ Login successful! Token saved.');
         
-        // ✅ FETCH WORKSPACES AND SET DEFAULT (NEW)
+        // ✅ FETCH WORKSPACES AND SET DEFAULT
         try {
-          const workspacesResponse = await fetch(`${API_URL}/organizations/workspaces/`, {
-            credentials: 'include',
-            headers: {
-              'Authorization': `Bearer ${data.access}`,
-              'Content-Type': 'application/json'
-            }
-          });
+          // Set auth header for axios before making the call
+          api.defaults.headers.common['Authorization'] = `Bearer ${data.access}`;
           
-          if (workspacesResponse.ok) {
-            const workspacesData = await workspacesResponse.json();
+          const workspacesResponse = await api.get('/organizations/workspaces/');
+          const workspacesData = workspacesResponse.data;
+          
+          // Handle array response
+          let workspaces = Array.isArray(workspacesData) ? workspacesData : workspacesData.workspaces;
+          
+          if (workspaces && workspaces.length > 0) {
+            // Use stored ID if valid, otherwise default workspace
+            const defaultWorkspace = workspaces.find((w: any) => w.is_default);
+            const activeId = defaultWorkspace?.id || workspaces[0]?.id;
             
-            // Set active workspace ID from response
-            if (workspacesData.active_workspace_id) {
-              localStorage.setItem('active_workspace_id', String(workspacesData.active_workspace_id));
-              console.log('✅ Active workspace set:', workspacesData.active_workspace_id);
-            } else {
-              // Fallback to default workspace
-              const defaultWorkspace = workspacesData.workspaces?.find((w: any) => w.is_default);
-              if (defaultWorkspace) {
-                localStorage.setItem('active_workspace_id', String(defaultWorkspace.id));
-                console.log('✅ Default workspace set:', defaultWorkspace.id);
-              }
+            if (activeId) {
+              localStorage.setItem('active_workspace_id', String(activeId));
+              api.defaults.headers.common['X-Workspace-ID'] = String(activeId);
+              console.log('✅ Active workspace set:', activeId);
             }
           }
         } catch (wsError) {

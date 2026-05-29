@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { taskApi, usersApi, documentsApi, projectsApi } from '@/services/api';
 import { useAuth } from '@/hooks/useAuth';
 import { getStatusConfig } from '@/components/layout/DualView/taskConfig';
-import { Task, TaskAttachment, TaskLink } from '@/types';
+import { Task, TaskAttachment, TaskLink, Label } from '@/types';
 import { RichTextEditor } from '@/components/common/RichTextEditor';
 import { DocumentPreview, useDocumentPreviewKeyboard, DocumentThumbnail } from '@/components/common/DocumentPreview';
 
@@ -160,6 +160,10 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
         }
     }, [fullTaskDetails]);
     const [links, setLinks] = useState<string[]>(getInitialLinks(task.links));
+    const [selectedLabelIds, setSelectedLabelIds] = useState<number[]>(
+        (taskWithLabels.labels || []).map((l: Label) => l.id)
+    );
+    const [availableLabels, setAvailableLabels] = useState<Label[]>([]);
     const [linkInput, setLinkInput] = useState('')
     const [startDate, setStartDate] = useState(task.start_date?.split('T')[0] || '');
     const [endDate, setEndDate] = useState(task.end_date?.split('T')[0] || '');
@@ -215,11 +219,18 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
             });
 
             queryClient.invalidateQueries({ queryKey: ['task-detail', resolvedTaskId] });
+            queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            queryClient.invalidateQueries({ queryKey: ['tasks-list'] });
+            queryClient.invalidateQueries({ queryKey: ['tasksite'] });
 
             onTaskUpdated(updatedTask);
             setIsEditingStatus(false);
+            setIsEditingTitle(false);
+            setIsEditingDescription(false);
+            setShowStatusDropdown(false);
             setNewUsers([]);
             setHasUnsavedChanges(false);
+            onClose(); // ✅ Close the modal after save
         },
         onError: (error: any) => {
             const status = error?.response?.status;
@@ -292,17 +303,24 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
     useEffect(() => {
         const fetchUsersAndProjectMembers = async () => {
             try {
-                // Fetch all users
                 const userResponse = await usersApi.list();
                 const users = userResponse.results || userResponse;
                 setAvailableUsers(users);
 
-                // Fetch project members if task has a project
                 if (task) {
                     const projectId = task.project || (task as any)?.project_details?.id;
                     if (projectId) {
                         const projectDetails = await projectsApi.get(projectId);
                         setProjectMembers(projectDetails.members || []);
+
+                        // ✅ Fetch labels for this project
+                        try {
+                            const labelsResponse = await projectsApi.getLabels(projectId);
+                            const labels = labelsResponse.results || labelsResponse || [];
+                            setAvailableLabels(labels);
+                        } catch (e) {
+                            console.error('Failed to fetch labels:', e);
+                        }
                     }
                 }
             } catch (error) {
@@ -326,7 +344,9 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
         const linksChanged = JSON.stringify(links) !== JSON.stringify(originalLinks);
 
         const titleChanged = editableTitle !== (task.heading || '');
-        setHasUnsavedChanges(statusChanged || usersChanged || docsChanged || descriptionChanged || datesChanged || linksChanged || titleChanged);
+        const originalLabelIds = (taskWithLabels.labels || []).map((l: Label) => l.id).sort();
+        const labelsChanged = JSON.stringify([...selectedLabelIds].sort()) !== JSON.stringify(originalLabelIds);
+        setHasUnsavedChanges(statusChanged || usersChanged || docsChanged || descriptionChanged || datesChanged || linksChanged || titleChanged || labelsChanged);
     }, [selectedStatus, task.status, newUsers.length, newDocuments.length, editableDescription, task.description, startDate, endDate, task.start_date, task.end_date, links, task.links, editableTitle, task.heading]);
 
     const handleAddLink = () => {
@@ -369,11 +389,16 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
             if (JSON.stringify(links) !== JSON.stringify(originalLinks)) {
                 updates.links = links;
             }
+            // ✅ Add labels
+            const originalLabelIds = (taskWithLabels.labels || []).map((l: Label) => l.id).sort();
+            if (JSON.stringify([...selectedLabelIds].sort()) !== JSON.stringify(originalLabelIds)) {
+                updates.labels = selectedLabelIds;
+            }
             if (Object.keys(updates).length === 0) return;
             updateTaskMutation.mutate(updates);
             setNewUsers([]);
-            setIsEditingDescription(false);
-            setHasUnsavedChanges(false);
+            // setIsEditingDescription(false);
+            // setHasUnsavedChanges(false);
         } catch (error) {
             console.error('Error saving task:', error);
         }
@@ -421,15 +446,15 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
         if (!task) return;
         try {
             const projectIdNum = task.project || (task as any).project_details?.id;
-            
+
             let fileUrl = attachment.file_url;  // Cached URL as fallback
-            
+
             if (projectIdNum) {
                 try {
                     const downloadResponse = await documentsApi.getDownloadUrl(projectIdNum, {
                         document_id: attachment.id.toString()
                     });
-                    
+
                     if (downloadResponse?.url) {
                         fileUrl = downloadResponse.url;  // Fresh URL — PDF if ready
                     }
@@ -438,19 +463,19 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
                     // Fall through and use cached URL
                 }
             }
-            
+
             if (!fileUrl) {
                 alert('Unable to open attachment: Download URL not available.');
                 return;
             }
-            
+
             // Determine fileType from the URL we're actually using (which may be PDF)
             // The DocumentPreview component also detects PDF from URL path itself
             const urlPath = fileUrl.split('?')[0].toLowerCase();
-            const detectedFileType = urlPath.endsWith('.pdf') 
-                ? 'pdf' 
+            const detectedFileType = urlPath.endsWith('.pdf')
+                ? 'pdf'
                 : (attachment.file_name?.split('.').pop()?.toLowerCase() || '');
-            
+
             // Open in-app preview
             setPreviewDocument({
                 url: fileUrl,
@@ -953,6 +978,54 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
                                     <Plus className="w-5 h-5" />
                                 </button>
                             </div>
+                        </div>
+
+                        {/* Labels Section */}
+                        <div className="labels bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+                            <label className="text-sm font-semibold text-gray-700 block mb-3">Labels</label>
+
+                            {availableLabels.length === 0 ? (
+                                <p className="text-xs text-gray-400">No labels available for this project</p>
+                            ) : (
+                                <div className="flex flex-wrap gap-2">
+                                    {availableLabels.map((label) => {
+                                        const isSelected = selectedLabelIds.includes(label.id);
+                                        return (
+                                            <button
+                                                key={label.id}
+                                                onClick={() => {
+                                                    setSelectedLabelIds((prev) =>
+                                                        isSelected
+                                                            ? prev.filter((id) => id !== label.id)
+                                                            : [...prev, label.id]
+                                                    );
+                                                    setHasUnsavedChanges(true);
+                                                }}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border-2"
+                                                style={{
+                                                    backgroundColor: isSelected ? label.color : `${label.color}20`,
+                                                    color: isSelected ? '#fff' : label.color,
+                                                    borderColor: label.color,
+                                                }}
+                                            >
+                                                {isSelected && (
+                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                )}
+                                                {label.name}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+
+                            {/* Selected labels preview */}
+                            {selectedLabelIds.length > 0 && (
+                                <p className="text-[10px] text-gray-400 mt-2">
+                                    {selectedLabelIds.length} label{selectedLabelIds.length > 1 ? 's' : ''} selected — click Save Changes to apply
+                                </p>
+                            )}
                         </div>
 
                         {/* 4. Documents */}

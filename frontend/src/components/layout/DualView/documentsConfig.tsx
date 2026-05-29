@@ -342,10 +342,12 @@ export const createDocumentsTableColumns = ({ onDeleteClick, onInfoClick, onShar
 
         const backgroundColor = avatarColors[colorIndex];
 
+        const avatarUrl = (doc.created_by as any)?.avatar;
+
         return (
           <div className="flex items-center justify-center">
             <div
-              className="rounded-full flex items-center justify-center text-white font-semibold"
+              className="rounded-full flex items-center justify-center text-white font-semibold overflow-hidden"
               style={{
                 width: 32,
                 height: 32,
@@ -356,7 +358,19 @@ export const createDocumentsTableColumns = ({ onDeleteClick, onInfoClick, onShar
               }}
               title={ownerName}
             >
-              {initials}
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt={ownerName}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={(e) => {
+                    // If image fails to load, hide it and show initials
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              ) : (
+                initials
+              )}
             </div>
           </div>
         );
