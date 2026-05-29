@@ -131,8 +131,18 @@ class GatewayConsumer(AsyncWebsocketConsumer):
             if not room_id or not content:
                 return
 
-            room = ChatRoom.objects.get(id=room_id)
+            room = ChatRoom.original_objects.get(id=room_id)
             
+            # Set org + workspace context from the room so the message
+            # is saved with correct tenant/workspace IDs.
+            # WebSocket consumers run outside DRF, so thread-local
+            # context is never set — we must pass these explicitly.
+            from apps.organizations.context import set_current_organization, set_current_workspace
+            if room.organization_id:
+                set_current_organization(room.organization_id)
+            if room.workspace_id:
+                set_current_workspace(room.workspace_id)
+
             ChatMessageService.create_message(
                 room=room,
                 sender=self.user,
@@ -192,13 +202,16 @@ class GatewayConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_user_room_slugs(self):
+        # Use original_objects because WebSocket consumers have no
+        # tenant/workspace thread-local context set
         member_rooms = ChatRoomMembership.objects.filter(
             user=self.user
         ).values_list('room__slug', flat=True)
 
-        global_rooms = ChatRoom.objects.filter(
+        global_rooms = ChatRoom.original_objects.filter(
             room_type=ChatRoom.RoomType.GLOBAL, 
-            is_active=True
+            is_active=True,
+            organization_id=getattr(self.user, 'organization_id', None),
         ).values_list('slug', flat=True)
 
         return list(set(member_rooms) | set(global_rooms))

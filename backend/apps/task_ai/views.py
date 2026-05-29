@@ -1,15 +1,16 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import status, permissions
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.shortcuts import get_object_or_404
 from apps.projects.models import Project
 from .services import TaskAIService, CalendarAgentService
+from apps.users.serializers import UserSerializer  # Import UserSerializer
 import json
 from datetime import date
 from apps.users.auth import StaticTokenAuthentication
-
+from rest_framework.parsers import MultiPartParser, FormParser
 class SuggestTaskAIView(APIView):
     authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
     permission_classes = [IsAuthenticated]
@@ -150,3 +151,21 @@ class DyuksaChatAgentView(APIView):
             {"reply": "Standard message ignored by AI."}, 
             status=status.HTTP_200_OK
         )
+class MeView(APIView):
+    """
+    Get current user profile and update avatar.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    # NEW: Add parsers to handle file uploads (multipart/form-data)
+    parser_classes = [MultiPartParser, FormParser] 
+    
+    def get(self, request):
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data)
+    
+    def patch(self, request):
+        serializer = UserSerializer(request.user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)

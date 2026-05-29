@@ -74,7 +74,8 @@ class IsAdminRole(permissions.BasePermission):
 class UserListView(generics.ListAPIView):
     """
     List all users (for assignments, etc.)
-    Automatically scoped to the current user's organization.
+    If X-Workspace-ID header is present, returns only workspace members.
+    Otherwise falls back to all users in the organization.
     """
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -83,7 +84,22 @@ class UserListView(generics.ListAPIView):
     def get_queryset(self):
         user = self.request.user
         qs = User.objects.filter(is_active=True)
-        # Scope to current user's organization
+
+        # Check for workspace header
+        workspace_id = self.request.META.get("HTTP_X_WORKSPACE_ID")
+        if workspace_id:
+            from apps.organizations.models import WorkspaceMembership
+            try:
+                workspace_id = int(workspace_id)
+                member_user_ids = WorkspaceMembership.objects.filter(
+                    workspace_id=workspace_id,
+                    workspace__organization_id=user.organization_id,
+                ).values_list('user_id', flat=True)
+                return qs.filter(id__in=member_user_ids)
+            except (ValueError, TypeError):
+                pass
+
+        # Fallback: scope to organization
         if user.organization_id:
             qs = qs.filter(organization_id=user.organization_id)
         return qs
@@ -402,6 +418,18 @@ class AcceptInvitationView(APIView):
         )
         user.set_password(serializer.validated_data['password'])
         user.save()
+
+        # Auto-add to default workspace
+        from apps.organizations.models import Workspace, WorkspaceMembership
+        default_ws = Workspace.objects.filter(
+            organization=invitation.organization, is_default=True
+        ).first()
+        if default_ws:
+            WorkspaceMembership.objects.get_or_create(
+                user=user,
+                workspace=default_ws,
+                defaults={"role": "member"},
+            )
 
         # Burn the invitation token so it can't be used again
         invitation.is_used = True

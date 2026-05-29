@@ -38,10 +38,23 @@ class AllUsersListView(WorkspaceAPIView):
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        users = User.objects.all().order_by('username')
-        # Scope to current user's organization
-        if request.user.organization_id:
-            users = users.filter(organization_id=request.user.organization_id)
+        # Get active workspace ID from header
+        workspace_id = request.META.get("HTTP_X_WORKSPACE_ID")
+
+        if workspace_id:
+            # Return only users who are members of this workspace
+            from apps.organizations.models import WorkspaceMembership
+            member_user_ids = WorkspaceMembership.objects.filter(
+                workspace_id=workspace_id,
+                workspace__organization_id=request.user.organization_id,
+            ).values_list('user_id', flat=True)
+            users = User.objects.filter(id__in=member_user_ids).order_by('username')
+        else:
+            # Fallback: return all org users if no workspace header
+            users = User.objects.all().order_by('username')
+            if request.user.organization_id:
+                users = users.filter(organization_id=request.user.organization_id)
+
         serializer = UserManagementSerializer(users, many=True)
         return Response({
             "message": "All users retrieved successfully",
@@ -206,7 +219,31 @@ class TaskRetrieveUpdateView(WorkspaceAPIView):
                 "task": TaskSerializer(updated_task, context={'request': request}).data
             }, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    # ---> PASTE THIS HERE <---
+    def delete(self, request, task_id):
+        task = get_object_or_404(Task, id=task_id)
 
+        # --- Security Check ---
+        # Allow deletion if Manager OR Superuser OR the user who created the task
+        is_authorized = (
+            request.user.is_manager or 
+            request.user.is_superuser or 
+            task.assigned_by == request.user
+        )
+
+        if not is_authorized:
+            return Response(
+                {"detail": "You do not have permission to delete this task."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        task.delete()
+        
+        return Response(
+            {"message": "Task deleted successfully"}, 
+            status=status.HTTP_204_NO_CONTENT
+        )
+    # --------------------------
 class UserPerformanceView(WorkspaceAPIView):
     authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
     permission_classes = [IsAuthenticated]
