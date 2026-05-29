@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from django.template.loader import render_to_string
 from rest_framework import generics, permissions, status, permissions
 from rest_framework.response import Response
+from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.authentication import JWTAuthentication
@@ -21,7 +22,13 @@ from datetime import timedelta
 from .models import PasswordResetOTP, Invitation, ContactMessage
 User = get_user_model()
 
-
+class WorkspaceSafeTokenRefreshView(TokenRefreshView):
+    """
+    Custom refresh view that bypasses global workspace authentication checks.
+    The refresh token payload is sufficient for this specific endpoint.
+    """
+    authentication_classes = []  
+    
 class RegisterView(generics.CreateAPIView):
     """
     Register a new user.
