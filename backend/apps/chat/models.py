@@ -32,7 +32,7 @@ class ChatRoom(TenantModel):
         PRIVATE = 'private', 'Private Chat'
         TEAM = 'team', 'Team Chat'
         THREAD = 'thread', 'Thread Chat'
-        # AI_BOT = 'ai_bot', 'AI Bot Chat'
+        AI_BOT = 'ai_bot', 'AI Bot Chat'
     
     id = models.UUIDField(
         primary_key=True,
@@ -117,8 +117,8 @@ class ChatRoom(TenantModel):
             return f"Project: {self.project.name if self.project else 'Unknown'}"
         elif self.room_type == self.RoomType.TEAM:
             return f"Team: {self.team.name if self.team else 'Unknown'}"
-        # elif self.room_type == self.RoomType.AI_BOT: # <-- NEW
-        #     return f"AI Bot: {self.name}"
+        elif self.room_type == self.RoomType.AI_BOT:
+            return f"AI Bot: {self.name}"
         return f"Private: {self.name}"
 
     def save(self, *args, **kwargs):

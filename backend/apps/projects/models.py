@@ -19,8 +19,9 @@ class Project(TenantModel, UserStampedModel):
     class TaskType(models.TextChoices):
         Client = "client", "Client"
         Internal = "internal", "Internal"
-        CONTENT_CREATION = "content_creation", "Content Creation",
+        CONTENT_CREATION = "content_creation", "Content Creation"
         Ideas = "ideas", "Ideas"
+        Demo = "demo", "Demo" # Added Demo as a valid choice
     
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
