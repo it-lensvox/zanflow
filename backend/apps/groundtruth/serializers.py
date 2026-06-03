@@ -163,15 +163,15 @@ class LabelSerializer(serializers.ModelSerializer):
 # ============ UPDATE DOCUMENT SERIALIZER ============
 class DocumentSerializer(serializers.ModelSerializer):
     created_by = UserMinimalSerializer(read_only=True)
-    labels = LabelSerializer(many=True, read_only=True) # ADD THIS
+    labels = LabelSerializer(many=True, read_only=True) 
 
     class Meta:
         model = Document
         fields = [
-            "id", "project", "name", "description",
+            "id", "project", "folder", "name", "description",  # <-- ADD "folder" HERE
             "source_file", "source_file_url", "file_type", "file_size",
             "metadata", "status", "created_by", "created_at", "updated_at",
-            "labels" # ADD THIS
+            "labels" 
         ]
         read_only_fields = [
             "id", "file_size", "created_by", "created_at", "updated_at", "labels"
@@ -197,7 +197,7 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Document
         fields = [
-            "project", "name", "description", "source_file",
+            "project", "folder", "name", "description", "source_file",  # <-- ADD "folder" HERE
             "source_file_url", "file_type", "metadata",
         ]
     
