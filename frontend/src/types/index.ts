@@ -5,7 +5,7 @@ export interface User {
   email: string;
   first_name: string;
   last_name: string;
-  role: 'admin' | 'manager' | 'annotator' | 'viewer';
+  role: 'admin' | 'manager' | 'annotator' | 'viewer' | 'developer';
   avatar?: string;
   is_active: boolean;
   is_superuser?: boolean;
@@ -13,11 +13,9 @@ export interface User {
   skills?: string[];
 }
 
-// User Management 
-// Invite User
 export interface InviteUserPayload {
   email: string;
-  role: 'admin' | 'manager' | 'annotator' | 'viewer';
+  role: 'admin' | 'manager' | 'annotator' | 'viewer' | 'developer';
 }
 
 export interface InviteUserResponse {
@@ -27,7 +25,7 @@ export interface InviteUserResponse {
 // Invite Accept (Setup Account page)
 export interface InviteVerifyResponse {
   email: string;
-  role: 'admin' | 'manager' | 'annotator' | 'viewer';
+  role: 'admin' | 'manager' | 'annotator' | 'viewer' | 'developer';
 }
 
 export interface InviteAcceptPayload {
@@ -262,6 +260,13 @@ export interface CreateTaskCommentPayload {
   content: string;
 }
 
+export interface DocumentShareUser {
+  id: number;
+  full_name: string;
+  username: string;
+  avatar: string | null;
+}
+
 // Document types
 export interface Document {
   id: string;
@@ -283,6 +288,8 @@ export interface Document {
   updated_at: string;
   labels?: Label[];
   version_count?: number;
+  shared_with?: DocumentShareUser[];
+  shared_by?: DocumentShareUser | null;
 }
 
 export interface DocumentActivity {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { X, Search, Share2 } from 'lucide-react';
+import { X, Search, Share2, Trash2, Users } from 'lucide-react';
 import { Button } from '@/components/common';
 import { documentsApi, usersApi, projectsApi } from '@/services/api';
 import type { User as AppUser, Document } from '@/types';
@@ -66,6 +66,21 @@ export function DocumentShareModal({ isOpen, onClose, document: doc }: DocumentS
     },
     onError: (err: any) => {
       setError(err.response?.data?.detail || 'Failed to share document.');
+    },
+  });
+
+  const revokeMutation = useMutation({
+    mutationFn: ({ documentId, payload }: { documentId: string; payload: { user_id?: number; project_id?: number } }) =>
+      documentsApi.revokeShare(documentId, payload),
+    onSuccess: () => {
+      // ✅ Refresh document list so shared_with updates
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      queryClient.invalidateQueries({ queryKey: ['documents-shared-with-me'] });
+      setSuccessMsg('Access revoked successfully.');
+      setTimeout(() => setSuccessMsg(''), 2000);
+    },
+    onError: (err: any) => {
+      setError(err.response?.data?.detail || 'Failed to revoke access.');
     },
   });
 
@@ -164,11 +179,66 @@ export function DocumentShareModal({ isOpen, onClose, document: doc }: DocumentS
             </div>
           )}
 
-          {successMsg && (
+{successMsg && (
             <div className="rounded-lg bg-green-50 p-3 text-sm text-green-700 border border-green-200">
               {successMsg}
             </div>
           )}
+
+          {/* ✅ Currently Shared With section */}
+          {doc.shared_with && doc.shared_with.length > 0 && (
+            <div className="rounded-lg border border-gray-200 overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+                <Users className="w-4 h-4 text-gray-500" />
+                <span className="text-sm font-semibold text-gray-700">
+                  Currently Shared With ({doc.shared_with.length})
+                </span>
+              </div>
+              <div className="max-h-40 overflow-y-auto divide-y divide-gray-100">
+                {doc.shared_with.map((user) => {
+                  const name = user.full_name || user.username;
+                  const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+                  const isRevoking = revokeMutation.isPending;
+                  return (
+                    <div key={user.id} className="flex items-center justify-between px-4 py-2.5">
+                      <div className="flex items-center gap-3">
+                        {/* Avatar */}
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold overflow-hidden flex-shrink-0"
+                          style={{ background: user.avatar ? 'transparent' : '#4169FF' }}>
+                          {user.avatar
+                            ? <img src={user.avatar} alt={name} className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                            : initials
+                          }
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-800">{name}</p>
+                          <p className="text-xs text-gray-400">{user.username}</p>
+                        </div>
+                      </div>
+                      {/* ✅ Revoke button */}
+                      <button
+                        onClick={() => {
+                          if (!doc) return;
+                          revokeMutation.mutate({
+                            documentId: doc.id,
+                            payload: { user_id: user.id },
+                          });
+                        }}
+                        disabled={isRevoking}
+                        title="Revoke access"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-red-600 hover:bg-red-50 border border-red-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Revoke
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Share Type Selector */}
 
           {/* Share Type Selector */}
           <div className="flex items-center gap-4 mb-4">

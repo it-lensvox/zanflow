@@ -71,7 +71,7 @@ const getFileIcon = (fileName: string) => {
 };
 import { TablePopover } from '@/components/common';
 import { formatRelativeTime } from '@/lib/utils';
-import type { Document, DocumentStatus } from '@/types';
+import type { Document, DocumentStatus, DocumentShareUser } from '@/types';
 import type { TableColumn } from '../DualView';
 import { documentsApi } from '@/services/api';
 import { useQueryClient } from '@tanstack/react-query';
@@ -153,7 +153,202 @@ const getInitials = (name: string): string => {
   return parts.length >= 2 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : name.slice(0, 2).toUpperCase();
 };
 
-export const createDocumentsTableColumns = ({ onDeleteClick, onInfoClick, onShareClick }: DocumentTableColumnsProps): TableColumn<Document>[] => {
+// ─── Shared column header with toggle ────────────────────────────────────────
+// Uses module-level state via a simple event emitter pattern
+let sharedColumnMode: 'shared_with' | 'shared_by' = 'shared_with';
+const sharedColumnListeners = new Set<() => void>();
+
+function SharedColumnHeader() {
+  const [mode, setMode] = React.useState<'shared_with' | 'shared_by'>(sharedColumnMode);
+  const [open, setOpen] = React.useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const update = () => setMode(sharedColumnMode);
+    sharedColumnListeners.add(update);
+    return () => { sharedColumnListeners.delete(update); };
+  }, []);
+
+  // ✅ Close dropdown when clicking outside
+  React.useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const selectMode = (e: React.MouseEvent, newMode: 'shared_with' | 'shared_by') => {
+    e.stopPropagation();
+    sharedColumnMode = newMode;
+    sharedColumnListeners.forEach(fn => fn());
+    setOpen(false);
+  };
+
+  return (
+    <div ref={dropdownRef} style={{ position: 'relative', display: 'inline-block' }}>
+      {/* ✅ Dropdown trigger */}
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(p => !p); }}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 5,
+          background: 'none', border: 'none', cursor: 'pointer',
+          padding: 0, fontSize: 12, fontWeight: 600, color: '#6b7280',
+        }}
+      >
+        {mode === 'shared_with' ? 'Shared With' : 'Shared By'}
+        {/* Chevron icon */}
+        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3 5L6 8L9 5" stroke="#6b7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+
+      {/* ✅ Dropdown menu */}
+      {open && (
+        <div
+          style={{
+            position: 'absolute', top: '100%', left: 0, zIndex: 999,
+            marginTop: 4, background: '#fff',
+            border: '1px solid #e5e7eb', borderRadius: 8,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
+            minWidth: 140, overflow: 'hidden',
+          }}
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Shared With option */}
+          <button
+            onClick={(e) => selectMode(e, 'shared_with')}
+            style={{
+              width: '100%', textAlign: 'left', padding: '9px 14px',
+              fontSize: 13, fontWeight: mode === 'shared_with' ? 700 : 400,
+              color: mode === 'shared_with' ? '#4169FF' : '#1a1a1a',
+              background: mode === 'shared_with' ? '#EEF2FF' : '#fff',
+              border: 'none', cursor: 'pointer', display: 'flex',
+              alignItems: 'center', gap: 8,
+            }}
+            onMouseEnter={e => { if (mode !== 'shared_with') e.currentTarget.style.background = '#f9fafb'; }}
+            onMouseLeave={e => { if (mode !== 'shared_with') e.currentTarget.style.background = '#fff'; }}
+          >
+            {/* Checkmark for active */}
+            {mode === 'shared_with'
+              ? <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#4169FF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              : <span style={{ width: 12 }} />
+            }
+            Shared With
+          </button>
+
+          {/* Shared By option */}
+          <button
+            onClick={(e) => selectMode(e, 'shared_by')}
+            style={{
+              width: '100%', textAlign: 'left', padding: '9px 14px',
+              fontSize: 13, fontWeight: mode === 'shared_by' ? 700 : 400,
+              color: mode === 'shared_by' ? '#4169FF' : '#1a1a1a',
+              background: mode === 'shared_by' ? '#EEF2FF' : '#fff',
+              border: 'none', cursor: 'pointer', display: 'flex',
+              alignItems: 'center', gap: 8,
+            }}
+            onMouseEnter={e => { if (mode !== 'shared_by') e.currentTarget.style.background = '#f9fafb'; }}
+            onMouseLeave={e => { if (mode !== 'shared_by') e.currentTarget.style.background = '#fff'; }}
+          >
+            {mode === 'shared_by'
+              ? <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#4169FF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              : <span style={{ width: 12 }} />
+            }
+            Shared By
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Avatar stack helper ──────────────────────────────────────────────────────
+function SharedUserAvatars({ users }: { users: DocumentShareUser[] }) {
+  if (!users || users.length === 0) {
+    return <span style={{ fontSize: 12, color: '#d1d5db' }}>—</span>;
+  }
+  const shown = users.slice(0, 3);
+  const extra = users.length - 3;
+  const grads = [
+    'linear-gradient(135deg,#6366f1,#8b5cf6)',
+    'linear-gradient(135deg,#3b82f6,#60a5fa)',
+    'linear-gradient(135deg,#10b981,#34d399)',
+    'linear-gradient(135deg,#f59e0b,#fbbf24)',
+  ];
+  return (
+    <div style={{ display: 'flex', alignItems: 'center' }}>
+      {shown.map((u, i) => {
+        const name = u.full_name || u.username || '?';
+        const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+        return (
+          <div key={u.id} title={name} style={{
+            // ✅ Same size as Owner avatar — 32x32
+            width: 32, height: 32, borderRadius: '50%', border: '2px solid #fff',
+            marginLeft: i === 0 ? 0 : -8,
+            background: u.avatar ? 'transparent' : grads[i % grads.length],
+            display: 'grid', placeItems: 'center',
+            fontSize: 11, fontWeight: 600, color: '#fff',
+            zIndex: 3 - i, position: 'relative', overflow: 'hidden',
+          }}>
+            {u.avatar
+              ? <img src={u.avatar} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+              : initials
+            }
+          </div>
+        );
+      })}
+      {extra > 0 && (
+        <div style={{ marginLeft: -8, background: '#98a2b3', color: '#fff', borderRadius: '50%', width: 32, height: 32, display: 'grid', placeItems: 'center', fontSize: 11, border: '2px solid #fff', fontWeight: 600 }}>
+          +{extra}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SharedByAvatar({ user }: { user: DocumentShareUser | null | undefined }) {
+  if (!user) return <span style={{ fontSize: 12, color: '#d1d5db' }}>—</span>;
+  const name = user.full_name || user.username || '?';
+  const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  return (
+    // ✅ Only avatar circle — no name text
+    <div title={name} style={{
+      width: 32, height: 32, borderRadius: '50%',
+      background: user.avatar ? 'transparent' : 'linear-gradient(135deg,#6366f1,#8b5cf6)',
+      display: 'grid', placeItems: 'center',
+      fontSize: 11, fontWeight: 600, color: '#fff', overflow: 'hidden',
+      flexShrink: 0,
+    }}>
+      {user.avatar
+        ? <img src={user.avatar} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+        : initials
+      }
+    </div>
+  );
+}
+
+// ─── Shared column cell — reacts to toggle ────────────────────────────────────
+function SharedColumnCell({ doc }: { doc: Document }) {
+  const [mode, setMode] = React.useState<'shared_with' | 'shared_by'>(sharedColumnMode);
+
+  React.useEffect(() => {
+    const update = () => setMode(sharedColumnMode);
+    sharedColumnListeners.add(update);
+    return () => { sharedColumnListeners.delete(update); };
+  }, []);
+
+  if (mode === 'shared_with') {
+    return <SharedUserAvatars users={doc.shared_with || []} />;
+  }
+  return <SharedByAvatar user={doc.shared_by} />;
+}
+
+export const createDocumentsTableColumns = (
+  { onDeleteClick, onInfoClick, onShareClick }: DocumentTableColumnsProps): TableColumn<Document>[] => {
   const StatusDropdown = ({ doc }: { doc: Document }) => {
     const [activeDropdown, setActiveDropdown] = useState(false);
     const queryClient = useQueryClient();
@@ -230,12 +425,33 @@ export const createDocumentsTableColumns = ({ onDeleteClick, onInfoClick, onShar
       key: 'project',
       label: <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Project</span>,
       width: '140px',
-      render: (doc: Document) => (
-        <span className="inline-flex items-center gap-1.5 rounded-md" style={{ padding: '4px 10px', background: '#EEF2FF', color: '#4F46E5', fontSize: 13, border: '1px solid #C7D2FE' }}>
-          <Folder className="w-3 h-3" style={{ fill: '#4F46E5', stroke: 'none' }} />
-          {doc.project_name || 'General'}
-        </span>
-      ),
+      render: (doc: Document) => {
+        const name = doc.project_name || 'General';
+        // ✅ Fixed display: max 13 chars then ...
+        const display = name.length > 13 ? name.slice(0, 13) + '...' : name;
+        return (
+          <span
+            title={name}
+            className="inline-flex items-center gap-1.5 rounded-md"
+            style={{
+              padding: '4px 10px',
+              background: '#EEF2FF',
+              color: '#4F46E5',
+              fontSize: 13,
+              border: '1px solid #C7D2FE',
+              width: 130,        // ✅ fixed width — always same size
+              minWidth: 130,     // ✅ never shrinks
+              maxWidth: 130,     // ✅ never grows
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+              display: 'inline-flex',
+            }}
+          >
+            <Folder className="w-3 h-3 flex-shrink-0" style={{ fill: '#4F46E5', stroke: 'none' }} />
+            {display}
+          </span>
+        );
+      },
     },
     {
       key: 'labels',
@@ -306,6 +522,12 @@ export const createDocumentsTableColumns = ({ onDeleteClick, onInfoClick, onShar
       label: <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Updated</span>,
       width: '120px',
       render: (doc: Document) => <span style={{ fontSize: 14, color: '#1a1a1a' }}>{formatRelativeTime(doc.updated_at)}</span>,
+    },
+    {
+      key: 'shared_with' as any,
+      label: <SharedColumnHeader />,
+      width: '140px',
+      render: (doc: Document) => <SharedColumnCell doc={doc} />,
     },
     {
       key: 'created_by' as any,
@@ -402,8 +624,24 @@ export function DocumentGridCard({ document: doc, onDeleteClick, onCardClick, on
             <FileText className="w-4 h-4" />
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="line-clamp-1" style={{ fontWeight: 600, fontSize: 13, color: '#1a1a1a' }} title={doc.project_name}>{doc.project_name || 'General'}</span>
-            <span className="line-clamp-2" style={{ fontSize: 12, color: '#6b7280' }} title={doc.name}>{doc.name}</span>
+<span
+title={doc.project_name}
+style={{
+  fontWeight: 600,
+  fontSize: 13,
+  color: '#1a1a1a',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+  maxWidth: 120,   // ✅ fixed max width in grid card too
+  display: 'block',
+}}
+>
+{(doc.project_name || 'General').length > 13
+  ? (doc.project_name || 'General').slice(0, 13) + '...'
+  : (doc.project_name || 'General')
+}
+</span>            <span className="line-clamp-2" style={{ fontSize: 12, color: '#6b7280' }} title={doc.name}>{doc.name}</span>
           </div>
         </div>
         <span style={{ fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap' }}>{formatRelativeTime(doc.updated_at)}</span>

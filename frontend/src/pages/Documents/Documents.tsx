@@ -6,7 +6,7 @@ import {
   FileText, Search, Filter, ChevronDown, Bell, ChevronLeft, ChevronRight,
   Info, X, Calendar, User, HardDrive, Tag, Hash, Upload, Plus, List,
   Grid3X3, Network, FolderOpen, Folder, ChevronRight as ChevronRightIcon,
-  ArrowLeft, Move, Share, Trash2, MoreHorizontal, SortDesc, Settings,
+  ArrowLeft, Move, Share, Trash2, Share2, MoreHorizontal, SortDesc, Settings,
   Bookmark, Layers, Clock, Sparkles, HelpCircle, ExternalLink, ZoomIn, ZoomOut,
   MessageSquare, Pencil
 } from 'lucide-react';
@@ -67,7 +67,12 @@ function TreePanel({
   selectedDocs,
   setSelectedDocs,
   setMoveConfirmModal,
-  setToast, // ✅ ADD THIS
+  setToast,
+  showSharedWithMe,
+  setShowSharedWithMe,
+  setSelectedFolder,
+  setSelectedTreeFolderId,
+  sharedWithMeCount,
 }: {
   folders: TreeFolder[];
   onFolderClick: (name: string, folderId?: string, projectId?: number) => void;
@@ -82,14 +87,35 @@ function TreePanel({
   setSelectedDocs: (docs: Set<string>) => void;  // ✅ ADD THIS
   setMoveConfirmModal: (modal: any) => void;
   setToast: (toast: any) => void;
+  showSharedWithMe: boolean;
+  setShowSharedWithMe: (v: boolean) => void;
+  setSelectedFolder: (name: string) => void;
+  setSelectedTreeFolderId: (id: string | null) => void;
+  sharedWithMeCount: number;
 }) {
   const queryClient = useQueryClient();  // ✅ Make sure this is here
   const [openNodes, setOpenNodes] = useState<Record<string, boolean>>({ 'All Documents': true });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   // New folder inline state: which project node to show the input under
-  const [creatingUnder, setCreatingUnder] = useState<{ projectId: number; nodeKey: string } | null>(null);
+  const [creatingUnder, setCreatingUnder] = useState<{ projectId: number; nodeKey: string; parentFolderId: string | null } | null>(null);
   const [deleteFolderConfirm, setDeleteFolderConfirm] = useState<{ id: string; name: string } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    folder: TreeFolder;
+  } | null>(null);
+
+  React.useEffect(() => {
+    if (!contextMenu) return;
+    const handler = () => setContextMenu(null);
+    document.addEventListener('click', handler);
+    document.addEventListener('contextmenu', handler);
+    return () => {
+      document.removeEventListener('click', handler);
+      document.removeEventListener('contextmenu', handler);
+    };
+  }, [contextMenu]);
   const [newFolderName, setNewFolderName] = useState('');
   const [dragHoverTimer, setDragHoverTimer] = useState<NodeJS.Timeout | null>(null);
   const [autoOpenedNodes, setAutoOpenedNodes] = useState<Set<string>>(new Set());
@@ -105,15 +131,17 @@ function TreePanel({
     setEditingId(null); setEditName('');
   };
 
-  const startCreateFolder = (projectId: number, nodeKey: string) => {
+  const startCreateFolder = (projectId: number, nodeKey: string, parentFolderId: string | null = null) => {
     // Open the parent node so the input is visible
     setOpenNodes((p) => ({ ...p, [nodeKey]: true }));
-    setCreatingUnder({ projectId, nodeKey });
+    // ✅ Store parentFolderId so commitCreateFolder knows where to create
+    setCreatingUnder({ projectId, nodeKey, parentFolderId });
     setNewFolderName('');
   };
   const commitCreateFolder = () => {
     if (creatingUnder && newFolderName.trim()) {
-      onCreateFolder(creatingUnder.projectId, null, newFolderName.trim());
+      // ✅ Pass parentFolderId — null for root, folder UUID for subfolder
+      onCreateFolder(creatingUnder.projectId, creatingUnder.parentFolderId, newFolderName.trim());
     }
     setCreatingUnder(null); setNewFolderName('');
   };
@@ -173,6 +201,12 @@ function TreePanel({
           onMouseEnter={(e) => { if (!isSel) e.currentTarget.style.background = '#f3f4f6'; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = isSel ? '#EEF2FF' : 'transparent'; }}
           onClick={() => { if (hasC) toggleNode(nodeKey); onFolderClick(f.name, f.id, f.projectId); }}
+          // ✅ Right-click opens context menu
+          onContextMenu={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setContextMenu({ x: e.clientX, y: e.clientY, folder: f });
+          }}
 
           // ✅ UPDATE DRAG HANDLERS
           onDragOver={(e) => {
@@ -351,34 +385,26 @@ function TreePanel({
               {f.count}
             </span>
           </div>
-          {/* Rename pencil icon on hover */}
-          {f.id && !f.isSystemGenerated && !isEditing && (
-            <>
-              <button className="opacity-0 group-hover/folder:opacity-100 p-0.5 rounded"
-                style={{ color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer' }}
-                onClick={(e) => { e.stopPropagation(); startRename(f.id!, f.name); }} title="Rename folder">
-                <Pencil className="w-3 h-3" />
-              </button>
-              <button className="opacity-0 group-hover/folder:opacity-100 p-0.5 rounded"
-                style={{ color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer' }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setDeleteFolderConfirm({ id: f.id!, name: f.name });
-                }} title="Delete folder">
-                <Trash2 className="w-3 h-3" />
-              </button>
-            </>
-          )}
+
         </div>
 
         {/* Children + inline new folder input */}
+        {/* Children + inline new folder input */}
         {isO && (
           <div className="mt-1">
-            {f.children?.map((c) => renderFolder(c, depth + 1))}
-            {/* Inline new folder input row */}
+            {/* ✅ Input shows at TOP so user sees it immediately */}
+            {/* ✅ Input indented to show it's INSIDE the project */}
             {showNewInput && (
-              <div className="flex items-center gap-2 px-2 py-1.5 rounded-md text-sm" style={{ marginLeft: 20 }}>
-                <Folder className="w-4 h-4 flex-shrink-0" style={{ color: '#4169FF' }} />
+              <div
+                className="flex items-center gap-2 py-1 rounded-md text-sm"
+                style={{
+                  marginLeft: 36,   // ✅ pushed right — clearly inside the project
+                  marginBottom: 4,
+                  marginRight: 4,
+                }}
+              >
+                {/* ✅ Small folder icon to show it's a child */}
+                <Folder className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#4169FF' }} />
                 <input
                   autoFocus
                   value={newFolderName}
@@ -389,14 +415,26 @@ function TreePanel({
                   }}
                   onBlur={() => { if (newFolderName.trim()) commitCreateFolder(); else cancelCreateFolder(); }}
                   placeholder="Folder name..."
-                  className="flex-1 text-sm rounded px-2 py-1 min-w-0"
-                  style={{ border: '1px solid #4169FF', outline: 'none', background: '#fff', color: '#1a1a1a', fontSize: 13 }}
+                  className="flex-1 rounded px-2 py-0.5 min-w-0"
+                  style={{
+                    border: '1px solid #4169FF',
+                    outline: 'none',
+                    background: '#fff',
+                    color: '#1a1a1a',
+                    fontSize: 12,      // ✅ slightly smaller than project name
+                    height: 26,        // ✅ compact height
+                  }}
                 />
-                <button onClick={cancelCreateFolder} style={{ color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}>
+                <button
+                  onClick={cancelCreateFolder}
+                  style={{ color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: 2, flexShrink: 0 }}
+                >
                   <X className="w-3 h-3" />
                 </button>
               </div>
             )}
+            {/* ✅ Children sorted alphabetically */}
+            {[...(f.children || [])].sort((a, b) => a.name.localeCompare(b.name)).map((c) => renderFolder(c, depth + 1))}
           </div>
         )}
       </div>
@@ -428,46 +466,180 @@ function TreePanel({
           </div>
           <div className="space-y-1">{folders.map((f) => renderFolder(f))}</div>
 
-          {/* + New Folder button */}
-          <button className="flex items-center gap-2 mt-4 px-2 py-2 text-sm font-medium rounded-md w-full"
-            style={{ color: '#4169FF', background: 'none', border: 'none', cursor: 'pointer' }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#f3f4f6'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+          {/* ✅ Shared With Me section — below All Documents tree */}
+          <div
             onClick={() => {
-              // ✅ Find currently selected folder/project
-              const findSelected = (ff: TreeFolder[]): TreeFolder | undefined => {
-                for (const f of ff) {
-                  // Check if this is the selected node
-                  if ((f.id && selectedFolderId === f.id) || (!f.id && selectedFolder === f.name)) {
-                    return f;
-                  }
-                  // Recursively check children
-                  if (f.children) {
-                    const r = findSelected(f.children);
-                    if (r) return r;
-                  }
+              setShowSharedWithMe(true);
+              // Clear other selections
+              setSelectedFolder('Shared With Me');
+              setSelectedTreeFolderId(null);
+              // setTreeGroupFilter && setTreeGroupFilter(null);
+            }}
+            className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer text-sm mt-2"
+            style={{
+              background: showSharedWithMe ? '#EEF2FF' : 'transparent',
+              color: showSharedWithMe ? '#4169FF' : '#1a1a1a',
+              fontWeight: showSharedWithMe ? 600 : 400,
+              borderTop: '1px solid #e5e7eb',
+              paddingTop: 10,
+              marginTop: 8,
+            }}
+            onMouseEnter={e => { if (!showSharedWithMe) e.currentTarget.style.background = '#f3f4f6'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = showSharedWithMe ? '#EEF2FF' : 'transparent'; }}
+          >
+            <Share2 className="w-4 h-4 flex-shrink-0" style={{ color: showSharedWithMe ? '#4169FF' : '#6b7280' }} />
+            <span style={{ flex: 1 }}>Shared With Me</span>
+            {sharedWithMeCount > 0 && (
+              <span style={{ fontSize: 11, color: '#6b7280' }}>{sharedWithMeCount}</span>
+            )}
+          </div>
+          {/* + New Folder button */}
+          {/* + New Folder button */}
+          {(() => {
+            // ✅ Find currently selected node
+            const findSelected = (ff: TreeFolder[]): TreeFolder | undefined => {
+              for (const f of ff) {
+                if ((f.id && selectedFolderId === f.id) || (!f.id && selectedFolder === f.name)) {
+                  return f;
                 }
-                return undefined;
-              };
-
-              const selected = findSelected(folders);
-
-              if (selected?.projectId) {
-                // ✅ Create folder under the selected project/folder
-                startCreateFolder(selected.projectId, selected.id || selected.name);
-              } else {
-                // ✅ Fallback: use first project
-                const firstProject = folders[0]?.children?.find((c) => c.projectId);
-                if (firstProject?.projectId) {
-                  startCreateFolder(firstProject.projectId, firstProject.id || firstProject.name);
+                if (f.children) {
+                  const r = findSelected(f.children);
+                  if (r) return r;
                 }
               }
-            }}>
-            <Plus className="w-4 h-4" /> New Folder
-          </button>
+              return undefined;
+            };
+            const selected = findSelected(folders);
+
+            // ✅ Disable if "All Documents" is selected (no projectId)
+            const isDisabled = !selected?.projectId;
+
+            return (
+              <button
+                className="flex items-center gap-2 mt-4 px-2 py-2 text-sm font-medium rounded-md w-full"
+                disabled={isDisabled}
+                title={isDisabled ? 'Select a project first to create a folder' : 'Create new folder'}
+                style={{
+                  color: isDisabled ? '#b0b8c9' : '#4169FF',
+                  background: 'none',
+                  border: 'none',
+                  cursor: isDisabled ? 'not-allowed' : 'pointer',
+                  opacity: isDisabled ? 0.5 : 1,
+                }}
+                onMouseEnter={(e) => { if (!isDisabled) e.currentTarget.style.background = '#f3f4f6'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                onClick={() => {
+                  if (isDisabled) return;
+                  if (selected?.projectId) {
+                    // ✅ If a subfolder is selected, pass its ID as parentFolderId
+                    // If a project root is selected (no f.id), parentFolderId is null
+                    const parentFolderId = selected.id || null;
+                    startCreateFolder(selected.projectId, selected.id || selected.name, parentFolderId);
+                  }
+                }}
+              >
+                <Plus className="w-4 h-4" /> New Folder
+              </button>
+            );
+          })()}
           {/* <button style={{ color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: 4, marginTop: 4 }}><Settings className="w-4 h-4" /></button> */}
+
         </div>
       )}
+
+      {/* ✅ RIGHT-CLICK CONTEXT MENU */}
+      {contextMenu && (
+        <>
+          {/* Backdrop to close on click */}
+          <div
+            className="fixed inset-0 z-[998]"
+            onClick={() => setContextMenu(null)}
+            onContextMenu={(e) => { e.preventDefault(); setContextMenu(null); }}
+          />
+          {/* Menu */}
+          <div
+            className="fixed z-[999] rounded-lg shadow-xl py-1 animate-in fade-in duration-100"
+            style={{
+              left: contextMenu.x,
+              top: contextMenu.y,
+              background: '#fff',
+              border: '1px solid #e5e7eb',
+              minWidth: 180,
+              boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Folder name header */}
+            <div style={{ padding: '8px 14px 6px', borderBottom: '1px solid #f3f4f6' }}>
+              <p style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>
+                {contextMenu.folder.name}
+              </p>
+            </div>
+
+            {/* ✅ Create Subfolder */}
+            {contextMenu.folder.id && !contextMenu.folder.isSystemGenerated && (
+              <button
+                onClick={() => {
+                  setContextMenu(null);
+                  startCreateFolder(
+                    contextMenu.folder.projectId!,
+                    contextMenu.folder.id || contextMenu.folder.name,
+                    contextMenu.folder.id!
+                  );
+                }}
+                className="w-full text-left flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors"
+                style={{ color: '#1a1a1a', background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                <Plus className="w-4 h-4" style={{ color: '#4169FF' }} />
+                Create Subfolder
+              </button>
+            )}
+
+            {/* ✅ Rename */}
+            {contextMenu.folder.id && !contextMenu.folder.isSystemGenerated && (
+              <button
+                onClick={() => {
+                  setContextMenu(null);
+                  startRename(contextMenu.folder.id!, contextMenu.folder.name);
+                }}
+                className="w-full text-left flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors"
+                style={{ color: '#1a1a1a', background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                <Pencil className="w-4 h-4" style={{ color: '#6b7280' }} />
+                Rename
+              </button>
+            )}
+
+            {/* Divider */}
+            {contextMenu.folder.id && !contextMenu.folder.isSystemGenerated && (
+              <div style={{ height: 1, background: '#f3f4f6', margin: '4px 0' }} />
+            )}
+
+            {/* ✅ Delete */}
+            {contextMenu.folder.id && !contextMenu.folder.isSystemGenerated && (
+              <button
+                onClick={() => {
+                  setContextMenu(null);
+                  setDeleteFolderConfirm({ id: contextMenu.folder.id!, name: contextMenu.folder.name });
+                }}
+                className="w-full text-left flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-red-50 transition-colors"
+                style={{ color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete
+              </button>
+            )}
+
+            {/* If system generated — show message */}
+            {contextMenu.folder.isSystemGenerated && (
+              <div style={{ padding: '8px 14px', fontSize: 12, color: '#6b7280' }}>
+                System folder — no actions available
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
       {/* Delete Folder Confirmation Modal */}
       {deleteFolderConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -696,12 +868,9 @@ function BulkToolbar({ selectedCount, onClear, onDeleteSelected, onChangeStatus,
           <ToolbarBtn icon={<Move className="w-3.5 h-3.5" />} label="Move" onClick={() => setShowMoveDropdown(!showMoveDropdown)} />
           {showMoveDropdown && <BulkMoveDropdown projects={projects} onSelect={onMove} onClose={() => setShowMoveDropdown(false)} />}
         </div>
-        {/* Add Tags */}
-        {/* Add Tags - NOW ENABLED */}
-        {/* Add Tags - Direct Button */}
+
         <button
           onClick={() => {
-            console.log('🎯 Add Tags clicked!');
             onAddTags();
           }}
           title="Add tags to selected documents"
@@ -728,7 +897,7 @@ function BulkToolbar({ selectedCount, onClear, onDeleteSelected, onChangeStatus,
         {/* Delete */}
         <ToolbarBtn icon={<Trash2 className="w-3.5 h-3.5" />} label="Delete" onClick={onDeleteSelected} />
         <div style={{ width: 1, height: 24, background: '#e5e7eb', margin: '0 4px' }} />
-        <button className="flex items-center px-3 py-1.5 rounded-md" style={{ color: '#6b7280', border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer' }}><MoreHorizontal className="w-3.5 h-3.5" /></button>
+        {/* <button className="flex items-center px-3 py-1.5 rounded-md" style={{ color: '#6b7280', border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer' }}><MoreHorizontal className="w-3.5 h-3.5" /></button> */}
       </>) : <span style={{ fontSize: 13, color: '#6b7280' }}>Select documents to perform bulk actions</span>}
     </div>
   );
@@ -948,7 +1117,7 @@ function SidePreviewPanel({ doc, previewUrl, onClose, onOpenFull }: { doc: Docum
             <DetailRow label="Location" value={<span className="flex items-center gap-1" style={{ color: '#6b7280', fontSize: 13 }}><Folder className="w-3 h-3" />/ {doc.project_name || 'General'}</span>} />
           </div>
           <button onClick={onOpenFull} className="w-full mt-5 rounded-lg flex items-center justify-center gap-2" style={{ padding: 12, background: '#4169FF', color: '#fff', border: 'none', fontWeight: 600, fontSize: 14, cursor: 'pointer' }} onMouseEnter={(e) => { e.currentTarget.style.background = '#3554CC'; }} onMouseLeave={(e) => { e.currentTarget.style.background = '#4169FF'; }}><ExternalLink className="w-4 h-4" />Open Document</button>
-          <button className="w-full mt-4 rounded-lg flex items-center justify-center" style={{ padding: 10, border: '1px solid #e5e7eb', color: '#6b7280', background: 'none', cursor: 'pointer' }}><MoreHorizontal className="w-4 h-4" /></button>
+          {/* <button className="w-full mt-4 rounded-lg flex items-center justify-center" style={{ padding: 10, border: '1px solid #e5e7eb', color: '#6b7280', background: 'none', cursor: 'pointer' }}><MoreHorizontal className="w-4 h-4" /></button> */}
         </>)}
 
         {tab === 'details' && <div>
@@ -1928,6 +2097,7 @@ export function Documents() {
   const [shareDoc, setShareDoc] = useState<Document | null>(null);
   const [selectedFolder, setSelectedFolder] = useState('All Documents');
   const [selectedTreeFolderId, setSelectedTreeFolderId] = useState<string | null>(null);
+  const [showSharedWithMe, setShowSharedWithMe] = useState(false);
   const [selectedTreeFolderName, setSelectedTreeFolderName] = useState<string | null>(null);
   const [selectedDocs, setSelectedDocs] = useState<Set<string>>(new Set());
   const [isTreeOpen, setIsTreeOpen] = useState(true);
@@ -1957,13 +2127,31 @@ export function Documents() {
   const projectFilter = searchParams.get('project') || '';
   const statusFilter = searchParams.get('status') || '';
   const fileTypeFilter = searchParams.get('file_type') || '';
-  const [currentPage, setCurrentPage] = useState(1);
+  const highlightDocId = searchParams.get('highlight') || '';
+  const sharedParam = searchParams.get('shared') === 'true';
+  const [activeHighlightId, setActiveHighlightId] = React.useState(highlightDocId);
+    const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState<'updated_at' | 'created_at'>('updated_at');
   const [rowsPerPage, setRowsPerPage] = useState(25);
 
   React.useEffect(() => { setCurrentPage(1); }, [projectFilter, fileTypeFilter, searchTerm]);
   React.useEffect(() => { queryClient.invalidateQueries({ queryKey: ['documents'] }); }, []);
 
+  React.useEffect(() => {
+    if (sharedParam) {
+      setShowSharedWithMe(true);
+      setSelectedFolder('Shared With Me');
+      setSelectedTreeFolderId(null);
+      // ✅ Save highlight ID to state before clearing URL
+      if (highlightDocId) {
+        setActiveHighlightId(highlightDocId);
+        // ✅ Auto-clear highlight after 4 seconds
+        setTimeout(() => setActiveHighlightId(''), 4000);
+      }
+      // ✅ Clean up URL params
+      setSearchParams({}, { replace: true });
+    }
+  }, [sharedParam]);
   const { data: projectsData } = useQuery({ queryKey: ['projects'], queryFn: () => projectsApi.list() });
   // Fetch available tags/labels
   const { data: tagsData } = useQuery({
@@ -2024,12 +2212,21 @@ export function Documents() {
     staleTime: 0,
   });
 
-  // ✅ ADD THIS NEW QUERY - For tree counts only (no filters)
   const { data: allDocumentsForTree } = useQuery({
     queryKey: ['documents-tree-counts'],
-    queryFn: () => documentsApi.list({}),  // ✅ Fetch all with default page size
+    queryFn: () => documentsApi.list({}),
     staleTime: 30000,
   });
+
+  // ✅ Fetch shared-with-me documents when that section is selected
+  const { data: sharedWithMeData } = useQuery({
+    queryKey: ['documents-shared-with-me', 1],
+    queryFn: () => documentsApi.sharedWithMe({ page: 1 }),
+    enabled: showSharedWithMe,
+    staleTime: 0,
+  });
+  const sharedWithMeDocs = sharedWithMeData?.results || sharedWithMeData || [];
+  const sharedWithMeCount = sharedWithMeData?.count || sharedWithMeDocs.length || 0;
 
   // Fetch folders for ALL projects
   const { data: foldersData } = useQuery({
@@ -2043,7 +2240,10 @@ export function Documents() {
 
   const rawProjects = projectsData?.results || projectsData || [];
   const projects = (Array.isArray(rawProjects) ? rawProjects : []) as Project[];
-  const allDocs = allDocumentsData?.results || allDocumentsData || [];
+  // ✅ Show shared-with-me docs when that section is selected
+  const allDocs = showSharedWithMe
+    ? sharedWithMeDocs
+    : (allDocumentsData?.results || allDocumentsData || []);
   const allDocsForTree = allDocumentsForTree?.results || allDocumentsForTree || [];
   const totalCount = (allDocumentsData as any)?.count || 0;
   const hasNextPage = !!(allDocumentsData as any)?.next;
@@ -2282,13 +2482,13 @@ export function Documents() {
     }];
   })();
 
-  // Create folder handler (name comes from inline input in TreePanel)
   const handleCreateFolder = async (projectId: number, parentId: string | null, folderName: string) => {
     try {
       await documentsApi.createFolder({ project: projectId, name: folderName, parent: parentId });
-      queryClient.invalidateQueries({ queryKey: ['document-folders'] });
-      queryClient.invalidateQueries({ queryKey: ['documents'] });
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      // ✅ Refetch folders — tree will re-sort alphabetically automatically
+      await queryClient.invalidateQueries({ queryKey: ['document-folders'] });
+      await queryClient.invalidateQueries({ queryKey: ['documents'] });
+      await queryClient.invalidateQueries({ queryKey: ['projects'] });
     } catch (e: any) {
       console.error('Create folder failed:', e);
       alert(e.response?.data?.detail || e.response?.data?.name?.[0] || 'Failed to create folder');
@@ -2542,12 +2742,18 @@ export function Documents() {
           onRemoveFilter={removeFilter}
         />
         <div className="flex-1 flex overflow-hidden" style={{ background: '#fff' }}>
-          <TreePanel
-            folders={treeFolders}
-            onFolderClick={(name, folderId, folderProjectId) => {
+        <TreePanel
+  folders={treeFolders}
+  showSharedWithMe={showSharedWithMe}
+  setShowSharedWithMe={setShowSharedWithMe}
+  setSelectedFolder={setSelectedFolder}
+  setSelectedTreeFolderId={setSelectedTreeFolderId}
+  sharedWithMeCount={sharedWithMeCount}
+  onFolderClick={(name, folderId, folderProjectId) => {
+              // ✅ Reset shared with me when clicking any folder
+              setShowSharedWithMe(false);
               const pr = projects.find((p) => p.name === name);
               if (pr) {
-                // Clicked a project node
                 updateFilter('project', String(pr.id));
                 setSelectedFolder(name);
                 setSelectedTreeFolderId(null);
@@ -2666,7 +2872,17 @@ export function Documents() {
                       className: selectedDocs.has(doc.id) ? 'cursor-grab active:cursor-grabbing' : '',
                       style: {
                         opacity: selectedDocs.has(doc.id) ? 0.95 : 1,
+                        background: activeHighlightId === doc.id ? '#FEF9C3' : undefined,
+                        outline: activeHighlightId === doc.id ? '2px solid #F59E0B' : undefined,
+                        transition: 'background 0.5s ease',
                       },
+                      ref: activeHighlightId === doc.id ? (el: HTMLTableRowElement | null) => {
+                        if (el) {
+                          setTimeout(() => {
+                            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          }, 500);
+                        }
+                      } : undefined,
                       onDragStart: (e: React.DragEvent) => {
                         e.stopPropagation();
 
@@ -2711,10 +2927,10 @@ export function Documents() {
               <div className="flex items-center justify-between flex-shrink-0" style={{ padding: '16px 24px', borderTop: '1px solid #e5e7eb', background: '#fff' }}>
                 <div style={{ fontSize: 13, color: '#6b7280' }}>{displayedDocuments.length > 0 ? `Showing 1 to ${Math.min(rowsPerPage, displayedDocuments.length)} of ${totalCount} documents` : 'No documents found'}</div>
                 <div className="flex items-center gap-3">
-                  <label style={{ fontSize: 13, color: '#6b7280' }}>Rows per page:</label>
+                  {/* <label style={{ fontSize: 13, color: '#6b7280' }}>Rows per page:</label>
                   <select value={rowsPerPage} onChange={(e) => setRowsPerPage(Number(e.target.value))} style={{ padding: '6px 32px 6px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 13, background: '#fff', cursor: 'pointer', appearance: 'none' as const, backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M3 5L6 8L9 5' stroke='%236B7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")", backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center', fontFamily: 'inherit' }}>
                     <option value={25}>25</option><option value={50}>50</option><option value={100}>100</option>
-                  </select>
+                  </select> */}
                   <div className="flex gap-1.5">
                     <button className="flex items-center justify-center rounded-md" style={{ width: 32, height: 32, border: '1px solid #e5e7eb', background: '#fff', cursor: !hasPreviousPage ? 'not-allowed' : 'pointer', color: !hasPreviousPage ? '#e5e7eb' : '#6b7280' }} onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={!hasPreviousPage}><ChevronLeft className="w-3.5 h-3.5" /></button>
                     {Array.from({ length: Math.min(5, totalPages) }, (_, i) => i + 1).map((pg) => <button key={pg} className="flex items-center justify-center rounded-md" style={{ width: 32, height: 32, fontSize: 13, fontWeight: 500, cursor: 'pointer', background: currentPage === pg ? '#4169FF' : '#fff', color: currentPage === pg ? '#fff' : '#6b7280', border: `1px solid ${currentPage === pg ? '#4169FF' : '#e5e7eb'}` }} onClick={() => setCurrentPage(pg)}>{pg}</button>)}
@@ -2754,48 +2970,66 @@ export function Documents() {
           targetName={moveConfirmModal.targetName}
           isMoving={false}
           onConfirm={async () => {
+            // ✅ Helper to fully reset and refetch everything
+            const refreshAll = async () => {
+              setSelectedDocs(new Set());
+              setSelectedTreeFolderId(null);
+              setSelectedTreeFolderName(null);
+              setSelectedFolder('All Documents');
+              // ✅ invalidateQueries marks as stale AND triggers immediate refetch
+              await queryClient.invalidateQueries({ queryKey: ['documents'] });
+              await queryClient.invalidateQueries({ queryKey: ['document-folders'] });
+              await queryClient.invalidateQueries({ queryKey: ['documents-tree-counts'] });
+              // ✅ Also refetch the tree counts query specifically
+              await queryClient.refetchQueries({ queryKey: ['documents-tree-counts'] });
+            };
+
             try {
-              // Move documents
+              // Move each document one by one
               for (const docId of moveConfirmModal.documentIds) {
-                // ✅ DEBUG
-                console.log('📦 Moving document:', {
-                  docId,
-                  targetProject: moveConfirmModal.targetProjectId,
-                  targetFolder: moveConfirmModal.targetFolderId,
-                });
-                
                 await documentsApi.update(docId, {
                   project: moveConfirmModal.targetProjectId,
-                  folder: moveConfirmModal.targetFolderId || null
+                  folder: moveConfirmModal.targetFolderId || null,
                 } as any);
               }
 
-              // Clear selection and refresh
-              setSelectedDocs(new Set());
-              queryClient.invalidateQueries({ queryKey: ['documents'] });
-              queryClient.invalidateQueries({ queryKey: ['document-folders'] });
-              queryClient.invalidateQueries({ queryKey: ['documents-tree-counts'] });
+              // ✅ Refresh ALL document state after successful move
+              await refreshAll();
 
-              // Close modal
               setMoveConfirmModal(null);
 
-              // ✅ SHOW SUCCESS TOAST INSTEAD OF ALERT
               setToast({
                 isOpen: true,
                 type: 'success',
                 message: `Successfully moved ${moveConfirmModal.documentIds.length} document${moveConfirmModal.documentIds.length > 1 ? 's' : ''} to "${moveConfirmModal.targetName}"`,
               });
+
             } catch (error: any) {
               console.error('Failed to move documents:', error);
 
-              // ✅ SHOW ERROR TOAST INSTEAD OF ALERT
+              // ✅ Always refresh on error too — UI must show real backend state
+              await refreshAll();
+
+              setMoveConfirmModal(null);
+
+              const detail = error.response?.data?.detail || '';
+              const status = error.response?.status;
+
+              // ✅ Specific messages for known error types
+              let message = 'Failed to move documents. Please try again.';
+              if (status === 404 || detail.toLowerCase().includes('no document')) {
+                message = 'Document not found — it may have already been moved. Page refreshed.';
+              } else if (status === 403) {
+                message = 'You do not have permission to move this document.';
+              } else if (detail) {
+                message = detail;
+              }
+
               setToast({
                 isOpen: true,
                 type: 'error',
-                message: error.response?.data?.detail || 'Failed to move documents',
+                message,
               });
-
-              setMoveConfirmModal(null);
             }
           }}
         />
