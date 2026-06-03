@@ -5,7 +5,7 @@ export interface User {
   email: string;
   first_name: string;
   last_name: string;
-  role: 'admin' | 'manager' | 'annotator' | 'viewer';
+  role: 'admin' | 'manager' | 'annotator' | 'viewer' | 'developer';
   avatar?: string;
   is_active: boolean;
   is_superuser?: boolean;
@@ -13,11 +13,9 @@ export interface User {
   skills?: string[];
 }
 
-// User Management 
-// Invite User
 export interface InviteUserPayload {
   email: string;
-  role: 'admin' | 'manager' | 'annotator' | 'viewer';
+  role: 'admin' | 'manager' | 'annotator' | 'viewer' | 'developer';
 }
 
 export interface InviteUserResponse {

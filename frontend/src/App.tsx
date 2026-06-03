@@ -88,8 +88,8 @@ function PageLoader() {
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { isAllowed, isLoading, isAuthenticated } = useAuth();
-  const ALLOWED_ROLES: AppUser['role'][] = ['admin', 'manager', 'annotator'];
-  const isAuthorized = isAllowed(ALLOWED_ROLES);
+  const ALLOWED_ROLES: AppUser['role'][] = ['admin', 'manager', 'annotator', 'developer'];
+    const isAuthorized = isAllowed(ALLOWED_ROLES);
 
   if (isLoading && !isAuthenticated) {
     return (

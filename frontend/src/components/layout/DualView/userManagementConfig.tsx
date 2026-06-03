@@ -16,10 +16,12 @@ const getRoleColorConfig = (role: AppUser['role']) => {
       return { bg: 'bg-green-50', text: 'text-green-800', label: 'ADMIN' };
     case 'manager':
       return { bg: 'bg-blue-50', text: 'text-blue-800', label: 'MANAGER' };
-    case 'annotator':
-      return { bg: 'bg-yellow-50', text: 'text-yellow-800', label: 'ANNOTATOR' };
-    default:
-      return { bg: 'bg-gray-50', text: 'text-gray-800', label: 'VIEWER' };
+      case 'annotator':
+        return { bg: 'bg-yellow-50', text: 'text-yellow-800', label: 'ANNOTATOR' };
+      case 'developer':
+        return { bg: 'bg-purple-50', text: 'text-purple-800', label: 'DEVELOPER' };
+      default:
+        return { bg: 'bg-gray-50', text: 'text-gray-800', label: 'VIEWER' };
   }
 };
 

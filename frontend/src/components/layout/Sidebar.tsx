@@ -23,8 +23,7 @@ import {
   DialogFooter,
 } from '@/components/common/diaog';
 
-const ADMIN_ROLES = ['admin', 'manager', 'annotator', 'superuser'];
-
+const ADMIN_ROLES = ['admin', 'manager', 'annotator', 'superuser', 'developer'];
 // ✅ Add Workspace interface
 interface Workspace {
   id: number;

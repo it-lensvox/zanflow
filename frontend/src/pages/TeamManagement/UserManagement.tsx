@@ -36,6 +36,7 @@ const ChangeRoleModal: React.FC<{ user: AppUser; isOpen: boolean; onClose: () =>
     mutationFn: (role: AppUser['role']) => usersApi.updateRole(user.id, role),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.refetchQueries({ queryKey: ['users'] });
       onClose();
     },
   });
@@ -428,6 +429,8 @@ export function UserManagement() {
   const { data: usersData, isLoading } = useQuery<PaginatedResponse<AppUser>, Error>({
     queryKey: ['users'],
     queryFn: () => usersApi.list(),
+    staleTime: 0,        // ✅ always fetch fresh
+    refetchOnMount: 'always',  // ✅ refetch every time page mounts
   });
 
   const deleteUserMutation = useMutation({
