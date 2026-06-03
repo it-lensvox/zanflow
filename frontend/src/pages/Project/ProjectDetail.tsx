@@ -25,8 +25,14 @@ export function ProjectDetail() {
 
   const { data: project, isLoading: projectLoading } = useQuery({
     queryKey: ['project', id],
-    queryFn: () => projectsApi.get(Number(id)),
+    queryFn: async () => {
+      const res = await projectsApi.get(Number(id));
+      // ✅ normalize — handle both flat {id, name} and nested {project: {id, name}}
+      return res?.project ?? res;
+    },
     enabled: !!id,
+    staleTime: 0,
+    retry: 2,
   });
 
   const [documentPage, setDocumentPage] = useState(1);

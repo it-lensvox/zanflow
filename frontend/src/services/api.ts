@@ -11,9 +11,9 @@ import type {
 //export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.164:8000/api/v1';
 //const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://192.168.1.164:8000/ws/gateway';
 //const WS_AI_BOT_URL = (import.meta as any).env.VITE_WS_AI_BOT_URL || 'ws://192.168.1.164:8000/ws/ai-bot/';
-export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.220:8000/api/v1';
-const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://192.168.1.220:8000/ws/gateway';
-const WS_AI_BOT_URL = (import.meta as any).env.VITE_WS_AI_BOT_URL || 'ws://192.168.1.220:8000/ws/ai-bot/';
+export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.164:8000/api/v1';
+const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://192.168.1.164:8000/ws/gateway';
+const WS_AI_BOT_URL = (import.meta as any).env.VITE_WS_AI_BOT_URL || 'ws://192.168.1.164:8000/ws/ai-bot/';
 // export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://zanflow.lensvox.com/api/v1';
 export const api = axios.create({
   baseURL: API_URL,
@@ -573,6 +573,17 @@ export const documentsApi = {
     api.delete(`/documents/${documentId}/comments/${commentId}/`),
 
   getTeamMembers: () => usersApi.listAll(),
+
+  sharedWithMe: async (params?: { page?: number }) => {
+    const response = await api.get('/documents/shared-with-me/', { params });
+    return response.data;
+  },
+
+  // ✅ Revoke document sharing access from a user or project
+  revokeShare: async (documentId: string, payload: { user_id?: number; project_id?: number }) => {
+    const response = await api.delete(`/documents/${documentId}/share/`, { data: payload });
+    return response.data;
+  },
 };
 
 

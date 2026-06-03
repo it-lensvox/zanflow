@@ -16,7 +16,7 @@ const Projects = lazy(() => import('@/pages/Project/Projects').then(m => ({ defa
 const ProjectSettings = lazy(() => import('@/pages/Project/ProjectSettings').then(m => ({ default: m.ProjectSettings })));
 const DocumentCreate = lazy(() => import('@/pages/Documents/DocumentCreate').then(m => ({ default: m.DocumentCreate })));
 const Documents = lazy(() => import('@/pages/Documents/Documents').then(m => ({ default: m.Documents })));
-const MyTask = lazy(() => import('@/pages/MyTask/MyTask').then(m => ({ default: m.MyTask })));
+const SharedWithMe = lazy(() => import('@/pages/Documents/SharedWithMe').then(m => ({ default: m.SharedWithMe })));const MyTask = lazy(() => import('@/pages/MyTask/MyTask').then(m => ({ default: m.MyTask })));
 const CreateTask = lazy(() => import('@/pages/MyTask/CreateTask').then(m => ({ default: m.CreateTask })));
 const TaskDetailPage = lazy(() => import('@/pages/MyTask/TaskDetailPage').then(m => ({ default: m.TaskDetailPage })));
 const Teams = lazy(() => import('@/pages/TeamManagement/Teams').then(m => ({ default: m.Teams })));
@@ -128,10 +128,11 @@ function ProjectDetailWrapper() {
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
 
-  const { data: project } = useQuery({
+  const { data: project, isLoading } = useQuery({
     queryKey: ['project', id],
     queryFn: () => projectsApi.get(Number(id)),
     enabled: !!id,
+    staleTime: 0,
     placeholderData: () => {
       const cache = queryClient.getQueryData(['projects']) as any || queryClient.getQueryData(['projects', '']) as any;
       const list = Array.isArray(cache) ? cache : (cache?.results || []);
@@ -139,13 +140,19 @@ function ProjectDetailWrapper() {
     },
   });
 
+  // ✅ Show spinner while loading — never show blank page
+  if (isLoading && !project) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
   if (!project) return null;
 
-  // All project types now use the unified TaskDetails component
-  const supportedTypes = ['client', 'internal', 'Content Creation', 'ideas', 'content_creation', 'content-creation'];
-  if (supportedTypes.includes(project.task_type)) {
-    return <TaskDetails />;
-  }
+  // ✅ All project types use TaskDetails — including demo and any future types
+  return <TaskDetails />;
 }
 
 // Helper component to render the Admin UI for nested routes
@@ -211,7 +218,8 @@ function AppRoutes() {
         <Route path="/projects/:projectId/documents/new" element={<DocumentCreate />} />
         <Route path="/projects/:id/settings" element={<ProjectSettings />} />
         <Route path="/notifications" element={<NotificationsPage />} />
-        <Route path="/documents" element={<Documents />} />
+<Route path="/documents" element={<Documents />} />
+<Route path="/documents/shared-with-me" element={<SharedWithMe />} />
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/team-chat" element={<TeamChatModern />} />
         <Route path="/team-chat/chat" element={<TeamChatModern />} />

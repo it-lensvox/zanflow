@@ -183,22 +183,34 @@ export function NotificationsPage({
   const relatedType = (n.related_object?.type || n.related_object_info?.type) as string | undefined;
   const relatedId = n.related_object?.id || n.related_object_info?.id;
 
-  if (relatedType === 'document' && relatedId) {
-      navigate(`/documents`);
-    } else if (relatedType === 'task' || n.metadata?.task_id) {
-      const taskId = relatedId || n.metadata?.task_id;
-      navigate(`/tasks/${taskId}`);
-    } else if (relatedType === 'project' || n.metadata?.project_id) {
-      const projectId = relatedId || n.metadata?.project_id;
-      navigate(`/projects/${projectId}`);
-    } else if (relatedType === 'event' || n.metadata?.event_id) {
-      const eventId = relatedId || n.metadata?.event_id;
-      // Pass the event ID as a query parameter
-      navigate(`/calendar?eventId=${eventId}`);
+  if (n.notification_type === 'document_shared') {
+    const documentId = n.metadata?.document_id;
+    // ✅ Navigate to main documents page, select "Shared With Me" section
+    if (documentId) {
+      navigate(`/documents?shared=true&highlight=${documentId}`);
+    } else {
+      navigate(`/documents?shared=true`);
     }
+  } else if (relatedType === 'document' && relatedId) {
+    const projectId = n.metadata?.project_id;
+    if (projectId) {
+      navigate(`/documents?project=${projectId}&highlight=${relatedId}`);
+    } else {
+      navigate(`/documents?highlight=${relatedId}`);
+    }
+  } else if (relatedType === 'task' || n.metadata?.task_id) {
+    const taskId = relatedId || n.metadata?.task_id;
+    navigate(`/tasks/${taskId}`);
+  } else if (relatedType === 'project' || n.metadata?.project_id) {
+    const projectId = relatedId || n.metadata?.project_id;
+    navigate(`/projects/${projectId}`);
+  } else if (relatedType === 'event' || n.metadata?.event_id) {
+    const eventId = relatedId || n.metadata?.event_id;
+    navigate(`/calendar?eventId=${eventId}`);
+  }
 
-    if (onClose) onClose();
-  };
+  if (onClose) onClose();
+};
 
   return (
     // Backdrop overlay to create the popup feel

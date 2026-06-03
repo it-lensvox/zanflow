@@ -14,6 +14,7 @@ const TASK_TYPES = [
     { value: 'internal', label: 'Internal' },
     { value: 'content_creation', label: 'Content Creation' },
     { value: 'ideas', label: 'Ideas' },
+    { value: 'demo', label: 'Demo' },
 ];
 
 const PROJECT_ROLES = [
@@ -65,22 +66,19 @@ export function CreateProjectModal({ isOpen, onClose, navigateOnSuccess = false 
     const createMutation = useMutation({
         mutationFn: (data: ProjectCreatePayload) => projectsApi.create(data),
         onSuccess: (newProject) => {
-          // 1. Invalidate the projects list so the new project appears
-          queryClient.invalidateQueries({ queryKey: ['projects'] });
-          
-          // --- NEW: Invalidate chat rooms so the new project chat appears instantly ---
-          queryClient.invalidateQueries({ queryKey: ['project-chat-rooms'] });
-          queryClient.invalidateQueries({ queryKey: ['sidebar-all-chat-rooms'] });
-          
-          // Close the modal (your existing logic)
-          onClose();
-          
-          // (Any other existing success logic you have...)
+            queryClient.invalidateQueries({ queryKey: ['projects'] });
+            queryClient.invalidateQueries({ queryKey: ['project-chat-rooms'] });
+            queryClient.invalidateQueries({ queryKey: ['sidebar-all-chat-rooms'] });
+
+            // ✅ seed cache immediately so ProjectDetail loads without blank page
+            queryClient.setQueryData(['project', String(newProject.id)], newProject);
+
+            onClose();
         },
         onError: (error) => {
-          console.error("Failed to create project:", error);
+            console.error("Failed to create project:", error);
         }
-      });
+    });
 
     const handleClose = () => {
         setFormData({ name: '', description: '', task_type: 'key_value' });
@@ -225,7 +223,18 @@ export function CreateProjectModal({ isOpen, onClose, navigateOnSuccess = false 
                             name="name"
                             type="text"
                             value={formData.name}
-                            onChange={handleChange}
+                            onChange={(e) => {
+                                // ✅ Auto capitalize first letter of every word
+                                const raw = e.target.value;
+                                const titled = raw
+                                    .split(' ')
+                                    .map(word => word.length > 0
+                                        ? word[0].toLocaleUpperCase() + word.slice(1)
+                                        : ''
+                                    )
+                                    .join(' ');
+                                setFormData(prev => ({ ...prev, name: titled }));
+                            }}
                             placeholder="Enter project name"
                             required
                         />
@@ -353,7 +362,7 @@ export function CreateProjectModal({ isOpen, onClose, navigateOnSuccess = false 
                         {/* Task Type*/}
                         <div className="relative space-y-2" ref={taskTypeDropdownRef}>
                             <label className="text-sm font-medium">
-                                Task Type <span className="text-destructive">*</span>
+                                Project Type <span className="text-destructive">*</span>
                             </label>
 
                             <div
@@ -361,8 +370,7 @@ export function CreateProjectModal({ isOpen, onClose, navigateOnSuccess = false 
                                 onClick={() => setTaskTypeDropdownOpen(!taskTypeDropdownOpen)}
                             >
                                 <span className={formData.task_type ? "text-foreground" : "text-muted-foreground"}>
-                                    {TASK_TYPES.find(t => t.value === formData.task_type)?.label || "Select Task Type..."}
-                                </span>
+                                    {TASK_TYPES.find(t => t.value === formData.task_type)?.label || "Select Project Type..."}                                </span>
                                 <svg
                                     className={`h-4 w-4 text-muted-foreground transition-transform ${taskTypeDropdownOpen ? 'rotate-180' : ''}`}
                                     xmlns="http://www.w3.org/2000/svg"

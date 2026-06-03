@@ -262,6 +262,13 @@ export interface CreateTaskCommentPayload {
   content: string;
 }
 
+export interface DocumentShareUser {
+  id: number;
+  full_name: string;
+  username: string;
+  avatar: string | null;
+}
+
 // Document types
 export interface Document {
   id: string;
@@ -283,6 +290,8 @@ export interface Document {
   updated_at: string;
   labels?: Label[];
   version_count?: number;
+  shared_with?: DocumentShareUser[];
+  shared_by?: DocumentShareUser | null;
 }
 
 export interface DocumentActivity {
