@@ -165,18 +165,77 @@ class DocumentSerializer(serializers.ModelSerializer):
     created_by = UserMinimalSerializer(read_only=True)
     labels = LabelSerializer(many=True, read_only=True) 
 
+    shared_with = serializers.SerializerMethodField()
+    shared_by = serializers.SerializerMethodField()
+    
+    # ============ NEW FIELD ============
+    project_name = serializers.CharField(source='project.name', read_only=True)
+    # ===================================
+
     class Meta:
         model = Document
         fields = [
-            "id", "project", "folder", "name", "description",  # <-- ADD "folder" HERE
+            "id", "project", "project_name", "folder", "name", "description",  # <-- ADD project_name
             "source_file", "source_file_url", "file_type", "file_size",
             "metadata", "status", "created_by", "created_at", "updated_at",
-            "labels" 
+            "labels",
+            "shared_with", "shared_by"
         ]
         read_only_fields = [
-            "id", "file_size", "created_by", "created_at", "updated_at", "labels"
+            "id", "file_size", "created_by", "created_at", "updated_at", "labels",
+            "shared_with", "shared_by", "project_name" # <-- ADD project_name
         ]
 
+    # ============ BULLETPROOF AVATAR HELPER ============
+    def _get_safe_avatar_string(self, user):
+        """Forces the avatar to be a plain text URL string."""
+        avatar_url = None
+        
+        # 1. Try to get the URL from the Django ImageField
+        if hasattr(user, 'avatar') and getattr(user.avatar, 'name', None):
+            try:
+                request = self.context.get('request')
+                if request:
+                    avatar_url = request.build_absolute_uri(user.avatar.url)
+                else:
+                    avatar_url = user.avatar.url
+            except Exception:
+                pass
+                
+        # 2. Fallback to a string URL field if the ImageField failed
+        if not avatar_url:
+            avatar_url = getattr(user, 'avatar_url', None)
+            
+        # 3. Force string casting to guarantee no binary objects pass through
+        return str(avatar_url) if avatar_url else None
+    # ===================================================
+
+    def get_shared_with(self, obj):
+        users = []
+        for share in obj.shares.all():
+            if share.shared_with:
+                user = share.shared_with
+                users.append({
+                    "id": user.id,
+                    "full_name": f"{user.first_name} {user.last_name}".strip() or user.username,
+                    "username": user.username,
+                    "avatar": self._get_safe_avatar_string(user)
+                })
+        return users
+
+    def get_shared_by(self, obj):
+        shares = obj.shares.all()
+        if shares:
+            user = shares[0].created_by
+            if user:
+                return {
+                    "id": user.id,
+                    "full_name": f"{user.first_name} {user.last_name}".strip() or user.username,
+                    "username": user.username,
+                    "avatar": self._get_safe_avatar_string(user)
+                }
+        return None
+    
 class DocumentDetailSerializer(DocumentSerializer):
     """
     Detailed serializer with versions and comments.

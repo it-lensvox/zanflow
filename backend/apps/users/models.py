@@ -14,6 +14,7 @@ class User(AbstractUser):
     class Role(models.TextChoices):
         ADMIN = "admin", "Admin"
         MANAGER = "manager", "Manager"
+        DEVELOPER = "developer", "Developer"
         ANNOTATOR = "annotator", "Annotator"
         VIEWER = "viewer", "Viewer"
 
@@ -68,6 +69,10 @@ class User(AbstractUser):
     @property
     def is_manager(self):
         return self.role in [self.Role.ADMIN, self.Role.MANAGER] or self.is_superuser
+    
+    @property
+    def is_developer(self):
+        return self.role == self.Role.DEVELOPER
     
     @property
     def can_annotate(self):

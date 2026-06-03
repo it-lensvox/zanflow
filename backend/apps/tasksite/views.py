@@ -107,8 +107,14 @@ class TaskListCreateView(WorkspaceAPIView):
         return paginator.get_paginated_response(serializer.data)
 
     def post(self, request):
-        # Allow Admin to create tasks too
-        if not (request.user.is_manager or request.user.is_superuser):
+        # Allow Admin, Manager, OR Developer to create tasks
+        is_authorized = (
+            request.user.is_manager or 
+            request.user.is_superuser or 
+            request.user.role == User.Role.DEVELOPER
+        )
+        
+        if not is_authorized:
             return Response(
                 {"detail": "You do not have permission to create tasks."},
                 status=status.HTTP_403_FORBIDDEN
@@ -159,24 +165,29 @@ class TaskRetrieveUpdateView(WorkspaceAPIView):
         task = get_object_or_404(Task, id=task_id)
         old_status = task.status
         
-        # ================================================================
         # 1. Capture existing assignees BEFORE the update
-        # ================================================================
         old_assignee_ids = set(task.assigned_to.values_list('id', flat=True))
 
-        if request.user.is_manager:
+        # --- UPDATE THIS LOGIC ---
+        # A user gets FULL edit access if they are a Manager/Admin OR if they are a Developer who created the task
+        has_full_edit_access = (
+            request.user.is_manager or 
+            request.user.is_superuser or 
+            (request.user.role == User.Role.DEVELOPER and task.assigned_by == request.user)
+        )
+
+        if has_full_edit_access:
             serializer = TaskSerializer(task, data=request.data, partial=True, context={'request': request})
         else:
+            # If not full access, they must be assigned to it to change the status
             if not task.assigned_to.filter(id=request.user.id).exists():
                 return Response(
                     {"detail": "You do not have permission to update this task."},
                     status=status.HTTP_403_FORBIDDEN
                 )
             
-            # Allow status updates
-            if len(request.data) > 1 or ('status' in request.data and len(request.data) == 1):
-                pass
-            else:
+            # Allow status updates only
+            if len(request.data) > 1 or ('status' not in request.data and len(request.data) == 1):
                 return Response(
                     {"detail": "You can only update the 'status' field."},
                     status=status.HTTP_400_BAD_REQUEST
