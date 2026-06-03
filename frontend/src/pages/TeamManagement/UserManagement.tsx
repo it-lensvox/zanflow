@@ -31,8 +31,7 @@ const CustomModal: React.FC<{ isOpen: boolean; onClose: () => void; children: Re
 const ChangeRoleModal: React.FC<{ user: AppUser; isOpen: boolean; onClose: () => void; queryClient: any }> = ({ user, isOpen, onClose, queryClient }) => {
   const [newRole, setNewRole] = useState<AppUser['role']>(user.role);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const roles: AppUser['role'][] = ['admin', 'manager', 'annotator', 'viewer'];
-
+  const roles: AppUser['role'][] = ['admin', 'manager', 'annotator', 'viewer', 'developer'];
   const changeRoleMutation = useMutation({
     mutationFn: (role: AppUser['role']) => usersApi.updateRole(user.id, role),
     onSuccess: () => {
@@ -208,8 +207,7 @@ const AddUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient
 
             {isDropdownOpen && (
               <div className="border border-gray-200 rounded-md mt-1 bg-white overflow-hidden shadow-sm">
-                {['admin', 'manager', 'annotator', 'viewer'].map((role) => (
-                  <div
+              {['admin', 'manager', 'annotator', 'viewer', 'developer'].map((role) => (                  <div
                     key={role}
                     className="px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer capitalize"
                     onClick={() => {
@@ -358,8 +356,8 @@ const InviteUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryCli
             </div>
             {isDropdownOpen && (
               <div className="border border-gray-200 rounded-md mt-1 bg-white overflow-hidden shadow-sm">
-                {(['admin', 'manager', 'annotator', 'viewer'] as AppUser['role'][]).map((role) => (
-                  <div
+              {(['admin', 'manager', 'annotator', 'viewer', 'developer'] as AppUser['role'][]).map((role) => (
+                                  <div
                     key={role}
                     className="px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer capitalize"
                     onClick={() => {

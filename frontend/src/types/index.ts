@@ -27,7 +27,7 @@ export interface InviteUserResponse {
 // Invite Accept (Setup Account page)
 export interface InviteVerifyResponse {
   email: string;
-  role: 'admin' | 'manager' | 'annotator' | 'viewer';
+  role: 'admin' | 'manager' | 'annotator' | 'viewer' | 'developer';
 }
 
 export interface InviteAcceptPayload {
