@@ -97,15 +97,26 @@ class DocumentViewSet(viewsets.ModelViewSet):
     """
     ViewSet for Document CRUD operations with restricted visibility.
     """
-    # 1. Add the dynamic queryset logic inside the class
     def get_queryset(self):
         user = self.request.user
 
         # 1. BASE SECURITY: Only fetch documents from projects the user owns or is a member of.
-        # This prevents users from accessing documents in workspaces they don't belong to.
         queryset = Document.objects.filter(
             Q(project__created_by=user) | Q(project__members=user)
         )
+
+        # ============ NEW: PREFETCH RELATED ============
+        # Pre-loads the shares and the associated users to keep the API blazing fast
+        # and avoid the N+1 query problem for the new shared_with/shared_by fields
+        queryset = queryset.prefetch_related(
+            'shares__shared_with', 
+            'shares__created_by'
+        )
+        # ===============================================
+
+        if self.action != 'list':
+            return queryset.distinct()
+        
 
         # 2. PROJECT FILTER: Scope down to a specific project if requested by the frontend
         project_id = self.request.query_params.get('project')
@@ -120,11 +131,8 @@ class DocumentViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(folder_id=folder_id)
         else:
             # If no folder is specified, only return "root" level documents.
-            # This keeps the "Tasks" folder files safely hidden from the main flat view.
             queryset = queryset.filter(folder__isnull=True)
 
-        # distinct() is essential here because the Q(project__members=user) lookup 
-        # spans a ManyToMany relationship, which can cause duplicate rows in SQL joins.
         return queryset.distinct()
     
     @action(detail=False, methods=["post"], url_path="bulk-add-labels")
@@ -188,6 +196,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
             "updated_count": len(updated_docs),
             "documents": serializer.data
         }, status=status.HTTP_200_OK)
+    
     # 2. Re-add the serializer logic to fix the AssertionError
     def get_serializer_class(self):
         if self.action == "create":
@@ -498,7 +507,33 @@ class DocumentViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED,
         )
 
+    @action(detail=False, methods=["get"], url_path="shared-with-me")
+    def shared_with_me(self, request):
+        user = request.user
+        
+        # 1. Fetch documents shared directly with the user OR with a project they belong to
+        queryset = Document.objects.filter(
+            Q(shares__shared_with=user) |
+            Q(shares__shared_project__members=user) |
+            Q(shares__shared_project__created_by=user)
+        ).distinct()
 
+        # 2. Pre-fetch relationships for performance and sort by newest
+        queryset = queryset.prefetch_related(
+            'shares__shared_with', 
+            'shares__created_by',
+            'project'
+        ).order_by('-created_at')
+
+        # 3. Apply standard pagination (returns "count", "next", "previous", "results")
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+    
 class DocumentCommentViewSet(viewsets.ModelViewSet):
     """
     ViewSet for document comments.
@@ -722,7 +757,8 @@ class ProjectAllDocumentsView(APIView):
     
 class DocumentShareView(APIView):
     """
-    Explicit endpoint to handle sharing a document with a user OR a project.
+    Explicit endpoint to handle sharing and revoking a document 
+    with a user OR a project.
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -794,6 +830,10 @@ class DocumentShareView(APIView):
                 notification_type=Notification.NotificationType.DOCUMENT_SHARED,
                 content_type=ContentType.objects.get_for_model(Document),
                 object_id=str(document.id),
+                metadata={
+                    "document_id": str(document.id),
+                    "project_id": document.project_id
+                }
             )
             
             notification_data = NotificationSerializer(notification).data
@@ -842,9 +882,6 @@ class DocumentShareView(APIView):
             document.updated_at = timezone.now()
             document.save()
 
-            # Get all project members + creator (excluding the user who is sending it)
-
-            # Get all project members + creator (excluding the user who is sending it)
             target_users = list(target_project.members.exclude(id=user.id))
             if target_project.created_by != user and target_project.created_by not in target_users:
                 target_users.append(target_project.created_by)
@@ -859,6 +896,10 @@ class DocumentShareView(APIView):
                     notification_type=Notification.NotificationType.DOCUMENT_SHARED,
                     content_type=ContentType.objects.get_for_model(Document),
                     object_id=str(document.id),
+                    metadata={
+                        "document_id": str(document.id),
+                        "project_id": document.project_id
+                    }
                 )
                 
                 notification_data = NotificationSerializer(notification).data
@@ -879,6 +920,84 @@ class DocumentShareView(APIView):
                 status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
             )
 
+    # ==========================================
+    # NEW METHOD: REVOKE SHARE ACCESS
+    # ==========================================
+    def delete(self, request, document_id):
+        user = request.user
+        
+        # 1. Fetch document and verify access
+        document = get_object_or_404(
+            Document.objects.filter(
+                Q(project__created_by=user) | 
+                Q(project__members=user) | 
+                Q(shares__shared_with=user) |
+                Q(shares__shared_project__members=user) |
+                Q(shares__shared_project__created_by=user)
+            ).distinct(),
+            id=document_id
+        )
+
+        target_user_id = request.data.get("user_id")
+        target_project_id = request.data.get("project_id")
+
+        if not target_user_id and not target_project_id:
+            return Response(
+                {"detail": "Please provide either user_id or project_id to revoke access."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if target_user_id:
+            try:
+                share_record = DocumentShare.objects.get(
+                    document=document, 
+                    shared_with_id=target_user_id
+                )
+                share_record.delete()
+                
+                # Audit Log
+                log_action(
+                    document, 
+                    "share_revoked", 
+                    change_summary=f"Revoked document access for user ID {target_user_id}", 
+                    user=user
+                )
+                
+            except DocumentShare.DoesNotExist:
+                return Response(
+                    {"detail": "Share record not found for this user."}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+        elif target_project_id:
+            try:
+                share_record = DocumentShare.objects.get(
+                    document=document, 
+                    shared_project_id=target_project_id
+                )
+                share_record.delete()
+                
+                # Audit Log
+                log_action(
+                    document, 
+                    "share_revoked", 
+                    change_summary=f"Revoked document access for project ID {target_project_id}", 
+                    user=user
+                )
+                
+            except DocumentShare.DoesNotExist:
+                return Response(
+                    {"detail": "Share record not found for this project."}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+        # Update the document's timestamp to reflect the revocation
+        document.updated_by = user
+        document.updated_at = timezone.now()
+        document.save(update_fields=['updated_by', 'updated_at'])
+
+        return Response({"detail": "Access revoked successfully."}, status=status.HTTP_200_OK)
+
 class FolderViewSet(viewsets.ModelViewSet):
     serializer_class = FolderSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -887,7 +1006,13 @@ class FolderViewSet(viewsets.ModelViewSet):
         user = self.request.user
         project_id = self.request.query_params.get('project')
         
-        queryset = Folder.objects.all()
+        # ==================== THE FIX ====================
+        # Delete `queryset = Folder.objects.all()`
+        # Replace it with this explicit project-member bypass:
+        queryset = Folder.objects.filter(
+            Q(project__created_by=user) | Q(project__members=user)
+        )
+        # =================================================
 
         if project_id:
             queryset = queryset.filter(project_id=project_id)
@@ -899,8 +1024,6 @@ class FolderViewSet(viewsets.ModelViewSet):
             else:
                 queryset = queryset.filter(parent_id=parent_id)
 
-        # ============ THE FIX ============
-        # We apply your exact logic to BOTH counts to prevent JOIN explosions
         return queryset.annotate(
             document_count=Count(
                 'documents', 

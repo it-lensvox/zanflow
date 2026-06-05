@@ -427,6 +427,17 @@ class ProjectViewSet(viewsets.ModelViewSet):
         Add a member to the project.
         """
         project = self.get_object()
+        # --- SECURITY CHECK (Rule 1 Enforcement) ---
+        # Only allow System Admins/Managers, or the Project Creator/Owner to add members
+        is_system_manager = request.user.is_manager or request.user.is_superuser
+        is_creator = project.created_by == request.user
+        is_owner = project.members.through.objects.filter(
+            project=project, user=request.user, role='owner'
+        ).exists()
+
+        if not (is_system_manager or is_creator or is_owner):
+            raise PermissionDenied("You do not have permission to add members to this project.")
+        # --- END SECURITY CHECK ---
         serializer = ProjectMembershipSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         
@@ -485,6 +496,16 @@ class ProjectViewSet(viewsets.ModelViewSet):
         Update the role of an existing project member.
         """
         project = self.get_object()
+        # --- SECURITY CHECK (Rule 2 Enforcement) ---
+        is_system_manager = request.user.is_manager or request.user.is_superuser
+        is_creator = project.created_by == request.user
+        is_owner = project.members.through.objects.filter(
+            project=project, user=request.user, role='owner'
+        ).exists()
+
+        if not (is_system_manager or is_creator or is_owner):
+            raise PermissionDenied("You do not have permission to change member roles.")
+        # --- END SECURITY CHECK ---
         new_role = request.data.get("role")
         
         try:

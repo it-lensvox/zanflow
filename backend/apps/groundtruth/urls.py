@@ -56,7 +56,13 @@ urlpatterns = [
         }), 
         name="document-bulk-import"
     ),
-    
+    path(
+        "shared-with-me/", 
+        views.DocumentViewSet.as_view({
+            'get': 'shared_with_me'
+        }), 
+        name="document-shared-with-me"
+    ),
     # Standard CRUD
     path(
         "", 

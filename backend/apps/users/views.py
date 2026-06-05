@@ -20,6 +20,7 @@ from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
 from .models import PasswordResetOTP, Invitation, ContactMessage
+from apps.organizations.models import WorkspaceMembership
 User = get_user_model()
 
 class WorkspaceSafeTokenRefreshView(TokenRefreshView):
@@ -47,14 +48,31 @@ class IsAdminRole(permissions.BasePermission):
 class UserCreateView(generics.CreateAPIView):
     """
     Admin-only view to create new users/employees.
-    Auto-assigns the new user to the creator's organization.
+    Auto-assigns the new user to the creator's organization and active workspace.
     """
     queryset = User.objects.all()
     serializer_class = UserCreateSerializer
     permission_classes = [IsAdminRole]
 
     def perform_create(self, serializer):
-        serializer.save(organization=self.request.user.organization)
+        # 1. Save the user to the database and attach to the organization
+        new_user = serializer.save(organization=self.request.user.organization)
+
+        # 2. Grab the active workspace ID from the frontend's request headers
+        workspace_id = self.request.META.get("HTTP_X_WORKSPACE_ID")
+
+        # 3. If a workspace ID was sent, auto-assign the user to it
+        if workspace_id:
+            from apps.organizations.models import WorkspaceMembership
+            try:
+                WorkspaceMembership.objects.get_or_create(
+                    user=new_user,
+                    workspace_id=workspace_id,
+                    defaults={"role": "member"}  # Standard workspace role
+                )
+            except Exception:
+                # Failsafe: if the workspace ID is invalid, the user is still created successfully
+                pass
 
 class MeView(APIView):
     """
@@ -143,15 +161,16 @@ class ChangeUserRoleView(APIView):
                     status=status.HTTP_403_FORBIDDEN
                 )
             
-            # B. Limit allowed role transitions (only Viewer <-> Annotator)
-            allowed_manager_roles = [User.Role.ANNOTATOR, User.Role.VIEWER]
+            # B. Limit allowed role transitions (Rule 6 implemented here)
+            # --> Added User.Role.DEVELOPER to allowed assignments
+            allowed_manager_roles = [User.Role.ANNOTATOR, User.Role.VIEWER, User.Role.DEVELOPER]
             if new_role not in allowed_manager_roles:
                 return Response(
-                    {"detail": "Managers can only assign Annotator or Viewer roles."},
+                    {"detail": "Managers can only assign Developer, Annotator or Viewer roles."},
                     status=status.HTTP_403_FORBIDDEN
                 )
 
-        # 3. ADMIN CHECK: If not Admin and failed Manager check, deny access
+        # 3. ADMIN CHECK: If not Admin and failed Manager check, deny access (Rule 2 implemented here)
         elif user.role != User.Role.ADMIN:
             return Response(
                 {"detail": "Only Admins and Managers can change user roles."},

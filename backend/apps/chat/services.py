@@ -468,210 +468,604 @@ class ChatMessageService:
         except Exception as e:
             print(f"CRITICAL ERROR in create_message: {e}")
             raise e
+    # ------------------------------------------------------------------
+    # CONTEXT BUILDER
+    # Gathers all real data from the DB so the AI never has to guess.
+    # ------------------------------------------------------------------
     @staticmethod
-    def process_zanflow_ai(room_id, prompt_text, user_id):
-        from apps.tasksite.models import Task 
-        
-        room = ChatRoom.objects.get(id=room_id)
-        sender_user = User.objects.get(id=user_id)
-        
-        # 1. Fetch active tasks for the user
-        active_tasks = Task.objects.filter(
-            assigned_to=sender_user, 
-            status__in=['pending', 'in_progress']
-        )
-        
-        if active_tasks.exists():
-            task_list_str = "\n".join([
-                f"- Task ID: {task.id}, Heading: {task.heading}, Status: {task.status}, Priority: {task.priority}" 
-                for task in active_tasks
-            ])
+    def build_ai_context(room: ChatRoom, sender_user) -> dict:
+        """
+        Build a rich, structured context dictionary containing everything
+        the AI needs to answer reliably:
+          - Full user profile + ALL tasks (every status) with timing data
+          - Full project data: all tasks grouped by status, all members
+          - Team info
+          - Calendar / events (if the model exists)
+          - Recent chat history (last 30 messages, AI replies filtered out)
+
+        Returns a plain dict that process_zanflow_ai serialises into the
+        system prompt.
+        """
+        from apps.tasksite.models import Task
+
+        context = {}
+
+        # ── 1. USER PROFILE ───────────────────────────────────────────
+        context['user'] = {
+            'id': sender_user.id,
+            'username': sender_user.username,
+            'full_name': sender_user.get_full_name() or sender_user.username,
+            'email': sender_user.email,
+        }
+
+        # ── 2. USER'S TASKS (ALL statuses) ───────────────────────────
+        all_user_tasks = Task.objects.filter(
+            assigned_to=sender_user
+        ).select_related('project').prefetch_related('assigned_to')
+
+        user_tasks_by_status = {
+            'pending': [],
+            'in_progress': [],
+            'completed': [],
+            'overdue': [],
+            'other': [],
+        }
+
+        now = timezone.now()
+        total_completion_seconds = []
+
+        for task in all_user_tasks:
+            # Compute how long the task took if completed
+            completion_time_str = None
+            if task.status == 'completed':
+                # Use updated_at as proxy for completed_at if no dedicated field exists
+                completed_at = getattr(task, 'completed_at', None) or task.updated_at
+                delta = completed_at - task.created_at
+                hours = delta.total_seconds() / 3600
+                completion_time_str = f"{hours:.1f} hrs"
+                total_completion_seconds.append(delta.total_seconds())
+
+            # Detect overdue: pending/in_progress tasks past their due_date
+            due_date = getattr(task, 'due_date', None)
+            is_overdue = (
+                due_date
+                and task.status not in ['completed']
+                and due_date < now
+            )
+
+            task_entry = {
+                'id': task.id,
+                'heading': task.heading,
+                'status': task.status,
+                'priority': task.priority,
+                'project_name': task.project.name if task.project else 'No Project',
+                'project_id': task.project.id if task.project else None,
+                'created_at': task.created_at.strftime('%Y-%m-%d'),
+                'due_date': due_date.strftime('%Y-%m-%d') if due_date else 'Not set',
+                'completion_time': completion_time_str,
+                'description': (task.description or '')[:120],
+            }
+
+            if is_overdue:
+                user_tasks_by_status['overdue'].append(task_entry)
+            elif task.status == 'pending':
+                user_tasks_by_status['pending'].append(task_entry)
+            elif task.status == 'in_progress':
+                user_tasks_by_status['in_progress'].append(task_entry)
+            elif task.status == 'completed':
+                user_tasks_by_status['completed'].append(task_entry)
+            else:
+                user_tasks_by_status['other'].append(task_entry)
+
+        # Average completion time
+        if total_completion_seconds:
+            avg_hours = (sum(total_completion_seconds) / len(total_completion_seconds)) / 3600
+            context['user_avg_completion_hours'] = round(avg_hours, 1)
         else:
-            task_list_str = "The user currently has NO assigned tasks."
+            context['user_avg_completion_hours'] = None
 
-        # 2. Fetch Chat History
-        history = ChatMessage.objects.filter(room=room, is_deleted=False).order_by('-created_at')[:15]
-        context_str = "\n".join([
-            f"{msg.sender.username if msg.sender else '@zanflow'}: {msg.content}" 
-            for msg in reversed(history)
-        ])
-        
-        # Project/Thread Context
-        participants = room.participants.all()
-        users_context = "\n".join([f"- Name: {u.get_full_name() or u.username} | Username: {u.username} | ID: {u.id}" for u in participants])
-        project_context = f"Project context: {room.project.name if room.project else 'None'}"
+        context['user_tasks'] = user_tasks_by_status
 
-        # 4. Update the System Instruction
-        system_instruction = (
-            "You are @dyuksa, an AI assistant inside the dyuksa platform. "
-            f"The user speaking to you right now has the ID: {user_id}. "
-            f"{project_context}\n"
-            "Always base your task summaries ONLY on the 'Current Real Tasks' provided below.\n\n"
-            f"--- CURRENT REAL TASKS ---\n{task_list_str}\n--------------------------\n\n"
-            f"--- AVAILABLE USERS IN CONTEXT ---\n{users_context}\n---------------------------------------\n\n"
-            "=== TASK CREATION INSTRUCTIONS ===\n"
-            "If the user explicitly asks you to CREATE A TASK, you must reply ONLY with a valid JSON block and NO OTHER TEXT. "
-            "If they say 'assign it to me', use the ID of the user speaking to you. "
-            "Match the user names mentioned to the User IDs provided. "
-            "The JSON MUST look exactly like this:\n"
+        # ── 3. PROJECT CONTEXT ────────────────────────────────────────
+        project = room.project
+        if project:
+            # All tasks in the project (not just the current user's)
+            project_tasks = Task.objects.filter(
+                project=project
+            ).prefetch_related('assigned_to')
+
+            project_task_groups = {
+                'pending': [],
+                'in_progress': [],
+                'completed': [],
+                'overdue': [],
+                'other': [],
+            }
+
+            for task in project_tasks:
+                due_date = getattr(task, 'due_date', None)
+                is_overdue = (
+                    due_date
+                    and task.status not in ['completed']
+                    and due_date < now
+                )
+                assignees = ", ".join([
+                    u.get_full_name() or u.username
+                    for u in task.assigned_to.all()
+                ]) or 'Unassigned'
+
+                t = {
+                    'id': task.id,
+                    'heading': task.heading,
+                    'status': task.status,
+                    'priority': task.priority,
+                    'assignees': assignees,
+                    'due_date': due_date.strftime('%Y-%m-%d') if due_date else 'Not set',
+                    'created_at': task.created_at.strftime('%Y-%m-%d'),
+                }
+
+                if is_overdue:
+                    project_task_groups['overdue'].append(t)
+                elif task.status == 'pending':
+                    project_task_groups['pending'].append(t)
+                elif task.status == 'in_progress':
+                    project_task_groups['in_progress'].append(t)
+                elif task.status == 'completed':
+                    project_task_groups['completed'].append(t)
+                else:
+                    project_task_groups['other'].append(t)
+
+            # Project members with IDs (needed for task assignment)
+            members_qs = []
+            if hasattr(project, 'members'):
+                members_qs = project.members.all().select_related()
+            elif hasattr(project, 'memberships'):
+                members_qs = [m.user for m in project.memberships.select_related('user')]
+
+            project_members = [
+                {
+                    'id': u.id,
+                    'username': u.username,
+                    'full_name': u.get_full_name() or u.username,
+                    'email': u.email,
+                }
+                for u in members_qs
+            ]
+
+            context['project'] = {
+                'id': project.id,
+                'name': project.name,
+                'description': getattr(project, 'description', '') or '',
+                'status': getattr(project, 'status', 'unknown'),
+                'start_date': project.created_at.strftime('%Y-%m-%d') if hasattr(project, 'created_at') and project.created_at else 'Unknown',
+                'deadline': getattr(project, 'deadline', None),
+                'tasks': project_task_groups,
+                'task_counts': {
+                    'total': sum(len(v) for v in project_task_groups.values()),
+                    'pending': len(project_task_groups['pending']),
+                    'in_progress': len(project_task_groups['in_progress']),
+                    'completed': len(project_task_groups['completed']),
+                    'overdue': len(project_task_groups['overdue']),
+                },
+                'members': project_members,
+            }
+        else:
+            context['project'] = None
+
+        # ── 4. TEAM CONTEXT ──────────────────────────────────────────
+        team = getattr(room, 'team', None)
+        if team:
+            team_members = []
+            if hasattr(team, 'members'):
+                for m in team.members.select_related('user'):
+                    u = m.user
+                    team_members.append({
+                        'id': u.id,
+                        'username': u.username,
+                        'full_name': u.get_full_name() or u.username,
+                        'role': getattr(m, 'role', 'member'),
+                    })
+            context['team'] = {
+                'id': team.id,
+                'name': team.name,
+                'members': team_members,
+            }
+        else:
+            context['team'] = None
+
+        # ── 5. CALENDAR / EVENTS (optional — skipped if model missing) ─
+        try:
+            from apps.daily_updates.models import Event  # adjust import path if different
+            upcoming_events = Event.objects.filter(
+                Q(attendees=sender_user) | Q(created_by=sender_user),
+                start_date__gte=now,
+                start_date__lte=now + timezone.timedelta(days=14),
+            ).order_by('start_date')[:10]
+
+            context['upcoming_events'] = [
+                {
+                    'title': ev.title,
+                    'start': ev.start_date.strftime('%Y-%m-%d %H:%M'),
+                    'end': ev.end_date.strftime('%Y-%m-%d %H:%M') if getattr(ev, 'end_date', None) else '',
+                    'description': (getattr(ev, 'description', '') or '')[:80],
+                }
+                for ev in upcoming_events
+            ]
+        except Exception:
+            # Calendar app not present or model differs — not a blocker
+            context['upcoming_events'] = []
+
+        # ── 6. CHAT HISTORY (last 30, human messages only) ──────────
+        history_qs = ChatMessage.objects.filter(
+            room=room,
+            is_deleted=False,
+            is_ai_generated=False,   # skip bot replies to reduce noise
+        ).order_by('-created_at')[:30]
+
+        context['chat_history'] = [
+            {
+                'sender': msg.sender.username if msg.sender else 'System',
+                'content': msg.content,
+                'at': msg.created_at.strftime('%H:%M'),
+            }
+            for msg in reversed(list(history_qs))
+        ]
+
+        # ── 7. ROOM PARTICIPANTS (for @mention resolution) ───────────
+        context['room_participants'] = [
+            {
+                'id': u.id,
+                'username': u.username,
+                'full_name': u.get_full_name() or u.username,
+            }
+            for u in room.participants.all()
+        ]
+
+        return context
+
+    # ------------------------------------------------------------------
+    # PROMPT BUILDER
+    # Turns the context dict into a clean, sectioned system prompt.
+    # ------------------------------------------------------------------
+    @staticmethod
+    def build_system_prompt(context: dict) -> str:
+        """
+        Serialises the context dict into structured, clearly-labelled
+        sections so the model reads the right data for each intent.
+        """
+        user = context['user']
+        user_tasks = context['user_tasks']
+        project = context['project']
+        team = context['team']
+        avg_hrs = context['user_avg_completion_hours']
+        events = context['upcoming_events']
+        history = context['chat_history']
+        participants = context['room_participants']
+
+        lines = []
+
+        # ── Identity & role ──────────────────────────────────────────
+        project_name = project['name'] if project else 'No Project'
+        lines.append(
+            "You are @dyuksa, the AI assistant embedded inside the Dyuksa ERP platform. "
+            "You have been given REAL, LIVE data from the database. "
+            "NEVER guess or make up task names, counts, or user information. "
+            "ONLY use the data provided in the sections below. "
+            "If data for a question is not present, say so clearly.\n\n"
+            "CRITICAL SCOPING RULES:\n"
+            f"- This chat room belongs to the project: '{project_name}'.\n"
+            f"- When the user asks about project tasks, counts, or members, ALWAYS use ONLY the "
+            f"'=== PROJECT: {project_name} ===' section below. Do NOT mix in tasks from other projects.\n"
+            "- The '=== USER'S TASKS ===' section shows the current user's personal tasks across "
+            "ALL projects — only use it when the user asks specifically about their own tasks "
+            "(e.g. 'my tasks', 'my pending tasks', 'how long did I take').\n"
+            "- ALWAYS list ALL items — never truncate. Show every single task in the relevant section."
+        )
+
+        # ── Current user ─────────────────────────────────────────────
+        lines.append(
+            f"\n=== CURRENT USER ===\n"
+            f"Name: {user['full_name']} | Username: {user['username']} | ID: {user['id']} | Email: {user['email']}"
+        )
+
+        # ── User's own tasks (personal / cross-project) ───────────────
+        lines.append(
+            "\n=== USER'S TASKS (personal — across ALL projects) ===\n"
+            "Use this section ONLY when the user asks about their own personal tasks."
+        )
+
+        def fmt_task(t, show_completion=False):
+            line = (
+                f"  • [#{t['id']}] {t['heading']} | "
+                f"Status: {t['status']} | Priority: {t['priority']} | "
+                f"Project: {t['project_name']} | Due: {t['due_date']}"
+            )
+            if show_completion and t.get('completion_time'):
+                line += f" | Took: {t['completion_time']}"
+            return line
+
+        if user_tasks['overdue']:
+            lines.append(f"  OVERDUE ({len(user_tasks['overdue'])}):")
+            lines.extend([fmt_task(t) for t in user_tasks['overdue']])
+        if user_tasks['pending']:
+            lines.append(f"  Pending ({len(user_tasks['pending'])}):")
+            lines.extend([fmt_task(t) for t in user_tasks['pending']])
+        if user_tasks['in_progress']:
+            lines.append(f"  In Progress ({len(user_tasks['in_progress'])}):")
+            lines.extend([fmt_task(t) for t in user_tasks['in_progress']])
+        if user_tasks['completed']:
+            lines.append(f"  Completed ({len(user_tasks['completed'])}) — ALL listed below:")
+            lines.extend([fmt_task(t, show_completion=True) for t in user_tasks['completed']])
+        if not any(user_tasks.values()):
+            lines.append("  No tasks assigned to this user.")
+
+        if avg_hrs is not None:
+            lines.append(f"  Average task completion time: {avg_hrs} hours")
+
+        # ── Project context ──────────────────────────────────────────
+        if project:
+            tc = project['task_counts']
+            lines.append(
+                f"\n=== PROJECT: {project['name']} ===\n"
+                f"ID: {project['id']} | Status: {project['status']} | "
+                f"Started: {project['start_date']}\n"
+                f"Task Summary → Total: {tc['total']} | "
+                f"Pending: {tc['pending']} | In Progress: {tc['in_progress']} | "
+                f"Completed: {tc['completed']} | Overdue: {tc['overdue']}"
+            )
+
+            if project['description']:
+                lines.append(f"Description: {project['description'][:200]}")
+
+            # All project tasks (flat list — AI can answer "who is working on X?")
+            lines.append("\n  ALL PROJECT TASKS:")
+            all_proj_tasks = (
+                project['tasks']['overdue']
+                + project['tasks']['pending']
+                + project['tasks']['in_progress']
+                + project['tasks']['completed']
+                + project['tasks']['other']
+            )
+            for t in all_proj_tasks:
+                lines.append(
+                    f"    • [#{t['id']}] {t['heading']} | "
+                    f"Status: {t['status']} | Priority: {t['priority']} | "
+                    f"Assigned to: {t['assignees']} | Due: {t['due_date']}"
+                )
+
+            # Project members (needed for task assignment)
+            lines.append("\n  PROJECT MEMBERS (use IDs when creating tasks):")
+            for m in project['members']:
+                lines.append(
+                    f"    - {m['full_name']} | Username: {m['username']} | ID: {m['id']}"
+                )
+        else:
+            lines.append("\n=== PROJECT ===\nNo project context for this room.")
+
+        # ── Team context ─────────────────────────────────────────────
+        if team:
+            lines.append(f"\n=== TEAM: {team['name']} ===")
+            for m in team['members']:
+                lines.append(
+                    f"  - {m['full_name']} | Username: {m['username']} | "
+                    f"ID: {m['id']} | Role: {m['role']}"
+                )
+
+        # ── Calendar / events ────────────────────────────────────────
+        lines.append("\n=== UPCOMING EVENTS (next 14 days) ===")
+        if events:
+            for ev in events:
+                lines.append(
+                    f"  • {ev['title']} | Starts: {ev['start']} | Ends: {ev['end']}"
+                )
+        else:
+            lines.append("  No upcoming events found.")
+
+        # ── Room participants (for @mention resolution) ───────────────
+        lines.append("\n=== ROOM PARTICIPANTS ===")
+        for p in participants:
+            lines.append(f"  - {p['full_name']} | Username: {p['username']} | ID: {p['id']}")
+
+        # ── Chat history ─────────────────────────────────────────────
+        lines.append("\n=== RECENT CHAT HISTORY ===")
+        if history:
+            for msg in history:
+                lines.append(f"  [{msg['at']}] {msg['sender']}: {msg['content']}")
+        else:
+            lines.append("  No recent messages.")
+
+        # ── Task creation instructions ───────────────────────────────
+        lines.append(
+            "\n=== TASK CREATION INSTRUCTIONS ===\n"
+            "If the user explicitly asks you to CREATE A TASK, reply ONLY with a "
+            "valid JSON block and NO other text whatsoever.\n"
+            "Use project member IDs listed above when assigning tasks.\n"
+            "If the user says 'assign it to me', use the CURRENT USER's ID shown above.\n"
+            "Priority must be one of: low, medium, high, critical\n"
+            "JSON format:\n"
             "```json\n"
             "{\n"
             '  "action": "create_task",\n'
             '  "heading": "Task title",\n'
             '  "description": "Task description",\n'
-            '  "priority": "medium",\n'  # priority must be one of: low, medium, high, critical
+            '  "priority": "medium",\n'
             '  "assigned_to_ids": [12]\n'
             "}\n"
             "```\n"
-            "If they are NOT asking to create a task, reply with normal conversational text to fulfill their request based on the Chat History:\n"
-            f"Chat History:\n{context_str}"
+            "For all other questions, reply in clear, friendly conversational text "
+            "using ONLY the data provided above."
         )
 
+        return "\n".join(lines)
+
+    # ------------------------------------------------------------------
+    # MAIN AI PROCESSOR  (replaces the old process_zanflow_ai)
+    # ------------------------------------------------------------------
+    @staticmethod
+    def process_zanflow_ai(room_id, prompt_text, user_id):
+        from apps.tasksite.models import Task
+
+        try:
+            room = ChatRoom.objects.select_related('project', 'team').get(id=room_id)
+            sender_user = User.objects.get(id=user_id)
+        except (ChatRoom.DoesNotExist, User.DoesNotExist) as e:
+            logger.error(f"process_zanflow_ai: object not found — {e}")
+            return
+
+        # ── Build rich context & system prompt ───────────────────────
+        try:
+            context = ChatMessageService.build_ai_context(room, sender_user)
+            system_instruction = ChatMessageService.build_system_prompt(context)
+        except Exception as ctx_err:
+            logger.error(f"Failed to build AI context: {ctx_err}", exc_info=True)
+            # Fall back to a minimal prompt so the bot still responds
+            system_instruction = (
+                f"You are @dyuksa, AI assistant in the Dyuksa platform. "
+                f"User: {sender_user.username} (ID: {sender_user.id}). "
+                "Context could not be loaded; apologise and ask the user to try again."
+            )
+
         model_id = settings.BEDROCK_MODEL_ID
-        logger.info(f"Invoking Bedrock AI using model: {model_id} for room {room.id}")
+        logger.info(f"Invoking Bedrock AI (model: {model_id}) for room {room.id}")
 
         try:
             client = boto3.client(
-                'bedrock-runtime', 
+                'bedrock-runtime',
                 region_name=settings.AWS_REGION,
                 aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
+                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
             )
-            
-            # Payload formatting
+
+            # ── Payload formatting (support Nova + Claude 3) ──────────
             if "amazon.nova" in model_id.lower():
                 body = json.dumps({
                     "system": [{"text": system_instruction}],
                     "messages": [{"role": "user", "content": [{"text": prompt_text}]}],
-                    "inferenceConfig": {"maxTokens": 1024}
+                    "inferenceConfig": {"maxTokens": 2048},
                 })
-            elif "claude-3" in model_id.lower():
+            elif "claude" in model_id.lower():
                 body = json.dumps({
                     "anthropic_version": "bedrock-2023-05-31",
-                    "max_tokens": 1024,
+                    "max_tokens": 2048,
                     "system": system_instruction,
-                    "messages": [{"role": "user", "content": prompt_text}]
+                    "messages": [{"role": "user", "content": prompt_text}],
                 })
             else:
-                raise ValueError(f"Unsupported model family for ID: {model_id}")
-            
-            # Invoke model
+                raise ValueError(f"Unsupported model family: {model_id}")
+
             response = client.invoke_model(
                 modelId=model_id,
                 body=body,
                 contentType="application/json",
-                accept="application/json"
+                accept="application/json",
             )
             response_body = json.loads(response.get('body').read())
-            
-            if "amazon.nova" in model_id.lower():
-                ai_reply_text = response_body.get('output', {}).get('message', {}).get('content', [{}])[0].get('text', "")
-            elif "claude-3" in model_id.lower():
-                ai_reply_text = response_body.get('content')[0].get('text')
-            else:
-                ai_reply_text = "I processed your request, but couldn't parse my own output."
-            
-            # ==========================================================
-            # 5. INTERCEPT AI JSON AND CREATE THE TASK
-            # ==========================================================
-            ai_reply_text = ai_reply_text.strip()
-            
-            try:
-                # Check if the AI replied with the JSON block
-                cleaned_text = ai_reply_text
-                if "```json" in cleaned_text:
-                    cleaned_text = cleaned_text.split("```json")[1].split("```")[0].strip()
-                elif "```" in cleaned_text:
-                    cleaned_text = cleaned_text.split("```")[1].split("```")[0].strip()
-                    
-                ai_json = json.loads(cleaned_text)
-                
-                # Check if the AI wants to execute the 'create_task' action
-                if isinstance(ai_json, dict) and ai_json.get("action") == "create_task":
-                    
-                    # Ensure priority matches Django model choices
-                    priority = str(ai_json.get("priority", "medium")).lower()
-                    if priority not in ['low', 'medium', 'high', 'critical']:
-                        priority = 'medium'
-                        
-                    # ---> NEW: Handle missing project context gracefully <---
-                    project_to_assign = room.project
-                        
-                    # Create the Task in the database
-                    new_task = Task.objects.create(
-                        heading=ai_json.get("heading", "AI Generated Task"),
-                        description=ai_json.get("description", ""),
-                        priority=priority,
-                        project=project_to_assign, # Will be None if generated from Global bot
-                        assigned_by=sender_user,
-                        status="pending"
-                    )
-                    
-                    # Assign the users
-                    assignee_ids = ai_json.get("assigned_to_ids", [])
-                    if not assignee_ids:
-                        assignee_ids = [user_id] # Default to the person who asked if AI fails
-                    new_task.assigned_to.add(*assignee_ids)
-                    # ==========================================================
-                    # >>> NEW: BROADCAST TASK CREATION TO USERS <<<
-                    # ==========================================================
-                    try:
-                        from channels.layers import get_channel_layer
-                        from asgiref.sync import async_to_sync
-                        channel_layer = get_channel_layer()
-                        
-                        # Notify everyone in the project (or just the assignees)
-                        members_to_notify = room.project.members.all() if room.project else User.objects.filter(id__in=assignee_ids)
-                        
-                        for member in members_to_notify:
-                            async_to_sync(channel_layer.group_send)(
-                                f"user_{member.id}_global",
-                                {
-                                    "type": "gateway_signal",
-                                    "event": "TASK_CREATED", # Custom event name
-                                    "data": {
-                                        "task_id": new_task.id,
-                                        "project_id": str(room.project.id) if room.project else None
-                                    }
-                                }
-                            )
-                    except Exception as ws_err:
-                        logger.error(f"Failed to broadcast task creation: {ws_err}")
-                    # ==========================================================
-                    # Format a nice success message to show in the chat
-                    assignees = new_task.assigned_to.all()
-                    assignee_names = ", ".join([u.username for u in assignees])
-                    
-                    ai_reply_text = (
-                        f"✅ **Task Created Successfully!**\n\n"
-                        f"**ID:** #{new_task.id}\n"
-                        f"**Heading:** {new_task.heading}\n"
-                        f"**Priority:** {new_task.priority.capitalize()}\n"
-                        f"**Assigned To:** {assignee_names}"
-                    )
-            except json.JSONDecodeError:
-                # The AI didn't output JSON, it output a normal text reply. 
-                pass
-            except Exception as e:
-                logger.error(f"Failed to create task via AI: {e}")
-                ai_reply_text = "I understood your request to create a task, but a system error occurred while saving it to the database."
 
-            # 6. Push the final message back to the chat room
-            ChatMessageService.create_message(
-                room=room,
-                sender=None,
-                content=ai_reply_text,
-                is_ai_generated=True
-            )
-            
+            if "amazon.nova" in model_id.lower():
+                ai_reply_text = (
+                    response_body
+                    .get('output', {})
+                    .get('message', {})
+                    .get('content', [{}])[0]
+                    .get('text', "")
+                )
+            else:
+                ai_reply_text = response_body.get('content', [{}])[0].get('text', "")
+
+            ai_reply_text = ai_reply_text.strip()
+
         except Exception as e:
-            logger.error(f"Failed to invoke Bedrock AI: {e}")
+            logger.error(f"Bedrock invocation failed: {e}", exc_info=True)
             ChatMessageService.create_message(
                 room=room,
                 sender=None,
-                content="I'm sorry, my AI processing failed. Please check the server logs.",
-                is_ai_generated=True
+                content="I'm sorry, I couldn't reach my AI engine. Please try again in a moment.",
+                is_ai_generated=True,
             )
+            return
+
+        # ── Intercept JSON → create task ─────────────────────────────
+        try:
+            cleaned_text = ai_reply_text
+            if "```json" in cleaned_text:
+                cleaned_text = cleaned_text.split("```json")[1].split("```")[0].strip()
+            elif "```" in cleaned_text:
+                cleaned_text = cleaned_text.split("```")[1].split("```")[0].strip()
+
+            ai_json = json.loads(cleaned_text)
+
+            if isinstance(ai_json, dict) and ai_json.get("action") == "create_task":
+                priority = str(ai_json.get("priority", "medium")).lower()
+                if priority not in ['low', 'medium', 'high', 'critical']:
+                    priority = 'medium'
+
+                new_task = Task.objects.create(
+                    heading=ai_json.get("heading", "AI Generated Task"),
+                    description=ai_json.get("description", ""),
+                    priority=priority,
+                    project=room.project,
+                    assigned_by=sender_user,
+                    status="pending",
+                )
+
+                assignee_ids = ai_json.get("assigned_to_ids", []) or [user_id]
+                new_task.assigned_to.add(*assignee_ids)
+
+                # Broadcast task creation via WebSocket
+                try:
+                    from channels.layers import get_channel_layer
+                    from asgiref.sync import async_to_sync
+                    channel_layer = get_channel_layer()
+                    members_to_notify = (
+                        room.project.members.all()
+                        if room.project
+                        else User.objects.filter(id__in=assignee_ids)
+                    )
+                    for member in members_to_notify:
+                        async_to_sync(channel_layer.group_send)(
+                            f"user_{member.id}_global",
+                            {
+                                "type": "gateway_signal",
+                                "event": "TASK_CREATED",
+                                "data": {
+                                    "task_id": new_task.id,
+                                    "project_id": str(room.project.id) if room.project else None,
+                                },
+                            },
+                        )
+                except Exception as ws_err:
+                    logger.error(f"Failed to broadcast task creation: {ws_err}")
+
+                assignee_names = ", ".join(
+                    u.get_full_name() or u.username
+                    for u in new_task.assigned_to.all()
+                )
+                ai_reply_text = (
+                    "\u2705 **Task Created Successfully!**\n\n"
+                    + "**ID:** #" + str(new_task.id) + "\n"
+                    + "**Heading:** " + new_task.heading + "\n"
+                    + "**Priority:** " + new_task.priority.capitalize() + "\n"
+                    + "**Assigned To:** " + assignee_names
+                )
+
+        except json.JSONDecodeError:
+            # Normal conversational reply — no action needed
+            pass
+        except Exception as e:
+            logger.error(f"Task creation via AI failed: {e}", exc_info=True)
+            ai_reply_text = (
+                "I understood your request to create a task, "
+                "but a system error occurred while saving it. Please try again."
+            )
+
+        # ── Send the final AI reply back into the chat ────────────────
+        ChatMessageService.create_message(
+            room=room,
+            sender=None,
+            content=ai_reply_text,
+            is_ai_generated=True,
+        )
+
     @staticmethod
     def _send_notification(message: ChatMessage):
         """

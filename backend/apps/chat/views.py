@@ -28,6 +28,7 @@ from .serializers import (
     CreateThreadRoomSerializer
 )
 from .services import ChatRoomService, ChatMessageService, ChatPermissionService
+# GetAIBotRoomView is defined at the bottom of this file
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -224,8 +225,15 @@ class SendMessageView(APIView):
                     message.save(update_fields=['preview_status'])
             # ============================================================
             
-            # # ---> Optional: Keep your existing @zanflow trigger for other rooms <---
-            if '@dyuksa' in content.lower() and message_type == 'text':
+            # AI Bot room: every message auto-triggers the global AI bot
+            if room.room_type == ChatRoom.RoomType.AI_BOT and message_type == 'text':
+                import threading
+                threading.Thread(
+                    target=ChatMessageService.process_global_ai,
+                    args=(room.id, content, request.user.id)
+                ).start()
+            # Project/Thread rooms: @dyuksa mention triggers project-scoped AI
+            elif '@dyuksa' in content.lower() and message_type == 'text':
                 import threading
                 threading.Thread(
                     target=ChatMessageService.process_zanflow_ai,
@@ -929,15 +937,15 @@ class CreateThreadRoomView(APIView):
         )
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)
     
-# class GetAIBotRoomView(APIView):
-#     """
-#     Get or create the personal AI Assistant room for the current user.
-#     GET /api/v1/chat/rooms/ai-bot/
-#     """
-#     permission_classes = [IsAuthenticated]
+class GetAIBotRoomView(APIView):
+    """
+    Get or create the personal AI Assistant room for the current user.
+    GET /api/v1/chat/rooms/ai-bot/
+    """
+    permission_classes = [IsAuthenticated]
 
-#     @extend_schema(summary="Get or create personal AI Bot room", responses={200: ChatRoomDetailSerializer})
-#     def get(self, request):
-#         room = ChatRoomService.get_or_create_ai_room(request.user)
-#         serializer = ChatRoomDetailSerializer(room, context={'request': request})
-#         return Response(serializer.data)
+    @extend_schema(summary="Get or create personal AI Bot room", responses={200: ChatRoomDetailSerializer})
+    def get(self, request):
+        room = ChatRoomService.get_or_create_ai_room(request.user)
+        serializer = ChatRoomDetailSerializer(room, context={'request': request})
+        return Response(serializer.data)

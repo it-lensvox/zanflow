@@ -220,6 +220,138 @@ Return ONLY a FLAT JSON object with this exact schema:
             
         return result_text
 
+
+    @staticmethod
+    def execute_project_details(user, project_name):
+        """
+        Returns full details about a specific project: description, status,
+        all tasks with assignees, and all members. Used by the AI bot when
+        the user asks about a specific project by name.
+        """
+        if not user or not user.is_authenticated:
+            return "Error: User is not authenticated."
+
+        from apps.projects.models import Project, ProjectMembership
+
+        # Find project by name (case-insensitive, user must be a member)
+        try:
+            project = Project.objects.filter(
+                members=user,
+                name__icontains=project_name.strip()
+            ).first()
+        except Exception:
+            project = None
+
+        if not project:
+            # Try without membership filter in case name matches exactly
+            project = Project.objects.filter(name__icontains=project_name.strip()).first()
+
+        if not project:
+            return f"DATABASE RESULT: No project named '{project_name}' was found."
+
+        now = timezone.now()
+
+        # Tasks
+        all_tasks = Task.objects.filter(project=project).prefetch_related('assigned_to')
+        total      = all_tasks.count()
+        pending    = all_tasks.filter(status='pending').count()
+        in_progress = all_tasks.filter(status='in_progress').count()
+        completed  = all_tasks.filter(status='completed').count()
+        overdue    = sum(
+            1 for t in all_tasks.exclude(status='completed')
+            if getattr(t, 'end_date', None) and t.end_date < now
+        )
+
+        result = (
+            f"DATABASE RESULT: Full details for project '{project.name}'\n"
+            f"Status: {getattr(project, 'status', 'Unknown')}\n"
+            f"Description: {getattr(project, 'description', 'No description') or 'No description'}\n"
+            f"\nTask Summary:\n"
+            f"  Total: {total} | Pending: {pending} | In Progress: {in_progress} | "
+            f"Completed: {completed} | Overdue: {overdue}\n"
+            f"\nALL TASKS:\n"
+        )
+
+        for task in all_tasks:
+            assignees = ", ".join(u.get_full_name() or u.username for u in task.assigned_to.all()) or "Unassigned"
+            due = getattr(task, 'end_date', None)
+            due_str = due.strftime('%Y-%m-%d') if due else 'No due date'
+            result += (
+                f"  - [#{task.id}] '{task.heading}' | Status: {task.status} | "
+                f"Priority: {task.priority} | Assigned to: {assignees} | Due: {due_str}\n"
+            )
+
+        # Members
+        result += "\nPROJECT MEMBERS:\n"
+        try:
+            for pm in ProjectMembership.objects.filter(project=project).select_related('user'):
+                u = pm.user
+                result += (
+                    f"  - {u.get_full_name() or u.username} | Username: {u.username} | "
+                    f"ID: {u.id} | Role: {getattr(pm, 'role', 'member')}\n"
+                )
+        except Exception:
+            for u in project.members.all():
+                result += f"  - {u.get_full_name() or u.username} | Username: {u.username} | ID: {u.id}\n"
+
+        return result
+
+
+    @staticmethod
+    def execute_event_search(user, date_filter=None, upcoming=False):
+        """
+        Search events the user is attending or has created.
+        date_filter: 'today', 'tomorrow', 'this_week', or None (returns next 14 days)
+        """
+        if not user or not user.is_authenticated:
+            return "Error: User is not authenticated."
+
+        from django.db.models import Q
+        now = timezone.now()
+        today = now.date()
+
+        base_qs = Event.objects.filter(
+            Q(attendees=user) | Q(organizer=user)
+        ).distinct().order_by('start_time')
+
+        # Apply date filter
+        if date_filter == 'today':
+            events = base_qs.filter(start_time__date=today)
+            label = "today"
+        elif date_filter == 'tomorrow':
+            tomorrow = today + timedelta(days=1)
+            events = base_qs.filter(start_time__date=tomorrow)
+            label = "tomorrow"
+        elif date_filter == 'this_week':
+            week_end = today + timedelta(days=7)
+            events = base_qs.filter(start_time__date__gte=today, start_time__date__lte=week_end)
+            label = "this week"
+        else:
+            # Default: upcoming 14 days
+            two_weeks = today + timedelta(days=14)
+            events = base_qs.filter(start_time__date__gte=today, start_time__date__lte=two_weeks)
+            label = "in the next 14 days"
+
+        total = events.count()
+
+        if total == 0:
+            return f"DATABASE RESULT: You have 0 events scheduled {label}."
+
+        result = f"DATABASE RESULT: You have {total} event(s) scheduled {label}. Here they are:\n"
+        for ev in events:
+            start_str = ev.start_time.strftime('%Y-%m-%d %H:%M') if ev.start_time else 'Unknown'
+            end_str   = ev.end_time.strftime('%H:%M') if ev.end_time else 'Unknown'
+            attendees = ", ".join(
+                u.get_full_name() or u.username
+                for u in ev.attendees.exclude(id=user.id)
+            ) or "No other attendees"
+            result += (
+                f"  - '{ev.title}' | Type: {getattr(ev, 'event_type', 'Event')} | "
+                f"Date: {start_str} - {end_str} | With: {attendees}\n"
+            )
+
+        return result
+
     @staticmethod
     def fallback_assignment(members_with_skills, task_category='general'):
         """
@@ -326,12 +458,17 @@ Return ONLY a FLAT JSON object with this exact schema:
             return "DATABASE RESULT: 0 tasks found matching that criteria."
 
         result_text = f"DATABASE RESULT: There are exactly {total_count} tasks matching this criteria.\n"
-        result_text += "Here is a sample of the first 5 for context:\n"
+        result_text += f"ALL {total_count} tasks listed below:\n"
         
-        for task in tasks[:5]: 
+        for task in tasks:
             project_name = task.project.name if task.project else "No Project"
+            due_date = getattr(task, 'end_date', None)
+            due_str = due_date.strftime('%Y-%m-%d') if due_date else 'No due date'
+            assignees = ", ".join([u.username for u in task.assigned_to.all()]) or "Unassigned"
             result_text += (
-                f"- Task: '{task.heading}' (Project: {project_name}) | Status: {task.status} | Priority: {task.priority}\n"
+                f"- [#{task.id}] '{task.heading}' | Project: {project_name} | "
+                f"Status: {task.status} | Priority: {task.priority} | "
+                f"Assigned to: {assignees} | Due: {due_str}\n"
             )
             
         return result_text
@@ -419,6 +556,77 @@ Return ONLY a FLAT JSON object with this exact schema:
         return context_text
 
     @staticmethod
+    def _extract_last_project_from_history(chat_history):
+        """
+        Scans chat history in reverse to find the most recently mentioned project name.
+        Looks in both user messages and assistant replies.
+        Returns the project name string or None.
+        """
+        if not chat_history:
+            return None
+
+        try:
+            projects = list(
+                Project.objects.values_list('name', flat=True)
+            )
+        except Exception:
+            return None
+
+        # Scan history newest-first
+        for msg in reversed(chat_history):
+            text = msg.get('text', '') or ''
+            text_lower = text.lower()
+            for project_name in projects:
+                if project_name.lower() in text_lower:
+                    return project_name
+
+        return None
+
+
+    @staticmethod
+    def _resolve_project_name(raw_project_name, chat_history, user):
+        """
+        Reliably resolve what project the user is referring to.
+
+        Strategy (in order of confidence):
+        1. If raw_project_name matches a real project name in the DB → use it directly.
+        2. If raw_project_name is vague (empty, or contains words like 'last', 'same',
+           'that', 'the', 'it', 'this', 'current', 'discussed', 'project') →
+           scan chat_history for the most recently mentioned real project name.
+        3. If still nothing → return raw_project_name as-is so execute_project_details
+           can return a clean "not found" message.
+        """
+        VAGUE_KEYWORDS = {
+            'last', 'same', 'that', 'the', 'it', 'this', 'current',
+            'discussed', 'project', 'mentioned', 'above', 'previous',
+            'placeholder', 'context', 'recent', 'name'
+        }
+
+        # Step 1: Check if the AI gave us a real project name
+        if raw_project_name:
+            words = set(raw_project_name.lower().split())
+            is_vague = words.issubset(VAGUE_KEYWORDS) or len(words) == 0
+            
+            if not is_vague:
+                # Verify it actually exists in DB
+                try:
+                    exists = Project.objects.filter(
+                        name__icontains=raw_project_name
+                    ).exists()
+                    if exists:
+                        return raw_project_name
+                except Exception:
+                    pass
+
+        # Step 2: Scan history for real project names
+        from_history = TaskAIService._extract_last_project_from_history(chat_history)
+        if from_history:
+            return from_history
+
+        # Step 3: Fall back — let execute_project_details handle the "not found" case
+        return raw_project_name
+
+    @staticmethod
     def generate_chat_stream(user_message, chat_history=None, user=None):
         if chat_history is None:
             chat_history = []
@@ -430,13 +638,40 @@ Return ONLY a FLAT JSON object with this exact schema:
             region_name=settings.AWS_REGION
         )
 
-        prompt = """You are the Dyuksa ERP AI Assistant. 
-        CRITICAL RULES:
-        1. Answer directly and concisely. DO NOT narrate your actions.
-        2. You have NO direct access to the user's screen or data. 
-        3. You MUST use your tools to fetch real-time database information.
-        4. When a tool returns a "Total Count", use that exact number in your response.
-        """
+        # Detect the last project discussed in this conversation so the AI
+        # can resolve follow-up references like "it", "that project", "the same one"
+        last_project = TaskAIService._extract_last_project_from_history(chat_history)
+        
+        context_hint = ""
+        if last_project:
+            context_hint = (
+                f"\n\nCONVERSATION CONTEXT:\n"
+                f"The user has been discussing the project '{last_project}' in this conversation. "
+                f"If the user refers to 'it', 'the project', 'that project', 'this project', "
+                f"'the same project', or any vague reference to a project, "
+                f"they almost certainly mean '{last_project}'. "
+                f"Use '{last_project}' as the project_name in search_project_details "
+                f"without asking the user to clarify."
+            )
+
+        prompt = """You are the Dyuksa ERP AI Assistant — a friendly, knowledgeable helper for the platform.
+
+CRITICAL RULES:
+1. Answer directly and concisely. DO NOT narrate your actions or say things like "I will now search...".
+2. You have NO direct access to the user's data. You MUST use tools to get real database information.
+3. When a tool returns a result, use the EXACT numbers and names from the result. Never guess or make up data.
+4. When a tool returns "DATABASE RESULT: There are exactly N tasks", always use that exact number N in your reply.
+5. ALWAYS show ALL tasks returned by the tool — never say "here are the first N" or truncate the list.
+6. NEVER ask the user to repeat or clarify a project name if the CONVERSATION CONTEXT already identifies it.
+
+TOOL USAGE GUIDE:
+- User asks about a specific named project (explain, describe, tasks in, members of, who is manager): use search_project_details
+- User uses "it", "the project", "that project", "same project", "how many members" without naming a project: check CONVERSATION CONTEXT for the last project, then use search_project_details with that name
+- User asks about their tasks (pending, completed, by priority, by status): use search_global_tasks
+- User asks how many projects they are in: use search_user_projects
+- User asks about events, meetings, schedule, calendar ("events today", "meetings this week", "what's scheduled"): use search_events — NEVER use search_project_details for event questions
+- User asks to create a task: explain you can create tasks — ask for the project name, task title, and priority
+""" + context_hint
 
         formatted_messages = []
         for msg in chat_history:
@@ -467,11 +702,47 @@ Return ONLY a FLAT JSON object with this exact schema:
                 {
                     "toolSpec": {
                         "name": "search_user_projects",
-                        "description": "Use this tool to find out how many projects the user is enrolled in.",
+                        "description": "Use this tool to find out how many projects the user is enrolled in. Returns project names only.",
                         "inputSchema": {
                             "json": {
                                 "type": "object",
                                 "properties": {}
+                            }
+                        }
+                    }
+                },
+                {
+                    "toolSpec": {
+                        "name": "search_project_details",
+                        "description": "Use this tool when the user asks about a specific project by name — to get its full details: description, status, ALL tasks with assignees and due dates, and all members. Always use this tool when the user asks to 'explain', 'describe', 'summarise', or asks about tasks/members of a named project.",
+                        "inputSchema": {
+                            "json": {
+                                "type": "object",
+                                "properties": {
+                                    "project_name": {
+                                        "type": "string",
+                                        "description": "The name (or partial name) of the project the user is asking about."
+                                    }
+                                },
+                                "required": ["project_name"]
+                            }
+                        }
+                    }
+                },
+                {
+                    "toolSpec": {
+                        "name": "search_events",
+                        "description": "Use this tool when the user asks about their calendar events, meetings, or scheduled activities. Use it for questions like 'how many events today', 'what meetings do I have this week', 'any events tomorrow'. Do NOT use search_project_details for event questions.",
+                        "inputSchema": {
+                            "json": {
+                                "type": "object",
+                                "properties": {
+                                    "date_filter": {
+                                        "type": "string",
+                                        "enum": ["today", "tomorrow", "this_week"],
+                                        "description": "Use 'today' for today's events, 'tomorrow' for tomorrow, 'this_week' for next 7 days. Omit for all upcoming events in the next 14 days."
+                                    }
+                                }
                             }
                         }
                     }
@@ -506,6 +777,27 @@ Return ONLY a FLAT JSON object with this exact schema:
                 )
             elif tool_name == "search_user_projects":
                 tool_result_text = TaskAIService.execute_project_search(user=user)
+            elif tool_name == "search_project_details":
+                # ── Resolve the project name reliably ────────────────────────
+                # The AI sometimes passes vague strings like "last discussed project"
+                # or "the project" when it can't resolve context from the prompt alone.
+                # We intercept here and resolve it ourselves from actual history.
+                raw_project_name = tool_inputs.get("project_name", "").strip()
+                resolved_project_name = TaskAIService._resolve_project_name(
+                    raw_project_name=raw_project_name,
+                    chat_history=chat_history,
+                    user=user,
+                )
+                print(f"=== Resolved project name: '{raw_project_name}' -> '{resolved_project_name}' ===")
+                tool_result_text = TaskAIService.execute_project_details(
+                    user=user,
+                    project_name=resolved_project_name,
+                )
+            elif tool_name == "search_events":
+                tool_result_text = TaskAIService.execute_event_search(
+                    user=user,
+                    date_filter=tool_inputs.get("date_filter"),
+                )
             else:
                 tool_result_text = "Tool not found."
 
