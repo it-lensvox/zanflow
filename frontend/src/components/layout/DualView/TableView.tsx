@@ -67,8 +67,7 @@ export function TableView<T>({
               {columns.map((column) => (
                 <th
                   key={column.key}
-                  className={`group/header text-left py-[10px] px-3 font-semibold text-[12px] text-[#5e6c84] border-r border-[#dfe1e6] last:border-r-0 whitespace-nowrap relative ${activeFilterKey === column.key ? 'z-[100]' : ''} ${column.headerClassName || ''}`}
-                  style={column.width ? { width: column.width } : undefined}
+                  className={`group/header text-left py-[12px] px-3 font-semibold text-[13px] text-[#5e6c84] border-r border-[#dfe1e6] last:border-r-0 whitespace-nowrap relative ${activeFilterKey === column.key ? 'z-[100]' : ''} ${column.headerClassName || ''}`}                  style={column.width ? { width: column.width } : undefined}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex-1 min-w-0">{column.label}</div>
@@ -121,8 +120,7 @@ export function TableView<T>({
                   {columns.map((column) => (
                     <td
                       key={column.key}
-                      className={`py-2 px-3 h-12 align-middle text-[13px] border-r border-[#f4f5f7] group-hover:border-r-[#dfe1e6] last:border-r-0 relative ${column.className || ''}`}
-                      style={column.width ? { width: column.width } : undefined}
+                      className={`py-3 px-3 h-14 align-middle text-[14px] border-r border-[#f4f5f7] group-hover:border-r-[#dfe1e6] last:border-r-0 relative ${column.className || ''}`}                      style={column.width ? { width: column.width } : undefined}
                     >
                       {column.render ? column.render(item, index) : (item as any)[column.key]}
                     </td>

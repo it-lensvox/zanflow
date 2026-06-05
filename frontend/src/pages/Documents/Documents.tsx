@@ -1281,8 +1281,16 @@ function DocumentInfoPanel({ doc, onClose }: { doc: Document | null; onClose: ()
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
           {rows.map((r, i) => <div key={i} className="flex items-start gap-3 py-1.5" style={{ borderBottom: '1px solid #f9fafb' }}><div className="mt-0.5 flex-shrink-0">{r.icon}</div><div className="flex-1 min-w-0"><div style={{ fontSize: 13, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' as const, letterSpacing: '0.05em', marginBottom: 2 }}>{r.label}</div><div style={{ fontSize: 12, color: '#1a1a1a' }}>{r.value}</div></div></div>)}
-          {doc.labels && doc.labels.length > 0 && <div className="flex items-start gap-3 py-1.5"><Tag className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" style={{ color: '#7C3AED' }} /><div className="flex-1"><div style={{ fontSize: 10, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' as const, marginBottom: 4 }}>Labels</div><div className="flex flex-wrap gap-1">{doc.labels.map((l) => <span key={l.id} className="px-2 py-0.5 rounded-full text-white" style={{ fontSize: 10, fontWeight: 500, backgroundColor: l.color }}>{l.name}</span>)}</div></div></div>}
-        </div>
+          <DetailRow label="Tags" value={
+            doc.labels && doc.labels.length > 0
+              ? <div className="flex flex-wrap gap-1.5 justify-end">
+                {doc.labels.slice(0, 2).map((l) => (
+                  <span key={l.id} className="rounded-md" style={{ padding: '4px 10px', fontSize: 12, fontWeight: 500, background: l.color ? `${l.color}20` : '#F3E8FF', color: l.color || '#7C3AED' }}>{l.name}</span>
+                ))}
+                {doc.labels.length > 2 && <span className="rounded-md" style={{ padding: '4px 8px', fontSize: 12, fontWeight: 500, background: '#F3F4F6', color: '#6B7280' }}>+{doc.labels.length - 2}</span>}
+              </div>
+              : <span style={{ color: '#6b7280', fontSize: 13 }}>—</span>
+          } />        </div>
       </div>
     </div>
   );
@@ -1460,19 +1468,22 @@ function TagSelectorModal({
     queryKey: ['labels-modal'],
     queryFn: async () => {
       const token = localStorage.getItem('access_token');
+      const workspaceId = localStorage.getItem('active_workspace_id');
       const response = await fetch(`${API_URL}/documents/labels/`, {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'X-Workspace-ID': workspaceId || '',  // ✅ fetch all workspace labels
         }
       });
       if (!response.ok) throw new Error('Failed to fetch labels');
       const data = await response.json();
       return data.results || data || [];
     },
-    enabled: isOpen,  // Only fetch when modal is open
-    staleTime: 0,     // Always refetch
+    enabled: isOpen,
+    staleTime: 0,
+    refetchOnMount: true,  // ✅ always refetch when modal opens
   });
   const [selectedTags, setSelectedTags] = useState<number[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -1515,26 +1526,25 @@ function TagSelectorModal({
     setIsCreating(true);
     try {
       const token = localStorage.getItem('access_token');
-
+      const workspaceId = localStorage.getItem('active_workspace_id');
       const urlParams = new URLSearchParams(window.location.search);
       const projectIdFromUrl = urlParams.get('project');
-      const currentProjectId = projectIdFromUrl ? Number(projectIdFromUrl) : 154;
-
-      console.log('🔄 Creating label:', {
-        project: currentProjectId,
-        name: newLabelName.trim(),
-        color: newLabelColor
-      });
+      // ✅ Use first available project if none selected — no hardcoded ID
+      const currentProjectId = projectIdFromUrl
+        ? Number(projectIdFromUrl)
+        : (document.querySelector('[data-project-id]') as any)?.dataset?.projectId
+          || null;
 
       const response = await fetch(`${API_URL}/documents/labels/`, {
         method: 'POST',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'X-Workspace-ID': workspaceId || '',  // ✅ workspace header
         },
         body: JSON.stringify({
-          project: currentProjectId,
+          ...(currentProjectId ? { project: Number(currentProjectId) } : {}),
           name: newLabelName.trim(),
           color: newLabelColor
         })
@@ -1568,11 +1578,11 @@ function TagSelectorModal({
       setNewLabelColor('#3B82F6');
       setShowCreateForm(false);
 
-      alert(`Label "${newLabel.name}" created successfully! You can now select it.`);
-
+      setSuccessMessage(`✓ Label "${newLabel.name}" created! You can now select it.`);
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (error: any) {
       console.error('Failed to create label:', error);
-      alert(error.message || 'Failed to create label');
+      setSuccessMessage(`❌ ${error.message || 'Failed to create label'}`);
     } finally {
       setIsCreating(false);
     }
@@ -1881,8 +1891,7 @@ function TagSelectorModal({
                 }, 2000);
 
               } catch (error: any) {
-                setSuccessMessage('');
-                alert(error.message || 'Failed to add tags');
+                setSuccessMessage(`❌ ${error.message || 'Failed to add tags'}`);
               } finally {
                 setIsSubmitting(false);
               }
@@ -2130,7 +2139,7 @@ export function Documents() {
   const highlightDocId = searchParams.get('highlight') || '';
   const sharedParam = searchParams.get('shared') === 'true';
   const [activeHighlightId, setActiveHighlightId] = React.useState(highlightDocId);
-    const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState<'updated_at' | 'created_at'>('updated_at');
   const [rowsPerPage, setRowsPerPage] = useState(25);
 
@@ -2214,7 +2223,7 @@ export function Documents() {
 
   const { data: allDocumentsForTree } = useQuery({
     queryKey: ['documents-tree-counts'],
-    queryFn: () => documentsApi.list({}),
+    queryFn: () => documentsApi.list({ page_size: 1000 } as any),
     staleTime: 30000,
   });
 
@@ -2454,8 +2463,7 @@ export function Documents() {
           children: buildChildren(f.id, p.id),  // ✅ children also get projectId
         }));
 
-      // ✅ CORRECT - Use allDocsForTree (not filtered by project)
-      const projectDocCount = allDocsForTree.filter(
+      const projectDocCount = (p as any).document_count ?? allDocsForTree.filter(
         (doc: Document) => doc.project === p.id && !doc.folder
       ).length;
 
@@ -2562,48 +2570,44 @@ export function Documents() {
       alert('Please select at least one tag');
       return;
     }
-
     const documentIds = Array.from(selectedDocs);
     if (documentIds.length === 0) {
       alert('Please select at least one document');
       return;
     }
-
     try {
       const token = localStorage.getItem('access_token');
-
-      const response = await fetch('${API_URL}/documents/bulk-add-labels/', {
+      const workspaceId = localStorage.getItem('active_workspace_id');
+      // ✅ Fixed: backticks instead of single quotes so API_URL is interpolated
+      const response = await fetch(`${API_URL}/documents/bulk-add-labels/`, {
         method: 'POST',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'X-Workspace-ID': workspaceId || '',
         },
         body: JSON.stringify({
           document_ids: documentIds,
           label_ids: tagIds,
         }),
       });
-
       if (!response.ok) {
-        const error = await response.json();
+        // ✅ Handle empty error response safely
+        const text = await response.text();
+        const error = text ? JSON.parse(text) : {};
         throw new Error(error.error || error.detail || 'Failed to add tags');
       }
+      // ✅ Handle empty response body (204 No Content) safely
+      const text = await response.text();
+      const result = text ? JSON.parse(text) : { updated_count: documentIds.length, skipped_count: 0 };
 
-      const result = await response.json();
-
-      // Success!
       setShowTagSelector(false);
       setSelectedDocs(new Set());
       queryClient.invalidateQueries({ queryKey: ['documents'] });
       queryClient.invalidateQueries({ queryKey: ['documents-tree-counts'] });
 
-      // ✅ UNCOMMENT THIS - Show success message
-      const message = result.skipped_count
-        ? `Successfully added tags to ${result.updated_count} document(s). ${result.skipped_count} skipped due to permissions.`
-        : `Successfully added tags to ${result.updated_count} document(s)`;
-
-      alert(message);
+      // ✅ No alert — modal handles success message internally
     } catch (error: any) {
       console.error('Bulk add tags failed:', error);
       alert(error.message || 'Failed to add tags. Please try again.');
@@ -2742,14 +2746,14 @@ export function Documents() {
           onRemoveFilter={removeFilter}
         />
         <div className="flex-1 flex overflow-hidden" style={{ background: '#fff' }}>
-        <TreePanel
-  folders={treeFolders}
-  showSharedWithMe={showSharedWithMe}
-  setShowSharedWithMe={setShowSharedWithMe}
-  setSelectedFolder={setSelectedFolder}
-  setSelectedTreeFolderId={setSelectedTreeFolderId}
-  sharedWithMeCount={sharedWithMeCount}
-  onFolderClick={(name, folderId, folderProjectId) => {
+          <TreePanel
+            folders={treeFolders}
+            showSharedWithMe={showSharedWithMe}
+            setShowSharedWithMe={setShowSharedWithMe}
+            setSelectedFolder={setSelectedFolder}
+            setSelectedTreeFolderId={setSelectedTreeFolderId}
+            sharedWithMeCount={sharedWithMeCount}
+            onFolderClick={(name, folderId, folderProjectId) => {
               // ✅ Reset shared with me when clicking any folder
               setShowSharedWithMe(false);
               const pr = projects.find((p) => p.name === name);
@@ -3219,8 +3223,11 @@ export function Documents() {
               </div>
             </div>
 
-            {/* Footer */}
-            <div className="flex items-center justify-end gap-3 px-6 py-4" style={{ borderTop: '1px solid #e5e7eb' }}>
+        {/* Footer */}
+        <div
+          className="flex items-center justify-end gap-3 px-6 py-4"
+          style={{ borderTop: '1px solid #e5e7eb' }}
+        >
               <button
                 onClick={() => {
                   setShowNewDocModal(false);
