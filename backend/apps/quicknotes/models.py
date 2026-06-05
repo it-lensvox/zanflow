@@ -4,7 +4,10 @@ from django.conf import settings
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
 from apps.projects.models import Project
-class Folder(models.Model):
+from apps.organizations.models import TenantModel
+
+
+class Folder(TenantModel):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='note_folders')
     name = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -12,12 +15,13 @@ class Folder(models.Model):
 
     class Meta:
         ordering = ['-created_at']
-        unique_together = ('user', 'name') # Prevents duplicate folder names for a single user
+        unique_together = ('user', 'name')
 
     def __str__(self):
         return self.name
 
-class Note(models.Model):
+
+class Note(TenantModel):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notes')
     updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='updated_notes')
     folder = models.ForeignKey(Folder, on_delete=models.CASCADE, null=True, blank=True, related_name='notes')
@@ -26,8 +30,9 @@ class Note(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     project = models.ForeignKey(Project, on_delete=models.SET_NULL, null=True, blank=True, related_name='project_notes')
+
     class Meta:
-        ordering = ['-updated_at'] # Shows most recently edited notes first
+        ordering = ['-updated_at']
 
     def __str__(self):
         return self.title or "Untitled Note"

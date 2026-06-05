@@ -129,13 +129,37 @@ class AuthenticatedResetPasswordSerializer(serializers.Serializer):
         return data
     
 class SendInvitationSerializer(serializers.ModelSerializer):
+    workspace_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text="Optional. ID of the workspace to add the user to. If not provided, user is added to the default workspace.",
+    )
+
     class Meta:
         model = Invitation
-        fields = ['email', 'role']
-            
+        fields = ['email', 'role', 'workspace_id']
+
     def validate_role(self, value):
         if value not in [choice[0] for choice in User.Role.choices]:
             raise serializers.ValidationError("Invalid role selected.")
+        return value
+
+    def validate_workspace_id(self, value):
+        if value is None:
+            return value
+        from apps.organizations.models import Workspace
+        request = self.context.get('request')
+        if request:
+            try:
+                workspace = Workspace.objects.get(
+                    id=value,
+                    organization=request.user.organization,
+                    is_active=True,
+                )
+            except Workspace.DoesNotExist:
+                raise serializers.ValidationError(
+                    "Workspace not found or does not belong to your organization."
+                )
         return value
 
 class AcceptInvitationSerializer(serializers.Serializer):

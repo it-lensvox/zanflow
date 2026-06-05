@@ -353,39 +353,58 @@ class SendInvitationView(APIView):
     permission_classes = [IsAdminRole]
 
     def post(self, request):
-        serializer = SendInvitationSerializer(data=request.data)
+        serializer = SendInvitationSerializer(
+            data=request.data,
+            context={'request': request}
+        )
         serializer.is_valid(raise_exception=True)
-        
+
         email = serializer.validated_data['email']
         role = serializer.validated_data['role']
+        workspace_id = serializer.validated_data.get('workspace_id')
 
         if User.objects.filter(email=email).exists():
-            return Response({"detail": "A user with this email already exists."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "A user with this email already exists."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Resolve workspace if provided
+        workspace = None
+        if workspace_id:
+            from apps.organizations.models import Workspace
+            workspace = Workspace.objects.filter(
+                id=workspace_id,
+                organization=request.user.organization,
+                is_active=True,
+            ).first()
 
         invitation = Invitation.objects.create(
             email=email,
             role=role,
-            organization=request.user.organization
+            organization=request.user.organization,
+            workspace=workspace,
         )
 
-        # 1. Set your frontend URL here. 
-        frontend_url = settings.FRONTEND_URL # Update with your actual frontend URL
+        # Build invite link
+        frontend_url = settings.FRONTEND_URL
         invite_link = f"{frontend_url}/setup-account?token={invitation.token}"
 
-        # 2. Pass the data to the HTML template
+        # Email context
         context = {
             'email': email,
             'role': role,
-            'invite_link': invite_link
+            'invite_link': invite_link,
+            'workspace_name': workspace.name if workspace else None,
         }
 
-        # 3. Render the beautiful HTML you designed
         html_content = render_to_string('dyuksa.html', context)
-        
-        # 4. Plain text fallback
-        text_content = f"You have been invited to join DYUKSA as a {role}. Click here to set up your account: {invite_link}. This link expires in 12 hours."
+        text_content = (
+            f"You have been invited to join DYUKSA as a {role}"
+            + (f" in the '{workspace.name}' workspace" if workspace else "")
+            + f". Click here to set up your account: {invite_link}. This link expires in 12 hours."
+        )
 
-        # 5. Send the email
         subject = "You've been invited to join DYUKSA"
         msg = EmailMultiAlternatives(
             subject,
@@ -396,7 +415,10 @@ class SendInvitationView(APIView):
         msg.attach_alternative(html_content, "text/html")
         msg.send()
 
-        return Response({"detail": "Invitation sent successfully."}, status=status.HTTP_200_OK)
+        return Response({
+            "detail": "Invitation sent successfully.",
+            "workspace": workspace.name if workspace else "Default workspace",
+        }, status=status.HTTP_200_OK)
 
 class VerifyInvitationTokenView(APIView):
     """
@@ -445,17 +467,30 @@ class AcceptInvitationView(APIView):
         user.set_password(serializer.validated_data['password'])
         user.save()
 
-        # Auto-add to default workspace
+        # Workspace assignment:
+        # - No workspace in invitation → add to DEFAULT workspace only
+        # - Workspace in invitation → add to THAT workspace only (not default)
         from apps.organizations.models import Workspace, WorkspaceMembership
-        default_ws = Workspace.objects.filter(
-            organization=invitation.organization, is_default=True
-        ).first()
-        if default_ws:
+
+        if invitation.workspace:
+            # Admin specified a workspace → add to that workspace ONLY
             WorkspaceMembership.objects.get_or_create(
                 user=user,
-                workspace=default_ws,
+                workspace=invitation.workspace,
                 defaults={"role": "member"},
             )
+        else:
+            # No workspace specified → add to default workspace
+            default_ws = Workspace.objects.filter(
+                organization=invitation.organization,
+                is_default=True,
+            ).first()
+            if default_ws:
+                WorkspaceMembership.objects.get_or_create(
+                    user=user,
+                    workspace=default_ws,
+                    defaults={"role": "member"},
+                )
 
         # Burn the invitation token so it can't be used again
         invitation.is_used = True

@@ -107,6 +107,16 @@ class Invitation(models.Model):
         on_delete=models.CASCADE,
         related_name="invitations"
     )
+    # Optional: invite directly to a specific workspace
+    # If null, user gets added to the default workspace only
+    workspace = models.ForeignKey(
+        "organizations.Workspace",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="invitations",
+        help_text="If set, user is added to this workspace on acceptance. Otherwise added to default workspace.",
+    )
     token = models.CharField(max_length=64, unique=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
