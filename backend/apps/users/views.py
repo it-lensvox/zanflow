@@ -68,10 +68,10 @@ class UserCreateView(generics.CreateAPIView):
                 WorkspaceMembership.objects.get_or_create(
                     user=new_user,
                     workspace_id=workspace_id,
-                    defaults={"role": "member"}  # Standard workspace role
+                    # FIX: Use the role assigned to the user instead of "member"
+                    defaults={"role": new_user.role} 
                 )
             except Exception:
-                # Failsafe: if the workspace ID is invalid, the user is still created successfully
                 pass
 
 class MeView(APIView):
@@ -470,6 +470,9 @@ class AcceptInvitationView(APIView):
         # Workspace assignment:
         # - No workspace in invitation → add to DEFAULT workspace only
         # - Workspace in invitation → add to THAT workspace only (not default)
+        # Workspace assignment:
+        # - No workspace in invitation → add to DEFAULT workspace only
+        # - Workspace in invitation → add to THAT workspace only (not default)
         from apps.organizations.models import Workspace, WorkspaceMembership
 
         if invitation.workspace:
@@ -477,7 +480,8 @@ class AcceptInvitationView(APIView):
             WorkspaceMembership.objects.get_or_create(
                 user=user,
                 workspace=invitation.workspace,
-                defaults={"role": "member"},
+                # FIX: Use the user's actual role
+                defaults={"role": user.role},
             )
         else:
             # No workspace specified → add to default workspace
@@ -489,7 +493,8 @@ class AcceptInvitationView(APIView):
                 WorkspaceMembership.objects.get_or_create(
                     user=user,
                     workspace=default_ws,
-                    defaults={"role": "member"},
+                    # FIX: Use the user's actual role
+                    defaults={"role": user.role},
                 )
 
         # Burn the invitation token so it can't be used again
