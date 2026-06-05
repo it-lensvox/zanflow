@@ -90,8 +90,8 @@ export function Sidebar() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const { unreadCount } = useNotifications();
-  const [chatUnreadCount, setChatUnreadCount] = useState<number>(0);
+  const { unreadCount, chatUnreadCount } = useNotifications();
+    // const [chatUnreadCount, setChatUnreadCount] = useState<number>(0);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] = useState(false);
 
@@ -240,36 +240,38 @@ export function Sidebar() {
     return [];
   }, [teamsData]);
 
-  useEffect(() => {
-    const fetchInitialUnread = async () => {
-      try {
-        const { chatApi, notificationSocket } = await import('@/services/api');
-        const data = await chatApi.getUnreadCount();
-        setChatUnreadCount(data.total_unread);
+  // useEffect(() => {
+  //   let unsubscribe: (() => void) | null = null;
 
-        if (!notificationSocket.isConnected()) {
-          notificationSocket.connect();
-        }
+  //   const fetchInitialUnread = async () => {
+  //     try {
+  //       const { chatApi, notificationSocket } = await import('@/services/api');
+  //       const data = await chatApi.getUnreadCount();
+  //       setChatUnreadCount(data.total_unread);
 
-        const unsubscribe = notificationSocket.onChatUnreadUpdate((updateData) => {
-          const activeRoomId = (window as any).__activeTeamChatRoomId as string | undefined;
-          const roomUnread = updateData.room_unread || 0;
-          const isActiveRoom = activeRoomId && updateData.room_id === activeRoomId;
-          const correctedTotal = isActiveRoom
-            ? Math.max(0, updateData.total_unread - roomUnread)
-            : updateData.total_unread;
-          setChatUnreadCount(correctedTotal);
-        });
-        return () => {
-          unsubscribe();
-        };
-      } catch (error) {
-        console.error('Failed to fetch chat unread count:', error);
-      }
-    };
+  //       if (!notificationSocket.isConnected()) {
+  //         notificationSocket.connect();
+  //       }
 
-    fetchInitialUnread();
-  }, []);
+  //       // ✅ Store unsubscribe outside async so cleanup works correctly
+  //       unsubscribe = notificationSocket.onChatUnreadUpdate((updateData) => {
+  //         // ✅ Just use total_unread directly — backend already calculated correct count
+  //         if (updateData.total_unread !== undefined) {
+  //           setChatUnreadCount(Math.max(0, updateData.total_unread));
+  //         }
+  //       });
+  //     } catch (error) {
+  //       console.error('Failed to fetch chat unread count:', error);
+  //     }
+  //   };
+
+  //   fetchInitialUnread();
+
+  //   // ✅ Proper cleanup — unsubscribes WebSocket listener on unmount
+  //   return () => {
+  //     if (unsubscribe) unsubscribe();
+  //   };
+  // }, []);
 
   return (
     <div
