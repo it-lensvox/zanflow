@@ -112,7 +112,8 @@ api.interceptors.response.use(
     if (isAuthError(error) && !originalRequest._retry) {
       // Don't retry the refresh endpoint itself
       if (originalRequest.url?.includes('/auth/refresh')) {
-        localStorage.clear();
+        stopProactiveRefresh(); // Add this
+        localStorage.clear();   // Wipes access, refresh, and active_workspace_id completely
         window.location.href = '/login';
         return Promise.reject(error);
       }
@@ -168,7 +169,8 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
-        localStorage.clear();
+        stopProactiveRefresh(); // Add this
+        localStorage.clear();   // Wipes everything
         window.location.href = '/login';
         return Promise.reject(refreshError);
       } finally {
@@ -273,6 +275,8 @@ export function stopProactiveRefresh() {
 // Auth API
 export const authApi = {
   login: async (username: string, password: string) => {
+    localStorage.removeItem('active_workspace_id');
+    delete api.defaults.headers.common['X-Workspace-ID'];
     const response = await api.post<AuthTokens>('/auth/login/', {
       username,
       password,
@@ -290,10 +294,17 @@ export const authApi = {
     clearTokens();
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
+    localStorage.removeItem('active_workspace_id');
     delete api.defaults.headers.common['Authorization'];
+    delete api.defaults.headers.common['X-Workspace-ID'];
+    window.location.href = '/login';
   },
 
   register: async (data: OrganizationSignupPayload): Promise<OrganizationSignupResponse> => {
+    // 💡 Add these two lines here as well!
+    localStorage.removeItem('active_workspace_id');
+    delete api.defaults.headers.common['X-Workspace-ID'];
+
     const response = await api.post<OrganizationSignupResponse>(
       '/organizations/signup/',
       data
@@ -381,7 +392,7 @@ export const projectsApi = {
     return response.data;
   },
 
-  update: async (id: number, data: Partial<{ name: string; description: string; is_favourite: boolean }>) => {
+  update: async (id: number, data: Partial<{ name: string; description: string; is_favourite: boolean; task_type: string }>) => {
     const response = await api.patch(`/projects/${id}/`, data);
     return response.data;
   },
@@ -1908,7 +1919,7 @@ interface Workspace {
   is_default: boolean;
   is_active: boolean;
   member_count: number;
-  role: 'admin' | 'manager' | 'member';
+  role: 'admin' | 'manager' | 'viewer' | 'annotator' | 'developer' | null;
   created_by?: number;
   created_at: string;
   updated_at: string;
@@ -1923,6 +1934,52 @@ export const workspaceApi = {
   getActiveWorkspaceId: (): number | null => {
     const id = localStorage.getItem('active_workspace_id');
     return id ? parseInt(id) : null;
+  },
+
+  // ✅ Get workspace details with members
+  async getWorkspaceDetails(workspaceId: number) {
+    const response = await api.get(`/organizations/workspaces/${workspaceId}/`);
+    return response.data;
+  },
+
+  // ✅ Get available users to add
+  async getAvailableUsers(workspaceId: number, search?: string) {
+    const response = await api.get(`/organizations/workspaces/${workspaceId}/available-users/`, {
+      params: search ? { search } : undefined,
+    });
+    return response.data;
+  },
+
+  // ✅ Get workspace members
+  async getWorkspaceMembers(workspaceId: number) {
+    const response = await api.get(`/organizations/workspaces/${workspaceId}/members/`);
+    return response.data;
+  },
+
+  // ✅ Add member to workspace
+  async addMember(workspaceId: number, userId: number, role: string) {
+    const response = await api.post(`/organizations/workspaces/${workspaceId}/members/`, {
+      user_id: userId, role,
+    });
+    return response.data;
+  },
+
+  // ✅ Remove member from workspace
+  async removeMember(workspaceId: number, userId: number) {
+    const response = await api.delete(`/organizations/workspaces/${workspaceId}/members/${userId}/`);
+    return response.data;
+  },
+
+  // ✅ Update member role
+  async updateMemberRole(workspaceId: number, userId: number, role: string) {
+    const response = await api.patch(`/organizations/workspaces/${workspaceId}/members/${userId}/`, { role });
+    return response.data;
+  },
+
+  // ✅ Update workspace name
+  async updateWorkspace(workspaceId: number, data: { name: string }) {
+    const response = await api.patch(`/organizations/workspaces/${workspaceId}/`, data);
+    return response.data;
   },
 
   async deleteWorkspace(workspaceId: number) {
@@ -2010,10 +2067,10 @@ export const workspaceApi = {
   },
 
   // 4️⃣ GET WORKSPACE DETAILS
-  async getWorkspaceDetails(workspaceId: number) {
-    const response = await api.get(`/organizations/workspaces/${workspaceId}/`);
-    return response.data;
-  },
+  // async getWorkspaceDetails(workspaceId: number) {
+  //   const response = await api.get(`/organizations/workspaces/${workspaceId}/`);
+  //   return response.data;
+  // },
 
   // Helper methods
   setActiveWorkspace(workspaceId: number): void {
@@ -2023,6 +2080,8 @@ export const workspaceApi = {
   clearActiveWorkspace(): void {
     localStorage.removeItem('active_workspace_id');
   }
+
+  
 };
 
 // ✅ Auto-start proactive refresh if user is already logged in (page reload)

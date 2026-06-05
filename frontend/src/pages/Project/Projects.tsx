@@ -257,7 +257,7 @@ function TreePanel({ projects, selected, selectedGroup, onSelect, onSelectGroup,
 }
 
 // ─── Bulk action toolbar ───────────────────────────────────────────────────────
-function BulkToolbar({ count, onClear, onDelete }: { count: number; onClear: () => void; onDelete: () => void }) {
+function BulkToolbar({ count, onClear, onDelete, onMove }: { count: number; onClear: () => void; onDelete: () => void; onMove: () => void }) {
   const btn: React.CSSProperties = { height: 30, border: `1px solid ${LINE}`, borderRadius: 6, background: '#fff', padding: '0 11px', fontSize: 12, fontWeight: 700, display: 'inline-flex', gap: 6, alignItems: 'center', cursor: 'pointer', color: TEXT };
   return (
     <div style={{ height: 50, borderBottom: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', gap: 10, padding: '0 16px', background: '#fff', flexShrink: 0 }}>
@@ -267,11 +267,8 @@ function BulkToolbar({ count, onClear, onDelete }: { count: number; onClear: () 
             <input type="checkbox" checked readOnly style={{ accentColor: BLUE, width: 15, height: 15 }} />
             {count} selected
           </div>
-          <button style={btn}><Move className="w-3.5 h-3.5" />Move</button>
-          <button style={btn}><Tag className="w-3.5 h-3.5" />Add Tags</button>
-          <button style={btn}><Share className="w-3.5 h-3.5" />Share</button>
-          <button onClick={onDelete} style={{ ...btn, color: '#ef4444' }}><Trash2 className="w-3.5 h-3.5" />Delete</button>
-          <button style={btn}><MoreHorizontal className="w-3.5 h-3.5" /></button>
+          <button onClick={onMove} style={btn}><Move className="w-3.5 h-3.5" />Move</button>
+          <button style={btn}><Settings className="w-3.5 h-3.5" />Edit</button>
         </>
       ) : (
         <span style={{ fontSize: 13, color: MUTED }}>Select projects to perform bulk actions</span>
@@ -401,6 +398,125 @@ const PROJECT_TYPE_FILTERS = [
   { label: 'Ideas', value: 'ideas', dotColor: '#eab308' },
 ] as const;
 
+// ─── Move Project Type Modal ──────────────────────────────────────────────────
+const PROJECT_TYPES = [
+  { value: 'client', label: 'Client Projects', color: '#3b82f6', desc: 'External client work' },
+  { value: 'internal', label: 'Internal Projects', color: '#8b5cf6', desc: 'Internal team projects' },
+  { value: 'content_creation', label: 'Content Creation', color: '#ec4899', desc: 'Content and media' },
+  { value: 'ideas', label: 'Ideas', color: '#f59e0b', desc: 'Brainstorming and concepts' },
+  { value: 'demo', label: 'Demo Projects', color: '#22c36a', desc: 'Demo and showcase' },
+];
+
+function MoveProjectModal({ selectedIds, projects, onClose, onSuccess }: {
+  selectedIds: Set<number>;
+  projects: Project[];
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const queryClient = useQueryClient();
+  const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [isMoving, setIsMoving] = useState(false);
+  const [error, setError] = useState('');
+
+  const selectedProjects = projects.filter(p => selectedIds.has(p.id));
+
+  const handleMove = async () => {
+    if (!selectedType) return;
+    setIsMoving(true);
+    setError('');
+    try {
+      await Promise.all(
+        selectedProjects.map(p => projectsApi.update(p.id, { task_type: selectedType }))
+      );
+      onSuccess();
+    } catch (e: any) {
+      setError(e.response?.data?.detail || 'Failed to move projects. Please try again.');
+      setIsMoving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      {/* Modal */}
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+        {/* Header */}
+        <div style={{ padding: '20px 24px', borderBottom: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: TEXT }}>Move to Project Type</h3>
+            <p style={{ margin: '4px 0 0', fontSize: 13, color: MUTED }}>
+              Moving {selectedProjects.length} project{selectedProjects.length > 1 ? 's' : ''}
+            </p>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: MUTED, fontSize: 20 }}>✕</button>
+        </div>
+
+        {/* Selected projects preview */}
+        <div style={{ padding: '12px 24px', background: '#f9fafb', borderBottom: `1px solid ${LINE}` }}>
+          <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Selected Projects</p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {selectedProjects.map(p => (
+              <span key={p.id} style={{ background: '#EEF2FF', color: BLUE, borderRadius: 6, padding: '3px 10px', fontSize: 12, fontWeight: 600 }}>
+                {p.name}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Type options */}
+        <div style={{ padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Select Destination</p>
+          {PROJECT_TYPES.map(type => {
+            const isSelected = selectedType === type.value;
+            const isCurrent = selectedProjects.every(p => (p as any).task_type === type.value);
+            return (
+              <div
+                key={type.value}
+                onClick={() => !isCurrent && setSelectedType(type.value)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '12px 14px', borderRadius: 10, cursor: isCurrent ? 'not-allowed' : 'pointer',
+                  border: `2px solid ${isSelected ? type.color : LINE}`,
+                  background: isSelected ? `${type.color}10` : isCurrent ? '#f9fafb' : '#fff',
+                  opacity: isCurrent ? 0.5 : 1,
+                  transition: 'all 0.15s',
+                }}
+              >
+                {/* Color dot */}
+                <div style={{ width: 12, height: 12, borderRadius: '50%', background: type.color, flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: TEXT }}>{type.label}</p>
+                  <p style={{ margin: 0, fontSize: 12, color: MUTED }}>{type.desc}</p>
+                </div>
+                {isCurrent && <span style={{ fontSize: 11, color: MUTED, fontWeight: 600 }}>Current</span>}
+                {isSelected && <span style={{ fontSize: 16, color: type.color }}>✓</span>}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Error */}
+        {error && <p style={{ margin: '0 24px', fontSize: 13, color: '#ef4444' }}>{error}</p>}
+
+        {/* Footer */}
+        <div style={{ padding: '16px 24px', borderTop: `1px solid ${LINE}`, display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{ height: 40, padding: '0 20px', borderRadius: 8, border: `1px solid ${LINE}`, background: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer', color: TEXT }}>
+            Cancel
+          </button>
+          <button
+            onClick={handleMove}
+            disabled={!selectedType || isMoving}
+            style={{ height: 40, padding: '0 20px', borderRadius: 8, border: 'none', background: selectedType ? BLUE : '#e5e7eb', color: selectedType ? '#fff' : MUTED, fontSize: 14, fontWeight: 700, cursor: selectedType ? 'pointer' : 'not-allowed' }}
+          >
+            {isMoving ? 'Moving...' : `Move ${selectedProjects.length} Project${selectedProjects.length > 1 ? 's' : ''}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function Projects() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -413,6 +529,7 @@ export function Projects() {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'list' | 'grid' | 'tree'>('list');
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [showMoveModal, setShowMoveModal] = useState(false);
   const [detailProject, setDetailProject] = useState<Project | null>(null);
   const [treeOpen, setTreeOpen] = useState(true);
   const [treeFilter, setTreeFilter] = useState<number | null>(null);
@@ -598,8 +715,7 @@ export function Projects() {
         {/* Main area */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
 
-          <BulkToolbar count={selectedIds.size} onClear={() => setSelectedIds(new Set())} onDelete={() => { }} />
-
+          <BulkToolbar count={selectedIds.size} onClear={() => setSelectedIds(new Set())} onDelete={() => { }} onMove={() => setShowMoveModal(true)} />
           {/* Content */}
           <div style={{ flex: 1, overflow: 'auto' }}>
             {isLoading ? (
@@ -633,25 +749,23 @@ export function Projects() {
                         return (
                           <div key={p.id}
                             onClick={() => setDetailProject(detailProject?.id === p.id ? null : p)}
-                            style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: idx < groupProjects.length - 1 ? `1px solid ${LINE}` : 'none', background: isSel ? '#f7faff' : '#fff', cursor: 'pointer', paddingLeft: 36 }}
-                            onMouseOver={e => { if (!isSel) e.currentTarget.style.background = '#f3f4f6'; }}
+                            style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderBottom: idx < groupProjects.length - 1 ? `1px solid ${LINE}` : 'none', background: isSel ? '#f7faff' : '#fff', cursor: 'pointer', paddingLeft: 36, minHeight: 56 }} onMouseOver={e => { if (!isSel) e.currentTarget.style.background = '#f3f4f6'; }}
                             onMouseOut={e => { e.currentTarget.style.background = isSel ? '#f7faff' : '#fff'; }}>
                             {/* Checkbox */}
-                            <input type="checkbox" checked={isSel} onChange={() => toggleSelect(p.id)} onClick={e => e.stopPropagation()} style={{ accentColor: BLUE, width: 15, height: 15, cursor: 'pointer', flexShrink: 0 }} />
+                            <input type="checkbox" checked={isSel} onChange={() => toggleSelect(p.id)} onClick={e => e.stopPropagation()} style={{ accentColor: BLUE, width: 16, height: 16, cursor: 'pointer', flexShrink: 0 }} />
                             {/* Color square + name */}
-                            <div style={{ width: 22, height: 22, borderRadius: 5, background: color, display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 800, fontSize: 12, flexShrink: 0 }}>
+                            <div style={{ width: 32, height: 32, borderRadius: 7, background: color, display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 800, fontSize: 14, flexShrink: 0 }}>
                               {p.name[0].toUpperCase()}
                             </div>
-                            <span style={{ flex: 1, fontWeight: 600, fontSize: 13, color: TEXT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
+                            <span style={{ flex: 1, fontWeight: 600, fontSize: 14, color: TEXT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
                             {/* Docs */}
-                            <span style={{ fontSize: 12, color: MUTED, minWidth: 60 }}>{(p as any).document_count ?? 0} docs</span>
+                            <span style={{ fontSize: 13, color: MUTED, minWidth: 70 }}>{(p as any).document_count ?? 0} docs</span>
                             {/* Members */}
-                            <div style={{ minWidth: 80 }}><MemberAvatars members={members} /></div>
+                            <div style={{ minWidth: 90 }}><MemberAvatars members={members} /></div>
                             {/* Status */}
-                            <div style={{ minWidth: 90 }}><StatusPill status={(p as any).status} /></div>
+                            <div style={{ minWidth: 100 }}><StatusPill status={(p as any).status} /></div>
                             {/* Updated */}
-                            <span style={{ fontSize: 12, color: MUTED, minWidth: 80 }}>{formatRelativeTime(p.updated_at || '')}</span>
-                            {/* Favourite */}
+                            <span style={{ fontSize: 13, color: MUTED, minWidth: 90 }}>{formatRelativeTime(p.updated_at || '')}</span>
                             <button onClick={e => toggleFavorite(e, p)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, flexShrink: 0 }}>
                               {(p as any).is_favourite ? <span style={{ color: '#f59e0b' }}>★</span> : <span style={{ color: '#d1d5db' }}>☆</span>}
                             </button>
@@ -680,18 +794,17 @@ export function Projects() {
                         return (
                           <div key={p.id}
                             onClick={() => setDetailProject(detailProject?.id === p.id ? null : p)}
-                            style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: idx < ungrouped.length - 1 ? `1px solid ${LINE}` : 'none', background: isSel ? '#f7faff' : '#fff', cursor: 'pointer', paddingLeft: 36 }}
-                            onMouseOver={e => { if (!isSel) e.currentTarget.style.background = '#f3f4f6'; }}
+                            style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderBottom: idx < ungrouped.length - 1 ? `1px solid ${LINE}` : 'none', background: isSel ? '#f7faff' : '#fff', cursor: 'pointer', paddingLeft: 36, minHeight: 56 }} onMouseOver={e => { if (!isSel) e.currentTarget.style.background = '#f3f4f6'; }}
                             onMouseOut={e => { e.currentTarget.style.background = isSel ? '#f7faff' : '#fff'; }}>
-                            <input type="checkbox" checked={isSel} onChange={() => toggleSelect(p.id)} onClick={e => e.stopPropagation()} style={{ accentColor: BLUE, width: 15, height: 15, cursor: 'pointer', flexShrink: 0 }} />
-                            <div style={{ width: 22, height: 22, borderRadius: 5, background: color, display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 800, fontSize: 12, flexShrink: 0 }}>
+                            <input type="checkbox" checked={isSel} onChange={() => toggleSelect(p.id)} onClick={e => e.stopPropagation()} style={{ accentColor: BLUE, width: 16, height: 16, cursor: 'pointer', flexShrink: 0 }} />
+                            <div style={{ width: 32, height: 32, borderRadius: 7, background: color, display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 800, fontSize: 14, flexShrink: 0 }}>
                               {p.name[0].toUpperCase()}
                             </div>
-                            <span style={{ flex: 1, fontWeight: 600, fontSize: 13, color: TEXT }}>{p.name}</span>
-                            <span style={{ fontSize: 12, color: MUTED, minWidth: 60 }}>{(p as any).document_count ?? 0} docs</span>
-                            <div style={{ minWidth: 80 }}><MemberAvatars members={members} /></div>
-                            <div style={{ minWidth: 90 }}><StatusPill status={(p as any).status} /></div>
-                            <span style={{ fontSize: 12, color: MUTED, minWidth: 80 }}>{formatRelativeTime(p.updated_at || '')}</span>
+                            <span style={{ flex: 1, fontWeight: 600, fontSize: 14, color: TEXT }}>{p.name}</span>
+                            <span style={{ fontSize: 13, color: MUTED, minWidth: 70 }}>{(p as any).document_count ?? 0} docs</span>
+                            <div style={{ minWidth: 90 }}><MemberAvatars members={members} /></div>
+                            <div style={{ minWidth: 100 }}><StatusPill status={(p as any).status} /></div>
+                            <span style={{ fontSize: 13, color: MUTED, minWidth: 90 }}>{formatRelativeTime(p.updated_at || '')}</span>
                             <button onClick={e => toggleFavorite(e, p)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, flexShrink: 0 }}>
                               {(p as any).is_favourite ? <span style={{ color: '#f59e0b' }}>★</span> : <span style={{ color: '#d1d5db' }}>☆</span>}
                             </button>
@@ -815,6 +928,20 @@ export function Projects() {
       <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
 
       <CreateProjectModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} navigateOnSuccess={false} />
+
+      {/* ✅ Move Project Type Modal */}
+      {showMoveModal && (
+        <MoveProjectModal
+          selectedIds={selectedIds}
+          projects={allProjects}
+          onClose={() => setShowMoveModal(false)}
+          onSuccess={() => {
+            setShowMoveModal(false);
+            setSelectedIds(new Set());
+            queryClient.invalidateQueries({ queryKey: ['projects'] });
+          }}
+        />
+      )}
     </div>
   );
 }

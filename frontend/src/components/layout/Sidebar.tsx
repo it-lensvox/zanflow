@@ -562,7 +562,10 @@ export function Sidebar() {
               role: activeWorkspace?.role,
               includes: activeWorkspace && ['admin', 'manager'].includes(activeWorkspace.role),
             })}
-            {activeWorkspace && ['admin', 'manager'].includes(activeWorkspace.role) && (
+            {activeWorkspace && (
+  ['admin', 'manager'].includes(activeWorkspace.role) ||
+  ['admin', 'manager'].includes(user?.role || '')
+) && (
               <button
                 onClick={() => setShowCreateWorkspaceModal(true)}
                 className="flex w-full items-center justify-center gap-2 rounded-lg border p-2 text-white bg-black hover:bg-gray-600 transition-colors"

@@ -423,7 +423,7 @@ export const createDocumentsTableColumns = (
     },
     {
       key: 'project',
-      label: <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Project</span>,
+      label: <span style={{ fontSize: 13, fontWeight: 600, color: '#6b7280' }}>Project</span>,
       width: '140px',
       render: (doc: Document) => {
         const name = doc.project_name || 'General';

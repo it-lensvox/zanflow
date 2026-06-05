@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { UserPlus, Loader2, User, Mail, X, Lock, ChevronDown, CheckCircle, Crown, Send } from 'lucide-react';
+import { UserPlus, Loader2, User, Mail, X, Lock, ChevronDown, Building, CheckCircle, Crown, Send } from 'lucide-react';
 import { Button } from '@/components/common';
-import { usersApi } from '@/services/api';
+import { usersApi, api } from '@/services/api';
 import type { User as AppUser, PaginatedResponse } from '@/types';
 import { DualView, useViewMode, ViewToggle } from '@/components/layout/DualView';
 import { createUserTableColumns } from '@/components/layout/DualView/userManagementConfig';
@@ -37,6 +37,8 @@ const ChangeRoleModal: React.FC<{ user: AppUser; isOpen: boolean; onClose: () =>
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       queryClient.refetchQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+      queryClient.refetchQueries({ queryKey: ['workspaces'] });
       onClose();
     },
   });
@@ -110,23 +112,45 @@ const AddUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient
   const [errors, setErrors] = useState<{ username?: string; email?: string; password?: string; confirmPassword?: string }>({});
   const [showSuccess, setShowSuccess] = useState(false);
 
+  // Inside AddUserModal, add this:
+  useEffect(() => {
+    if (!isOpen) {
+      setForm({ username: '', email: '', password: '', confirmPassword: '', firstName: '', lastName: '', role: 'viewer' });
+      setErrors({});
+    }
+  }, [isOpen]);
+
   const isValidEmail = (email: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
   const validate = () => {
-     const newErrors: { username?: string; email?: string; password?: string; confirmPassword?: string } = {};
-    if (form.username && /^\d/.test(form.username)) {
+    const newErrors: { username?: string; email?: string; password?: string; confirmPassword?: string } = {};
+
+    // ✅ Add required checks
+    if (!form.username.trim()) {
+      newErrors.username = 'Username is required.';
+    } else if (/^\d/.test(form.username)) {
       newErrors.username = 'Username must start with a letter.';
     }
-    if (form.email && !isValidEmail(form.email)) {
+
+    if (!form.email.trim()) {
+      newErrors.email = 'Email is required.';
+    } else if (!isValidEmail(form.email)) {
       newErrors.email = 'Please enter a valid email address.';
     }
-    if (form.password && form.password.length < 4) {
+
+    if (!form.password) {
+      newErrors.password = 'Password is required.';
+    } else if (form.password.length < 4) {
       newErrors.password = 'Password must be at least 4 characters.';
     }
-    if (form.password && form.confirmPassword && form.password !== form.confirmPassword) {
+
+    if (!form.confirmPassword) {
+      newErrors.confirmPassword = 'Please confirm your password.';
+    } else if (form.password !== form.confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match.';
     }
+
     return newErrors;
   };
   const createUserMutation = useMutation({
@@ -136,14 +160,31 @@ const AddUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient
       setShowSuccess(true);
       setTimeout(() => {
         setShowSuccess(false);
+        setForm({ username: '', email: '', password: '', confirmPassword: '', firstName: '', lastName: '', role: 'viewer' }); // ✅ ADD THIS
+        setErrors({});  // ✅ AND THIS
         onClose();
       }, 2500);
     },
+    // AFTER — handles username, email, and generic errors
     onError: (error: any) => {
       const data = error?.response?.data;
+      if (data?.username) {
+        setErrors(prev => ({
+          ...prev,
+          username: Array.isArray(data.username)
+            ? data.username[0]
+            : 'This username is already taken.',
+        }));
+      }
       if (data?.email) {
-        setErrors(prev => ({ ...prev, email: 'This email is already in use.' }));
-      } else if (data?.detail) {
+        setErrors(prev => ({
+          ...prev,
+          email: Array.isArray(data.email)
+            ? data.email[0]
+            : 'This email is already in use.',
+        }));
+      }
+      if (!data?.username && !data?.email && data?.detail) {
         setErrors(prev => ({ ...prev, email: data.detail }));
       }
     },
@@ -208,16 +249,16 @@ const AddUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient
 
             {isDropdownOpen && (
               <div className="border border-gray-200 rounded-md mt-1 bg-white overflow-hidden shadow-sm">
-              {['admin', 'manager', 'annotator', 'viewer', 'developer'].map((role) => (                  <div
-                    key={role}
-                    className="px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer capitalize"
-                    onClick={() => {
-                      setForm({ ...form, role: role as any });
-                      setIsDropdownOpen(false);
-                    }}
-                  >
-                    {role}
-                  </div>
+                {['admin', 'manager', 'annotator', 'viewer', 'developer'].map((role) => (<div
+                  key={role}
+                  className="px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer capitalize"
+                  onClick={() => {
+                    setForm({ ...form, role: role as any });
+                    setIsDropdownOpen(false);
+                  }}
+                >
+                  {role}
+                </div>
                 ))}
               </div>
             )}
@@ -262,7 +303,11 @@ const AddUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient
       </div>
 
       <div className="flex justify-end gap-3 pt-6 mt-2 border-t">
-        <Button variant="outline" className="px-6" onClick={onClose}>Cancel</Button>
+        <Button variant="outline" className="px-6" onClick={() => {
+          setErrors({});        // ✅ clear errors
+          setForm({ username: '', email: '', password: '', confirmPassword: '', firstName: '', lastName: '', role: 'viewer' }); // ✅ clear form
+          onClose();
+        }}>Cancel</Button>
         <Button
           className="px-6 bg-[#1a1f2e] text-white hover:bg-[#252b3d]"
           onClick={() => {
@@ -300,11 +345,30 @@ const AddUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient
 };
 
 const InviteUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient: any }> = ({ isOpen, onClose, queryClient }) => {
-  const [form, setForm] = useState({ email: '', role: 'viewer' as AppUser['role'] });
+
+  // ✅ 1. Add workspace_id to form state
+  const activeWorkspaceId = parseInt(localStorage.getItem('active_workspace_id') || '0') || null;
+
+  const [form, setForm] = useState({
+    email: '',
+    role: 'viewer' as AppUser['role'],
+    workspace_id: activeWorkspaceId as number | null,
+  });
+
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isWorkspaceDropdownOpen, setIsWorkspaceDropdownOpen] = useState(false); // NEW
   const [errors, setErrors] = useState<{ email?: string }>({});
   const [showSuccess, setShowSuccess] = useState(false);
 
+  // ✅ 2. Fetch workspaces when modal opens
+  // REPLACE THE ENTIRE BLOCK WITH THIS:
+  const { data: workspacesData } = useQuery({
+    queryKey: ['workspaces'],
+    queryFn: () => (usersApi as any).getWorkspaces(), enabled: isOpen,
+  });
+  const workspaces = Array.isArray(workspacesData?.workspaces)
+    ? workspacesData.workspaces   // ✅ extract from { active_workspace_id, workspaces: [...] }
+    : [];
   const inviteUserMutation = useMutation({
     mutationFn: usersApi.invite,
     onSuccess: () => {
@@ -313,7 +377,7 @@ const InviteUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryCli
       setTimeout(() => {
         setShowSuccess(false);
         onClose();
-        setForm({ email: '', role: 'viewer' });
+        setForm({ email: '', role: 'viewer', workspace_id: null }); // ✅ 3. Reset workspace_id too
       }, 2500);
     },
     onError: (error: any) => {
@@ -357,8 +421,8 @@ const InviteUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryCli
             </div>
             {isDropdownOpen && (
               <div className="border border-gray-200 rounded-md mt-1 bg-white overflow-hidden shadow-sm">
-              {(['admin', 'manager', 'annotator', 'viewer', 'developer'] as AppUser['role'][]).map((role) => (
-                                  <div
+                {(['admin', 'manager', 'annotator', 'viewer', 'developer'] as AppUser['role'][]).map((role) => (
+                  <div
                     key={role}
                     className="px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer capitalize"
                     onClick={() => {
@@ -372,11 +436,47 @@ const InviteUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryCli
               </div>
             )}
           </div>
+          {/* currently your code ends the role section here: */}
+        </div>  {/* ← this closes the Role <div> */}
+
+        {/* ✅ ADD THIS BLOCK RIGHT HERE */}
+        <div>
+          <label className={labelClass}>
+            <Crown className="h-4 w-4" />
+            Add to Workspace <span className="text-gray-400 font-normal ml-1">(optional)</span>
+          </label>
+          <div className="space-y-1">
+            <div
+              className={`${inputClass} cursor-pointer flex justify-between items-center bg-white`}
+              onClick={() => setIsWorkspaceDropdownOpen(!isWorkspaceDropdownOpen)}
+            >
+              <span className="text-sm text-gray-700">
+                {workspaces.find((w: any) => w.id === form.workspace_id)?.name ?? 'Select Workspace'}
+              </span>
+              <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isWorkspaceDropdownOpen ? 'rotate-180' : ''}`} />
+            </div>
+
+            {isWorkspaceDropdownOpen && (
+              <div className="border border-gray-200 rounded-md mt-1 bg-white overflow-hidden shadow-sm">
+                {workspaces.map((ws: any) => (
+                  <div
+                    key={ws.id}
+                    className={`px-3 py-2 text-sm cursor-pointer ${form.workspace_id === ws.id ? 'bg-blue-50 text-blue-700 font-medium' : 'hover:bg-gray-50 text-gray-700'}`}
+                    onClick={() => { setForm({ ...form, workspace_id: ws.id }); setIsWorkspaceDropdownOpen(false); }}
+                  >
+                    {ws.name}
+                    {ws.is_default && <span className="ml-2 text-xs text-gray-400">(default)</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+
+      </div>  {/* ← this closes the scrollable container */}
 
       <div className="flex justify-end gap-3 pt-6 mt-2 border-t">
-        <Button variant="outline" className="px-6" onClick={() => { onClose(); setForm({ email: '', role: 'viewer' }); setErrors({}); }}>Cancel</Button>
+        <Button variant="outline" className="px-6" onClick={() => { onClose(); setForm({ email: '', role: 'viewer', workspace_id: activeWorkspaceId }); setErrors({}); }}>Cancel</Button>
         <Button
           className="px-6 bg-[#1a1f2e] text-white hover:bg-[#252b3d]"
           onClick={() => {
@@ -384,7 +484,11 @@ const InviteUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryCli
               setErrors({ email: 'Email is required.' });
               return;
             }
-            inviteUserMutation.mutate({ email: form.email, role: form.role });
+            inviteUserMutation.mutate({
+              email: form.email,
+              role: form.role,
+              workspace_id: form.workspace_id,
+            });
           }}
           disabled={inviteUserMutation.isPending}
         >

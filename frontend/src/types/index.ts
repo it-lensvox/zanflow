@@ -16,6 +16,7 @@ export interface User {
 export interface InviteUserPayload {
   email: string;
   role: 'admin' | 'manager' | 'annotator' | 'viewer' | 'developer';
+  workspace_id?: number | null; 
 }
 
 export interface InviteUserResponse {
