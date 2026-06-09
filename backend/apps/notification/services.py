@@ -52,40 +52,39 @@ def _send_notification_signal(notification_id: int, recipient_id: int):
     """
     Sends a lightweight WebSocket signal to the user.
     Executed only after the DB transaction commits successfully.
+    Includes workspace_id so frontend can filter by workspace.
     """
     try:
         channel_layer = get_channel_layer()
-        # This group name MUST match what we set in GatewayConsumer.connect()
         group_name = f"user_{recipient_id}_global"
 
-        # We fetch the fresh count so the Red Dot is always accurate
-        unread_count = Notification.objects.filter(
-            recipient_id=recipient_id, 
-            is_read=False
+        # Use original_objects — no tenant context in async/post-commit
+        unread_count = Notification.original_objects.filter(
+            recipient_id=recipient_id,
+            is_read=False,
         ).count()
-        
-        # Optional: Fetch basic details for the Toast (title, etc.)
-        notification = Notification.objects.get(id=notification_id)
 
-        # The Payload: A simple "Trigger" + Metadata
+        notification = Notification.original_objects.get(id=notification_id)
+
         payload = {
-            "type": "gateway_signal",       # Calls gateway_signal() in Consumer
-            "event": "NEW_NOTIFICATION",    # The Event Name
+            "type": "gateway_signal",
+            "event": "NEW_NOTIFICATION",
             "data": {
                 "id": notification.id,
                 "title": notification.title,
                 "unread_count": unread_count,
-                # Context for the frontend to know where to redirect (e.g., Task ID)
+                # ✅ Include workspace info so frontend filters correctly
+                "workspace_id": notification.workspace_id,
+                "workspace_name": notification.workspace.name if notification.workspace else None,
                 "related_object": {
                     "type": notification.content_type.model,
                     "id": notification.object_id
-                } if notification.content_type else None
+                } if notification.content_type else None,
             }
         }
 
         async_to_sync(channel_layer.group_send)(group_name, payload)
     except Exception as e:
-        # We catch errors so a socket failure doesn't crash the whole request
         print(f"WebSocket Signal Error: {e}")
 
 def create_notification(
@@ -97,41 +96,34 @@ def create_notification(
     priority: str = Notification.Priority.MEDIUM,
     related_object: Optional[Model] = None,
     metadata: Optional[Dict[str, Any]] = None,
+    workspace=None,
+    organization=None,
 ) -> Optional[Notification]:
     """
     Create a single notification for a user.
-    
+
     Args:
-        recipient: User who will receive the notification
-        title: Short title for the notification
-        message: Detailed message
-        notification_type: Type of notification (from Notification.NotificationType)
-        actor: User who triggered the notification (optional)
-        priority: Priority level (from Notification.Priority)
-        related_object: Django model instance related to notification (optional)
-        metadata: Additional data as dictionary (optional)
-    
-    Returns:
-        Notification instance or None if user has disabled notifications
-    
-    Example:
-        notification = create_notification(
-            recipient=user,
-            title="New Task Assigned",
-            message="You have been assigned to 'Design Logo'",
-            notification_type=Notification.NotificationType.TASK_ASSIGNED,
-            actor=manager,
-            related_object=task,
-            metadata={"project_name": "Marketing Campaign"}
-        )
+        workspace: Workspace instance the notification belongs to.
+                   If not provided, falls back to recipient's default workspace.
+        organization: Organization instance. Defaults to recipient's org.
     """
-    # Skip if recipient has disabled this notification type
     if not should_notify(recipient, notification_type):
         return None
-    
+
     if actor and actor.id == recipient.id:
         return None
-    
+
+    # Resolve organization
+    resolved_org = organization or getattr(recipient, 'organization', None)
+
+    # Resolve workspace — use provided, else recipient's default workspace
+    resolved_workspace = workspace
+    if resolved_workspace is None and resolved_org:
+        from apps.organizations.models import Workspace
+        resolved_workspace = Workspace.objects.filter(
+            organization=resolved_org, is_default=True
+        ).first()
+
     notification_data = {
         'recipient': recipient,
         'title': title,
@@ -140,23 +132,22 @@ def create_notification(
         'actor': actor,
         'priority': priority,
         'metadata': metadata or {},
+        'organization': resolved_org,
+        'workspace': resolved_workspace,
     }
-    
+
     if related_object:
         notification_data['content_type'] = ContentType.objects.get_for_model(related_object)
         notification_data['object_id'] = str(related_object.pk)
-    
-    # --- MODIFIED SECTION STARTS HERE ---
-    
-    # 1. Save to DB (Your existing code)
-    notification = Notification.objects.create(**notification_data)
 
-    # 2. Trigger the WebSocket Signal (The new "Wire")
-    # We use a lambda to pass the IDs to the helper function
+    # Save to DB using original_objects to bypass TenantManager
+    notification = Notification.original_objects.create(**notification_data)
+
+    # Trigger WebSocket signal after commit
     transaction.on_commit(
         lambda: _send_notification_signal(notification.id, recipient.id)
     )
-    
+
     return notification
 
 
@@ -169,40 +160,18 @@ def notify(
     priority: str = Notification.Priority.MEDIUM,
     related_object: Optional[Model] = None,
     metadata: Optional[Dict[str, Any]] = None,
-    exclude_actor: bool = True
+    exclude_actor: bool = True,
+    workspace=None,
+    organization=None,
 ) -> List[Notification]:
     """
     Send notifications to one or multiple users.
-    
-    Args:
-        recipients: Single User or list of Users
-        title: Short title for the notification
-        message: Detailed message
-        notification_type: Type of notification
-        actor: User who triggered the notification
-        priority: Priority level
-        related_object: Related Django model instance
-        metadata: Additional data
-        exclude_actor: Whether to exclude actor from recipients (default: True)
-    
-    Returns:
-        List of created Notification instances
-    
-    Example:
-        # Notify multiple users
-        notifications = notify(
-            recipients=[user1, user2, manager],
-            title="Task Status Updated",
-            message="Task 'Design Logo' has been marked as completed",
-            notification_type=Notification.NotificationType.TASK_STATUS_UPDATED,
-            actor=developer,
-            related_object=task
-        )
+    Pass workspace= and organization= so notifications are scoped correctly.
     """
     # Normalize to list
     if isinstance(recipients, User):
         recipients = [recipients]
-    
+
     # Remove duplicates while preserving order
     seen = set()
     unique_recipients = []
@@ -210,15 +179,14 @@ def notify(
         if user.id not in seen:
             seen.add(user.id)
             unique_recipients.append(user)
-    
+
     created_notifications = []
-    
+
     with transaction.atomic():
         for recipient in unique_recipients:
-            # Skip actor if exclude_actor is True
             if exclude_actor and actor and recipient.id == actor.id:
                 continue
-            
+
             notification = create_notification(
                 recipient=recipient,
                 title=title,
@@ -227,12 +195,14 @@ def notify(
                 actor=actor,
                 priority=priority,
                 related_object=related_object,
-                metadata=metadata
+                metadata=metadata,
+                workspace=workspace,
+                organization=organization,
             )
-            
+
             if notification:
                 created_notifications.append(notification)
-    
+
     return created_notifications
 
 
@@ -339,7 +309,9 @@ def notify_task_created(task, actor: User) -> List[Notification]:
             'task_heading': task.heading,
             'project_name': project_name,
             'priority': task.priority,
-        }
+        },
+        workspace=getattr(task, 'workspace', None),
+        organization=getattr(task, 'organization', None),
     )
 
 
@@ -394,7 +366,9 @@ def notify_task_status_updated(
             'project_name': project_name,
             'old_status': old_status,
             'new_status': new_status,
-        }
+        },
+        workspace=getattr(task, 'workspace', None),
+        organization=getattr(task, 'organization', None),
     )
 
 
@@ -423,7 +397,9 @@ def notify_task_comment(task, comment, actor: User) -> List[Notification]:
             'task_id': task.id,
             'task_heading': task.heading,
             'comment_preview': comment.content[:100] if comment.content else '',
-        }
+        },
+        workspace=getattr(task, 'workspace', None),
+        organization=getattr(task, 'organization', None),
     )
 
 
@@ -452,7 +428,9 @@ def notify_project_created(project, actor: User, assigned_members: List[User] = 
         metadata={
             'project_id': str(project.id),
             'project_name': project.name,
-        }
+        },
+        workspace=getattr(project, 'workspace', None),
+        organization=getattr(project, 'organization', None),
     )
 
 
@@ -592,7 +570,9 @@ def notify_task_assignees_added(task, actor: User, new_assignees: List[User]) ->
             'task_heading': task.heading,
             'project_name': project_name,
             'priority': task.priority,
-        }
+        },
+        workspace=getattr(task, 'workspace', None),
+        organization=getattr(task, 'organization', None),
     )
 
 # ============================================================================
@@ -612,16 +592,18 @@ def notify_new_chat_message(room, message, actor: User, recipients: List[User]) 
         recipients=recipients,
         title=f"New message from {actor.first_name or actor.username}",
         message=content_preview,
-        notification_type='new_message',  # Hardcoded string to avoid Enum lookup errors
+        notification_type='new_message',
         actor=actor,
         priority=Notification.Priority.MEDIUM,
-        related_object=None,  # <-- FIX: Set to None to prevent UUID vs Integer crashes!
+        related_object=None,
         metadata={
             'room_id': str(room.id),
             'room_name': room.name,
             'message_id': str(message.id),
             'related_type': 'message'
-        }
+        },
+        workspace=getattr(room, 'workspace', None),
+        organization=getattr(room, 'organization', None),
     )
 
 # ============================================================================
