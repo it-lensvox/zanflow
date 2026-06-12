@@ -39,6 +39,7 @@ class NotificationSerializer(serializers.ModelSerializer):
     time_since = serializers.SerializerMethodField()
     related_object_info = serializers.SerializerMethodField()
     workspace_name = serializers.SerializerMethodField()
+    workspace_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Notification
@@ -57,6 +58,7 @@ class NotificationSerializer(serializers.ModelSerializer):
             'related_object_info',
             'time_since',
             'workspace_name',
+            'workspace_id',
             'created_at',
             'updated_at',
         ]
@@ -66,6 +68,9 @@ class NotificationSerializer(serializers.ModelSerializer):
         if obj.workspace:
             return obj.workspace.name
         return None
+
+    def get_workspace_id(self, obj):
+        return obj.workspace_id
     
     def get_time_since(self, obj):
         """Return human-readable time since notification was created."""
@@ -112,6 +117,7 @@ class NotificationListSerializer(serializers.ModelSerializer):
     actor_name = serializers.SerializerMethodField()
     time_since = serializers.SerializerMethodField()
     workspace_name = serializers.SerializerMethodField()
+    workspace_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Notification
@@ -127,6 +133,7 @@ class NotificationListSerializer(serializers.ModelSerializer):
             'time_since',
             'created_at',
             'workspace_name',
+            'workspace_id',
         ]
         read_only_fields = fields
 
@@ -134,6 +141,9 @@ class NotificationListSerializer(serializers.ModelSerializer):
         if obj.workspace:
             return obj.workspace.name
         return None
+
+    def get_workspace_id(self, obj):
+        return obj.workspace_id
     
     def get_actor_name(self, obj):
         if obj.actor:

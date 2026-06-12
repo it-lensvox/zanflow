@@ -536,6 +536,9 @@ class WorkspaceListCreateView(APIView):
                 "is_default": m.workspace.is_default,
                 "is_active": m.workspace.is_active,
                 "created_by": m.workspace.created_by_id,
+                "member_count": WorkspaceMembership.objects.filter(
+                    workspace=m.workspace
+                ).count(),
             }
             for m in memberships
         ]

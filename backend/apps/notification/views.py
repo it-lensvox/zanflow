@@ -219,9 +219,16 @@ class NotificationMarkReadView(APIView):
         # Otherwise, check request body for IDs
         serializer = MarkAsReadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        
+
         notification_ids = serializer.validated_data.get('notification_ids', [])
-        
+
+        # Get current workspace from header
+        workspace_id = request.META.get("HTTP_X_WORKSPACE_ID")
+        try:
+            workspace_id = int(workspace_id) if workspace_id else None
+        except (ValueError, TypeError):
+            workspace_id = None
+
         if notification_ids:
             # Mark specific notifications as read
             updated_count = Notification.original_objects.filter(
@@ -232,18 +239,30 @@ class NotificationMarkReadView(APIView):
                 is_read=True,
                 read_at=timezone.now()
             )
-            
+
             return Response({
                 'message': f'{updated_count} notification(s) marked as read',
                 'marked_count': updated_count
             }, status=status.HTTP_200_OK)
         else:
-            # Mark all as read
-            updated_count = mark_all_as_read(user)
-            
+            # Mark all as read — scoped to current workspace
+            qs = Notification.original_objects.filter(
+                recipient=user,
+                organization=user.organization,
+                is_read=False,
+            )
+            if workspace_id:
+                qs = qs.filter(workspace_id=workspace_id)
+
+            updated_count = qs.update(
+                is_read=True,
+                read_at=timezone.now()
+            )
+
             return Response({
-                'message': 'All notifications marked as read',
-                'marked_count': updated_count
+                'message': f'All notifications marked as read',
+                'marked_count': updated_count,
+                'workspace_id': workspace_id,
             }, status=status.HTTP_200_OK)
 
 
@@ -316,21 +335,34 @@ class NotificationCountView(APIView):
 
 class NotificationDeleteAllView(APIView):
     """
-    DELETE: Delete all notifications (both read and unread) for the user.
+    DELETE: Delete all notifications for the CURRENT workspace only.
+    Uses X-Workspace-ID header to scope the deletion.
     """
     authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
     permission_classes = [IsAuthenticated]
-    
+
     def delete(self, request):
-        # We removed `is_read=True` so it grabs ALL notifications for this user
-        deleted_count, _ = Notification.original_objects.filter(
+        workspace_id = request.META.get("HTTP_X_WORKSPACE_ID")
+        try:
+            workspace_id = int(workspace_id) if workspace_id else None
+        except (ValueError, TypeError):
+            workspace_id = None
+
+        qs = Notification.original_objects.filter(
             recipient=request.user,
             organization=request.user.organization,
-        ).delete()
-        
+        )
+
+        # Filter by current workspace if header present
+        if workspace_id:
+            qs = qs.filter(workspace_id=workspace_id)
+
+        deleted_count, _ = qs.delete()
+
         return Response({
             'message': f'{deleted_count} notification(s) deleted',
-            'deleted_count': deleted_count
+            'deleted_count': deleted_count,
+            'workspace_id': workspace_id,
         }, status=status.HTTP_200_OK)
 
 
