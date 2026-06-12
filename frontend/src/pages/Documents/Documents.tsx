@@ -1382,7 +1382,10 @@ function UploadDocumentModal({ isOpen, onClose, projectId, projectName, folderId
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }} onClick={onClose} />
-      <div className="relative w-full max-w-[520px] rounded-xl shadow-2xl" style={{ background: '#fff', border: '1px solid #e5e7eb' }}>
+      <div
+        className="relative w-full max-w-[520px] rounded-xl shadow-2xl"
+        style={{ background: '#fff', border: '1px solid #e5e7eb', position: 'relative', overflow: 'hidden' }}
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid #e5e7eb' }}>
           <div className="flex items-center gap-2">
@@ -1448,19 +1451,20 @@ function UploadDocumentModal({ isOpen, onClose, projectId, projectName, folderId
   );
 }
 
-// Tag Selector Modal for Bulk Add Tags
 function TagSelectorModal({
   isOpen,
   onClose,
   availableTags,
   selectedCount,
-  onConfirm
+  onConfirm,
+  projects,
 }: {
   isOpen: boolean;
   onClose: () => void;
   availableTags: any[];
   selectedCount: number;
   onConfirm: (tagIds: number[]) => void;
+  projects: any[];
 }) {
   const queryClient = useQueryClient();
   // ✅ ADD THIS - Fetch labels directly in modal
@@ -1487,9 +1491,11 @@ function TagSelectorModal({
   });
   const [selectedTags, setSelectedTags] = useState<number[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);  // ✅ ADD THIS
-  const [successMessage, setSuccessMessage] = useState('');  // ✅ ADD THIS
-  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);  
+  const [successMessage, setSuccessMessage] = useState('');
+  const [deletingLabelId, setDeletingLabelId] = useState<number | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; name: string } | null>(null);
+    const [showCreateForm, setShowCreateForm] = useState(false);
   const [newLabelName, setNewLabelName] = useState('');
   const [newLabelColor, setNewLabelColor] = useState('#3B82F6'); // Default blue
   const [isCreating, setIsCreating] = useState(false);
@@ -1503,8 +1509,45 @@ function TagSelectorModal({
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  const handleDeleteLabel = async (tagId: number, tagName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeleteConfirm({ id: tagId, name: tagName });
+  };
 
+  const confirmDeleteLabel = async () => {
+    if (!deleteConfirm) return;
+    const { id: tagId, name: tagName } = deleteConfirm;
+    setDeleteConfirm(null);
+    setDeletingLabelId(tagId);
+    try {
+      const token = localStorage.getItem('access_token');
+      const workspaceId = localStorage.getItem('active_workspace_id');
+      const response = await fetch(`${API_URL}/documents/labels/${tagId}/`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Workspace-ID': workspaceId || '',
+        },
+      });
+      if (response.ok || response.status === 204) {
+        await refetchLabels();
+        await queryClient.invalidateQueries({ queryKey: ['labels'] });
+        setSuccessMessage(`Label "${tagName}" deleted successfully`);
+        setTimeout(() => setSuccessMessage(''), 3000);
+        setSelectedTags(prev => prev.filter(id => id !== tagId));
+      } else {
+        const err = await response.json().catch(() => ({}));
+        setSuccessMessage(`Failed: ${err.detail || 'Failed to delete label'}`);
+      }
+    } catch (error: any) {
+      setSuccessMessage(`Failed: ${error.message || 'Failed to delete label'}`);
+    } finally {
+      setDeletingLabelId(null);
+    }
+  };
+
+  if (!isOpen) return null;
   const labelsToUse: any[] = freshLabels || availableTags || [];
 
   const filteredTags = labelsToUse.filter((tag: any) =>
@@ -1529,11 +1572,22 @@ function TagSelectorModal({
       const workspaceId = localStorage.getItem('active_workspace_id');
       const urlParams = new URLSearchParams(window.location.search);
       const projectIdFromUrl = urlParams.get('project');
-      // ✅ Use first available project if none selected — no hardcoded ID
-      const currentProjectId = projectIdFromUrl
-        ? Number(projectIdFromUrl)
-        : (document.querySelector('[data-project-id]') as any)?.dataset?.projectId
-          || null;
+
+      // ✅ Get project ID from URL or first available project
+      let currentProjectId: number | null = null;
+      if (projectIdFromUrl) {
+        currentProjectId = Number(projectIdFromUrl);
+      } else if (projects && projects.length > 0) {
+        // ✅ projects is a plain array from API
+        const firstProject = Array.isArray(projects) ? projects[0] : (projects as any)?.results?.[0];
+        currentProjectId = firstProject?.id || null;
+      }
+
+      if (!currentProjectId) {
+        setSuccessMessage('Failed to create label: No project available. Please select a project first.');
+        setIsCreating(false);
+        return;
+      }
 
       const response = await fetch(`${API_URL}/documents/labels/`, {
         method: 'POST',
@@ -1541,10 +1595,10 @@ function TagSelectorModal({
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
-          'X-Workspace-ID': workspaceId || '',  // ✅ workspace header
+          'X-Workspace-ID': workspaceId || '',
         },
         body: JSON.stringify({
-          ...(currentProjectId ? { project: Number(currentProjectId) } : {}),
+          project: currentProjectId,  // ✅ always send project
           name: newLabelName.trim(),
           color: newLabelColor
         })
@@ -1552,21 +1606,21 @@ function TagSelectorModal({
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('❌ Backend error details:', errorData);
 
         let errorMessage = 'Failed to create label';
         if (errorData.name && Array.isArray(errorData.name)) {
           errorMessage = errorData.name[0];
+        } else if (errorData.project && Array.isArray(errorData.project)) {
+          errorMessage = `Project error: ${errorData.project[0]}`;
         } else if (errorData.detail) {
           errorMessage = errorData.detail;
+        } else {
+          errorMessage = JSON.stringify(errorData);
         }
         throw new Error(errorMessage);
       }
 
       const newLabel = await response.json();
-      console.log('✅ Label created:', newLabel);
-
-      // ✅ Refetch both queries
       await refetchLabels();
       await queryClient.invalidateQueries({ queryKey: ['labels'] });
 
@@ -1578,11 +1632,11 @@ function TagSelectorModal({
       setNewLabelColor('#3B82F6');
       setShowCreateForm(false);
 
-      setSuccessMessage(`✓ Label "${newLabel.name}" created! You can now select it.`);
-      setTimeout(() => setSuccessMessage(''), 3000);
+      setSuccessMessage(`Label "${newLabel.name}" created! You can now select it.`);
+            setTimeout(() => setSuccessMessage(''), 3000);
     } catch (error: any) {
-      console.error('Failed to create label:', error);
-      setSuccessMessage(`❌ ${error.message || 'Failed to create label'}`);
+      
+      setSuccessMessage(`Failed: ${error.message || 'Failed to create label'}`);
     } finally {
       setIsCreating(false);
     }
@@ -1712,37 +1766,35 @@ function TagSelectorModal({
           {/* Existing Available Tags list */}
           <div className="text-sm font-semibold text-gray-700 mb-2">AVAILABLE TAGS</div>
 
-          {/* Success Message */}
-          {successMessage && (
-            <div
-              className="rounded-lg"
-              style={{
+          {successMessage && (() => {
+            const isError = successMessage.toLowerCase().includes('failed') ||
+              successMessage.toLowerCase().includes('error') ||
+              successMessage.startsWith('❌');
+            const cleanMsg = successMessage.replace(/^❌\s*/, '').replace(/^✓\s*/, '');
+            return (
+              <div className="rounded-lg" style={{
                 padding: '12px 16px',
-                background: '#D1FAE5',
-                border: '1px solid #10B981',
+                background: isError ? '#FEF2F2' : '#D1FAE5',
+                border: `1px solid ${isError ? '#FECACA' : '#10B981'}`,
                 marginBottom: 16
-              }}
-            >
-              <div className="flex items-center gap-2">
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="#10B981"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-                <p style={{ fontSize: 14, fontWeight: 500, color: '#065F46', margin: 0 }}>
-                  {successMessage}
-                </p>
+              }}>
+                <div className="flex items-center gap-2">
+                  {isError ? (
+                    <svg className="w-5 h-5" fill="none" stroke="#DC2626" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="none" stroke="#10B981" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                  <p style={{ fontSize: 14, fontWeight: 500, color: isError ? '#991B1B' : '#065F46', margin: 0 }}>
+                    {cleanMsg}
+                  </p>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Selected Tags Summary */}
           {selectedTags.length > 0 && (
@@ -1829,6 +1881,25 @@ function TagSelectorModal({
                       >
                         {tag.name}
                       </span>
+                      {/* ✅ Delete button */}
+                      <button
+                        onClick={(e) => handleDeleteLabel(tag.id, tag.name, e)}
+                        disabled={deletingLabelId === tag.id}
+                        title="Delete label"
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          padding: 4, borderRadius: 4, color: '#ef4444',
+                          display: 'flex', alignItems: 'center', flexShrink: 0,
+                          opacity: deletingLabelId === tag.id ? 0.5 : 1,
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#FEF2F2'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                      >
+                        {deletingLabelId === tag.id
+                          ? <div style={{ width: 14, height: 14, border: '2px solid #ef4444', borderTop: '2px solid transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                          : <Trash2 className="w-4 h-4" />
+                        }
+                      </button>
                     </div>
                   );
                 })
@@ -1847,6 +1918,37 @@ function TagSelectorModal({
             </div>
           </div>
         </div>
+
+        {/* ✅ Delete confirmation modal */}
+        {deleteConfirm && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl"
+            style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)' }}>
+            <div className="bg-white rounded-xl shadow-xl p-6 mx-4 w-full max-w-sm">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                  <Trash2 className="w-5 h-5 text-red-600" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#1a1a1a' }}>Delete Label</h3>
+                  <p style={{ margin: 0, fontSize: 13, color: '#6b7280' }}>This cannot be undone</p>
+                </div>
+              </div>
+              <p style={{ fontSize: 14, color: '#374151', marginBottom: 20 }}>
+                Are you sure you want to delete <strong>"{deleteConfirm.name}"</strong>? It will be removed from all documents.
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setDeleteConfirm(null)}
+                  style={{ flex: 1, height: 38, border: '1px solid #e5e7eb', borderRadius: 8, background: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer', color: '#374151' }}>
+                  Cancel
+                </button>
+                <button onClick={confirmDeleteLabel}
+                  style={{ flex: 1, height: 38, border: 'none', borderRadius: 8, background: '#EF4444', fontSize: 14, fontWeight: 600, cursor: 'pointer', color: '#fff' }}>
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Footer */}
         <div
@@ -1891,7 +1993,7 @@ function TagSelectorModal({
                 }, 2000);
 
               } catch (error: any) {
-                setSuccessMessage(`❌ ${error.message || 'Failed to add tags'}`);
+                setSuccessMessage(` ${error.message || 'Failed to add tags'}`);
               } finally {
                 setIsSubmitting(false);
               }
@@ -3045,6 +3147,7 @@ export function Documents() {
         availableTags={availableTags}
         selectedCount={selectedDocs.size}
         onConfirm={handleBulkAddTags}
+        projects={projects}
       />
 
       {/* New Document Modal */}

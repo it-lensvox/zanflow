@@ -440,12 +440,12 @@ export interface AuthTokens {
   refresh: string;
 }
 
-// Sign Up page
 export interface OrganizationSignupPayload {
   company_name: string;
   admin_email: string;
   password: string;
   password_confirm: string;
+  otp: string;
 }
 
 export interface OrganizationSignupResponse {
@@ -895,6 +895,15 @@ export interface NotificationData {
     full_name?: string;
     email?: string;
   };
+  workspace_id?: number;
+workspace_name?: string;
+_isCurrentWorkspace?: boolean;
+other_workspaces?: {
+    workspace_id: number;
+    workspace_name: string;
+    unread_count: number;
+    message: string;
+}[];
 }
 
 // API response wrapper for notification list

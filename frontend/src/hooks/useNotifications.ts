@@ -60,6 +60,39 @@ export function useNotifications() {
     notificationSocket.connect();
     setIsConnected(notificationSocket.isConnected());
     const unsubscribe = notificationSocket.onNotification((notification) => {
+      // ── Workspace filter ──
+      const currentWorkspaceId = parseInt(localStorage.getItem('active_workspace_id') || '0');
+      const isSameWorkspace = !notification.workspace_id || notification.workspace_id === currentWorkspaceId;
+
+      if (!isSameWorkspace) {
+        // Different workspace — play subtle sound
+        if (audioRef.current) {
+            audioRef.current.currentTime = 0;
+            audioRef.current.play().catch(() => {});
+        }
+    
+        // Show browser notification with workspace name only
+        if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification(`🔔 ${notification.workspace_name}`, {
+                body: `You have a new notification in "${notification.workspace_name}"`,
+                icon: dyuksaLogo,
+                tag: `dyuksa-other-workspace-${notification.workspace_id}`,
+                silent: false,
+            });
+        }
+    
+        // Update bell badge count so user sees something
+        if (notification.unread_count !== undefined) {
+            setUnreadCount(prev => prev + 1);
+        }
+    
+        // Invalidate so "Other Workspaces" section updates in panel
+        queryClient.invalidateQueries({ queryKey: ['notifications-initial'] });
+    
+        return;
+    }
+
+      // ── Same workspace — full notification below ──
       // 4. Play the sound when a new notification arrives
       if (audioRef.current) {
         audioRef.current.currentTime = 0;

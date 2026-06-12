@@ -210,7 +210,8 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route path="/dashboard" element={<Dashboard />} />
+       <Route path="/dashboard" element={<Dashboard />} />
+<Route path="/my-work" element={<div style={{ padding: 40, color: '#667085', fontSize: 16 }}>My Work — coming soon</div>} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/resetPassword" element={<ResetPassword />} />
         <Route path="/projects" element={<Projects />} />
@@ -232,6 +233,7 @@ function AppRoutes() {
         <Route path="/settings" element={<Settings />} />
         <Route path="/quick-notes" element={<QuickNotesPage />} />
         <Route path="/tasks/:id" element={<TaskDetailPage />} />
+        
 
         {/* Taskboard Routes */}
         <Route path="/taskboard" element={<MyTask />}>

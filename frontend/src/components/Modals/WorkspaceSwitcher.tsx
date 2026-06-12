@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { workspaceApi } from '@/services/api';
-import { ChevronUp, Check, Plus, Trash2 } from 'lucide-react';
+import { ChevronUp, Check, Plus, Trash2, Users } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 // ✅ Updated interface with created_by
@@ -215,6 +215,7 @@ export function WorkspaceSwitcher({ onCreateWorkspace }: WorkspaceSwitcherProps)
                               )}
                             </div>
                             <div className="flex items-center gap-2 mt-0.5">
+                            <Users className="w-2.5 h-2.5 text-gray-400" />
                               <span className="text-[10px] text-gray-500">
                                 {workspace.member_count} members
                               </span>
@@ -245,18 +246,18 @@ export function WorkspaceSwitcher({ onCreateWorkspace }: WorkspaceSwitcherProps)
                 </div>
 
                 
-                {/* {activeWorkspace && ['admin', 'manager'].includes(activeWorkspace.role) && (
+                {activeWorkspace && ['admin', 'manager'].includes(activeWorkspace.role) && (
                   <button
                     onClick={() => {
                       setIsOpen(false);
                       onCreateWorkspace?.();
                     }}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors"
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium text-white bg-black hover:bg-gray-700 transition-colors"
                   >
                     <Plus className="h-4 w-4" />
                     <span>New Workspace</span>
                   </button>
-                )} */}
+                )}
               </>
             )}
           </div>

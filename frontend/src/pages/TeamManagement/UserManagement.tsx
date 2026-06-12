@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { UserPlus, Loader2, User, Mail, X, Lock, ChevronDown, Building, CheckCircle, Crown, Send } from 'lucide-react';
+import { UserPlus, Loader2, User, Mail, X, Lock, ChevronDown, Building, CheckCircle, Crown, Send, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/common';
 import { usersApi, api } from '@/services/api';
 import type { User as AppUser, PaginatedResponse } from '@/types';
@@ -111,6 +111,8 @@ const AddUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [errors, setErrors] = useState<{ username?: string; email?: string; password?: string; confirmPassword?: string }>({});
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Inside AddUserModal, add this:
   useEffect(() => {
@@ -266,24 +268,33 @@ const AddUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient
         </div>
         <div>
           <label className={labelClass}><Lock className="h-4 w-4" /> Password</label>
-          <input
-            type="password"
-            placeholder="********"
-            className={`${inputClass} ${errors.password ? 'border-red-400 focus:ring-red-200' : ''}`}
-            onChange={e => {
-              setForm({ ...form, password: e.target.value });
-              setErrors(prev => ({ ...prev, password: undefined }));
-            }}
-          />
+          <div className="relative">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              placeholder="********"
+              className={`${inputClass} pr-9 ${errors.password ? 'border-red-400 focus:ring-red-200' : ''}`}
+              onChange={e => {
+                setForm({ ...form, password: e.target.value });
+                setErrors(prev => ({ ...prev, password: undefined }));
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(prev => !prev)}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
           {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
         </div>
         <div>
           <label className={labelClass}><Lock className="h-4 w-4" /> Confirm Password</label>
           <div className="relative">
-            <input
-              type="password"
-              placeholder="********"
-              className={`${inputClass} pr-9 ${errors.confirmPassword ? 'border-red-400 focus:ring-red-200' : ''}`}
+          <input
+  type={showConfirmPassword ? 'text' : 'password'}
+  placeholder="********"
+  className={`${inputClass} pr-9 ${errors.confirmPassword ? 'border-red-400 focus:ring-red-200' : ''}`}
               onChange={e => {
                 setForm({ ...form, confirmPassword: e.target.value });
                 setErrors(prev => ({ ...prev, confirmPassword: undefined }));
@@ -296,7 +307,15 @@ const AddUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient
             />
             {form.password.length >= 4 && form.confirmPassword && form.password === form.confirmPassword && (
               <CheckCircle className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
+              
             )}
+             <button
+      type="button"
+      onClick={() => setShowConfirmPassword(prev => !prev)}
+      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+    >
+      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+    </button>
           </div>
           {errors.confirmPassword && <p className="text-xs text-red-500 mt-1">{errors.confirmPassword}</p>}
         </div>
@@ -336,6 +355,7 @@ const AddUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient
         <div className="absolute inset-0 flex items-center justify-center z-10 rounded-lg bg-white/80 backdrop-blur-sm">
           <div className="flex flex-col items-center gap-3 px-8 py-6 rounded-xl shadow-lg bg-white border border-green-100">
             <CheckCircle className="w-10 h-10 text-green-500" />
+            
             <p className="text-base font-semibold text-gray-800 tracking-wide">User created successfully.</p>
           </div>
         </div>

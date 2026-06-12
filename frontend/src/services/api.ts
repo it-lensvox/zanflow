@@ -300,6 +300,11 @@ export const authApi = {
     window.location.href = '/login';
   },
 
+  sendOtp: async (email: string) => {
+    const response = await api.post('/organizations/signup/send-otp/', { email });
+    return response.data;
+  },
+
   register: async (data: OrganizationSignupPayload): Promise<OrganizationSignupResponse> => {
     // 💡 Add these two lines here as well!
     localStorage.removeItem('active_workspace_id');
@@ -1245,8 +1250,10 @@ export class NotificationWebSocketService {
 
           // Check if this is a notification event
           if (message.type === 'SIGNAL' && message.event === 'NEW_NOTIFICATION') {
-            const notificationData: NotificationData = message.data;
-            this.notificationCallbacks.forEach(callback => {
+    const notificationData: NotificationData = message.data;
+    const currentWorkspaceId = parseInt(localStorage.getItem('active_workspace_id') || '0');
+    notificationData._isCurrentWorkspace = notificationData.workspace_id === currentWorkspaceId;
+    this.notificationCallbacks.forEach(callback => {
               try {
                 callback(notificationData);
               } catch (err) {
