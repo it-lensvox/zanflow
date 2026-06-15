@@ -442,6 +442,10 @@ export const documentsApi = {
     status?: string;
     file_type?: string;
     page?: number;
+    page_size?: number;
+    folder?: string;
+    root_only?: boolean;
+    disable_pagination?: boolean;
   }) => {
     const response = await api.get('/documents/', { params });
     return response.data;

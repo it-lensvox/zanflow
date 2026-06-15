@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { workspaceApi } from '@/services/api';
-import { ChevronUp, Check, Plus, Trash2, Users } from 'lucide-react';
+import { ChevronDown, Check, Plus, Trash2, Users } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 // ✅ Updated interface with created_by
@@ -161,12 +161,12 @@ export function WorkspaceSwitcher({ onCreateWorkspace }: WorkspaceSwitcherProps)
         <button
           onClick={() => setIsOpen(!isOpen)}
           disabled={isSwitching}
-          className="flex items-center justify-between w-full gap-2 px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 text-sm"
+          className="flex items-center justify-between w-full gap-2 bg-white  hover:bg-gray-50 transition-colors disabled:opacity-50 text-sm"
         >
           <span className="font-medium truncate">
             {isSwitching ? 'Switching...' : isLoading ? 'Loading...' : (activeWorkspace?.name || 'Select Workspace')}
           </span>
-          <ChevronUp className="w-4 h-4 text-gray-500 flex-shrink-0" />
+          <ChevronDown className="w-18 h-4 text-gray-500 flex-shrink-0" />
         </button>
 
         {/* Dropdown Menu - Opens UPWARD */}
@@ -174,9 +174,9 @@ export function WorkspaceSwitcher({ onCreateWorkspace }: WorkspaceSwitcherProps)
           <div
             className="absolute left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden"
             style={{
-              bottom: 'calc(100% + 8px)',
+              top: 'calc(100% + 8px)',
               zIndex: 9999,
-              minWidth: '100%'
+              width: '240px'
             }}
           >
             {isLoading ? (

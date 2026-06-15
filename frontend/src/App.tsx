@@ -8,6 +8,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { projectsApi, notificationSocket, gatewaySocket } from '@/services/api';
 import { TaskDraftsProvider } from '@/pages/MyTask/Taskdrafts';
+import { MyWork } from '@/pages/MyWork';
 
 // Lazy-loaded page components for route-level code splitting
 const Dashboard = lazy(() => import('@/pages/Dashboard').then(m => ({ default: m.Dashboard })));
@@ -211,8 +212,8 @@ function AppRoutes() {
         }
       >
        <Route path="/dashboard" element={<Dashboard />} />
-<Route path="/my-work" element={<div style={{ padding: 40, color: '#667085', fontSize: 16 }}>My Work — coming soon</div>} />
-        <Route path="/profile" element={<Profile />} />
+       <Route path="/my-work" element={<MyWork />} />
+               <Route path="/profile" element={<Profile />} />
         <Route path="/resetPassword" element={<ResetPassword />} />
         <Route path="/projects" element={<Projects />} />
         <Route path="/projects/:id" element={<ProjectDetailWrapper />} />

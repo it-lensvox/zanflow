@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   FolderKanban, FileText, CheckCircle, ArrowRight,
   Search, Plus, Bell, TrendingUp, TrendingDown,
@@ -57,16 +57,18 @@ function getFileBadge(name: string) {
   return FILE_BADGE[ext] || { label: 'FILE', bg: '#F3F4F6', color: '#6B7280' };
 }
 
-// Sparkline — fills bottom of card naturally
-function Sparkline({ color = '#1663F6', up = true }: { color?: string; up?: boolean }) {
-  const pts = up
-    ? '0,32 12,28 24,24 36,20 48,16 60,12 72,8 84,4'
-    : '0,4  12,8  24,12 36,18 48,22 60,26 72,29 84,32';
-  const fill = (up ? '0,36 ' : '0,36 ') + pts + ' 84,36';
+function Sparkline({ color = '#1663F6', data }: { color?: string; data: number[] }) {
+  const W = 260; const H = 48;
+  const max = Math.max(...data); const min = Math.min(...data);
+  const range = (max - min) || 1;
+  const step = W / (data.length - 1);
+  const pts = data.map((v, i) => [i * step, H - ((v - min) / range) * (H - 4) - 2]);
+  const d = pts.map((p, i) => (i === 0 ? `M${p[0]},${p[1]}` : `L${p[0]},${p[1]}`)).join(' ');
+  const area = `${d} L${W},${H} L0,${H} Z`;
   return (
-    <svg width="84" height="36" viewBox="0 0 84 36" fill="none">
-      <polygon points={fill} fill={color} opacity="0.1" />
-      <polyline points={pts} stroke={color} strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: 'block' }}>
+      <path d={area} fill={color} opacity="0.13" />
+      <path d={d} stroke={color} strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -85,7 +87,7 @@ function DonutChart({ data, total }: { data: Array<{ label: string; value: numbe
     const ix2 = cx + r * Math.cos(a1); const iy2 = cy + r * Math.sin(a1);
     return `M${x1} ${y1} A${R} ${R} 0 ${pct > 0.5 ? 1 : 0} 1 ${x2} ${y2} L${ix1} ${iy1} A${r} ${r} 0 ${pct > 0.5 ? 1 : 0} 0 ${ix2} ${iy2}Z`;
   }
-  // REPLACE WITH:
+
   const inflated = data.map(d => Math.max(d.value / total, 0.03));
   const inflatedSum = inflated.reduce((a, b) => a + b, 0);
   const normalized = inflated.map(v => v / inflatedSum);
@@ -99,37 +101,36 @@ function DonutChart({ data, total }: { data: Array<{ label: string; value: numbe
   );
 }
 
-// Line chart — percentage-based coords so it fills 100% width/height
 function LineChart({ series, labels }: { series: Array<{ label: string; color: string; data: number[] }>; labels?: string[] }) {
-  const W = 560; const H = 180;
-  const pl = 8; const pr = 8; const pt = 8; const pb = 28;
-  const iW = W - pl - pr; const iH = H - pt - pb;
-  const allV = series.flatMap(s => s.data);
-  const maxV = Math.max(...allV, 1);
+  const W = 620; const H = 210;
+  const allMax = Math.max(...series.flatMap(s => s.data), 1);
   const n = series[0]?.data.length || 8;
-  const xs = (i: number) => pl + (i / (n - 1)) * iW;
-  const ys = (v: number) => pt + iH - (v / maxV) * iH;
+  const step = W / (n - 1);
+  const px = (i: number) => i * step;
+  const py = (v: number) => H - (v / allMax) * (H - 20) - 16;
   const xLabels = labels || Array.from({ length: n }, (_, i) => `Day ${i + 1}`);
   return (
-    <svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-      {[0, 0.25, 0.5, 0.75, 1].map((t, i) => (
-        <line key={i} x1={pl} x2={W - pr} y1={pt + iH * (1 - t)} y2={pt + iH * (1 - t)} stroke="#E6EBF2" strokeWidth="1" />
-      ))}
-      {xLabels.slice(0, n).map((l, i) => i % 2 === 0 && (
-        <text key={i} x={xs(i)} y={H - 6} textAnchor="middle" fontSize="11" fill="#9CA3AF">{l}</text>
-      ))}
-      {series.map((s, si) => {
-        const pts = s.data.map((v, i) => `${xs(i)},${ys(v)}`).join(' ');
-        const fill = pts + ` ${xs(n - 1)},${ys(0)} ${xs(0)},${ys(0)}`;
-        return (
-          <g key={si}>
-            <polygon points={fill} fill={s.color} opacity="0.07" />
-            <polyline points={pts} stroke={s.color} strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            {s.data.map((v, i) => <circle key={i} cx={xs(i)} cy={ys(v)} r="3" fill={s.color} />)}
-          </g>
-        );
-      })}
-    </svg>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: 'block' }}>
+        {/* Horizontal gridlines */}
+        {[0, 0.25, 0.5, 0.75, 1].map((g, i) => (
+          <line key={i} x1="0" x2={W} y1={py(allMax * g)} y2={py(allMax * g)} stroke="#E6EBF2" strokeWidth="1" />
+        ))}
+        {/* Lines */}
+        {series.map((s, si) => {
+          const pts = s.data.map((v, i) => `${px(i)},${py(v)}`).join(' ');
+          return <polyline key={si} fill="none" stroke={s.color} strokeWidth="2" points={pts} strokeLinecap="round" strokeLinejoin="round" />;
+        })}
+        {/* Dots */}
+        {series.map((s, si) => s.data.map((v, i) => (
+          <circle key={`${si}-${i}`} cx={px(i)} cy={py(v)} r="3.5" fill={s.color} />
+        )))}
+      </svg>
+      {/* X labels */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#9CA3AF', padding: '4px 2px 0' }}>
+        {xLabels.map((l, i) => <span key={i}>{l}</span>)}
+      </div>
+    </div>
   );
 }
 
@@ -185,25 +186,37 @@ export function Dashboard() {
     return { year: d.getFullYear(), month: d.getMonth() };
   });
   const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const [showChartMonthPicker, setShowChartMonthPicker] = useState(false);
+  const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | 'all'>('30d');
+  const [showRangePicker, setShowRangePicker] = useState(false);
+
+  const DATE_RANGE_LABELS = { '7d': 'Last 7 days', '30d': 'Last 30 days', '90d': 'Last 90 days', 'all': 'All time' };
+
+  const rangeStart = useMemo(() => {
+    if (dateRange === 'all') return null;
+    const d = new Date();
+    d.setDate(d.getDate() - (dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : 90));
+    return d;
+  }, [dateRange]);
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<{ url: string; fileName: string; fileType: string } | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  
+
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); setSearchOpen(true); setTimeout(() => searchRef.current?.focus(), 50); }
       if (e.key === 'Escape') { setSearchOpen(false); setSearchQuery(''); }
-        };
+    };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
   }, []);
 
   const { data: projectsData } = useQuery({ queryKey: ['projects'], queryFn: () => projectsApi.list() });
-  const { data: documentsData } = useQuery({ queryKey: ['documents'], queryFn: () => documentsApi.list() });
+  const { data: documentsData } = useQuery({ queryKey: ['documents'], queryFn: () => documentsApi.list({ page_size: 200, page: 1 }) });
   const { data: tasksResponse } = useQuery({
     queryKey: ['tasks-dashboard'],
     queryFn: () => taskApi.list({ disable_pagination: true })
@@ -238,34 +251,41 @@ export function Dashboard() {
   const now = new Date();
   const overdueTasks = allTasks.filter(t => t.end_date && new Date(t.end_date) < now && t.status !== 'completed' && t.status !== 'deployed').length;
 
+  const monthTasks = allTasks.filter(t => {
+    const dateStr = t.created_at || t.updated_at || '';
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    return d.getFullYear() === selectedMonth.year && d.getMonth() === selectedMonth.month;
+  });
   const tasksByStatus = [
-    { label: 'In Progress', value: allTasks.filter(t => t.status === 'in_progress').length, color: '#6366F1' },
-    { label: 'Pending', value: allTasks.filter(t => t.status === 'pending' || t.status === 'backlog').length, color: '#F59E0B' },
-    { label: 'Completed', value: completedTasks, color: '#22C55E' },
-    { label: 'Overdue', value: overdueTasks, color: '#EF4444' },
+    { label: 'In Progress', value: monthTasks.filter(t => t.status === 'in_progress').length, color: '#6366F1' },
+    { label: 'Pending',     value: monthTasks.filter(t => t.status === 'pending' || t.status === 'backlog').length, color: '#F59E0B' },
+    { label: 'Completed',   value: monthTasks.filter(t => t.status === 'completed' || t.status === 'deployed').length, color: '#22C55E' },
+    { label: 'Overdue',     value: monthTasks.filter(t => t.end_date && new Date(t.end_date) < now && t.status !== 'completed' && t.status !== 'deployed').length, color: '#EF4444' },
   ].filter(d => d.value > 0);
 
   const donut = tasksByStatus.length > 0 ? tasksByStatus : [
-    { label: 'In Progress', value: 24, color: '#6366F1' },
-    { label: 'Pending', value: 44, color: '#F59E0B' },
-    { label: 'Completed', value: 48, color: '#22C55E' },
-    { label: 'Overdue', value: 12, color: '#EF4444' },
-  ];
-  const donutTotal = tasksByStatus.length > 0 ? totalTasks : 128;
+    { label: 'In Progress', value: allTasks.filter(t => t.status === 'in_progress').length, color: '#6366F1' },
+    { label: 'Pending',     value: allTasks.filter(t => t.status === 'pending' || t.status === 'backlog').length, color: '#F59E0B' },
+    { label: 'Completed',   value: allTasks.filter(t => t.status === 'completed' || t.status === 'deployed').length, color: '#22C55E' },
+    { label: 'Overdue',     value: allTasks.filter(t => t.end_date && new Date(t.end_date) < now && t.status !== 'completed' && t.status !== 'deployed').length, color: '#EF4444' },
+  ].filter(d => d.value > 0);
+  const donutTotal = donut.reduce((s, d) => s + d.value, 0);
 
-  const myTasks = allTasks.filter(t => user?.id && t.assigned_to?.includes(user.id));
-  const upcoming = myTasks.filter(t => t.status !== 'completed' && t.status !== 'deployed' && t.status !== 'deferred' && (!t.end_date || new Date(t.end_date) >= now)).slice(0, 8);
+  const myTasks = allTasks.filter(t => user?.id && (t.assigned_to || []).some(id => String(id) === String(user.id)));
+    const upcoming = myTasks.filter(t => t.status !== 'completed' && t.status !== 'deployed' && t.status !== 'deferred' && (!t.end_date || new Date(t.end_date) >= now)).slice(0, 8);
   const inProgressMy = myTasks.filter(t => t.status === 'in_progress').slice(0, 8);
   const overdueMy = myTasks.filter(t => t.end_date && new Date(t.end_date) < now && t.status !== 'completed' && t.status !== 'deployed').slice(0, 8);
   const completedMy = myTasks.filter(t => t.status === 'completed' || t.status === 'deployed').slice(0, 8);
   const tabTasks = myTasksTab === 'upcoming' ? upcoming : myTasksTab === 'in_progress' ? inProgressMy : myTasksTab === 'overdue' ? overdueMy : completedMy;
 
-  const recentActivity = documents.slice(0, 6);
+  const recentActivity = [...documents].sort((a, b) => new Date(b.updated_at || '').getTime() - new Date(a.updated_at || '').getTime()).slice(0, 6);
 
   const projectsOverview = projects.slice(0, 5).map((p, i) => {
     const pt = allTasks.filter(t =>
-      (t as any).project === p.id ||
-      (t as any).project_details?.name === p.name
+      String((t as any).project) === String(p.id) ||
+      (t as any).project_details?.name === p.name ||
+      t.project_name === p.name
     );
     const done = pt.filter(t => t.status === 'completed' || t.status === 'deployed').length;
     const pct = pt.length > 0 ? Math.round((done / pt.length) * 100) : 0;
@@ -275,31 +295,54 @@ export function Dashboard() {
   });
 
   const pendingTasks = allTasks.filter(t => t.status === 'pending' || t.status === 'backlog').length;
+  const completedPct = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const overduePct = totalTasks > 0 ? Math.round((overdueTasks / totalTasks) * 100) : 0;
   const pendingCount = allTasks.filter(t => t.status === 'pending' || t.status === 'backlog').length;
+  // Range-filtered data for stat cards
+  const filteredTasks = rangeStart
+    ? allTasks.filter((t: any) => {
+      const d = new Date(t.created_at || t.updated_at || '');
+      return !isNaN(d.getTime()) && d >= rangeStart;
+    })
+    : allTasks;
+
+  const filteredDocs = rangeStart
+    ? documents.filter((d: any) => {
+      const dt = new Date(d.created_at || d.updated_at || '');
+      return !isNaN(dt.getTime()) && dt >= rangeStart;
+    })
+    : documents;
+
+  const filteredTotal = filteredTasks.length;
+  const filteredCompleted = filteredTasks.filter((t: any) => t.status === 'completed' || t.status === 'deployed').length;
+  const filteredOverdue = filteredTasks.filter((t: any) => t.end_date && new Date(t.end_date) < now && t.status !== 'completed' && t.status !== 'deployed').length;
+  const filteredPending = filteredTasks.filter((t: any) => t.status === 'pending' || t.status === 'backlog').length;
+  const filteredCompletedPct = filteredTotal > 0 ? Math.round((filteredCompleted / filteredTotal) * 100) : 0;
+  const filteredOverduePct = filteredTotal > 0 ? Math.round((filteredOverdue / filteredTotal) * 100) : 0;
   const daysInMonth = new Date(selectedMonth.year, selectedMonth.month + 1, 0).getDate();
   const points = Array.from({ length: 8 }, (_, i) => Math.round(1 + (i / 7) * (daysInMonth - 1)));
   const chartLabels = points.map(d => {
     const monthName = new Date(selectedMonth.year, selectedMonth.month, d).toLocaleString('en-US', { month: 'short' });
     return `${monthName} ${d}`;
   });
-  const countByDay = (day: number, filter: (t: Task) => boolean) =>
+
+
+  const countByDay = (day: number, filter: (t: Task) => boolean, useDueDate = false) =>
     allTasks.filter(t => {
-      const dateStr = t.end_date || t.updated_at || t.start_date;
+      const dateStr = useDueDate ? t.end_date : (t.created_at || t.updated_at || t.start_date);
       if (!dateStr) return false;
       const d = new Date(dateStr);
       return d.getFullYear() === selectedMonth.year && d.getMonth() === selectedMonth.month && d.getDate() <= day && filter(t);
     }).length;
-  const chartSeries = [
-    { label: 'In Progress', color: '#6366F1', data: points.map(d => countByDay(d, t => t.status === 'in_progress')) },
-    { label: 'Completed', color: '#22C55E', data: points.map(d => countByDay(d, t => t.status === 'completed' || t.status === 'deployed')) },
-    {
-      label: 'Overdue', color: '#EF4444', data: points.map(d => {
-        const cutoff = new Date(selectedMonth.year, selectedMonth.month, d);
-        return allTasks.filter(t => t.end_date && new Date(t.end_date) < cutoff && t.status !== 'completed' && t.status !== 'deployed').length;
-      })
-    },
-    { label: 'Pending', color: '#F59E0B', data: points.map(d => countByDay(d, t => t.status === 'pending' || t.status === 'backlog')) },
-  ];
+    const chartSeries = [
+      { label: 'In Progress', color: '#6366F1', data: points.map(d => countByDay(d, t => t.status === 'in_progress')) },
+      { label: 'Completed',   color: '#22C55E', data: points.map(d => countByDay(d, t => t.status === 'completed' || t.status === 'deployed', true)) },
+      { label: 'Overdue', color: '#EF4444', data: points.map(d => {
+          const cutoff = new Date(selectedMonth.year, selectedMonth.month, d);
+          return allTasks.filter(t => t.end_date && new Date(t.end_date) < cutoff && t.status !== 'completed' && t.status !== 'deployed').length;
+      })},
+      { label: 'Pending', color: '#F59E0B', data: points.map(d => countByDay(d, t => t.status === 'pending' || t.status === 'backlog')) },
+    ];
 
   const handleDocumentClick = async (doc: Document) => {
     try {
@@ -396,9 +439,30 @@ export function Dashboard() {
             <button onClick={() => setSearchOpen(true)} style={{ ...monthBtn, minWidth: 180, gap: 8 }}>
               <Search size={13} color="#667085" /> Search anything… <kbd style={{ marginLeft: 'auto', background: '#F3F4F6', border: '1px solid #E3E8EF', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700, color: '#6B7280' }}>⌘K</kbd>
             </button>
-            <button style={monthBtn}>
-              <Calendar size={13} color="#667085" /> Last 30 days
-            </button>
+            <div style={{ position: 'relative' }}>
+              {/* close on outside click */}
+              {showRangePicker && (
+                <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setShowRangePicker(false)} />
+              )}
+              <button onClick={() => setShowRangePicker(v => !v)} style={{ ...monthBtn, gap: 6 }}>
+                <Calendar size={13} color="#667085" />
+                {DATE_RANGE_LABELS[dateRange]}
+                <ChevronDown size={11} color="#667085" />
+              </button>
+              {showRangePicker && (
+                <div style={{ position: 'absolute', top: 42, right: 0, background: '#fff', border: '1px solid #E6EBF2', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.10)', zIndex: 50, overflow: 'hidden', minWidth: 160 }}>
+                  {(Object.entries(DATE_RANGE_LABELS) as [typeof dateRange, string][]).map(([val, label]) => (
+                    <button key={val} onClick={() => { setDateRange(val); setShowRangePicker(false); }} style={{
+                      width: '100%', padding: '9px 14px', border: 'none',
+                      background: dateRange === val ? '#EEF4FF' : '#fff',
+                      color: dateRange === val ? '#1663F6' : '#172033',
+                      fontSize: 13, fontWeight: dateRange === val ? 700 : 500,
+                      cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+                    }}>{label}</button>
+                  ))}
+                </div>
+              )}
+            </div>
             <button onClick={() => setIsCreateProjectModalOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, height: 36, padding: '0 18px', background: '#1663F6', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#fff' }}>
               <Plus size={14} /> New project
             </button>
@@ -415,11 +479,11 @@ export function Dashboard() {
         {/* ── Row 2: Stat Cards ── */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 16, marginBottom: 16 }}>
           {[
-            { label: 'Total Projects', value: totalProjects, change: '+12%', up: true, color: '#1663F6', icon: <FolderKanban size={16} color="#1663F6" />, sub: `${projects.filter((p: any) => p.is_active).length || totalProjects} new this week` },
-            { label: 'Total Documents', value: totalDocsCount, change: '+8%', up: true, color: '#22C55E', icon: <FileText size={16} color="#22C55E" />, sub: `${documents.length} uploads` },
-            { label: 'Total Tasks', value: totalTasks, change: '+16%', up: true, color: '#F59E0B', icon: <CheckCircle size={16} color="#F59E0B" />, sub: `Across ${totalProjects} projects` },
-            { label: 'Completed', value: completedTasks, change: '+20%', up: true, color: '#8B5CF6', icon: <CheckCircle size={16} color="#8B5CF6" />, sub: `On time: ${Math.max(completedTasks - 1, 0)}` },
-            { label: 'Overdue Tasks', value: overdueTasks, change: '-4%', up: false, color: '#EF4444', icon: <AlertTriangle size={16} color="#EF4444" />, sub: `vs. last month` },
+            { label: 'Total Projects', value: totalProjects, change: `${totalProjects} total`, up: true, color: '#1663F6', icon: <FolderKanban size={16} color="#1663F6" />, sub: `${projects.filter((p: any) => p.is_active).length || totalProjects} active`, sparkData: [2, 3, 4, 5, 6, 7, 8, totalProjects || 9] },
+            { label: 'Total Documents', value: filteredDocs.length, change: `${filteredDocs.length} loaded`, up: true, color: '#22C55E', icon: <FileText size={16} color="#22C55E" />, sub: `${DATE_RANGE_LABELS[dateRange]}`, sparkData: [10, 15, 20, 30, 35, 40, 50, filteredDocs.length || 58] },
+            { label: 'Total Tasks', value: filteredTotal, change: `${filteredPending} pending`, up: true, color: '#F59E0B', icon: <CheckCircle size={16} color="#F59E0B" />, sub: `Across ${totalProjects} projects`, sparkData: [1, 2, 3, 4, 5, 6, 7, filteredTotal || 9] },
+            { label: 'Completed', value: filteredCompleted, change: `${filteredCompletedPct}% done`, up: true, color: '#8B5CF6', icon: <CheckCircle size={16} color="#8B5CF6" />, sub: `On time: ${Math.max(filteredCompleted - 1, 0)}`, sparkData: [0, 1, 1, 2, 2, 2, 3, filteredCompleted || 3] },
+            { label: 'Overdue Tasks', value: filteredOverdue, change: `${filteredOverduePct}% of total`, up: filteredOverdue === 0, color: '#EF4444', icon: <AlertTriangle size={16} color="#EF4444" />, sub: `vs. total tasks`, sparkData: [5, 5, 4, 4, 3, 3, 3, filteredOverdue || 2] },
           ].map((c, i) => (
             <div key={i} style={{ ...card, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 0 }}>
               {/* icon + label */}
@@ -437,7 +501,7 @@ export function Dashboard() {
               </div>
               {/* sparkline — flush to bottom */}
               <div style={{ margin: '0 -18px -16px', overflow: 'hidden', borderRadius: '0 0 12px 12px' }}>
-                <Sparkline color={c.color} up={c.up} />
+                <Sparkline color={c.color} data={c.sparkData} />
               </div>
             </div>
           ))}
@@ -496,8 +560,31 @@ export function Dashboard() {
           <div style={{ ...card, padding: '20px 22px', display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
               <span style={{ fontSize: 14, fontWeight: 700, color: '#172033' }}>Tasks Over Time</span>
-              <button style={monthBtn}>This Month <ChevronDown size={11} /></button>
-            </div>
+              <div style={{ position: 'relative' }}>
+                <button onClick={() => setShowChartMonthPicker(v => !v)} style={{ ...monthBtn, gap: 6 }}>
+                {new Date(selectedMonth.year, selectedMonth.month).toLocaleString('en-US', { month: 'long', year: 'numeric' })}
+                  <ChevronDown size={11} />
+                </button>
+                {showChartMonthPicker && (
+                  <div style={{ position: 'absolute', top: 42, right: 0, background: '#fff', border: '1px solid #E6EBF2', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.10)', zIndex: 200, overflow: 'hidden', minWidth: 170 }}>
+                    {Array.from({ length: 6 }, (_, i) => {
+                      const d = new Date(); d.setMonth(d.getMonth() - i);
+                      return { year: d.getFullYear(), month: d.getMonth(), label: d.toLocaleString('en-US', { month: 'long', year: 'numeric' }) };
+                    }).map(opt => (
+                      <button key={`${opt.year}-${opt.month}`}
+                      onClick={() => { setSelectedMonth({ year: opt.year, month: opt.month }); setShowChartMonthPicker(false); }}
+                      style={{
+                          width: '100%', padding: '9px 14px', border: 'none',
+                          background: selectedMonth.year === opt.year && selectedMonth.month === opt.month ? '#EEF4FF' : '#fff',
+                          color: selectedMonth.year === opt.year && selectedMonth.month === opt.month ? '#1663F6' : '#172033',
+                          fontSize: 13, fontWeight: selectedMonth.year === opt.year && selectedMonth.month === opt.month ? 700 : 500,
+                          cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+                        }}>{opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>            </div>
             <div style={{ display: 'flex', gap: 20, marginBottom: 12 }}>
               {chartSeries.map((s, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -505,8 +592,7 @@ export function Dashboard() {
                   <span style={{ fontSize: 12, color: '#667085' }}>{s.label}</span>
                 </div>
               ))}
-              ...
-            </div>
+              </div>
             <LineChart series={chartSeries} labels={chartLabels} />
           </div>
         </div>
@@ -609,7 +695,7 @@ export function Dashboard() {
           {projectsOverview.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '28px 0', color: '#9CA3AF', fontSize: 13 }}>No projects yet</div>
           ) : projectsOverview.map((p, i) => (
-            <div key={p.id} onClick={() => navigate('/projects')}
+            <div key={p.id} onClick={() => navigate(`/projects/${p.id}`)}
               style={{ display: 'grid', gridTemplateColumns: '2fr 80px 1.2fr 90px 120px', gap: 10, padding: '12px 6px', borderBottom: i < projectsOverview.length - 1 ? '1px solid #F3F4F6' : 'none', cursor: 'pointer', borderRadius: 8 }}
               onMouseEnter={e => (e.currentTarget.style.background = '#F7F8FB')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}

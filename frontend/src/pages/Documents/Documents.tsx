@@ -13,7 +13,7 @@ import {
 import { API_URL } from '@/services/api';
 import { Button, Card, CardContent, Input } from '@/components/common';
 import { documentsApi, projectsApi, usersApi } from '@/services/api';
-import type { Document, Project, DocumentStatus } from '@/types';
+import type { Document, Project, DocumentStatus, Label } from '@/types';
 import { ViewToggle, DualView, useViewMode } from '@/components/layout/DualView';
 import type { TableColumn } from '@/components/layout/DualView';
 import { createDocumentsTableColumns, DocumentGridCard } from '@/components/layout/DualView/documentsConfig';
@@ -1491,11 +1491,11 @@ function TagSelectorModal({
   });
   const [selectedTags, setSelectedTags] = useState<number[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);  
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [deletingLabelId, setDeletingLabelId] = useState<number | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: number; name: string } | null>(null);
-    const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
   const [newLabelName, setNewLabelName] = useState('');
   const [newLabelColor, setNewLabelColor] = useState('#3B82F6'); // Default blue
   const [isCreating, setIsCreating] = useState(false);
@@ -1633,9 +1633,9 @@ function TagSelectorModal({
       setShowCreateForm(false);
 
       setSuccessMessage(`Label "${newLabel.name}" created! You can now select it.`);
-            setTimeout(() => setSuccessMessage(''), 3000);
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (error: any) {
-      
+
       setSuccessMessage(`Failed: ${error.message || 'Failed to create label'}`);
     } finally {
       setIsCreating(false);
@@ -2299,21 +2299,30 @@ export function Documents() {
   }, [tagsData]);
   // Existing query for displaying documents (filtered)
   const { data: allDocumentsData, isLoading } = useQuery({
-    queryKey: ['documents', 'all', projectFilter, fileTypeFilter, currentPage, selectedTreeFolderId],
+    queryKey: ['documents', 'all', projectFilter, fileTypeFilter, currentPage, selectedTreeFolderId, searchTerm],
     queryFn: () => {
+      // When searching — fetch ALL docs across all folders, ignore pagination
+      if (searchTerm.trim()) {
+        const params: any = {
+          page_size: 500,
+          page: 1,
+          file_type: fileTypeFilter || undefined,
+          status: statusFilter || undefined,
+        };
+        if (projectFilter) params.project = Number(projectFilter);
+        return documentsApi.list(params);
+      }
       const params: any = {
         page: currentPage,
         file_type: fileTypeFilter || undefined,
         status: statusFilter || undefined,
       };
-
       if (selectedTreeFolderId) {
         params.folder = selectedTreeFolderId;
       } else if (projectFilter) {
         params.project = Number(projectFilter);
         params.root_only = true;
       }
-
       return documentsApi.list(params);
     },
     enabled: true,
@@ -2530,8 +2539,26 @@ export function Documents() {
       return { ...d, name: dn, project_name: projectLookup[d.project] || d.project_name || 'General' };
     }).filter((d: Document) => {
       if (statusFilter && d.status !== statusFilter) return false;
-      if (searchTerm && !d.name.toLowerCase().includes(searchTerm.toLowerCase())) return false; return true;
-    }).sort((a: Document, b: Document) => new Date(b[sortBy]).getTime() - new Date(a[sortBy]).getTime());
+      if (searchTerm) {
+        const q = searchTerm.toLowerCase();
+        const matchesName     = (d.name || '').toLowerCase().includes(q);
+        const matchesProject  = (d as any).project_name?.toLowerCase().includes(q) || 
+                                (d as any).project_details?.name?.toLowerCase().includes(q);
+                                const matchesTags = (d.labels || []).some((t: Label) => 
+                                  (t.name || '').toLowerCase().includes(q)
+                                );
+        const matchesStatus   = (d.status || '').toLowerCase().includes(q);
+        const matchesOwner    = (d as any).uploaded_by_details?.username?.toLowerCase().includes(q) ||
+                                (d as any).uploaded_by_details?.first_name?.toLowerCase().includes(q) ||
+                                (d as any).uploaded_by_details?.last_name?.toLowerCase().includes(q) ||
+                                (d as any).owner?.username?.toLowerCase().includes(q);
+        const matchesShared   = (d as any).shared_with?.some((u: any) => 
+                                  (u.username || u.first_name || '').toLowerCase().includes(q));
+        const matchesUpdated  = (d.updated_at || '').toLowerCase().includes(q);
+        if (!matchesName && !matchesProject && !matchesTags && !matchesStatus && !matchesOwner && !matchesShared && !matchesUpdated) return false;
+      }
+      return true;
+        }).sort((a: Document, b: Document) => new Date(b[sortBy]).getTime() - new Date(a[sortBy]).getTime());
   })();
 
   const backendFolders = (foldersData || []) as { id: string; project: number; parent: string | null; name: string; is_system_generated?: boolean; document_count?: number; created_at: string }[];
@@ -2812,27 +2839,37 @@ export function Documents() {
                   <Network className="w-4 h-4" />
                 </button>
               </div>
-              <button className="relative" style={{ padding: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }} onClick={() => setIsActivityOpen(!isActivityOpen)}>
+              {/* <button className="relative" style={{ padding: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }} onClick={() => setIsActivityOpen(!isActivityOpen)}>
                 <Bell className="h-5 w-5" />{unreadCount > 0 && <span className="absolute rounded-full" style={{ top: 4, right: 4, width: 8, height: 8, background: '#EF4444' }} />}
-              </button>
+              </button> */}
             </div>
           </div>
-          <div className="relative mb-4">
-            <Search className="absolute h-4 w-4" style={{ left: 12, top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
-            <input type="text" placeholder="Search documents by name, content, tags, or owner..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ width: '100%', padding: '10px 40px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, background: '#f9fafb', outline: 'none', fontFamily: 'inherit' }}
-              onFocus={(e) => { e.currentTarget.style.borderColor = '#4169FF'; e.currentTarget.style.background = '#fff'; }} onBlur={(e) => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.background = '#f9fafb'; }} />
-            <span className="absolute rounded" style={{ right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: '#6b7280', background: '#fff', padding: '2px 6px', border: '1px solid #e5e7eb' }}>⌘ K</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <select value={projectFilter} onChange={(e) => updateFilter('project', e.target.value)} style={{ padding: '8px 32px 8px 12px', border: '1px solid #e5e7eb', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 14, appearance: 'none' as const, backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M3 5L6 8L9 5' stroke='%236B7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")", backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center', fontFamily: 'inherit', color: '#1a1a1a' }}>
-              <option value="">All Projects</option>{projects.map((p: Project) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-            <select value={fileTypeFilter} onChange={(e) => updateFilter('file_type', e.target.value)} style={{ padding: '8px 32px 8px 12px', border: '1px solid #e5e7eb', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 14, appearance: 'none' as const, backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M3 5L6 8L9 5' stroke='%236B7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")", backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center', fontFamily: 'inherit', color: '#1a1a1a' }}>
-              {FILE_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-            <button className="flex items-center gap-2 rounded-md" style={{ padding: '8px 12px', border: '1px solid #e5e7eb', background: '#fff', fontSize: 14, cursor: 'pointer', color: '#1a1a1a' }} onMouseEnter={(e) => { e.currentTarget.style.background = '#f3f4f6'; }} onMouseLeave={(e) => { e.currentTarget.style.background = '#fff'; }} onClick={() => setShowFilters(!showFilters)}><Filter className="w-3.5 h-3.5" /> Filters</button>
-            {/* <button className="flex items-center justify-center rounded-full" style={{ width: 32, height: 32, background: '#4169FF', color: '#fff', border: 'none', fontWeight: 600, cursor: 'pointer' }}>?</button> */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+            {/* Search — 65% width */}
+            <div style={{ flex: '0 0 65%', position: 'relative' }}>
+              <Search className="absolute h-4 w-4" style={{ left: 12, top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
+              <input type="text" placeholder="Search documents by name, content, tags, or owner..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+                style={{ width: '100%', padding: '10px 40px', border: '1px solid #e5e7eb', borderRadius: 8, fontSize: 14, background: '#f9fafb', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' as const }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = '#4169FF'; e.currentTarget.style.background = '#fff'; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.background = '#f9fafb'; }} />
+              <span className="absolute rounded" style={{ right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: '#6b7280', background: '#fff', padding: '2px 6px', border: '1px solid #e5e7eb' }}>⌘ K</span>
+            </div>
+
+            {/* Filters — remaining 35% */}
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <select value={projectFilter} onChange={(e) => updateFilter('project', e.target.value)} style={{ flex: 1, padding: '10px 28px 10px 10px', border: '1px solid #e5e7eb', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 13, appearance: 'none' as const, backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M3 5L6 8L9 5' stroke='%236B7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")", backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', fontFamily: 'inherit', color: '#1a1a1a' }}>
+                <option value="">All Projects</option>{projects.map((p: Project) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <select value={fileTypeFilter} onChange={(e) => updateFilter('file_type', e.target.value)} style={{ flex: 1, padding: '10px 28px 10px 10px', border: '1px solid #e5e7eb', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 13, appearance: 'none' as const, backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M3 5L6 8L9 5' stroke='%236B7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")", backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', fontFamily: 'inherit', color: '#1a1a1a' }}>
+                {FILE_TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              <button className="flex items-center gap-2 rounded-md" style={{ padding: '10px 12px', border: '1px solid #e5e7eb', background: '#fff', fontSize: 13, cursor: 'pointer', color: '#1a1a1a', whiteSpace: 'nowrap' as const }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#f3f4f6'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#fff'; }}
+                onClick={() => setShowFilters(!showFilters)}>
+                <Filter className="w-3.5 h-3.5" /> Filters
+              </button>
+            </div>
           </div>
         </div>
 
@@ -3326,11 +3363,11 @@ export function Documents() {
               </div>
             </div>
 
-        {/* Footer */}
-        <div
-          className="flex items-center justify-end gap-3 px-6 py-4"
-          style={{ borderTop: '1px solid #e5e7eb' }}
-        >
+            {/* Footer */}
+            <div
+              className="flex items-center justify-end gap-3 px-6 py-4"
+              style={{ borderTop: '1px solid #e5e7eb' }}
+            >
               <button
                 onClick={() => {
                   setShowNewDocModal(false);

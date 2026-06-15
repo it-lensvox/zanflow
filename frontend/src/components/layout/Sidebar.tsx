@@ -301,7 +301,14 @@ export function Sidebar() {
             onClick={handleLogoClick}
           >
             DYUKSA
+
+            {isExpanded && (
+          <div className="border-b px-0 py-0">
+            <WorkspaceSwitcher onCreateWorkspace={() => setShowCreateWorkspaceModal(true)} />
+          </div>
+        )}
           </span>
+          
         )}
       </div>
 
@@ -550,12 +557,8 @@ export function Sidebar() {
           )}
         </div>
 
-        {/* ✅ Workspace Section - Only visible when expanded */}
-        {isExpanded && (
-          <div className="border-b px-4 py-3">
-            <WorkspaceSwitcher onCreateWorkspace={() => setShowCreateWorkspaceModal(true)} />
-          </div>
-        )}
+        
+        
 
         {/* ✅ New Workspace Button - Only for admin/manager */}
         {isExpanded && (
