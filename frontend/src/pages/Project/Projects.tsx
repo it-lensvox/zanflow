@@ -521,7 +521,6 @@ export function Projects() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { unreadCount } = useNotifications();
-  const { isActivityOpen, setIsActivityOpen } = useOutletContext<{ isActivityOpen: boolean; setIsActivityOpen: (o: boolean) => void }>();
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [typeFilter, setTypeFilter] = useState('');
