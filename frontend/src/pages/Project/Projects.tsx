@@ -244,14 +244,14 @@ function TreePanel({ projects, selected, selectedGroup, onSelect, onSelectGroup,
       </div>
 
       {/* New Folder */}
-      <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: BLUE, fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
+      {/* <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: BLUE, fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <Plus className="w-3.5 h-3.5" />New Folder
         </span>
         <div style={{ width: 32, height: 32, border: `1px solid ${LINE}`, borderRadius: 8, display: 'grid', placeItems: 'center', color: MUTED }}>
           <Settings className="w-3.5 h-3.5" />
         </div>
-      </div>
+      </div> */}
     </div>
   );
 }
