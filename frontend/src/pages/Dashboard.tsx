@@ -188,10 +188,9 @@ export function Dashboard() {
     const d = new Date();
     return { year: d.getFullYear(), month: d.getMonth() };
   });
-  const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [showChartMonthPicker, setShowChartMonthPicker] = useState(false);
-  const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | 'all'>('30d');
-  const [showRangePicker, setShowRangePicker] = useState(false);
+  const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | 'all'>('all');
+    const [showRangePicker, setShowRangePicker] = useState(false);
 
   const DATE_RANGE_LABELS = { '7d': 'Last 7 days', '30d': 'Last 30 days', '90d': 'Last 90 days', 'all': 'All time' };
 
@@ -248,7 +247,6 @@ export function Dashboard() {
   };
 
   const totalProjects = projects.length;
-  const totalDocs = documents.length;
   const totalTasks = allTasks.length;
   const completedTasks = allTasks.filter(t => t.status === 'completed' || t.status === 'deployed').length;
   const now = new Date();
@@ -294,15 +292,8 @@ export function Dashboard() {
 
   const pendingTasks = allTasks.filter(t => t.status === 'pending' || t.status === 'backlog').length;
   const completedPct = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-  const overduePct = totalTasks > 0 ? Math.round((overdueTasks / totalTasks) * 100) : 0;
-  const pendingCount = allTasks.filter(t => t.status === 'pending' || t.status === 'backlog').length;
-  // Range-filtered data for stat cards
-  const filteredTasks = rangeStart
-    ? allTasks.filter((t: any) => {
-      const d = new Date(t.created_at || t.updated_at || '');
-      return !isNaN(d.getTime()) && d >= rangeStart;
-    })
-    : allTasks;
+  const overduePct = totalTasks > 0 ? Math.round((overdueTasks / totalTasks) * 100) : 0;  // Range-filtered data for stat cards
+
 
   const filteredDocs = rangeStart
     ? documents.filter((d: any) => {
@@ -311,12 +302,6 @@ export function Dashboard() {
     })
     : documents;
 
-  const filteredTotal = filteredTasks.length;
-  const filteredCompleted = filteredTasks.filter((t: any) => t.status === 'completed' || t.status === 'deployed').length;
-  const filteredOverdue = filteredTasks.filter((t: any) => t.end_date && new Date(t.end_date) < now && t.status !== 'completed' && t.status !== 'deployed').length;
-  const filteredPending = filteredTasks.filter((t: any) => t.status === 'pending' || t.status === 'backlog').length;
-  const filteredCompletedPct = filteredTotal > 0 ? Math.round((filteredCompleted / filteredTotal) * 100) : 0;
-  const filteredOverduePct = filteredTotal > 0 ? Math.round((filteredOverdue / filteredTotal) * 100) : 0;
   const daysInMonth = new Date(selectedMonth.year, selectedMonth.month + 1, 0).getDate();
   const points = Array.from({ length: 8 }, (_, i) => Math.round(1 + (i / 7) * (daysInMonth - 1)));
   const chartLabels = points.map(d => {
@@ -480,7 +465,7 @@ export function Dashboard() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 16, marginBottom: 16 }}>
           {[
             { label: 'Total Projects',  value: totalProjects,   change: `${totalProjects} total`,          up: true,                  color: '#1663F6', icon: <FolderKanban size={16} color="#1663F6" />, sub: `${projects.filter((p: any) => p.is_active).length || totalProjects} active`, sparkData: [2, 3, 4, 5, 6, 7, 8, totalProjects || 9] },
-            { label: 'Total Documents', value: totalDocsCount,  change: `${filteredDocs.length} this period`, up: true,               color: '#22C55E', icon: <FileText size={16} color="#22C55E" />,         sub: DATE_RANGE_LABELS[dateRange],                                                  sparkData: [10, 15, 20, 30, 35, 40, 50, totalDocsCount || 58] },
+            { label: 'Total Documents', value: totalDocsCount,  change: dateRange === 'all' ? `${totalDocsCount} total` : `${filteredDocs.length} in period`, up: true, color: '#22C55E', icon: <FileText size={16} color="#22C55E" />, sub: dateRange === 'all' ? 'all time' : DATE_RANGE_LABELS[dateRange], sparkData: [10, 15, 20, 30, 35, 40, 50, totalDocsCount || 1] },
             { label: 'Total Tasks',     value: totalTasks,      change: `${pendingTasks} pending`,           up: true,                color: '#F59E0B', icon: <CheckCircle size={16} color="#F59E0B" />,       sub: `Across ${totalProjects} projects`,                                            sparkData: [1, 2, 3, 4, 5, 6, 7, totalTasks || 9] },
             { label: 'Completed',       value: completedTasks,  change: `${completedPct}% done`,             up: true,                color: '#8B5CF6', icon: <CheckCircle size={16} color="#8B5CF6" />,       sub: `On time: ${Math.max(completedTasks - 1, 0)}`,                                 sparkData: [0, 1, 1, 2, 2, 2, 3, completedTasks || 3] },
             { label: 'Overdue Tasks',   value: overdueTasks,    change: `${overduePct}% of total`,           up: overdueTasks === 0,  color: '#EF4444', icon: <AlertTriangle size={16} color="#EF4444" />,     sub: `vs. total tasks`,                                                             sparkData: [5, 5, 4, 4, 3, 3, 3, overdueTasks || 2] },
@@ -514,29 +499,8 @@ export function Dashboard() {
           <div style={{ ...card, padding: '20px 22px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
               <span style={{ fontSize: 14, fontWeight: 700, color: '#172033' }}>Tasks by Status</span>
-              <div style={{ position: 'relative' }}>
-                <button style={monthBtn} onClick={() => setShowMonthPicker(p => !p)}>
-                  {new Date(selectedMonth.year, selectedMonth.month).toLocaleString('en-US', { month: 'long', year: 'numeric' })} <ChevronDown size={11} />
-                </button>
-                {showMonthPicker && (
-                  <>
-                    <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setShowMonthPicker(false)} />
-                    <div style={{ position: 'absolute', right: 0, top: 36, zIndex: 50, background: '#fff', border: '1px solid #E6EBF2', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.10)', padding: '8px 0', minWidth: 180 }}>
-                      {Array.from({ length: 12 }, (_, i) => {
-                        const target = new Date(new Date().getFullYear(), new Date().getMonth() - (11 - i));
-                        const y = target.getFullYear(); const m = target.getMonth();
-                        const isSelected = selectedMonth.year === y && selectedMonth.month === m;
-                        return (
-                          <div key={i} onClick={() => { setSelectedMonth({ year: y, month: m }); setShowMonthPicker(false); }}
-                            style={{ padding: '8px 16px', fontSize: 13, cursor: 'pointer', fontWeight: isSelected ? 700 : 400, color: isSelected ? '#1663F6' : '#344054', background: isSelected ? '#EEF2FF' : 'transparent' }}>
-                            {target.toLocaleString('en-US', { month: 'long', year: 'numeric' })}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
-              </div>
+              <span style={{ fontSize: 12, color: '#9CA3AF', fontWeight: 500 }}>All tasks</span>
+
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
               <DonutChart data={donut} total={donutTotal} />
