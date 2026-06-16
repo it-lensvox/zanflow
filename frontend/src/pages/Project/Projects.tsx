@@ -244,14 +244,14 @@ function TreePanel({ projects, selected, selectedGroup, onSelect, onSelectGroup,
       </div>
 
       {/* New Folder */}
-      <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: BLUE, fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
+      {/* <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: BLUE, fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <Plus className="w-3.5 h-3.5" />New Folder
         </span>
         <div style={{ width: 32, height: 32, border: `1px solid ${LINE}`, borderRadius: 8, display: 'grid', placeItems: 'center', color: MUTED }}>
           <Settings className="w-3.5 h-3.5" />
         </div>
-      </div>
+      </div> */}
     </div>
   );
 }
@@ -521,7 +521,6 @@ export function Projects() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { unreadCount } = useNotifications();
-  const { isActivityOpen, setIsActivityOpen } = useOutletContext<{ isActivityOpen: boolean; setIsActivityOpen: (o: boolean) => void }>();
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [typeFilter, setTypeFilter] = useState('');
@@ -616,9 +615,9 @@ export function Projects() {
   const toggleSelect = (id: number) => setSelectedIds(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleAll = () => setSelectedIds(selectedIds.size === paginated.length ? new Set() : new Set(paginated.map(p => p.id)));
 
-  // ── Shared styles ──────────────────────────────────────────────────────────
-  const th: React.CSSProperties = { textAlign: 'left', color: '#344054', fontSize: 11, fontWeight: 800, padding: '12px 10px', borderBottom: `1px solid ${LINE}` };
-  const td: React.CSSProperties = { padding: '10px', borderBottom: `1px solid ${LINE}`, verticalAlign: 'middle', fontSize: 12 };
+
+  const th: React.CSSProperties = { textAlign: 'left', color: '#344054', fontSize: 14, fontWeight: 700, padding: '14px 16px', borderBottom: `1px solid ${LINE}`, borderRight: `1px solid ${LINE}`, background: '#f9fafb', whiteSpace: 'nowrap' as const };
+  const td: React.CSSProperties = { padding: '14px 16px', borderBottom: `1px solid ${LINE}`, borderRight: `1px solid ${LINE}`, verticalAlign: 'middle', fontSize: 14, color: TEXT };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#fff', overflow: 'hidden' }}>
@@ -639,10 +638,10 @@ export function Projects() {
             <button onClick={() => setIsCreateModalOpen(true)} style={{ height: 42, background: BLUE, color: '#fff', border: `1px solid ${BLUE}`, borderRadius: 8, padding: '0 24px', fontWeight: 700, fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
               <Plus className="w-4 h-4" />New Project
             </button>
-            <div onClick={() => setIsActivityOpen(!isActivityOpen)} style={{ width: 43, height: 43, border: `1px solid ${LINE}`, borderRadius: 9, display: 'grid', placeItems: 'center', background: '#fff', cursor: 'pointer', position: 'relative' }}>
+            {/* <div onClick={() => setIsActivityOpen(!isActivityOpen)} style={{ width: 43, height: 43, border: `1px solid ${LINE}`, borderRadius: 9, display: 'grid', placeItems: 'center', background: '#fff', cursor: 'pointer', position: 'relative' }}>
               <Bell className="w-5 h-5" style={{ color: MUTED }} />
               {unreadCount > 0 && <span style={{ position: 'absolute', right: -5, top: -7, background: '#ff3b47', color: '#fff', borderRadius: '50%', fontSize: 11, minWidth: 18, height: 18, display: 'grid', placeItems: 'center', fontWeight: 700 }}>{unreadCount}</span>}
-            </div>
+            </div> */}
           </div>
         </div>
 
@@ -830,7 +829,7 @@ export function Projects() {
               </div>
             ) : (
               /* ── TABLE ──────────────────────────────────────────────────── */
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 8 }}>
                 <thead>
                   <tr style={{ background: '#f9fafb' }}>
                     <th style={{ ...th, width: 40 }}>
@@ -874,10 +873,10 @@ export function Projects() {
                         </td>
                         <td style={td}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontWeight: 700 }}>
-                            <div style={{ width: 22, height: 22, borderRadius: 5, background: color, display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 800, fontSize: 12, flexShrink: 0 }}>
+                            <div style={{ width: 30, height: 30, borderRadius: 7, background: color, display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 800, fontSize: 14, flexShrink: 0 }}>
                               {p.name[0].toUpperCase()}
                             </div>
-                            <span style={{ color: TEXT }}>{p.name}</span>
+                            <span style={{ color: TEXT, fontWeight: 400}}>{p.name}</span>
                           </div>
                         </td>
                         <td style={td}><TypePill type={(p as any).task_type} /></td>

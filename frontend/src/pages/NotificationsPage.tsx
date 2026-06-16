@@ -7,10 +7,10 @@ import { cn } from '@/lib/utils';
 import type { NotificationData } from '@/types';
 import { useNotifications } from '@/hooks/useNotifications';
 
-export function NotificationsPage({ 
+export function NotificationsPage({
   onClose,
   defaultFilter = 'unread'
-}: { 
+}: {
   onClose?: () => void;
   defaultFilter?: 'all' | 'unread';
 }) {
@@ -19,14 +19,14 @@ export function NotificationsPage({
   const [filter, setFilter] = useState<'all' | 'unread'>(defaultFilter);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
   // Get unread count from useNotifications hook
   const { setNotifications: setGlobalNotifications } = useNotifications();
 
   const handleClose = () => (onClose ? onClose() : navigate(-1));
 
-// Step A: Fetch notifications from REST API with pagination
+  // Step A: Fetch notifications from REST API with pagination
   const {
     data: infiniteData,
     isLoading: isFetchingInitial,
@@ -63,7 +63,12 @@ export function NotificationsPage({
     return merged;
   }, [infiniteData]);
 
- // Update global notifications when data changes
+  const otherWorkspaces = React.useMemo(() => {
+    const lastPage = infiniteData?.pages?.[0];
+    return lastPage?.other_workspaces ?? [];
+  }, [infiniteData]);
+
+  // Update global notifications when data changes
   useEffect(() => {
     if (notifications.length > 0) {
       setGlobalNotifications(notifications);
@@ -114,6 +119,16 @@ export function NotificationsPage({
       queryClient.invalidateQueries({ queryKey: ['notifications-initial'] });
     },
   });
+
+  const markAllReadMutation = useMutation({
+    mutationFn: async () => {
+        await api.post('/notification/mark-all-read/');
+    },
+    onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['notifications-initial'] });
+        queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] });  // ← add this
+    },
+});
 
   // Mutation for deleting notifications
   const deleteNotificationMutation = useMutation({
@@ -169,6 +184,12 @@ export function NotificationsPage({
     return '#9170df';
   };
 
+  const handleWorkspaceSwitch = async (workspaceId: number) => {
+    await api.post(`/organizations/workspaces/${workspaceId}/switch/`);
+    localStorage.setItem('active_workspace_id', String(workspaceId));
+    window.location.reload();
+  };
+
   const handleNotificationClick = async (n: NotificationData) => {
     if (!n.is_read) {
       try {
@@ -179,38 +200,38 @@ export function NotificationsPage({
       }
     }
 
-  // Navigate based on related object or metadata
-  const relatedType = (n.related_object?.type || n.related_object_info?.type) as string | undefined;
-  const relatedId = n.related_object?.id || n.related_object_info?.id;
+    // Navigate based on related object or metadata
+    const relatedType = (n.related_object?.type || n.related_object_info?.type) as string | undefined;
+    const relatedId = n.related_object?.id || n.related_object_info?.id;
 
-  if (n.notification_type === 'document_shared') {
-    const documentId = n.metadata?.document_id;
-    // ✅ Navigate to main documents page, select "Shared With Me" section
-    if (documentId) {
-      navigate(`/documents?shared=true&highlight=${documentId}`);
-    } else {
-      navigate(`/documents?shared=true`);
+    if (n.notification_type === 'document_shared') {
+      const documentId = n.metadata?.document_id;
+      // ✅ Navigate to main documents page, select "Shared With Me" section
+      if (documentId) {
+        navigate(`/documents?shared=true&highlight=${documentId}`);
+      } else {
+        navigate(`/documents?shared=true`);
+      }
+    } else if (relatedType === 'document' && relatedId) {
+      const projectId = n.metadata?.project_id;
+      if (projectId) {
+        navigate(`/documents?project=${projectId}&highlight=${relatedId}`);
+      } else {
+        navigate(`/documents?highlight=${relatedId}`);
+      }
+    } else if (relatedType === 'task' || n.metadata?.task_id) {
+      const taskId = relatedId || n.metadata?.task_id;
+      navigate(`/tasks/${taskId}`);
+    } else if (relatedType === 'project' || n.metadata?.project_id) {
+      const projectId = relatedId || n.metadata?.project_id;
+      navigate(`/projects/${projectId}`);
+    } else if (relatedType === 'event' || n.metadata?.event_id) {
+      const eventId = relatedId || n.metadata?.event_id;
+      navigate(`/calendar?eventId=${eventId}`);
     }
-  } else if (relatedType === 'document' && relatedId) {
-    const projectId = n.metadata?.project_id;
-    if (projectId) {
-      navigate(`/documents?project=${projectId}&highlight=${relatedId}`);
-    } else {
-      navigate(`/documents?highlight=${relatedId}`);
-    }
-  } else if (relatedType === 'task' || n.metadata?.task_id) {
-    const taskId = relatedId || n.metadata?.task_id;
-    navigate(`/tasks/${taskId}`);
-  } else if (relatedType === 'project' || n.metadata?.project_id) {
-    const projectId = relatedId || n.metadata?.project_id;
-    navigate(`/projects/${projectId}`);
-  } else if (relatedType === 'event' || n.metadata?.event_id) {
-    const eventId = relatedId || n.metadata?.event_id;
-    navigate(`/calendar?eventId=${eventId}`);
-  }
 
-  if (onClose) onClose();
-};
+    if (onClose) onClose();
+  };
 
   return (
     // Backdrop overlay to create the popup feel
@@ -221,7 +242,7 @@ export function NotificationsPage({
       <div className="w-full max-w-md border border-white/10 rounded-[2rem] shadow-2xl flex flex-col max-h-[85vh] bg-white"
         onClick={(e) => e.stopPropagation()}>
 
-        {/* Header Section */} 
+        {/* Header Section */}
         <div className="px-6 py-5 border-b border-white/5 bg-white/10">
           <div className="flex items-center justify-between mb-4">
             {/* Left: Title (Hide when searching on small screens if needed) */}
@@ -254,13 +275,21 @@ export function NotificationsPage({
                 </div>
               ) : (
                 <>
-                <button
+                  <button
                     onClick={() => clearAllReadMutation.mutate()}
                     disabled={clearAllReadMutation.isPending || notifications.length === 0}
                     className="text-[10px] font-semibold text-gray-400 hover:text-red-500 transition-colors disabled:opacity-40 whitespace-nowrap"
                     title="Clear all notifications"
                   >
                     Clear All
+                  </button>
+                  <button
+                    onClick={() => markAllReadMutation.mutate()}
+                    disabled={markAllReadMutation.isPending || notifications.every(n => n.is_read)}
+                    className="text-[10px] font-semibold text-gray-400 hover:text-blue-500 transition-colors disabled:opacity-40 whitespace-nowrap"
+                    title="Mark all as read"
+                  >
+                    Mark All Read
                   </button>
                   <Search
                     className="h-4 w-4 opacity-60 hover:opacity-100 cursor-pointer"
@@ -296,7 +325,34 @@ export function NotificationsPage({
 
         {/* Scrollable List with Padding */}
         <div ref={scrollContainerRef} className="flex-1 overflow-y-auto custom-scrollbar px-4 mb-10">
-          {isFetchingInitial ? (
+
+  {/* ── Other Workspaces Summary — always at top ── */}
+  {otherWorkspaces.length > 0 && (
+    <div className="mt-4 mb-2">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 px-1 mb-2">
+        Other Workspaces
+      </p>
+      {otherWorkspaces.map((ws: any) => (
+        <div
+          key={ws.workspace_id}
+          className="flex items-center justify-between p-3 rounded-2xl mb-2 border border-gray-100 bg-gray-50"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-lg">🔔</span>
+            <p className="text-xs text-gray-600">{ws.message}</p>
+          </div>
+          <button
+            onClick={() => handleWorkspaceSwitch(ws.workspace_id)}
+            className="text-[10px] font-semibold text-blue-600 hover:text-blue-800 border border-blue-200 hover:border-blue-400 px-2.5 py-1 rounded-lg transition-all whitespace-nowrap"
+          >
+            Switch
+          </button>
+        </div>
+      ))}
+    </div>
+  )}
+
+  {isFetchingInitial ? (
             <div className="py-20 text-center text-sm opacity-50 italic">
               Loading activity...
             </div>
@@ -358,19 +414,20 @@ export function NotificationsPage({
                   </div>
                 );
               })}
-            {/* Load more indicator */}
-            {isFetchingNextPage && (
-              <div className="py-4 text-center text-xs text-muted-foreground opacity-50 italic">
-                Loading more...
-              </div>
-            )}
+              {/* Load more indicator */}
+              {isFetchingNextPage && (
+                <div className="py-4 text-center text-xs text-muted-foreground opacity-50 italic">
+                  Loading more...
+                </div>
+              )}
+
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
               <BellOff className="h-12 w-12 mb-3 opacity-40" />
               <p className="text-sm font-medium">No activity yet</p>
               <p className="text-xs opacity-60">
-                You’re all caught up ✨
+                You're all caught up ✨
               </p>
             </div>
           )}

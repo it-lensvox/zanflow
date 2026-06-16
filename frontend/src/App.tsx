@@ -8,6 +8,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { projectsApi, notificationSocket, gatewaySocket } from '@/services/api';
 import { TaskDraftsProvider } from '@/pages/MyTask/Taskdrafts';
+import { MyWork } from '@/pages/MyWork';
 
 // Lazy-loaded page components for route-level code splitting
 const Dashboard = lazy(() => import('@/pages/Dashboard').then(m => ({ default: m.Dashboard })));
@@ -210,8 +211,9 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/profile" element={<Profile />} />
+       <Route path="/dashboard" element={<Dashboard />} />
+       <Route path="/my-work" element={<MyWork />} />
+               <Route path="/profile" element={<Profile />} />
         <Route path="/resetPassword" element={<ResetPassword />} />
         <Route path="/projects" element={<Projects />} />
         <Route path="/projects/:id" element={<ProjectDetailWrapper />} />
@@ -232,6 +234,7 @@ function AppRoutes() {
         <Route path="/settings" element={<Settings />} />
         <Route path="/quick-notes" element={<QuickNotesPage />} />
         <Route path="/tasks/:id" element={<TaskDetailPage />} />
+        
 
         {/* Taskboard Routes */}
         <Route path="/taskboard" element={<MyTask />}>

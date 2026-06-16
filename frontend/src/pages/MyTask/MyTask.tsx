@@ -185,13 +185,6 @@ export const MyTask: React.FC = () => {
         const allTasks: Task[] = infiniteData?.pages?.flatMap(p =>
             (p && Array.isArray((p as any).results)) ? (p as any).results : []
         ) ?? [];
-        console.log(
-            '%c[InfiniteQuery:tasks] 📋 Tasks flattened',
-            'color:#6366f1;font-weight:bold',
-            `| pages loaded: ${infiniteData?.pages?.length ?? 0}`,
-            `| total tasks: ${allTasks.length}`,
-            `| hasNextPage: ${hasNextPage}`
-        );
         let filtered = allTasks;
         if (user?.role === 'manager') {
             filtered = allTasks.filter((task: Task) =>
@@ -203,7 +196,11 @@ export const MyTask: React.FC = () => {
                 task.assigned_to.includes(user?.id ?? -1)
             );
         }
-        return filtered;
+        // Add status_label for search (converts in_progress → in progress)
+        return filtered.map(task => ({
+            ...task,
+            status_label: (task.status || '').toLowerCase().replace(/_/g, ' '),
+        }));
     }, [infiniteData, user]);
 
     // Sentinel ref
@@ -260,8 +257,8 @@ export const MyTask: React.FC = () => {
     } = useTableFilters<Task>({
         data: tasks,
         columns: filterConfig,
-        globalSearchFields: ['heading', 'description'],
-    });
+        globalSearchFields: ['heading', 'description', 'status', 'priority', 'project_name', 'status_label'],
+        });
 
     const handleTaskClick = useCallback((task: Task) => setSelectedTask(task), []);
     const handleCloseTaskDetail = useCallback(() => setSelectedTask(null), []);
@@ -318,7 +315,15 @@ export const MyTask: React.FC = () => {
             }
             const matchesFilter = activeFilter === 'ALL' || task.status.toUpperCase() === activeFilter;
             const matchesSearch = searchQuery.trim() === '' ||
-                (task.heading || '').toLowerCase().includes(searchQuery.toLowerCase());
+                (task.heading || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (task.status || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (task.status || '').toLowerCase().replace(/_/g, ' ').includes(searchQuery.toLowerCase()) ||
+                (task.project_details?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (task.description || '').replace(/<[^>]*>/g, '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (task.priority || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (task.labels || task.labels || []).some((l: any) =>
+                    (l.name || l.label || '').toLowerCase().includes(searchQuery.toLowerCase())
+                );
 
             // Filter by Assignee
             const assigneeFilterValue = columnFilters['assigned_to'];
@@ -448,7 +453,7 @@ export const MyTask: React.FC = () => {
                                             </button>
                                         </>
                                     )}
-                                    <Button
+                                    {/* <Button
                                         className="relative bg-[#F7EC8D]"
                                         onClick={() => setIsActivityOpen(!isActivityOpen)}
                                     >
@@ -458,7 +463,7 @@ export const MyTask: React.FC = () => {
                                                 {unreadCount}
                                             </span>
                                         )}
-                                    </Button>
+                                    </Button> */}
                                 </div>
                             </div>
 

@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   LayoutDashboard, FolderKanban, FileText, Settings, LogOut, Users, ChevronDown, ChevronUp, Plus, CheckSquare, CheckCircle, Clock, PlayCircle, Pause,
-  TrendingUp, ListTodo, Calendar,Share2, Eye, MessageSquare, UserPlus, NotebookPen, Building2
+  TrendingUp, ListTodo, Calendar,Share2, Eye, MessageSquare, UserPlus, NotebookPen, Building2, Briefcase, EyeOff
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -301,7 +301,14 @@ export function Sidebar() {
             onClick={handleLogoClick}
           >
             DYUKSA
+
+            {isExpanded && (
+          <div className="border-b px-0 py-0">
+            <WorkspaceSwitcher onCreateWorkspace={() => setShowCreateWorkspaceModal(true)} />
+          </div>
+        )}
           </span>
+          
         )}
       </div>
 
@@ -414,6 +421,7 @@ export function Sidebar() {
 
         {/* Simple Nav Links */}
         {[
+          { name: 'My Work', href: '/my-work', icon: Briefcase },
           { name: 'Documents', href: '/documents', icon: FileText },
           { name: 'Calendar', href: '/calendar', icon: Calendar },
           { name: 'Team Chat', href: '/team-chat', icon: MessageSquare, badge: chatUnreadCount }, // ✅ Badge with count
@@ -549,36 +557,30 @@ export function Sidebar() {
           )}
         </div>
 
-        {/* ✅ Workspace Section - Only visible when expanded */}
-        {isExpanded && (
-          <div className="border-b px-4 py-3">
-            <WorkspaceSwitcher onCreateWorkspace={() => setShowCreateWorkspaceModal(true)} />
-          </div>
-        )}
+        
+        
 
         {/* ✅ New Workspace Button - Only for admin/manager */}
         {isExpanded && (
-          <div className="mt-4 space-y-2 animate-in fade-in slide-in-from-bottom-2">
-            {console.log('🔍 Button Debug:', {
-              activeWorkspace,
-              role: activeWorkspace?.role,
-              includes: activeWorkspace && ['admin', 'manager'].includes(activeWorkspace.role),
-            })}
-            {activeWorkspace && (
-  ['admin', 'manager'].includes(activeWorkspace.role) ||
-  ['admin', 'manager'].includes(user?.role || '')
-) && (
-              <button
-                onClick={() => setShowCreateWorkspaceModal(true)}
-                className="flex w-full items-center justify-center gap-2 rounded-lg border p-2 text-white bg-black hover:bg-gray-600 transition-colors"
-              >
-                <Plus className="h-4 w-4" /> New Workspace
-              </button>
-            )}
+  <div className="mt-4 space-y-2 animate-in fade-in slide-in-from-bottom-2">
 
-            <div className="flex gap-2">
-              <button
-                onClick={() => navigate('/settings')}
+
+    {/* NEW WORKSPACE BUTTON MOVED TO WORKSPACE SWITCHER DROPDOWN
+    {activeWorkspace && (
+      ['admin', 'manager'].includes(activeWorkspace.role) ||
+      ['admin', 'manager'].includes(user?.role || '')
+    ) && (
+      <button
+        onClick={() => setShowCreateWorkspaceModal(true)}
+        className="flex w-full items-center justify-center gap-2 rounded-lg border p-2 text-white bg-black hover:bg-gray-600 transition-colors"
+      >
+        <Plus className="h-4 w-4" /> New Workspace
+      </button>
+    )} */}
+
+    <div className="flex gap-2">
+      <button
+        onClick={() => navigate('/settings')}
                 className="flex flex-1 items-center justify-center gap-2 rounded-lg border p-2 text-muted-foreground hover:bg-accent"
               >
                 <Settings className="h-4 w-4" /> Settings

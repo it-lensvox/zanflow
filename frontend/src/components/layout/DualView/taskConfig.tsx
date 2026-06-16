@@ -191,16 +191,20 @@ export function TaskGridCard({ task, onTaskClick }: TaskGridCardProps) {
         >
           <Users className="w-3 h-3 mr-1" />
           <span className="font-medium">Assigned:</span>
-          <span className="ml-1 font-bold">{task.assigned_to.length}</span>
+          <span className="ml-1 font-bold">{(task.assigned_to || []).length}</span>
 
           {/* Hover Dropdown */}
           <div className="absolute top-full left-0 mt-1 hidden group-hover/assigned:block z-50 min-w-[160px] bg-white border border-gray-200 rounded-lg shadow-xl p-2 animate-in fade-in zoom-in-95 duration-100">
             <div className="flex flex-col gap-1 max-h-[150px] overflow-y-auto">
-              {task.assigned_to_user_details && task.assigned_to_user_details.length > 0 ? (
-                task.assigned_to_user_details.map((u) => (
+            {(task.assigned_to_user_details || []).length > 0 ? (
+                (task.assigned_to_user_details || []).map((u) => (
                   <div key={u.id} className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded">
-                    <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-[9px] font-bold text-blue-700 shrink-0">
-                      {u.first_name[0]}{u.last_name?.[0]}
+                    <div className="w-5 h-5 rounded-full overflow-hidden flex items-center justify-center text-[9px] font-bold shrink-0 text-white"
+                      style={{ background: u.avatar ? 'transparent' : '#3b82f6' }}>
+                      {u.avatar
+                        ? <img src={u.avatar} alt={u.first_name} className="w-full h-full object-cover" />
+                        : <>{u.first_name?.[0]}{u.last_name?.[0]}</>
+                      }
                     </div>
                     <span className="text-[11px] font-medium text-gray-700 truncate">
                       {u.first_name} {u.last_name}
@@ -720,10 +724,14 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
           return (
             <div className="flex items-center gap-2">
               <div
-                className="w-6 h-6 rounded-full bg-[#6366f1] text-white flex items-center justify-center text-[10px] font-semibold ring-1 ring-white"
+                className="w-6 h-6 rounded-full overflow-hidden flex items-center justify-center text-[10px] font-semibold ring-1 ring-white text-white"
+                style={{ background: (creator as any).avatar ? 'transparent' : '#6366f1' }}
                 title={`${creator.first_name} ${creator.last_name}`}
               >
-                {creator.first_name?.[0] || ''}{creator.last_name?.[0] || ''}
+                {(creator as any).avatar
+                  ? <img src={(creator as any).avatar} alt={creator.first_name} className="w-full h-full object-cover" />
+                  : <>{creator.first_name?.[0] || ''}{creator.last_name?.[0] || ''}</>
+                }
               </div>
               <span className="text-[12px] text-gray-700 font-medium truncate max-w-[80px]">
                 {creator.first_name} {creator.last_name?.[0]}.
@@ -740,10 +748,14 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
           return (
             <div className="flex items-center gap-2">
               <div
-                className="w-6 h-6 rounded-full bg-[#10b981] text-white flex items-center justify-center text-[10px] font-semibold ring-1 ring-white"
+                className="w-6 h-6 rounded-full overflow-hidden flex items-center justify-center text-[10px] font-semibold ring-1 ring-white text-white"
+                style={{ background: (updater as any).avatar ? 'transparent' : '#10b981' }}
                 title={`${updater.first_name} ${updater.last_name}`}
               >
-                {updater.first_name?.[0] || ''}{updater.last_name?.[0] || ''}
+                {(updater as any).avatar
+                  ? <img src={(updater as any).avatar} alt={updater.first_name} className="w-full h-full object-cover" />
+                  : <>{updater.first_name?.[0] || ''}{updater.last_name?.[0] || ''}</>
+                }
               </div>
               <span className="text-[12px] text-gray-700 font-medium truncate max-w-[80px]">
                 {updater.first_name} {updater.last_name?.[0]}.
@@ -755,23 +767,27 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
         // Show Assignees (default)
         const trigger = (
           <div className="flex -space-x-1.5 cursor-pointer hover:opacity-80">
-            {task.assigned_to_user_details.length > 0 ? (
+            {(task.assigned_to_user_details || []).length > 0 ? (
               <>
-                {task.assigned_to_user_details.slice(0, 3).map((u) => (
+                {(task.assigned_to_user_details || []).slice(0, 3).map((u) => (
                   <div
                     key={u.id}
-                    className="w-6 h-6 rounded-full bg-[#8d87b5] text-white flex items-center justify-center text-[10px] font-semibold ring-1 ring-white"
+                    className="w-6 h-6 rounded-full ring-1 ring-white overflow-hidden flex items-center justify-center text-[10px] font-semibold text-white"
+                    style={{ background: u.avatar ? 'transparent' : '#8d87b5' }}
                     title={`${u.first_name} ${u.last_name}`}
                   >
-                    {u.first_name[0]}{u.last_name[0]}
+                    {u.avatar
+                      ? <img src={u.avatar} alt={u.first_name} className="w-full h-full object-cover" />
+                      : <>{u.first_name?.[0]}{u.last_name?.[0]}</>
+                    }
                   </div>
                 ))}
-                {task.assigned_to_user_details.length > 3 && (
+                {(task.assigned_to_user_details || []).length > 3 && (
                   <div
                     className="w-6 h-6 rounded-full bg-gray-400 text-white flex items-center justify-center text-[10px] font-semibold ring-1 ring-white"
-                    title={`+${task.assigned_to_user_details.length - 3} more`}
+                    title={`+${(task.assigned_to_user_details || []).length - 3} more`}
                   >
-                    +{task.assigned_to_user_details.length - 3}
+                    +{(task.assigned_to_user_details || []).length - 3}
                   </div>
                 )}
               </>
@@ -785,15 +801,19 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
             <div className="p-2 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-lg">
               <span className="text-xs font-semibold text-gray-700">Assignees</span>
               <span className="text-[10px] bg-gray-200 px-1.5 py-0.5 rounded text-gray-600">
-                {task.assigned_to_user_details.length}
+                {(task.assigned_to_user_details || []).length}
               </span>
             </div>
             <div className="max-h-48 overflow-y-auto p-1">
-              {task.assigned_to_user_details.length > 0 ? (
-                task.assigned_to_user_details.map((u) => (
+            {(task.assigned_to_user_details || []).length > 0 ? (
+                (task.assigned_to_user_details || []).map((u) => (
                   <div key={u.id} className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded">
-                    <div className="w-6 h-6 rounded-full bg-[#8d87b5] text-white flex items-center justify-center text-[10px] font-semibold shrink-0">
-                      {u.first_name[0]}{u.last_name?.[0]}
+                    <div className="w-6 h-6 rounded-full overflow-hidden flex items-center justify-center text-[10px] font-semibold shrink-0 text-white"
+                      style={{ background: u.avatar ? 'transparent' : '#8d87b5' }}>
+                      {u.avatar
+                        ? <img src={u.avatar} alt={u.first_name} className="w-full h-full object-cover" />
+                        : <>{u.first_name?.[0]}{u.last_name?.[0]}</>
+                      }
                     </div>
                     <div className="min-w-0">
                       <p className="text-[11px] font-medium text-gray-700 truncate">{u.first_name} {u.last_name}</p>
