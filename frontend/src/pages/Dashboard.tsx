@@ -21,7 +21,7 @@ type MyTasksTab = 'upcoming' | 'in_progress' | 'overdue' | 'completed';
 interface Task {
   id: number; heading: string; description: string; start_date: string; end_date: string;
   priority: string; project_name: string | null; project?: number; project_details?: { id: number; name: string }; assigned_to: number[];
-  assigned_to_user_details: Array<{ id: number; username: string; first_name: string; last_name: string; email: string; role: string }>;
+  assigned_to_user_details: Array<{ id: number; username: string; first_name: string; last_name: string; email: string; role: string; avatar?: string | null }>;
   status: TaskStatus; updated_at?: string; created_at?: string;
 }
 
@@ -142,13 +142,16 @@ function ProgressBar({ pct, color }: { pct: number; color: string }) {
   );
 }
 
-function AvatarStack({ users, max = 3 }: { users: Array<{ name: string }>; max?: number }) {
+function AvatarStack({ users, max = 3 }: { users: Array<{ name: string; avatar?: string | null }>; max?: number }) {
   const colors = ['#1663F6', '#22C55E', '#8B5CF6', '#F59E0B', '#EF4444'];
   return (
     <div style={{ display: 'flex' }}>
       {users.slice(0, max).map((u, i) => (
-        <div key={i} style={{ width: 24, height: 24, borderRadius: '50%', border: '2px solid #fff', marginLeft: i === 0 ? 0 : -7, background: colors[i % colors.length], display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: '#fff', position: 'relative', zIndex: max - i }}>
-          {u.name?.[0]?.toUpperCase() || '?'}
+        <div key={i} style={{ width: 24, height: 24, borderRadius: '50%', border: '2px solid #fff', marginLeft: i === 0 ? 0 : -7, background: u.avatar ? 'transparent' : colors[i % colors.length], display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: '#fff', position: 'relative', zIndex: max - i, overflow: 'hidden' }}>
+          {u.avatar
+            ? <img src={u.avatar} alt={u.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+            : u.name?.[0]?.toUpperCase() || '?'
+          }
         </div>
       ))}
       {users.length > max && (
@@ -250,18 +253,13 @@ export function Dashboard() {
   const completedTasks = allTasks.filter(t => t.status === 'completed' || t.status === 'deployed').length;
   const now = new Date();
   const overdueTasks = allTasks.filter(t => t.end_date && new Date(t.end_date) < now && t.status !== 'completed' && t.status !== 'deployed').length;
+  
 
-  const monthTasks = allTasks.filter(t => {
-    const dateStr = t.created_at || t.updated_at || '';
-    if (!dateStr) return false;
-    const d = new Date(dateStr);
-    return d.getFullYear() === selectedMonth.year && d.getMonth() === selectedMonth.month;
-  });
   const tasksByStatus = [
-    { label: 'In Progress', value: monthTasks.filter(t => t.status === 'in_progress').length, color: '#6366F1' },
-    { label: 'Pending',     value: monthTasks.filter(t => t.status === 'pending' || t.status === 'backlog').length, color: '#F59E0B' },
-    { label: 'Completed',   value: monthTasks.filter(t => t.status === 'completed' || t.status === 'deployed').length, color: '#22C55E' },
-    { label: 'Overdue',     value: monthTasks.filter(t => t.end_date && new Date(t.end_date) < now && t.status !== 'completed' && t.status !== 'deployed').length, color: '#EF4444' },
+    { label: 'In Progress', value: allTasks.filter(t => t.status === 'in_progress').length, color: '#6366F1' },
+    { label: 'Pending',     value: allTasks.filter(t => t.status === 'pending' || t.status === 'backlog').length, color: '#F59E0B' },
+    { label: 'Completed',   value: allTasks.filter(t => t.status === 'completed' || t.status === 'deployed').length, color: '#22C55E' },
+    { label: 'Overdue',     value: allTasks.filter(t => t.end_date && new Date(t.end_date) < now && t.status !== 'completed' && t.status !== 'deployed').length, color: '#EF4444' },
   ].filter(d => d.value > 0);
 
   const donut = tasksByStatus.length > 0 ? tasksByStatus : [
@@ -352,6 +350,8 @@ export function Dashboard() {
   };
 
   const firstName = user?.first_name || user?.username || 'there';
+
+  
 
   return (
     <div style={{ width: '100%', height: '100%', background: '#F7F8FB', fontFamily: '-apple-system,BlinkMacSystemFont,"Inter",system-ui,sans-serif', overflowY: 'auto' }}>
@@ -479,11 +479,11 @@ export function Dashboard() {
         {/* ── Row 2: Stat Cards ── */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 16, marginBottom: 16 }}>
           {[
-            { label: 'Total Projects', value: totalProjects, change: `${totalProjects} total`, up: true, color: '#1663F6', icon: <FolderKanban size={16} color="#1663F6" />, sub: `${projects.filter((p: any) => p.is_active).length || totalProjects} active`, sparkData: [2, 3, 4, 5, 6, 7, 8, totalProjects || 9] },
-            { label: 'Total Documents', value: filteredDocs.length, change: `${filteredDocs.length} loaded`, up: true, color: '#22C55E', icon: <FileText size={16} color="#22C55E" />, sub: `${DATE_RANGE_LABELS[dateRange]}`, sparkData: [10, 15, 20, 30, 35, 40, 50, filteredDocs.length || 58] },
-            { label: 'Total Tasks', value: filteredTotal, change: `${filteredPending} pending`, up: true, color: '#F59E0B', icon: <CheckCircle size={16} color="#F59E0B" />, sub: `Across ${totalProjects} projects`, sparkData: [1, 2, 3, 4, 5, 6, 7, filteredTotal || 9] },
-            { label: 'Completed', value: filteredCompleted, change: `${filteredCompletedPct}% done`, up: true, color: '#8B5CF6', icon: <CheckCircle size={16} color="#8B5CF6" />, sub: `On time: ${Math.max(filteredCompleted - 1, 0)}`, sparkData: [0, 1, 1, 2, 2, 2, 3, filteredCompleted || 3] },
-            { label: 'Overdue Tasks', value: filteredOverdue, change: `${filteredOverduePct}% of total`, up: filteredOverdue === 0, color: '#EF4444', icon: <AlertTriangle size={16} color="#EF4444" />, sub: `vs. total tasks`, sparkData: [5, 5, 4, 4, 3, 3, 3, filteredOverdue || 2] },
+            { label: 'Total Projects',  value: totalProjects,   change: `${totalProjects} total`,          up: true,                  color: '#1663F6', icon: <FolderKanban size={16} color="#1663F6" />, sub: `${projects.filter((p: any) => p.is_active).length || totalProjects} active`, sparkData: [2, 3, 4, 5, 6, 7, 8, totalProjects || 9] },
+            { label: 'Total Documents', value: totalDocsCount,  change: `${filteredDocs.length} this period`, up: true,               color: '#22C55E', icon: <FileText size={16} color="#22C55E" />,         sub: DATE_RANGE_LABELS[dateRange],                                                  sparkData: [10, 15, 20, 30, 35, 40, 50, totalDocsCount || 58] },
+            { label: 'Total Tasks',     value: totalTasks,      change: `${pendingTasks} pending`,           up: true,                color: '#F59E0B', icon: <CheckCircle size={16} color="#F59E0B" />,       sub: `Across ${totalProjects} projects`,                                            sparkData: [1, 2, 3, 4, 5, 6, 7, totalTasks || 9] },
+            { label: 'Completed',       value: completedTasks,  change: `${completedPct}% done`,             up: true,                color: '#8B5CF6', icon: <CheckCircle size={16} color="#8B5CF6" />,       sub: `On time: ${Math.max(completedTasks - 1, 0)}`,                                 sparkData: [0, 1, 1, 2, 2, 2, 3, completedTasks || 3] },
+            { label: 'Overdue Tasks',   value: overdueTasks,    change: `${overduePct}% of total`,           up: overdueTasks === 0,  color: '#EF4444', icon: <AlertTriangle size={16} color="#EF4444" />,     sub: `vs. total tasks`,                                                             sparkData: [5, 5, 4, 4, 3, 3, 3, overdueTasks || 2] },
           ].map((c, i) => (
             <div key={i} style={{ ...card, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 0 }}>
               {/* icon + label */}
@@ -645,7 +645,7 @@ export function Dashboard() {
                 </div>
                 <StatusBadge status={task.status} />
                 {task.assigned_to_user_details?.length > 0 && (
-                  <AvatarStack users={task.assigned_to_user_details.map(u => ({ name: u.first_name || u.username }))} max={1} />
+                  <AvatarStack users={(task.assigned_to_user_details || []).map(u => ({ name: u.first_name || u.username, avatar: u.avatar || null }))} max={1} />
                 )}
               </div>
             ))}
@@ -714,7 +714,7 @@ export function Dashboard() {
               </div>
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <AvatarStack
-                  users={(p.members || []).map((m: any) => ({ name: m.user?.first_name || m.user?.username || '?' }))}
+users={(p.members || []).map((m: any) => ({ name: m.user?.first_name || m.user?.username || '?', avatar: m.user?.avatar || m.avatar || null }))}
                   max={3}
                 />
               </div>

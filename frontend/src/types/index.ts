@@ -194,6 +194,7 @@ export interface Task {
     last_name: string;
     email: string;
     role: string;
+    avatar?: string | null;
   } | null;
 }
 
