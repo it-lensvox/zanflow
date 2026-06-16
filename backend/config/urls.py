@@ -30,6 +30,7 @@ urlpatterns = [
         path("organizations/", include("apps.organizations.urls")),
         path("quicknotes/", include("apps.quicknotes.urls")),
         path("daily-updates/", include("apps.daily_updates.urls")),
+        path("agent/", include("apps.ai_agent.urls")),
         # path("ai-ops/", include("apps.ai_ops.urls")),
     ])),
     

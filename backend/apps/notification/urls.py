@@ -45,6 +45,13 @@ urlpatterns = [
         views.NotificationMarkReadView.as_view(),
         name='notification_mark_read_bulk'
     ),
+
+    # POST /notifications/mark-all-read/ - Mark ALL notifications as read for current workspace
+    path(
+        'mark-all-read/',
+        views.NotificationMarkReadView.as_view(),
+        name='notification_mark_all_read'
+    ),
     
     # POST /notifications/<id>/mark-read/ - Mark single notification as read
     path(

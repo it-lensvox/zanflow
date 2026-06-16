@@ -56,7 +56,7 @@ LOCAL_APPS = [
     "apps.organizations",
     "apps.quicknotes",
     "apps.daily_updates.apps.DailyUpdatesConfig",
-    
+    "apps.ai_agent.apps.AiAgentConfig",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -159,7 +159,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # CORS
 _cors_origins = config(
     "CORS_ALLOWED_ORIGINS",
-    default="http://localhost:3001,http://localhost:3000,http://127.0.0.1:5173,http://192.168.1.121:5173,http://192.168.1.12:5173,http://192.168.1.160:3001,http://192.168.1.220:3001"
+    default="http://localhost:3001,http://localhost:3000,http://127.0.0.1:5173,http://192.168.1.121:5173,http://192.168.1.12:5173,http://192.168.1.160:3001,http://192.168.1.164:3001, http://192.168.1.188:8000"
 )
 CORS_ALLOWED_ORIGINS = [origin.strip() for origin in _cors_origins.split(",") if origin.strip()]
 CORS_ALLOW_CREDENTIALS = True

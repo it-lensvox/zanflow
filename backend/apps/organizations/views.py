@@ -1,12 +1,14 @@
 import logging
-
+import random
+from django.core.cache import cache
+from django.core.mail import send_mail
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.utils.text import slugify
 from rest_framework import permissions, status, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
-
 from .models import Organization, WorkspaceMembership, Workspace
 from .serializers import OrganizationSerializer, TenantSignupSerializer
 from .services import TenantOnboardingService
@@ -28,7 +30,57 @@ class IsSuperUser(permissions.BasePermission):
             and request.user.is_authenticated
             and request.user.is_superuser
         )
+class SendSignupOTPView(APIView):
+    """
+    Step 1 of Signup: Sends a 6-digit OTP to the provided email.
+    """
+    permission_classes = [permissions.AllowAny]
 
+    def post(self, request):
+        email = request.data.get("email")
+        if not email:
+            return Response(
+                {"detail": "Email is required."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        email = email.lower().strip()
+
+        # Check if user already exists
+        if User.objects.filter(email=email).exists():
+            return Response(
+                {"detail": "A user with this email already exists."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Generate 6-digit OTP
+        otp = str(random.randint(100000, 999999))
+        
+        # Cache the OTP for 5 minutes
+        cache_key = f"signup_otp_{email}"
+        cache.set(cache_key, otp, timeout=300)
+
+        # Send via SES
+        subject = "Your Dyuksa Signup OTP"
+        message = f"Your OTP for Dyuksa is {otp}. It expires in 5 minutes."
+        
+        try:
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[email],
+                fail_silently=False,
+            )
+            logger.info(f"Signup OTP sent to {email}")
+        except Exception as e:
+            logger.error(f"Failed to send OTP to {email}: {str(e)}")
+            return Response(
+                {"detail": "Failed to send OTP email. Please try again later."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        return Response({"message": "OTP sent successfully."}, status=status.HTTP_200_OK)
 
 class OrganizationViewSet(viewsets.ModelViewSet):
     """
@@ -45,30 +97,15 @@ class OrganizationViewSet(viewsets.ModelViewSet):
 class TenantSignupView(APIView):
     """
     Public self-service signup endpoint.
-    No authentication required.
-
-    POST /api/v1/organizations/signup/
-    {
-        "company_name": "Acme Corp",
-        "admin_email": "admin@acme.com",
-        "password": "SecurePass123",
-        "password_confirm": "SecurePass123"
-    }
-
-    Returns:
-        - Organization details
-        - Admin user details
-        - JWT tokens (access + refresh) for auto-login
     """
-
     permission_classes = [permissions.AllowAny]
-    # throttle_scope = "signup"
-    throttle_classes = [GlobalSignupDailyThrottle] #limit on signup
+    throttle_classes = [GlobalSignupDailyThrottle]
 
     def post(self, request):
         serializer = TenantSignupSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        # 1. Variables are extracted and assigned here
         company_name = serializer.validated_data["company_name"]
         admin_email = serializer.validated_data["admin_email"]
         password = serializer.validated_data["password"]
@@ -91,6 +128,9 @@ class TenantSignupView(APIView):
 
         org = result["organization"]
         admin_user = result["admin_user"]
+
+        # 2. Delete the OTP from cache (admin_email is safely defined above)
+        cache.delete(f"signup_otp_{admin_email}")
 
         # Generate JWT tokens for auto-login
         refresh = RefreshToken.for_user(admin_user)
@@ -496,6 +536,9 @@ class WorkspaceListCreateView(APIView):
                 "is_default": m.workspace.is_default,
                 "is_active": m.workspace.is_active,
                 "created_by": m.workspace.created_by_id,
+                "member_count": WorkspaceMembership.objects.filter(
+                    workspace=m.workspace
+                ).count(),
             }
             for m in memberships
         ]

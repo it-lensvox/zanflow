@@ -45,8 +45,13 @@ class NotificationPagination(PageNumberPagination):
 
 class NotificationListView(APIView):
     """
-    GET: List all notifications for the authenticated user.
-    
+    GET: List notifications for the authenticated user.
+
+    Workspace-aware behavior:
+    - Current workspace notifications → returned with FULL details
+    - Other workspace notifications → returned as SUMMARY only (count per workspace)
+      This maintains privacy — details only visible in the correct workspace.
+
     Query Parameters:
         - is_read: Filter by read status (true/false)
         - notification_type: Filter by type
@@ -56,40 +61,96 @@ class NotificationListView(APIView):
     """
     authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
     permission_classes = [IsAuthenticated]
-    
+
     def get(self, request):
+        from django.db.models import Count as DjangoCount
+
         user = request.user
-        queryset = Notification.objects.filter(recipient=user).select_related('actor')
-        
-        # 1. Filters (Keep your existing filter logic)
+
+        # Get active workspace from header
+        workspace_id = request.META.get("HTTP_X_WORKSPACE_ID")
+        try:
+            workspace_id = int(workspace_id) if workspace_id else None
+        except (ValueError, TypeError):
+            workspace_id = None
+
+        # Use original_objects to bypass TenantManager workspace filter
+        # We handle workspace logic manually here
+        all_notifications = Notification.original_objects.filter(
+            recipient=user,
+            organization=user.organization,
+        ).select_related('actor', 'workspace')
+
+        # ── Current workspace notifications (full details) ──────────────
+        if workspace_id:
+            current_qs = all_notifications.filter(workspace_id=workspace_id)
+            other_qs = all_notifications.exclude(workspace_id=workspace_id)
+        else:
+            # No workspace header — show all as current
+            current_qs = all_notifications
+            other_qs = Notification.original_objects.none()
+
+        # Apply filters to current workspace notifications
         is_read = request.query_params.get('is_read')
         if is_read is not None:
             is_read_bool = is_read.lower() in ('true', '1', 'yes')
-            queryset = queryset.filter(is_read=is_read_bool)
-        
+            current_qs = current_qs.filter(is_read=is_read_bool)
+
         notification_type = request.query_params.get('notification_type')
         if notification_type:
-            queryset = queryset.filter(notification_type=notification_type)
-        
+            current_qs = current_qs.filter(notification_type=notification_type)
+
         priority = request.query_params.get('priority')
         if priority:
-            queryset = queryset.filter(priority=priority)
-            
-        # Calculate unread count before paginating
-        unread_count = queryset.filter(is_read=False).count()
-        
-        # 2. Apply DRF Pagination
-        paginator = NotificationPagination()
-        paginated_queryset = paginator.paginate_queryset(queryset, request, view=self)
-        
-        # 3. Serialize and Return
-        if paginated_queryset is not None:
-            serializer = NotificationListSerializer(paginated_queryset, many=True)
-            return paginator.get_paginated_response(serializer.data, unread_count=unread_count)
+            current_qs = current_qs.filter(priority=priority)
 
-        # Fallback (safety catch)
-        serializer = NotificationListSerializer(queryset, many=True)
-        return Response({'notifications': serializer.data})
+        # ── Other workspace summaries (privacy preserved) ───────────────
+        other_workspace_summaries = []
+        other_workspaces_unread = 0
+
+        if workspace_id:
+            other_unread = other_qs.filter(is_read=False).values(
+                'workspace_id',
+                'workspace__name',
+            ).annotate(unread_count=DjangoCount('id'))
+
+            for item in other_unread:
+                if item['workspace_id']:
+                    count = item['unread_count']
+                    ws_name = item['workspace__name'] or 'Another Workspace'
+                    other_workspaces_unread += count
+                    other_workspace_summaries.append({
+                        'workspace_id': item['workspace_id'],
+                        'workspace_name': ws_name,
+                        'unread_count': count,
+                        'message': f"You have {count} new notification{'s' if count != 1 else ''} in '{ws_name}'",
+                    })
+
+        # ── Paginate current workspace notifications ────────────────────
+        unread_count = current_qs.filter(is_read=False).count()
+        paginator = NotificationPagination()
+        paginated_qs = paginator.paginate_queryset(current_qs, request, view=self)
+
+        if paginated_qs is not None:
+            serializer = NotificationListSerializer(paginated_qs, many=True)
+            response = paginator.get_paginated_response(
+                serializer.data,
+                unread_count=unread_count,
+            )
+            # Append other workspace summaries to response
+            response.data['other_workspaces'] = other_workspace_summaries
+            response.data['other_workspaces_unread'] = other_workspaces_unread
+            response.data['total_unread'] = unread_count + other_workspaces_unread
+            return response
+
+        # Fallback
+        serializer = NotificationListSerializer(current_qs, many=True)
+        return Response({
+            'notifications': serializer.data,
+            'other_workspaces': other_workspace_summaries,
+            'other_workspaces_unread': other_workspaces_unread,
+            'total_unread': unread_count + other_workspaces_unread,
+        })
 
 
 class NotificationDetailView(APIView):
@@ -158,12 +219,19 @@ class NotificationMarkReadView(APIView):
         # Otherwise, check request body for IDs
         serializer = MarkAsReadSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        
+
         notification_ids = serializer.validated_data.get('notification_ids', [])
-        
+
+        # Get current workspace from header
+        workspace_id = request.META.get("HTTP_X_WORKSPACE_ID")
+        try:
+            workspace_id = int(workspace_id) if workspace_id else None
+        except (ValueError, TypeError):
+            workspace_id = None
+
         if notification_ids:
             # Mark specific notifications as read
-            updated_count = Notification.objects.filter(
+            updated_count = Notification.original_objects.filter(
                 id__in=notification_ids,
                 recipient=user,
                 is_read=False
@@ -171,18 +239,30 @@ class NotificationMarkReadView(APIView):
                 is_read=True,
                 read_at=timezone.now()
             )
-            
+
             return Response({
                 'message': f'{updated_count} notification(s) marked as read',
                 'marked_count': updated_count
             }, status=status.HTTP_200_OK)
         else:
-            # Mark all as read
-            updated_count = mark_all_as_read(user)
-            
+            # Mark all as read — scoped to current workspace
+            qs = Notification.original_objects.filter(
+                recipient=user,
+                organization=user.organization,
+                is_read=False,
+            )
+            if workspace_id:
+                qs = qs.filter(workspace_id=workspace_id)
+
+            updated_count = qs.update(
+                is_read=True,
+                read_at=timezone.now()
+            )
+
             return Response({
-                'message': 'All notifications marked as read',
-                'marked_count': updated_count
+                'message': f'All notifications marked as read',
+                'marked_count': updated_count,
+                'workspace_id': workspace_id,
             }, status=status.HTTP_200_OK)
 
 
@@ -232,7 +312,7 @@ class NotificationCountView(APIView):
     
     def get(self, request):
         user = request.user
-        queryset = Notification.objects.filter(recipient=user)
+        queryset = Notification.original_objects.filter(recipient=user, organization=user.organization)
         
         total = queryset.count()
         unread = queryset.filter(is_read=False).count()
@@ -255,20 +335,34 @@ class NotificationCountView(APIView):
 
 class NotificationDeleteAllView(APIView):
     """
-    DELETE: Delete all notifications (both read and unread) for the user.
+    DELETE: Delete all notifications for the CURRENT workspace only.
+    Uses X-Workspace-ID header to scope the deletion.
     """
     authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
     permission_classes = [IsAuthenticated]
-    
+
     def delete(self, request):
-        # We removed `is_read=True` so it grabs ALL notifications for this user
-        deleted_count, _ = Notification.objects.filter(
-            recipient=request.user
-        ).delete()
-        
+        workspace_id = request.META.get("HTTP_X_WORKSPACE_ID")
+        try:
+            workspace_id = int(workspace_id) if workspace_id else None
+        except (ValueError, TypeError):
+            workspace_id = None
+
+        qs = Notification.original_objects.filter(
+            recipient=request.user,
+            organization=request.user.organization,
+        )
+
+        # Filter by current workspace if header present
+        if workspace_id:
+            qs = qs.filter(workspace_id=workspace_id)
+
+        deleted_count, _ = qs.delete()
+
         return Response({
             'message': f'{deleted_count} notification(s) deleted',
-            'deleted_count': deleted_count
+            'deleted_count': deleted_count,
+            'workspace_id': workspace_id,
         }, status=status.HTTP_200_OK)
 
 
@@ -334,8 +428,9 @@ class UnreadNotificationsView(APIView):
     def get(self, request):
         limit = int(request.query_params.get('limit', 20))
         
-        notifications = Notification.objects.filter(
+        notifications = Notification.original_objects.filter(
             recipient=request.user,
+            organization=request.user.organization,
             is_read=False
         ).select_related('actor')[:limit]
         

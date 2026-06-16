@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from .views import (
     OrganizationViewSet,
+    SendSignupOTPView,
     TenantSignupView,
     TenantDashboardView,
     TenantDetailView,
@@ -22,8 +23,9 @@ router.register(r"", OrganizationViewSet, basename="organization")
 
 urlpatterns = [
     # Public self-service signup (no auth required)
+    path("signup/send-otp/", SendSignupOTPView.as_view(), name="signup-send-otp"),
     path("signup/", TenantSignupView.as_view(), name="tenant-signup"),
-
+    
     # Workspace endpoints
     path("workspaces/", WorkspaceListCreateView.as_view(), name="workspace-list-create"),
     path("workspaces/<int:workspace_id>/", WorkspaceDetailView.as_view(), name="workspace-detail"),
