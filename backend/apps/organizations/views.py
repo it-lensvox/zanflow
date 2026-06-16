@@ -11,8 +11,12 @@ from .models import Organization, WorkspaceMembership, Workspace
 from .serializers import OrganizationSerializer, TenantSignupSerializer
 from .services import TenantOnboardingService
 from .throttles import GlobalSignupDailyThrottle
-
+from django.contrib.auth import get_user_model
+User = get_user_model()
 logger = logging.getLogger(__name__)
+
+# All valid workspace membership roles — matches organization user roles
+VALID_WORKSPACE_ROLES = ("admin", "manager", "developer", "annotator", "viewer")
 
 
 class IsSuperUser(permissions.BasePermission):
@@ -572,8 +576,8 @@ class WorkspaceListCreateView(APIView):
                     continue
 
                 # Validate role
-                if role not in ("admin", "manager", "member"):
-                    role = "member"
+                if role not in VALID_WORKSPACE_ROLES:
+                    role = "viewer"
 
                 try:
                     target_user = User.objects.get(
@@ -614,6 +618,136 @@ class WorkspaceListCreateView(APIView):
             response_data["members_skipped"] = skipped_members
 
         return Response(response_data, status=status.HTTP_201_CREATED)
+
+
+class WorkspaceDetailView(APIView):
+    """
+    GET   /api/v1/organizations/workspaces/<workspace_id>/
+        → Get workspace details + stats.
+
+    PATCH /api/v1/organizations/workspaces/<workspace_id>/
+        → Update workspace name/description (admin/manager only).
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def _get_workspace(self, request, workspace_id):
+        """Get workspace and verify user is a member."""
+        try:
+            workspace = Workspace.objects.get(
+                id=workspace_id,
+                organization=request.user.organization,
+            )
+        except Workspace.DoesNotExist:
+            return None, Response(
+                {"detail": "Workspace not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        is_member = WorkspaceMembership.objects.filter(
+            user=request.user,
+            workspace=workspace,
+        ).exists()
+
+        if not is_member:
+            return None, Response(
+                {"detail": "You are not a member of this workspace."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        return workspace, None
+
+    def get(self, request, workspace_id):
+        workspace, error = self._get_workspace(request, workspace_id)
+        if error:
+            return error
+
+        memberships = WorkspaceMembership.objects.filter(
+            workspace=workspace,
+        ).select_related("user").order_by("joined_at")
+
+        my_membership = memberships.filter(user=request.user).first()
+
+        return Response({
+            "id": workspace.id,
+            "name": workspace.name,
+            "slug": workspace.slug,
+            "description": workspace.description,
+            "is_default": workspace.is_default,
+            "is_active": workspace.is_active,
+            "created_by": workspace.created_by_id,
+            "my_role": my_membership.role if my_membership else None,
+            "member_count": memberships.count(),
+            "members": [
+                {
+                    "user_id": m.user.id,
+                    "username": m.user.username,
+                    "email": m.user.email,
+                    "first_name": m.user.first_name,
+                    "last_name": m.user.last_name,
+                    "role": m.role,
+                    "joined_at": m.joined_at,
+                }
+                for m in memberships
+            ],
+            "created_at": workspace.created_at,
+            "updated_at": workspace.updated_at,
+        })
+
+    def patch(self, request, workspace_id):
+        workspace, error = self._get_workspace(request, workspace_id)
+        if error:
+            return error
+
+        # Only admin/manager of workspace can update
+        membership = WorkspaceMembership.objects.filter(
+            user=request.user,
+            workspace=workspace,
+        ).first()
+
+        if not membership or membership.role not in ("admin", "manager"):
+            return Response(
+                {"detail": "Only workspace admins and managers can update settings."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        name = request.data.get("name")
+        description = request.data.get("description")
+
+        if name is not None:
+            # Check name uniqueness within org
+            if Workspace.objects.filter(
+                organization=request.user.organization,
+                name__iexact=name.strip(),
+            ).exclude(id=workspace.id).exists():
+                return Response(
+                    {"detail": "A workspace with this name already exists."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            workspace.name = name.strip()
+            workspace.slug = ""  # regenerated in save()
+
+        if description is not None:
+            workspace.description = description
+
+        workspace.save()
+
+        logger.info(
+            "Workspace updated: ws=%s, by=%s",
+            workspace.name, request.user.username,
+        )
+
+        return Response({
+            "message": "Workspace updated successfully.",
+            "id": workspace.id,
+            "name": workspace.name,
+            "slug": workspace.slug,
+            "description": workspace.description,
+            "is_default": workspace.is_default,
+            "is_active": workspace.is_active,
+            "created_by": workspace.created_by_id,
+            "updated_at": workspace.updated_at,
+        })
 
 
 class WorkspaceSwitchView(APIView):
@@ -728,4 +862,363 @@ class WorkspaceDeleteView(APIView):
         return Response({
             "message": f"Workspace '{workspace_name}' has been permanently deleted.",
             "summary": summary,
+        })
+
+class WorkspaceMembersView(APIView):
+    """
+    GET  /api/v1/organizations/workspaces/<workspace_id>/members/
+        → List all members of a workspace.
+
+    POST /api/v1/organizations/workspaces/<workspace_id>/members/
+        → Add a member to the workspace (admin/manager only).
+          Body: { "user_id": 5, "role": "member" }
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, workspace_id):
+        try:
+            workspace = Workspace.objects.get(
+                id=workspace_id,
+                organization=request.user.organization,
+            )
+        except Workspace.DoesNotExist:
+            return Response(
+                {"detail": "Workspace not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Must be a member to view members
+        if not WorkspaceMembership.objects.filter(
+            user=request.user, workspace=workspace,
+        ).exists():
+            return Response(
+                {"detail": "You are not a member of this workspace."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        memberships = WorkspaceMembership.objects.filter(
+            workspace=workspace,
+        ).select_related("user").order_by("joined_at")
+
+        members = [
+            {
+                "id": m.id,
+                "user_id": m.user.id,
+                "username": m.user.username,
+                "email": m.user.email,
+                "role": m.role,
+                "joined_at": m.joined_at,
+            }
+            for m in memberships
+        ]
+
+        return Response({"members": members})
+
+    def post(self, request, workspace_id):
+        try:
+            workspace = Workspace.objects.get(
+                id=workspace_id,
+                organization=request.user.organization,
+            )
+        except Workspace.DoesNotExist:
+            return Response(
+                {"detail": "Workspace not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Only admin/manager of workspace can add members
+        my_membership = WorkspaceMembership.objects.filter(
+            user=request.user, workspace=workspace,
+        ).first()
+
+        if not my_membership or my_membership.role not in ("admin", "manager"):
+            return Response(
+                {"detail": "Only workspace admins and managers can add members."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        user_id = request.data.get("user_id")
+        role = request.data.get("role", "member")
+
+        if not user_id:
+            return Response(
+                {"detail": "user_id is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if role not in VALID_WORKSPACE_ROLES:
+            return Response(
+                {"detail": f"Invalid role. Choose from: {', '.join(VALID_WORKSPACE_ROLES)}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validate user exists and belongs to same org
+        try:
+            target_user = User.objects.get(
+                id=user_id,
+                organization=request.user.organization,
+            )
+        except User.DoesNotExist:
+            return Response(
+                {"detail": "User not found or does not belong to your organization."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Check if already a member
+        if WorkspaceMembership.objects.filter(
+            user=target_user, workspace=workspace,
+        ).exists():
+            return Response(
+                {"detail": f"User '{target_user.username}' is already a member of this workspace."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        membership = WorkspaceMembership.objects.create(
+            user=target_user,
+            workspace=workspace,
+            role=role,
+        )
+
+        logger.info(
+            "Member added to workspace: user=%s, ws=%s, role=%s",
+            target_user.username, workspace.name, role,
+        )
+
+        return Response(
+            {
+                "message": f"User '{target_user.username}' added to workspace.",
+                "member": {
+                    "id": membership.id,
+                    "user_id": target_user.id,
+                    "username": target_user.username,
+                    "email": target_user.email,
+                    "role": membership.role,
+                    "joined_at": membership.joined_at,
+                },
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class WorkspaceMemberDetailView(APIView):
+    """
+    PATCH  /api/v1/organizations/workspaces/<workspace_id>/members/<user_id>/
+        → Update a member's role. Body: { "role": "manager" }
+
+    DELETE /api/v1/organizations/workspaces/<workspace_id>/members/<user_id>/
+        → Remove a member from the workspace.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def _check_permission(self, request, workspace_id):
+        try:
+            workspace = Workspace.objects.get(
+                id=workspace_id,
+                organization=request.user.organization,
+            )
+        except Workspace.DoesNotExist:
+            return None, Response(
+                {"detail": "Workspace not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        my_membership = WorkspaceMembership.objects.filter(
+            user=request.user, workspace=workspace,
+        ).first()
+
+        if not my_membership or my_membership.role not in ("admin", "manager"):
+            return None, Response(
+                {"detail": "Only workspace admins and managers can manage members."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        return workspace, None
+
+    def patch(self, request, workspace_id, user_id):
+        workspace, error = self._check_permission(request, workspace_id)
+        if error:
+            return error
+
+        # NEW CHECK: Prevent users from changing their own role
+        if str(request.user.id) == str(user_id):
+            return Response(
+                {"detail": "You cannot change your own role."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        new_role = request.data.get("role")
+        if new_role not in VALID_WORKSPACE_ROLES:
+            return Response(
+                {"detail": f"Invalid role. Choose from: {', '.join(VALID_WORKSPACE_ROLES)}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            target_user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response(
+                {"detail": "User not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        membership = WorkspaceMembership.objects.filter(
+            user=target_user, workspace=workspace,
+        ).first()
+
+        if not membership:
+            return Response(
+                {"detail": f"User '{target_user.username}' is not a member of this workspace."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        old_role = membership.role
+        membership.role = new_role
+        membership.save(update_fields=["role"])
+
+        logger.info(
+            "Role updated: user=%s, ws=%s, %s → %s",
+            target_user.username, workspace.name, old_role, new_role,
+        )
+
+        return Response({
+            "message": f"Role updated to '{new_role}'.",
+            "user_id": target_user.id,
+            "username": target_user.username,
+            "role": new_role,
+        })
+
+    def delete(self, request, workspace_id, user_id):
+        workspace, error = self._check_permission(request, workspace_id)
+        if error:
+            return error
+
+        # 1. NEW CHECK: Ensure the person making the request is specifically an 'admin'
+        # (_check_permission allows 'manager' through, so we must strictly check for 'admin' here)
+        my_membership = WorkspaceMembership.objects.filter(
+            user=request.user, workspace=workspace
+        ).first()
+        
+        if my_membership.role != "admin":
+            return Response(
+                {"detail": "Only workspace admins can remove members."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # 2. NEW CHECK: Prevent users from removing themselves entirely
+        if str(request.user.id) == str(user_id):
+            return Response(
+                {"detail": "You cannot remove yourself from the workspace. Another admin must do this."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            target_user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response(
+                {"detail": "User not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        deleted, _ = WorkspaceMembership.objects.filter(
+            user=target_user, workspace=workspace,
+        ).delete()
+
+        if not deleted:
+            return Response(
+                {"detail": f"User '{target_user.username}' is not a member of this workspace."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        logger.info(
+            "Member removed: user=%s, ws=%s, by=%s",
+            target_user.username, workspace.name, request.user.username,
+        )
+
+        return Response({
+            "message": f"User '{target_user.username}' removed from workspace.",
+        })
+
+
+class WorkspaceAvailableUsersView(APIView):
+    """
+    GET /api/v1/organizations/workspaces/<workspace_id>/available-users/
+
+    Returns all users in the organization who are NOT already
+    members of this workspace.
+
+    Used by the frontend "Add Member" dropdown — shows only
+    users that can still be added to this workspace.
+
+    Only workspace admins and managers can access this.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, workspace_id):
+        User = get_user_model()
+
+        # Validate workspace exists and belongs to user's org
+        try:
+            workspace = Workspace.objects.get(
+                id=workspace_id,
+                organization=request.user.organization,
+            )
+        except Workspace.DoesNotExist:
+            return Response(
+                {"detail": "Workspace not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Only workspace admin/manager can see available users
+        my_membership = WorkspaceMembership.objects.filter(
+            user=request.user,
+            workspace=workspace,
+        ).first()
+
+        if not my_membership or my_membership.role not in ("admin", "manager"):
+            return Response(
+                {"detail": "Only workspace admins and managers can view available users."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # Get IDs of users already in this workspace
+        existing_member_ids = WorkspaceMembership.objects.filter(
+            workspace=workspace,
+        ).values_list("user_id", flat=True)
+
+        # Return all org users NOT already in this workspace
+        available_users = User.objects.filter(
+            organization=request.user.organization,
+            is_active=True,
+        ).exclude(id__in=existing_member_ids).order_by("username")
+
+        # Optional search
+        search = request.query_params.get("search", "").strip()
+        if search:
+            from django.db.models import Q
+            available_users = available_users.filter(
+                Q(username__icontains=search) |
+                Q(email__icontains=search) |
+                Q(first_name__icontains=search) |
+                Q(last_name__icontains=search)
+            )
+
+        users_data = [
+            {
+                "user_id": u.id,
+                "username": u.username,
+                "email": u.email,
+                "first_name": u.first_name,
+                "last_name": u.last_name,
+                "role": u.role,
+            }
+            for u in available_users
+        ]
+
+        return Response({
+            "workspace": workspace.name,
+            "available_count": len(users_data),
+            "users": users_data,
         })

@@ -1,28 +1,32 @@
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.parsers import MultiPartParser, FormParser # <-- Import parsers
+from rest_framework.parsers import MultiPartParser, FormParser
 from .models import Folder, Note, NoteAttachment
 from .serializers import FolderSerializer, NoteSerializer, NoteAttachmentSerializer
 from .utils import generate_title_from_content
 from django.db.models import Q
-class FolderViewSet(viewsets.ModelViewSet):
+from apps.organizations.mixins import WorkspaceContextMixin
+
+
+class FolderViewSet(WorkspaceContextMixin, viewsets.ModelViewSet):
     serializer_class = FolderSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # Only return folders belonging to the logged-in user
+        # Scoped by workspace (via TenantManager) AND by user
         return Folder.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
-        # Automatically attach the logged-in user to the folder
         serializer.save(user=self.request.user)
 
-class NoteViewSet(viewsets.ModelViewSet):
+
+class NoteViewSet(WorkspaceContextMixin, viewsets.ModelViewSet):
     serializer_class = NoteSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
+        # TenantManager auto-filters by workspace, then we filter by user/project
         queryset = Note.objects.filter(
             Q(user=user) | Q(project__members=user)
         ).distinct()
@@ -32,55 +36,45 @@ class NoteViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        # Extract the title and content the user sent
         title = serializer.validated_data.get('title', '').strip()
         content = serializer.validated_data.get('content', '').strip()
 
-        # If the user left the title blank, let the AI generate it!
         if not title and content:
             title = generate_title_from_content(content)
 
-        # Save the note with the user and the (potentially AI-generated) title
         serializer.save(user=self.request.user, title=title)
 
     def perform_update(self, serializer):
-        # We can also do the same for updates if the user deletes the title
         title = serializer.validated_data.get('title', '').strip()
         content = serializer.validated_data.get('content', '').strip()
-        
-        # Check if 'title' is in the request but is empty
-        if 'title' in self.request.data and not title and content:
-             title = generate_title_from_content(content)
-             # Save the new title AND track who made the update
-             serializer.save(title=title, updated_by=self.request.user)
-        else:
-             # Just track who made the update
-             serializer.save(updated_by=self.request.user)
 
-class NoteAttachmentViewSet(viewsets.ModelViewSet):
+        if 'title' in self.request.data and not title and content:
+            title = generate_title_from_content(content)
+            serializer.save(title=title, updated_by=self.request.user)
+        else:
+            serializer.save(updated_by=self.request.user)
+
+
+class NoteAttachmentViewSet(WorkspaceContextMixin, viewsets.ModelViewSet):
     serializer_class = NoteAttachmentSerializer
     permission_classes = [IsAuthenticated]
-    
-    # Crucial: Tells DRF to accept file uploads
-    parser_classes = [MultiPartParser, FormParser] 
+    parser_classes = [MultiPartParser, FormParser]
 
     def get_queryset(self):
-        # Security: Only let users see attachments belonging to their own notes
+        # Scoped through Note → workspace
         return NoteAttachment.objects.filter(note__user=self.request.user)
-     # ============ NEW: Trigger PDF conversion after upload ============
+
     def perform_create(self, serializer):
         attachment = serializer.save()
-        
-        # Kick off PDF preview generation in background
+
         if attachment.file:
             from .preview_service import (
                 needs_pdf_conversion,
                 trigger_note_preview_async,
             )
-            
+
             if needs_pdf_conversion(attachment.file.name):
                 trigger_note_preview_async(attachment.id)
             else:
                 attachment.preview_status = 'not_needed'
                 attachment.save(update_fields=['preview_status'])
-    # ===================================================================

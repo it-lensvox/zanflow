@@ -96,3 +96,14 @@ class WorkspaceDestroyAPIView(WorkspaceContextMixin, DestroyAPIView):
 
 class WorkspaceGenericAPIView(WorkspaceContextMixin, GenericAPIView):
     pass
+
+# ViewSet support (for apps that use viewsets.ModelViewSet)
+from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
+
+class WorkspaceModelViewSet(WorkspaceContextMixin, ModelViewSet):
+    """Use instead of viewsets.ModelViewSet for workspace-scoped viewsets."""
+    pass
+
+class WorkspaceReadOnlyModelViewSet(WorkspaceContextMixin, ReadOnlyModelViewSet):
+    """Use instead of viewsets.ReadOnlyModelViewSet for workspace-scoped viewsets."""
+    pass

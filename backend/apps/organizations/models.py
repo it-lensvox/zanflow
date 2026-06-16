@@ -115,7 +115,9 @@ class WorkspaceMembership(models.Model):
     ROLE_CHOICES = [
         ("admin", "Admin"),
         ("manager", "Manager"),
-        ("member", "Member"),
+        ("developer", "Developer"),    
+        ("annotator", "Annotator"),    
+        ("viewer", "Viewer"), 
     ]
 
     user = models.ForeignKey(
