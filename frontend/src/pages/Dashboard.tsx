@@ -15,6 +15,7 @@ import { CreateProjectModal } from '@/pages/Project/CreateProjectModal';
 import { useNotifications } from '@/hooks/useNotifications';
 import { DocumentPreview } from '@/components/common/DocumentPreview';
 import { useOutletContext } from 'react-router-dom';
+import { QuickCreateButton } from '@/components/QuickCreateButton';
 
 type TaskStatus = 'pending' | 'backlog' | 'in_progress' | 'completed' | 'deployed' | 'deferred' | 'review';
 type MyTasksTab = 'upcoming' | 'in_progress' | 'overdue' | 'completed';
@@ -455,9 +456,7 @@ export function Dashboard() {
               <Bell size={15} color="#344054" />
               {unreadCount > 0 && <span style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, background: '#EF4444', borderRadius: '50%', fontSize: 9, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{unreadCount > 9 ? '9+' : unreadCount}</span>}
             </button>
-            <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#1663F6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#fff', cursor: 'pointer' }} onClick={() => navigate('/profile')}>
-              {firstName[0]?.toUpperCase()}
-            </div>
+            <QuickCreateButton />
           </div>
         </div>
 

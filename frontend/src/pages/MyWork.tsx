@@ -6,14 +6,14 @@ import { useAuth } from '@/hooks/useAuth';
 import { Plus, Calendar, CheckCircle, Clock, AlertCircle, ChevronRight, Video, MapPin } from 'lucide-react';
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
-const BLUE   = '#1663F6';
-const GREEN  = '#22C55E';
+const BLUE = '#1663F6';
+const GREEN = '#22C55E';
 const YELLOW = '#F59E0B';
-const RED    = '#EF4444';
+const RED = '#EF4444';
 const PURPLE = '#8B5CF6';
-const INK    = '#172033';
-const MUTED  = '#667085';
-const LINE   = '#E6EBF2';
+const INK = '#172033';
+const MUTED = '#667085';
+const LINE = '#E6EBF2';
 const SURFACE = '#FFFFFF';
 
 const EVENT_COLORS = [BLUE, PURPLE, YELLOW, GREEN, RED];
@@ -21,13 +21,13 @@ function eventColor(idx: number) { return EVENT_COLORS[idx % EVENT_COLORS.length
 
 // ── Status helpers ─────────────────────────────────────────────────────────────
 const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
-  in_progress: { label: 'In Progress', color: BLUE,   bg: '#EEF4FF' },
-  pending:     { label: 'Pending',     color: YELLOW, bg: '#FFFBEB' },
-  backlog:     { label: 'Backlog',     color: MUTED,  bg: '#F3F4F6' },
-  completed:   { label: 'Completed',   color: GREEN,  bg: '#F0FDF4' },
-  deployed:    { label: 'Deployed',    color: GREEN,  bg: '#F0FDF4' },
-  overdue:     { label: 'Overdue',     color: RED,    bg: '#FEF2F2' },
-  deferred:    { label: 'Deferred',    color: MUTED,  bg: '#F3F4F6' },
+  in_progress: { label: 'In Progress', color: BLUE, bg: '#EEF4FF' },
+  pending: { label: 'Pending', color: YELLOW, bg: '#FFFBEB' },
+  backlog: { label: 'Backlog', color: MUTED, bg: '#F3F4F6' },
+  completed: { label: 'Completed', color: GREEN, bg: '#F0FDF4' },
+  deployed: { label: 'Deployed', color: GREEN, bg: '#F0FDF4' },
+  overdue: { label: 'Overdue', color: RED, bg: '#FEF2F2' },
+  deferred: { label: 'Deferred', color: MUTED, bg: '#F3F4F6' },
 };
 function statusInfo(s: string) {
   return STATUS_MAP[s?.toLowerCase()] || { label: s, color: MUTED, bg: '#F3F4F6' };
@@ -54,17 +54,35 @@ function eventDuration(start: string, end: string) {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 function isToday(iso: string) {
-    if (!iso) return false;
-    // Handle date-only strings like "2026-06-15" without timezone shift
-    const dateStr = iso.includes('T') ? iso : iso + 'T00:00:00';
-    const d = new Date(dateStr);
-    const t = new Date();
-    return d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate();
+  if (!iso) return false;
+  // Handle date-only strings like "2026-06-15" without timezone shift
+  const dateStr = iso.includes('T') ? iso : iso + 'T00:00:00';
+  const d = new Date(dateStr);
+  const t = new Date();
+  return d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate();
+}
+
+function Avatar({ name, size = 28, color = BLUE, avatarUrl }: { name: string; size?: number; color?: string; avatarUrl?: string | null }) {
+  const init = (name || '?').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+
+  if (avatarUrl) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={name}
+        style={{
+          width: size, height: size, borderRadius: '50%',
+          objectFit: 'cover', flexShrink: 0,
+          border: `1.5px solid ${color}44`,
+        }}
+        onError={e => {
+          // fallback to initials if image fails
+          e.currentTarget.style.display = 'none';
+        }}
+      />
+    );
   }
 
-// ── Small components ───────────────────────────────────────────────────────────
-function Avatar({ name, size = 28, color = BLUE }: { name: string; size?: number; color?: string }) {
-  const init = (name || '?').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%',
@@ -95,7 +113,7 @@ function RescheduleModal({ event, onClose, onSave }: { event: any; onClose: () =
     if (!iso) return '';
     const d = new Date(iso);
     const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
 
   const [newStart, setNewStart] = useState(toLocal(event.start_time));
@@ -103,7 +121,7 @@ function RescheduleModal({ event, onClose, onSave }: { event: any; onClose: () =
   const handleSave = () => {
     if (!newStart) return;
     const startISO = new Date(newStart).toISOString();
-    const endISO   = new Date(new Date(newStart).getTime() + durationMs).toISOString();
+    const endISO = new Date(new Date(newStart).getTime() + durationMs).toISOString();
     onSave(event.id, startISO, endISO);
   };
 
@@ -141,13 +159,13 @@ function RescheduleModal({ event, onClose, onSave }: { event: any; onClose: () =
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export function MyWork() {
-  const navigate    = useNavigate();
-  const { user }    = useAuth();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [rescheduleEvent, setRescheduleEvent] = useState<any>(null);
   const { data: tasksResponse, isLoading: tasksLoading } = useQuery({
     queryKey: ['my-work-tasks'],
-    queryFn:  () => taskApi.list({ disable_pagination: true }),
+    queryFn: () => taskApi.list({ disable_pagination: true }),
   });
   const allTasks: any[] = useMemo(() => {
     return tasksResponse?.tasks || tasksResponse?.results || (Array.isArray(tasksResponse) ? tasksResponse : []);
@@ -158,7 +176,7 @@ export function MyWork() {
       (t.assigned_to || []).some((id: any) => String(id) === String(user.id))
     );
   }, [allTasks, user]);
-  const activeTask    = useMemo(() => myTasks.find((t: any) => t.status === 'in_progress'), [myTasks]);
+  const activeTask = useMemo(() => myTasks.find((t: any) => t.status === 'in_progress'), [myTasks]);
 
   const focusProgress = useMemo(() => {
     if (!activeTask) return 0;
@@ -173,11 +191,11 @@ export function MyWork() {
   const todayStr = today.toISOString().split('T')[0]; // YYYY-MM-DD
 
   // ── Queries ──────────────────────────────────────────────────────────────────
-  
+
 
   const { data: eventsResponse, isLoading: eventsLoading } = useQuery({
     queryKey: ['my-work-events', todayStr],
-    queryFn:  () => eventApi.list({ start_date: todayStr, end_date: todayStr }),
+    queryFn: () => eventApi.list({ start_date: todayStr, end_date: todayStr }),
     staleTime: 0,
   });
 
@@ -192,7 +210,7 @@ export function MyWork() {
   });
 
   // ── Derived data ──────────────────────────────────────────────────────────────
-  
+
 
   // Today's meetings/events — from eventApi, filtered to today
   const todayMeetings: any[] = useMemo(() => {
@@ -217,7 +235,7 @@ export function MyWork() {
   // Merge meetings + tasks, sorted by time
   const scheduleItems: any[] = useMemo(() => {
     const meetings = todayMeetings.map((ev: any) => ({ ...ev, _type: 'meeting', _sortTime: new Date(ev.start_time || ev.start_date).getTime() }));
-    const tasks    = tasksDueToday.map((t: any)  => ({ ...t,  _type: 'task',    _sortTime: new Date(t.end_date).getTime() }));
+    const tasks = tasksDueToday.map((t: any) => ({ ...t, _type: 'task', _sortTime: new Date(t.end_date).getTime() }));
     return [...meetings, ...tasks].sort((a, b) => a._sortTime - b._sortTime);
   }, [todayMeetings, tasksDueToday]);
 
@@ -231,7 +249,7 @@ export function MyWork() {
     };
     return [...myTasks].sort((a, b) => priority(a) - priority(b)).slice(0, 6);
   }, [myTasks]);
-    const isLoading     = tasksLoading || eventsLoading;
+  const isLoading = tasksLoading || eventsLoading;
 
   const card: React.CSSProperties = {
     background: SURFACE, borderRadius: 12,
@@ -339,9 +357,14 @@ export function MyWork() {
                       {/* Attendee avatars */}
                       {attendees.length > 0 && (
                         <div style={{ display: 'flex', alignItems: 'center' }}>
-                          {attendees.slice(0, 3).map((_: any, i: number) => (
+                          {attendees.slice(0, 3).map((att: any, i: number) => (
                             <div key={i} style={{ marginLeft: i > 0 ? -6 : 0, zIndex: 3 - i }}>
-                              <Avatar name={`U${i + 1}`} size={24} color={EVENT_COLORS[i % EVENT_COLORS.length]} />
+                              <Avatar
+                                name={att.full_name || att.first_name || att.username || `U${i + 1}`}
+                                size={24}
+                                color={EVENT_COLORS[i % EVENT_COLORS.length]}
+                                avatarUrl={att.avatar || null}
+                              />
                             </div>
                           ))}
                           {attendees.length > 3 && (
@@ -445,7 +468,12 @@ export function MyWork() {
                     </div>
                     <StatusPill status={overdue ? 'overdue' : task.status} />
                     {assigneeDetails && (
-                      <Avatar name={assigneeDetails.first_name || assigneeDetails.username || '?'} size={26} color={BLUE} />
+                      <Avatar
+                        name={`${assigneeDetails.first_name || ''} ${assigneeDetails.last_name || ''}`.trim() || assigneeDetails.username || '?'}
+                        size={26}
+                        color={BLUE}
+                        avatarUrl={assigneeDetails.avatar || null}
+                      />
                     )}
                   </div>
                 );
@@ -458,10 +486,10 @@ export function MyWork() {
       {/* ── Quick Stats ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginTop: 20 }}>
         {[
-          { label: 'In Progress', value: myTasks.filter((t: any) => t.status === 'in_progress').length,                                      color: BLUE,   icon: <Clock size={16} color={BLUE} /> },
-          { label: 'Pending',     value: myTasks.filter((t: any) => t.status === 'pending' || t.status === 'backlog').length,                color: YELLOW, icon: <Clock size={16} color={YELLOW} /> },
-          { label: 'Completed',   value: myTasks.filter((t: any) => t.status === 'completed' || t.status === 'deployed').length,             color: GREEN,  icon: <CheckCircle size={16} color={GREEN} /> },
-          { label: 'Overdue',     value: myTasks.filter((t: any) => isOverdue(t)).length,                                                    color: RED,    icon: <AlertCircle size={16} color={RED} /> },
+          { label: 'In Progress', value: myTasks.filter((t: any) => t.status === 'in_progress').length, color: BLUE, icon: <Clock size={16} color={BLUE} /> },
+          { label: 'Pending', value: myTasks.filter((t: any) => t.status === 'pending' || t.status === 'backlog').length, color: YELLOW, icon: <Clock size={16} color={YELLOW} /> },
+          { label: 'Completed', value: myTasks.filter((t: any) => t.status === 'completed' || t.status === 'deployed').length, color: GREEN, icon: <CheckCircle size={16} color={GREEN} /> },
+          { label: 'Overdue', value: myTasks.filter((t: any) => isOverdue(t)).length, color: RED, icon: <AlertCircle size={16} color={RED} /> },
         ].map((s, i) => (
           <div key={i} style={{ ...card, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ width: 40, height: 40, borderRadius: 10, background: s.color + '15', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>

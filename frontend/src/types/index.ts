@@ -708,6 +708,7 @@ export interface ChatUserMinimal {
   username: string;
   full_name: string;
   email: string;
+  avatar?: string | null;
 }
 
 export interface ChatRoomMembership {

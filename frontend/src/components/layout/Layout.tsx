@@ -11,6 +11,7 @@ import { Bell } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import logoImage from '../../public/assets/logo.png';
+import { QuickCreateButton } from '@/components/QuickCreateButton';
 
 // Page titles per route
 const PAGE_TITLES: Record<string, string> = {
@@ -154,13 +155,7 @@ export function Layout() {
               )}
             </button>
 
-            {/* Avatar */}
-            <div
-              onClick={() => navigate('/profile')}
-              style={{ width: 34, height: 34, borderRadius: '50%', background: '#1663F6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#fff', cursor: 'pointer', flexShrink: 0 }}
-            >
-              {firstName[0]?.toUpperCase()}
-            </div>
+            <QuickCreateButton />
           </div>
         )}
 

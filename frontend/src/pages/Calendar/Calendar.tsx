@@ -573,6 +573,19 @@ const DaysView: React.FC<DaysViewProps> = ({
         date: Date;
     } | null>(null);
 
+    React.useEffect(() => {
+        if (!selectedSlot) return;
+        const handleClickOutside = () => setSelectedSlot(null);
+        // Small delay so the click that created the slot doesn't immediately close it
+        const timer = setTimeout(() => {
+          document.addEventListener('click', handleClickOutside);
+        }, 100);
+        return () => {
+          clearTimeout(timer);
+          document.removeEventListener('click', handleClickOutside);
+        };
+      }, [selectedSlot]);
+
     // Clear drag preview when drag ends anywhere
     React.useEffect(() => {
         const handleDragEnd = () => setDragPreview(null);

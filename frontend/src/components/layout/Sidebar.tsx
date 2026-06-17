@@ -128,7 +128,19 @@ export function Sidebar() {
     setActiveAccordion(prev => (prev === name ? null : name));
 
   const isProjectsOpen = activeAccordion === 'projects';
+  useEffect(() => {
+    if (!location.pathname.startsWith('/projects')) {
+      if (isProjectsOpen) toggleAccordion('projects');
+    }
+  }, [location.pathname]);
   const isTasksOpen = activeAccordion === 'tasks';
+  // Add this useEffect wherever your other useEffects are:
+useEffect(() => {
+  if (!location.pathname.startsWith('/taskboard')) {
+    // Close tasks accordion when navigating away from taskboard
+    if (isTasksOpen) toggleAccordion('tasks');
+  }
+}, [location.pathname]);
   const isAdminOpen = activeAccordion === 'admin';
   const isChatsOpen = activeAccordion === 'chats';
 
