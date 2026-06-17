@@ -194,6 +194,7 @@ export interface Task {
     last_name: string;
     email: string;
     role: string;
+    avatar?: string | null;
   } | null;
 }
 
@@ -707,6 +708,7 @@ export interface ChatUserMinimal {
   username: string;
   full_name: string;
   email: string;
+  avatar?: string | null;
 }
 
 export interface ChatRoomMembership {

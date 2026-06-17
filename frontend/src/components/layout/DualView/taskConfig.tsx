@@ -725,11 +725,11 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
             <div className="flex items-center gap-2">
               <div
                 className="w-6 h-6 rounded-full overflow-hidden flex items-center justify-center text-[10px] font-semibold ring-1 ring-white text-white"
-                style={{ background: (creator as any).avatar ? 'transparent' : '#6366f1' }}
+                style={{ background: creator.avatar ? 'transparent' : '#6366f1' }}
                 title={`${creator.first_name} ${creator.last_name}`}
               >
-                {(creator as any).avatar
-                  ? <img src={(creator as any).avatar} alt={creator.first_name} className="w-full h-full object-cover" />
+                {creator.avatar
+                  ? <img src={creator.avatar} alt={creator.first_name} className="w-full h-full object-cover" />
                   : <>{creator.first_name?.[0] || ''}{creator.last_name?.[0] || ''}</>
                 }
               </div>
@@ -749,11 +749,11 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
             <div className="flex items-center gap-2">
               <div
                 className="w-6 h-6 rounded-full overflow-hidden flex items-center justify-center text-[10px] font-semibold ring-1 ring-white text-white"
-                style={{ background: (updater as any).avatar ? 'transparent' : '#10b981' }}
+                style={{ background: updater.avatar ? 'transparent' : '#10b981' }}
                 title={`${updater.first_name} ${updater.last_name}`}
               >
-                {(updater as any).avatar
-                  ? <img src={(updater as any).avatar} alt={updater.first_name} className="w-full h-full object-cover" />
+                {updater.avatar
+                  ? <img src={updater.avatar} alt={updater.first_name} className="w-full h-full object-cover" />
                   : <>{updater.first_name?.[0] || ''}{updater.last_name?.[0] || ''}</>
                 }
               </div>

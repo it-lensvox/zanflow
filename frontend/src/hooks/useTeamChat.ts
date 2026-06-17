@@ -79,6 +79,13 @@ export function useTeamChat() {
   const gatewaySocketRef = useRef<GatewayWebSocketService | null>(null);
   const isGatewayInitialized = useRef(false);
   const activeRoomRef = useRef<ChatRoom | null>(null);
+  const selectedUserIdRef = useRef<number | null>(null);
+  const justLeftRoomRef = useRef<string | null>(null);   
+const justLeftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    selectedUserIdRef.current = selectedUserId;
+  }, [selectedUserId]);
 
   // ─── Click outside for header menu 
   useEffect(() => {
@@ -529,7 +536,11 @@ export function useTeamChat() {
           queryClient.getQueryData<ChatRoomMessagesResponse>(['chat-messages', actualRoomId]);
         }, 100);
 
-        const isActiveRoom = actualRoomId === activeRoomRef.current?.id;
+        // Check if this message's room is currently open in ANY of the three views
+        const isActiveRoom =
+          actualRoomId === activeRoomRef.current?.id ||
+          // Also check the sender — if we have that user's chat open right now
+          (!isOwnMessage && selectedUserIdRef.current === enrichedMessage.sender.id);
 
         if (!isActiveRoom) {
           setUnreadCounts(prev => {
@@ -574,8 +585,9 @@ export function useTeamChat() {
         const roomId = unreadDataSignal.room_id;
         const roomUnread = unreadDataSignal.room_unread || 0;
         const isCurrentlyActiveRoom = roomId === activeRoomRef.current?.id;
+        const justLeft = roomId === justLeftRoomRef.current;
 
-        if (isCurrentlyActiveRoom) {
+        if (isCurrentlyActiveRoom || justLeft) {
           const userId = roomUserMapRef.current.get(roomId);
           if (userId) {
             setLastMessages(prev => {
@@ -684,7 +696,7 @@ export function useTeamChat() {
     queryFn: async () => {
       // ✅ FIX: Check URL roomId as fallback
       const roomId = activeRoom?.id || selectedProjectRoom?.id || selectedTeamRoom?.id || urlRoomId;
-      
+
       console.log('🔍 [MESSAGES QUERY] Fetching messages:', {
         roomId,
         activeRoomId: activeRoom?.id,
@@ -692,7 +704,7 @@ export function useTeamChat() {
         selectedTeamRoomId: selectedTeamRoom?.id,
         urlRoomId,
       });
-      
+
       if (!roomId) {
         console.warn('⚠️ [MESSAGES QUERY] No roomId available, returning empty');
         return Promise.resolve({ messages: [], count: 0, has_more: false });
@@ -701,7 +713,7 @@ export function useTeamChat() {
       console.log('✅ [MESSAGES QUERY] Fetching from API:', roomId);
       const messages = await chatApi.getRoomMessages(roomId);
       console.log('✅ [MESSAGES QUERY] Received messages:', messages.messages.length);
-      
+
       try {
         await chatApi.markAsRead(roomId);
         queryClient.invalidateQueries({ queryKey: ['chat-unread-counts'] });
@@ -994,6 +1006,14 @@ export function useTeamChat() {
   // ─── Selection Handlers ───────────────────────────────────────────────────
   const handleUserSelect = (userId: number) => {
     if (selectedUserId === userId) return;
+    const leavingRoomId = selectedUserId ? userRoomMap.get(selectedUserId) : null;
+  if (leavingRoomId) {
+    justLeftRoomRef.current = leavingRoomId;
+    if (justLeftTimerRef.current) clearTimeout(justLeftTimerRef.current);
+    justLeftTimerRef.current = setTimeout(() => {
+      justLeftRoomRef.current = null;
+    }, 3000); // suppress unread signals for 3s after leaving
+  }
     setSelectedProjectRoom(null);
     setSelectedTeamRoom(null);
     setSelectedUserId(userId);
@@ -1016,9 +1036,9 @@ export function useTeamChat() {
         activeRoomRef.current = roomData;
         (window as any).__activeTeamChatRoomId = roomData.id;
       });
-      
+
       navigate(`/team-chat/chat/${existingRoomId}`);
-      
+
       setUnreadCounts(prev => {
         const newMap = new Map(prev);
         newMap.set(existingRoomId, 0);

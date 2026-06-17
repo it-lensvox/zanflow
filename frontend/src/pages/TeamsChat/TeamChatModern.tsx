@@ -133,13 +133,16 @@ export function TeamChatModern() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
 
-// Derive the active tab from the URL — supports both exact and roomId-suffixed paths
+  // Derive the active tab from the URL
+  // 'all' has no dedicated URL — it maps to the base /team-chat path
+  // existing URLs are preserved: /team-chat/chat → direct, /team-chat/project or /team-chat/teams → channels
   const derivedTab = (() => {
-    if (pathname.startsWith('/team-chat/chat')) return 'chats';
-    if (pathname.startsWith('/team-chat/project')) return 'projects';
-    if (pathname.startsWith('/team-chat/teams')) return 'teams';
+    if (pathname.startsWith('/team-chat/chat')) return 'direct';
+    if (pathname.startsWith('/team-chat/project')) return 'channels';
+    if (pathname.startsWith('/team-chat/teams')) return 'channels';
     if (pathname.startsWith('/team-chat/unread')) return 'unread';
-    return null;
+    // base /team-chat path → all
+    return 'all';
   })();
 
   // Sync the active tab whenever the URL changes (sidebar navigation)
@@ -148,6 +151,19 @@ export function TeamChatModern() {
       chat.setActiveTab(derivedTab);
     }
   }, [derivedTab]);
+
+  const directUnreadCount = chat.tabUnreadCounts['chats' as keyof typeof chat.tabUnreadCounts] || 0;
+  const channelsUnreadCount = (chat.tabUnreadCounts['projects' as keyof typeof chat.tabUnreadCounts] || 0)
+    + (chat.tabUnreadCounts['teams' as keyof typeof chat.tabUnreadCounts] || 0);
+  const allUnreadCount = chat.tabUnreadCounts['unread' as keyof typeof chat.tabUnreadCounts] || 0;
+
+  // Tab config: label, value, unread count
+  const tabConfig = [
+    { value: 'all', label: 'All', count: allUnreadCount },
+    { value: 'channels', label: 'Channels', count: channelsUnreadCount },
+    { value: 'direct', label: 'Direct', count: directUnreadCount },
+    { value: 'unread', label: 'Unread', count: chat.tabUnreadCounts['unread' as keyof typeof chat.tabUnreadCounts] || 0 },
+  ] as const;
 
   return (
     <div className="flex h-screen bg-[#f3f2f1] overflow-hidden border-2 border-gray-200">
@@ -172,7 +188,7 @@ export function TeamChatModern() {
         ))}
       </div>
 
-      {/* Left Sidebar*/}
+      {/* Left Sidebar */}
       <div className="w-80 bg-[#f3f2f1] border-r border-gray-200 flex flex-col h-full overflow-hidden">
 
         {/* Sidebar Header */}
@@ -203,48 +219,347 @@ export function TeamChatModern() {
           </div>
         </div>
 
-{/* Tab Navigation */}
+        {/* Tab Navigation */}
         <Tabs.Root
           value={chat.activeTab}
           onValueChange={(tab) => {
             chat.setActiveTab(tab);
-            // Keep URL in sync with the selected tab
+            // Keep URL in sync — preserve existing URL routing, 'all' goes to base path
             const tabToUrl: Record<string, string> = {
-              chats: '/team-chat/chat',
-              projects: '/team-chat/project',
-              teams: '/team-chat/teams',
+              all: '/team-chat',
+              channels: '/team-chat/project',
+              direct: '/team-chat/chat',
               unread: '/team-chat/unread',
             };
             if (tabToUrl[tab]) navigate(tabToUrl[tab]);
           }}
           className="flex-1 flex flex-col min-h-0"
         >
+          {/* Tab Pills */}
           <Tabs.List className="flex items-center gap-1 px-3 py-2 bg-white border-b border-gray-200">
-            {(['chats', 'projects', 'teams', 'unread'] as const).map((tab) => {
-              const count = chat.tabUnreadCounts[tab as keyof typeof chat.tabUnreadCounts];
-              return (
-                <div key={tab} className="relative inline-flex">
-                  <Tabs.Trigger
-                    value={tab}
-                    className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
-                  >
-                    {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                  </Tabs.Trigger>
-                  {count > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 h-4 min-w-[16px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none pointer-events-none z-10">
-                      {count > 99 ? '99+' : count}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
+            {tabConfig.map(({ value, label, count }) => (
+              <div key={value} className="relative inline-flex">
+                <Tabs.Trigger
+                  value={value}
+                  className="px-4 py-1.5 text-xs font-medium rounded-full transition-all data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=inactive]:text-gray-600 data-[state=inactive]:hover:bg-gray-100"
+                >
+                  {label}
+                </Tabs.Trigger>
+                {count > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 h-4 min-w-[16px] px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none pointer-events-none z-10">
+                    {count > 99 ? '99+' : count}
+                  </span>
+                )}
+              </div>
+            ))}
           </Tabs.List>
 
           {/* Scrollable Lists */}
           <div className="flex-1 overflow-y-auto scrollbar-hide min-h-0 bg-white">
 
-            {/* ── Chats Tab */}
-            <Tabs.Content value="chats">
+            {/* ── All Tab — Direct users + Projects + Teams */}
+            <Tabs.Content value="all">
+              <div className="bg-white">
+
+                {/* Direct Messages section */}
+                {chat.filteredUsers.length > 0 && (
+                  <>
+                    <div className="px-4 py-2 border-t border-gray-100">
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Direct Messages</p>
+                    </div>
+                    {chat.filteredUsers.map(user => {
+                      const isSelected = chat.selectedUserId === user.id;
+                      const unreadCount = chat.getUserUnreadCount(user.id);
+                      const hasUnread = (user as any).isUnread || unreadCount > 0;
+                      const roomId = chat.userRoomMap.get(user.id);
+                      const roomDetailsQuery = roomId
+                        ? chat.queryClient.getQueryData(['chat-room-details', roomId]) as ChatRoom | undefined
+                        : undefined;
+                      const isFavourite = roomDetailsQuery?.current_user_membership?.is_favourite || false;
+                      const presenceStatus = chat.userPresence.get(user.id) ?? 'offline';
+
+                      return (
+                        <button
+                          key={user.id}
+                          onClick={() => chat.handleUserSelect(user.id)}
+                          className={cn(
+                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
+                            isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
+                          )}
+                        >
+                          <div className="relative flex-shrink-0">
+                            <div className={cn(
+                              "h-10 w-10 rounded-full flex items-center justify-center font-semibold text-sm overflow-hidden",
+                              isSelected ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-700"
+                            )}>
+                              {user.avatar ? (
+                                <img
+                                  src={user.avatar}
+                                  alt={`${user.first_name} ${user.last_name}`}
+                                  className="w-full h-full object-cover rounded-full"
+                                  onError={e => { e.currentTarget.style.display = 'none'; }}
+                                />
+                              ) : (
+                                ((user.first_name?.charAt(0) || '') + (user.last_name?.charAt(0) || '')).toUpperCase() || user.username.charAt(0).toUpperCase()
+                              )}
+                            </div>
+                            <PresenceIndicator status={presenceStatus} size="md" />
+                          </div>
+                          <div className="flex-1 min-w-0 text-left">
+                            <div className="flex items-center justify-between mb-0.5">
+                              <p className={cn(
+                                "text-sm truncate flex-1",
+                                hasUnread ? "font-bold text-gray-900" : "font-medium text-gray-900"
+                              )}>
+                                {user?.first_name} {user?.last_name}
+                              </p>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                {isFavourite && <Pin className="h-3.5 w-3.5 text-blue-600" />}
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <p className={cn(
+                                "text-xs truncate",
+                                hasUnread ? "font-semibold text-gray-900" : "text-gray-600"
+                              )}>
+                                {user.lastMessageContent
+                                  ? user.lastMessageContent.replace(/<[^>]*>/g, '').trim() || 'Sent a message'
+                                  : 'No messages yet'}
+                              </p>
+                              {unreadCount > 0 && (
+                                <span className="ml-2 flex-shrink-0 h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
+                                  {unreadCount}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </>
+                )}
+
+                {/* Projects section */}
+                {chat.projectRooms.length > 0 && (
+                  <>
+                    <div className="px-4 py-2 border-t border-gray-100 mt-1">
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Projects</p>
+                    </div>
+                    {chat.projectRooms.map(project => {
+                      const isSelected = chat.selectedProjectRoom?.id === project.id;
+                      const unreadCount = chat.unreadCounts.get(project.id) || 0;
+                      const roomDetailsQuery = chat.queryClient.getQueryData(['chat-room-details', project.id]) as ChatRoom | undefined;
+                      const isFavourite = roomDetailsQuery?.current_user_membership?.is_favourite || false;
+
+                      return (
+                        <button
+                          key={project.id}
+                          onClick={() => chat.handleProjectClick(project)}
+                          className={cn(
+                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
+                            isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
+                          )}
+                        >
+                          <div className="h-10 w-10 rounded bg-purple-100 flex items-center justify-center font-semibold text-purple-700 text-sm flex-shrink-0">
+                            {project.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0 text-left">
+                            <p className="text-sm font-medium text-gray-900 truncate">{project.name}</p>
+                            <p className="text-xs text-gray-600 truncate">
+                              {project.last_message?.content_preview
+                                ? project.last_message.content_preview.replace(/<[^>]*>/g, '').trim() || 'Sent a message'
+                                : 'No messages yet'}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {isFavourite && <Pin className="h-3.5 w-3.5 text-blue-600" />}
+                            {unreadCount > 0 && (
+                              <span className="h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
+                                {unreadCount}
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </>
+                )}
+
+                {/* Teams section */}
+                {chat.teamRooms.length > 0 && (
+                  <>
+                    <div className="px-4 py-2 border-t border-gray-100 mt-1">
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Teams</p>
+                    </div>
+                    {chat.teamRooms.map(team => {
+                      const isSelected = chat.selectedTeamRoom?.id === team.id;
+                      const unreadCount = chat.unreadCounts.get(team.id) || 0;
+                      const roomDetailsQuery = chat.queryClient.getQueryData(['chat-room-details', team.id]) as ChatRoom | undefined;
+                      const isFavourite = roomDetailsQuery?.current_user_membership?.is_favourite || false;
+
+                      return (
+                        <button
+                          key={team.id}
+                          onClick={() => chat.handleTeamClick(team)}
+                          className={cn(
+                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
+                            isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
+                          )}
+                        >
+                          <div className="h-10 w-10 rounded bg-green-100 flex items-center justify-center font-semibold text-green-700 text-sm flex-shrink-0">
+                            {team.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0 text-left">
+                            <p className="text-sm font-medium text-gray-900 truncate">{team.name}</p>
+                            <p className="text-xs text-gray-600 truncate">
+                              {(() => {
+                                const lastMsg = (team.last_message as any);
+                                if (!lastMsg) return 'No messages yet';
+                                const raw = lastMsg.content_preview || lastMsg.content || '';
+                                return raw.replace(/<[^>]*>/g, '').trim() || 'Sent a message';
+                              })()}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {isFavourite && <Pin className="h-3.5 w-3.5 text-blue-600" />}
+                            {unreadCount > 0 && (
+                              <span className="h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
+                                {unreadCount}
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </>
+                )}
+
+                {/* Empty state for All */}
+                {chat.filteredUsers.length === 0 && chat.projectRooms.length === 0 && chat.teamRooms.length === 0 && (
+                  <div className="p-4 text-center text-sm text-gray-500">Nothing found</div>
+                )}
+              </div>
+            </Tabs.Content>
+
+            {/* ── Channels Tab — Projects first (with label), then Teams (with label) */}
+            <Tabs.Content value="channels">
+              <div className="bg-white">
+
+                {/* Projects section */}
+                {chat.isLoadingProjects ? (
+                  <div className="p-4 text-center">
+                    <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="px-4 py-2 border-t border-gray-100">
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Projects</p>
+                    </div>
+                    {chat.projectRooms.length === 0 ? (
+                      <div className="px-4 pb-3 text-xs text-gray-400">No projects</div>
+                    ) : (
+                      chat.projectRooms.map(project => {
+                        const isSelected = chat.selectedProjectRoom?.id === project.id;
+                        const unreadCount = chat.unreadCounts.get(project.id) || 0;
+                        const roomDetailsQuery = chat.queryClient.getQueryData(['chat-room-details', project.id]) as ChatRoom | undefined;
+                        const isFavourite = roomDetailsQuery?.current_user_membership?.is_favourite || false;
+
+                        return (
+                          <button
+                            key={project.id}
+                            onClick={() => chat.handleProjectClick(project)}
+                            className={cn(
+                              "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
+                              isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
+                            )}
+                          >
+                            <div className="h-10 w-10 rounded bg-purple-100 flex items-center justify-center font-semibold text-purple-700 text-sm flex-shrink-0">
+                              {project.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0 text-left">
+                              <p className="text-sm font-medium text-gray-900 truncate">{project.name}</p>
+                              <p className="text-xs text-gray-600 truncate">
+                                {project.last_message?.content_preview
+                                  ? project.last_message.content_preview.replace(/<[^>]*>/g, '').trim() || 'Sent a message'
+                                  : 'No messages yet'}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              {isFavourite && <Pin className="h-3.5 w-3.5 text-blue-600" />}
+                              {unreadCount > 0 && (
+                                <span className="h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
+                                  {unreadCount}
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })
+                    )}
+                  </>
+                )}
+
+                {/* Teams section */}
+                {chat.isLoadingTeams ? (
+                  <div className="p-4 text-center">
+                    <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="px-4 py-2 border-t border-gray-100 mt-1">
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Teams</p>
+                    </div>
+                    {chat.teamRooms.length === 0 ? (
+                      <div className="px-4 pb-3 text-xs text-gray-400">No teams</div>
+                    ) : (
+                      chat.teamRooms.map(team => {
+                        const isSelected = chat.selectedTeamRoom?.id === team.id;
+                        const unreadCount = chat.unreadCounts.get(team.id) || 0;
+                        const roomDetailsQuery = chat.queryClient.getQueryData(['chat-room-details', team.id]) as ChatRoom | undefined;
+                        const isFavourite = roomDetailsQuery?.current_user_membership?.is_favourite || false;
+
+                        return (
+                          <button
+                            key={team.id}
+                            onClick={() => chat.handleTeamClick(team)}
+                            className={cn(
+                              "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
+                              isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
+                            )}
+                          >
+                            <div className="h-10 w-10 rounded bg-green-100 flex items-center justify-center font-semibold text-green-700 text-sm flex-shrink-0">
+                              {team.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0 text-left">
+                              <p className="text-sm font-medium text-gray-900 truncate">{team.name}</p>
+                              <p className="text-xs text-gray-600 truncate">
+                                {(() => {
+                                  const lastMsg = (team.last_message as any);
+                                  if (!lastMsg) return 'No messages yet';
+                                  const raw = lastMsg.content_preview || lastMsg.content || '';
+                                  return raw.replace(/<[^>]*>/g, '').trim() || 'Sent a message';
+                                })()}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              {isFavourite && <Pin className="h-3.5 w-3.5 text-blue-600" />}
+                              {unreadCount > 0 && (
+                                <span className="h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
+                                  {unreadCount}
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })
+                    )}
+                  </>
+                )}
+              </div>
+            </Tabs.Content>
+
+            {/* ── Direct Tab — 1-to-1 user conversations (was "chats") */}
+            <Tabs.Content value="direct">
               <div className="bg-white">
                 <div className="border-t border-gray-100">
                   {chat.isLoadingUsers ? (
@@ -276,10 +591,19 @@ export function TeamChatModern() {
                         >
                           <div className="relative flex-shrink-0">
                             <div className={cn(
-                              "h-10 w-10 rounded-full flex items-center justify-center font-semibold text-sm",
+                              "h-10 w-10 rounded-full flex items-center justify-center font-semibold text-sm overflow-hidden",
                               isSelected ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-700"
                             )}>
-                              {((user.first_name?.charAt(0) || '') + (user.last_name?.charAt(0) || '')).toUpperCase() || user.username.charAt(0).toUpperCase()}
+                              {user.avatar ? (
+                                <img
+                                  src={user.avatar}
+                                  alt={`${user.first_name} ${user.last_name}`}
+                                  className="w-full h-full object-cover rounded-full"
+                                  onError={e => { e.currentTarget.style.display = 'none'; }}
+                                />
+                              ) : (
+                                ((user.first_name?.charAt(0) || '') + (user.last_name?.charAt(0) || '')).toUpperCase() || user.username.charAt(0).toUpperCase()
+                              )}
                             </div>
                             <PresenceIndicator status={presenceStatus} size="md" />
                           </div>
@@ -319,116 +643,7 @@ export function TeamChatModern() {
               </div>
             </Tabs.Content>
 
-            {/* ── Projects Tab  */}
-            <Tabs.Content value="projects">
-              <div className="bg-white">
-                <div className="border-t border-gray-100">
-                  {chat.isLoadingProjects ? (
-                    <div className="p-4 text-center">
-                      <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto" />
-                    </div>
-                  ) : chat.projectRooms.length === 0 ? (
-                    <div className="p-4 text-center text-sm text-gray-500">No projects</div>
-                  ) : (
-                    chat.projectRooms.map(project => {
-                      const isSelected = chat.selectedProjectRoom?.id === project.id;
-                      const unreadCount = chat.unreadCounts.get(project.id) || 0;
-                      const roomDetailsQuery = chat.queryClient.getQueryData(['chat-room-details', project.id]) as ChatRoom | undefined;
-                      const isFavourite = roomDetailsQuery?.current_user_membership?.is_favourite || false;
-
-                      return (
-                        <button
-                          key={project.id}
-                          onClick={() => chat.handleProjectClick(project)}
-                          className={cn(
-                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
-                            isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
-                          )}
-                        >
-                          <div className="h-10 w-10 rounded bg-purple-100 flex items-center justify-center font-semibold text-purple-700 text-sm flex-shrink-0">
-                            {project.name.charAt(0).toUpperCase()}
-                          </div>
-                          <div className="flex-1 min-w-0 text-left">
-                            <p className="text-sm font-medium text-gray-900 truncate">{project.name}</p>
-                            <p className="text-xs text-gray-600 truncate">
-                              {project.last_message?.content_preview
-                                ? project.last_message.content_preview.replace(/<[^>]*>/g, '').trim() || 'Sent a message'
-                                : 'No messages yet'}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            {isFavourite && <Pin className="h-3.5 w-3.5 text-blue-600" />}
-                            {unreadCount > 0 && (
-                              <span className="h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
-                                {unreadCount}
-                              </span>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            </Tabs.Content>
-
-            {/* ── Teams Tab */}
-            <Tabs.Content value="teams">
-              <div className="bg-white">
-                <div className="border-t border-gray-100">
-                  {chat.isLoadingTeams ? (
-                    <div className="p-4 text-center">
-                      <div className="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full mx-auto" />
-                    </div>
-                  ) : chat.teamRooms.length === 0 ? (
-                    <div className="p-4 text-center text-sm text-gray-500">No teams</div>
-                  ) : (
-                    chat.teamRooms.map(team => {
-                      const isSelected = chat.selectedTeamRoom?.id === team.id;
-                      const unreadCount = chat.unreadCounts.get(team.id) || 0;
-                      const roomDetailsQuery = chat.queryClient.getQueryData(['chat-room-details', team.id]) as ChatRoom | undefined;
-                      const isFavourite = roomDetailsQuery?.current_user_membership?.is_favourite || false;
-
-                      return (
-                        <button
-                          key={team.id}
-                          onClick={() => chat.handleTeamClick(team)}
-                          className={cn(
-                            "w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-l-2",
-                            isSelected ? "bg-blue-50 border-blue-600" : "border-transparent"
-                          )}
-                        >
-                          <div className="h-10 w-10 rounded bg-green-100 flex items-center justify-center font-semibold text-green-700 text-sm flex-shrink-0">
-                            {team.name.charAt(0).toUpperCase()}
-                          </div>
-                          <div className="flex-1 min-w-0 text-left">
-                            <p className="text-sm font-medium text-gray-900 truncate">{team.name}</p>
-                            <p className="text-xs text-gray-600 truncate">
-                              {(() => {
-                                const lastMsg = (team.last_message as any);
-                                if (!lastMsg) return 'No messages yet';
-                                const raw = lastMsg.content_preview || lastMsg.content || '';
-                                return raw.replace(/<[^>]*>/g, '').trim() || 'Sent a message';
-                              })()}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            {isFavourite && <Pin className="h-3.5 w-3.5 text-blue-600" />}
-                            {unreadCount > 0 && (
-                              <span className="h-5 min-w-[20px] px-1.5 bg-blue-600 text-white text-[10px] font-semibold rounded-full flex items-center justify-center">
-                                {unreadCount}
-                              </span>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            </Tabs.Content>
-
-            {/* ── Unread Tab  */}
+            {/* ── Unread Tab — unchanged */}
             <Tabs.Content value="unread">
               <div className="bg-white">
                 <div className="border-t border-gray-100">
@@ -471,6 +686,7 @@ export function TeamChatModern() {
                 </div>
               </div>
             </Tabs.Content>
+
           </div>
         </Tabs.Root>
       </div>
@@ -681,10 +897,19 @@ export function TeamChatModern() {
                               {/* Avatar */}
                               <div className="flex-shrink-0">
                                 {showAvatar ? (
-                                  <div className="h-6 w-6 rounded-full bg-gradient-to-br from-blue-400 to-blue-500 flex items-center justify-center font-semibold text-white text-sm shadow-sm">
-                                    {message.sender.full_name
-                                      ? (message.sender.full_name.split(' ')[0]?.charAt(0) || '') + (message.sender.full_name.split(' ')[1]?.charAt(0) || '')
-                                      : message.sender.username.charAt(0).toUpperCase()}
+                                  <div className="h-6 w-6 rounded-full overflow-hidden bg-gradient-to-br from-blue-400 to-blue-500 flex items-center justify-center font-semibold text-white text-sm shadow-sm flex-shrink-0">
+                                    {(message.sender as any).avatar ? (
+                                      <img
+                                        src={(message.sender as any).avatar}
+                                        alt={message.sender.full_name || message.sender.username}
+                                        className="w-full h-full object-cover"
+                                        onError={e => { e.currentTarget.style.display = 'none'; }}
+                                      />
+                                    ) : (
+                                      message.sender.full_name
+                                        ? (message.sender.full_name.split(' ')[0]?.charAt(0) || '') + (message.sender.full_name.split(' ')[1]?.charAt(0) || '')
+                                        : message.sender.username.charAt(0).toUpperCase()
+                                    )}
                                   </div>
                                 ) : (
                                   <div className="h-9 w-9" />
@@ -971,7 +1196,7 @@ export function TeamChatModern() {
                       isUploading={chat.isUploadingFile}
                       selectedFile={null}
                       filePreviewUrl={null}
-                      onRemoveFile={() => {}}
+                      onRemoveFile={() => { }}
                       hasAttachments={chat.selectedFiles.length > 0}
                     />
                   </>
