@@ -9,8 +9,7 @@ interface CreateWorkspaceModalProps {
   onClose: () => void;
 }
 
-type MemberRole = 'admin' | 'manager' | 'member';
-
+type MemberRole = 'admin' | 'manager' | 'developer' | 'annotator' | 'viewer';
 interface SelectedMember {
   user_id: number;
   username: string;
@@ -21,13 +20,17 @@ interface SelectedMember {
 const ROLE_OPTIONS: { value: MemberRole; label: string }[] = [
   { value: 'admin', label: 'Admin' },
   { value: 'manager', label: 'Manager' },
-  { value: 'member', label: 'Member' },
+  { value: 'developer', label: 'Developer' },
+  { value: 'annotator', label: 'Annotator' },
+  { value: 'viewer', label: 'Viewer' },
 ];
 
 const ROLE_COLORS: Record<MemberRole, { bg: string; color: string }> = {
   admin:   { bg: '#FEE2E2', color: '#DC2626' },
   manager: { bg: '#FEF3C7', color: '#D97706' },
-  member:  { bg: '#DBEAFE', color: '#2563EB' },
+  developer:  { bg: '#DBEAFE', color: '#2563EB' },
+  annotator: { bg: '#F0F9FF', color: '#0EA5E9' },
+  viewer: { bg: '#F3F4F6', color: '#6B7280' },
 };
 
 export function CreateWorkspaceModal({ isOpen, onClose }: CreateWorkspaceModalProps) {
@@ -71,7 +74,7 @@ export function CreateWorkspaceModal({ isOpen, onClose }: CreateWorkspaceModalPr
     const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username;
     setSelectedMembers((prev) => [
       ...prev,
-      { user_id: user.id, username: user.username, full_name: fullName, role: 'member' },
+      { user_id: user.id, username: user.username, full_name: fullName, role: 'viewer' },
     ]);
     setMemberSearch('');
     setShowMemberDropdown(false);

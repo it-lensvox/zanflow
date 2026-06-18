@@ -70,8 +70,8 @@ function SegmentedControl<T extends string>({
           key={opt.value}
           onClick={() => onChange(opt.value)}
           className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${value === opt.value
-              ? 'bg-background text-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground'
+            ? 'bg-background text-foreground shadow-sm'
+            : 'text-muted-foreground hover:text-foreground'
             }`}
         >
           {opt.icon}
@@ -179,7 +179,7 @@ function WorkspaceSection({ activeWorkspace, userRole }: { activeWorkspace: any;
   const [showAddMember, setShowAddMember] = useState(false);
   const [addSearch, setAddSearch] = useState('');
   const [selectedUser, setSelectedUser] = useState<any>(null);
-  const [selectedRole, setSelectedRole] = useState('member');
+  const [selectedRole, setSelectedRole] = useState('viewer');
   const [isAdding, setIsAdding] = useState(false);
   const [removingUserId, setRemovingUserId] = useState<number | null>(null);
   const [updatingRoleId, setUpdatingRoleId] = useState<number | null>(null);
@@ -277,10 +277,9 @@ function WorkspaceSection({ activeWorkspace, userRole }: { activeWorkspace: any;
   const roleColors: Record<string, { bg: string; color: string }> = {
     admin:     { bg: '#dcfce7', color: '#16a34a' },
     manager:   { bg: '#dbeafe', color: '#2563eb' },
-     member:    { bg: '#f3f4f6', color: '#6b7280' },
+    developer: { bg: '#f3e8ff', color: '#7c3aed' },
     viewer:    { bg: '#f3f4f6', color: '#6b7280' },
     annotator: { bg: '#fef9c3', color: '#ca8a04' },
-    developer: { bg: '#f3e8ff', color: '#7c3aed' },
   };
 
   return (
@@ -410,14 +409,13 @@ function WorkspaceSection({ activeWorkspace, userRole }: { activeWorkspace: any;
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Role</label>
                     <select value={selectedRole} onChange={e => setSelectedRole(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50">
-                    {/* <option value="member">Member</option> */}
-                    <option value="viewer">Viewer</option>
-                    <option value="annotator">Annotator</option>
-                    <option value="developer">Developer</option>
-                    <option value="manager">Manager</option>
-                    <option value="admin">Admin</option>
-                  </select>
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50">
+                      <option value="admin">Admin</option>
+                      <option value="manager">Manager</option>
+                      <option value="developer">Developer</option>
+                      <option value="annotator">Annotator</option>
+                      <option value="viewer">Viewer</option>
+                    </select>
                   </div>
                 </div>
                 {/* Footer */}
@@ -451,8 +449,8 @@ function WorkspaceSection({ activeWorkspace, userRole }: { activeWorkspace: any;
               {filteredMembers.map((member: any) => {
                 const name = `${member.first_name || ''} ${member.last_name || ''}`.trim() || member.username;
                 const initials = name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
-                const roleStyle = roleColors[member.role] ?? roleColors.member;
-                const isRemoving = removingUserId === member.user_id;
+                const roleStyle = roleColors[member.role] ?? roleColors.viewer;
+                                const isRemoving = removingUserId === member.user_id;
                 const isUpdatingRole = updatingRoleId === member.user_id;
                 return (
                   <div key={member.user_id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-muted/50 transition-colors group">
