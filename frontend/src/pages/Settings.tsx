@@ -8,8 +8,6 @@ import {
   Plus,
   X,
   Check,
-  Bell,
-  Shield,
   Monitor,
   Cloud,
   Sun,

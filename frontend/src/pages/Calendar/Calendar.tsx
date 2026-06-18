@@ -463,9 +463,10 @@ interface DayCellProps {
     onTaskClick: (task: Task) => void;
     onEventClick?: (event: CalendarEventType) => void;
     onDateClick: (date: Date) => void;
+    onEventDrop?: (eventId: string, newDate: Date) => void;
 }
 
-const DayCell: React.FC<DayCellProps> = ({ day, onTaskClick, onEventClick, onDateClick }) => {
+const DayCell: React.FC<DayCellProps> = ({ day, onTaskClick, onEventClick, onDateClick, onEventDrop }) => {
     const maxVisibleItems = 3;
     const totalItems = day.tasks.length + day.events.length;
 
@@ -476,10 +477,20 @@ const DayCell: React.FC<DayCellProps> = ({ day, onTaskClick, onEventClick, onDat
     return (
         <div
             className={`
-                relative flex flex-col min-h-[120px] p-2 border-b border-r border-gray-200 transition-colors hover:bg-gray-50 cursor-pointer
-                ${!day.isCurrentMonth ? 'bg-gray-50/50' : 'bg-white'}
-            `}
+        relative flex flex-col min-h-[120px] p-2 border-b border-r border-gray-200 transition-colors hover:bg-gray-50 cursor-pointer
+        ${!day.isCurrentMonth ? 'bg-gray-50/50' : 'bg-white'}
+    `}
             onClick={() => onDateClick(day.date)}
+            onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.background = '#EEF4FF'; }}
+            onDragLeave={(e) => { e.currentTarget.style.background = ''; }}
+            onDrop={(e) => {
+                e.preventDefault();
+                e.currentTarget.style.background = '';
+                const eventId = e.dataTransfer.getData('eventId');
+                if (eventId && onEventDrop) {
+                    onEventDrop(eventId, day.date);
+                }
+            }}
         >
             <div className="flex items-center justify-between mb-2">
                 <span className={`
@@ -499,12 +510,21 @@ const DayCell: React.FC<DayCellProps> = ({ day, onTaskClick, onEventClick, onDat
 
             <div className="flex flex-col gap-1.5 overflow-hidden">
                 {visibleEvents.map((event) => (
-                    <CalendarEventUI
+                    <div
                         key={`event-${event.id}`}
-                        event={event}
-                        onClick={(ev) => onEventClick && onEventClick(ev)}
-                        compact
-                    />
+                        draggable
+                        onDragStart={(e) => {
+                            e.dataTransfer.setData('eventId', String(event.id));
+                            e.stopPropagation();
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <CalendarEventUI
+                            event={event}
+                            onClick={(ev) => onEventClick && onEventClick(ev)}
+                            compact
+                        />
+                    </div>
                 ))}
                 {visibleTasks.map((task) => (
                     <TaskEvent
@@ -578,13 +598,13 @@ const DaysView: React.FC<DaysViewProps> = ({
         const handleClickOutside = () => setSelectedSlot(null);
         // Small delay so the click that created the slot doesn't immediately close it
         const timer = setTimeout(() => {
-          document.addEventListener('click', handleClickOutside);
+            document.addEventListener('click', handleClickOutside);
         }, 100);
         return () => {
-          clearTimeout(timer);
-          document.removeEventListener('click', handleClickOutside);
+            clearTimeout(timer);
+            document.removeEventListener('click', handleClickOutside);
         };
-      }, [selectedSlot]);
+    }, [selectedSlot]);
 
     // Clear drag preview when drag ends anywhere
     React.useEffect(() => {
@@ -939,7 +959,7 @@ const DaysView: React.FC<DaysViewProps> = ({
                                         const startMinutes = (effectiveStart.getHours() * 60) + effectiveStart.getMinutes();
                                         const endMinutes = (effectiveEnd.getHours() * 60) + effectiveEnd.getMinutes();
                                         const topOffset = startMinutes * (64 / 60);
-                                        const eventHeight = Math.max((endMinutes - startMinutes) * (64 / 60), 24);
+                                        const eventHeight = 32;
                                         const widthPercent = 100 / totalOverlaps;
 
                                         // Check if this is a shared event (from someone else's calendar, not an invitation)
@@ -3943,7 +3963,26 @@ export const Calendar: React.FC = () => {
                                         key={index}
                                         day={day}
                                         onTaskClick={handleTaskClick}
+                                        onEventClick={handleEventClick}
                                         onDateClick={handleDateClick}
+                                        onEventDrop={(eventId, newDate) => {
+                                            const draggedEvent = events.find(ev => String(ev.id) === eventId);
+                                            if (!draggedEvent) return;
+
+                                            const originalStart = new Date(draggedEvent.start_time);
+                                            const originalEnd = new Date(draggedEvent.end_time);
+                                            const duration = originalEnd.getTime() - originalStart.getTime();
+
+                                            const newStart = new Date(newDate);
+                                            newStart.setHours(originalStart.getHours(), originalStart.getMinutes(), 0, 0);
+                                            const newEnd = new Date(newStart.getTime() + duration);
+
+                                            updateEventMutation({
+                                                id: draggedEvent.id,
+                                                start_time: newStart.toISOString(),
+                                                end_time: newEnd.toISOString(),
+                                            });
+                                        }}
                                     />
                                 ))}
                             </div>
