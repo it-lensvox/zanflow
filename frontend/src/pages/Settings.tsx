@@ -169,6 +169,8 @@ interface Workspace {
 }
 
 // ─── Workspace Management Section ────────────────────────────────────────────
+
+
 function WorkspaceSection({ activeWorkspace, userRole }: { activeWorkspace: any; userRole: string }) {
   const queryClient = useQueryClient();
   const [isEditingName, setIsEditingName] = useState(false);
@@ -185,6 +187,10 @@ function WorkspaceSection({ activeWorkspace, userRole }: { activeWorkspace: any;
   const [updatingRoleId, setUpdatingRoleId] = useState<number | null>(null);
   const [memberSearch, setMemberSearch] = useState('');
   const [toast, setToast] = useState('');
+
+  // ── New confirmation states ──
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<{ id: number; name: string } | null>(null);
 
   const workspaceId = activeWorkspace?.id;
   const isAdminOrManager = ['admin', 'manager'].includes(activeWorkspace?.my_role || userRole);
@@ -247,10 +253,21 @@ function WorkspaceSection({ activeWorkspace, userRole }: { activeWorkspace: any;
     } finally { setIsAdding(false); }
   };
 
-  // ✅ Remove member
-  const handleRemoveMember = async (userId: number, userName: string) => {
-    if (!confirm(`Remove ${userName} from this workspace?`)) return;
+  // ⚡ Updated Trigger Method: Instead of calling confirm(), setup state first
+  const triggerRemoveConfirmation = (userId: number, userName: string) => {
+    setUserToDelete({ id: userId, name: userName });
+    setShowConfirmDelete(true);
+  };
+
+  // ✅ Confirmed removal execution handler
+  const handleConfirmRemoveMember = async () => {
+    if (!userToDelete) return;
+    const { id: userId, name: userName } = userToDelete;
+    
+    setShowConfirmDelete(false);
+    setUserToDelete(null);
     setRemovingUserId(userId);
+    
     try {
       await workspaceApi.removeMember(workspaceId, userId);
       showToast(`✓ ${userName} removed from workspace`);
@@ -266,7 +283,6 @@ function WorkspaceSection({ activeWorkspace, userRole }: { activeWorkspace: any;
       await workspaceApi.updateMemberRole(workspaceId, userId, newRole);
       showToast(`✓ ${userName}'s role updated to ${newRole}`);
       refetchWs();
-      // ✅ Refresh workspaces cache so sidebar updates immediately
       queryClient.invalidateQueries({ queryKey: ['workspaces'] });
       queryClient.refetchQueries({ queryKey: ['workspaces'] });
     } catch (e: any) {
@@ -433,6 +449,31 @@ function WorkspaceSection({ activeWorkspace, userRole }: { activeWorkspace: any;
             </div>
           )}
 
+          {/* ── New Custom Confirmation Modal for Removing Members ── */}
+          {showConfirmDelete && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center">
+              <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => { setShowConfirmDelete(false); setUserToDelete(null); }} />
+              <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+                <div className="px-6 pt-6 pb-4">
+                  <h3 className="text-base font-semibold text-gray-900 mb-2">Remove Workspace Member</h3>
+                  <p className="text-sm text-gray-500">
+                    Are you sure you want to remove <span className="font-semibold text-gray-800">{userToDelete?.name}</span> from this workspace?
+                  </p>
+                </div>
+                <div className="flex gap-3 px-6 py-4 bg-gray-50 border-t border-gray-100">
+                  <button onClick={() => { setShowConfirmDelete(false); setUserToDelete(null); }}
+                    className="flex-1 px-4 py-2 border border-gray-200 bg-white rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors">
+                    Cancel
+                  </button>
+                  <button onClick={handleConfirmRemoveMember}
+                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors">
+                    Remove
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Member search */}
           <div className="relative mb-3">
             <input value={memberSearch} onChange={e => setMemberSearch(e.target.value)}
@@ -450,7 +491,7 @@ function WorkspaceSection({ activeWorkspace, userRole }: { activeWorkspace: any;
                 const name = `${member.first_name || ''} ${member.last_name || ''}`.trim() || member.username;
                 const initials = name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
                 const roleStyle = roleColors[member.role] ?? roleColors.viewer;
-                                const isRemoving = removingUserId === member.user_id;
+                const isRemoving = removingUserId === member.user_id;
                 const isUpdatingRole = updatingRoleId === member.user_id;
                 return (
                   <div key={member.user_id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-muted/50 transition-colors group">
@@ -464,7 +505,7 @@ function WorkspaceSection({ activeWorkspace, userRole }: { activeWorkspace: any;
                       <p className="text-sm font-medium text-foreground truncate">{name}</p>
                       <p className="text-xs text-muted-foreground truncate">{member.email}</p>
                     </div>
-                    {/* Role dropdown — admin/manager can change roles */}
+                    {/* Role dropdown */}
                     {isAdminOrManager ? (
                       <div className="relative">
                         <select
@@ -474,7 +515,6 @@ function WorkspaceSection({ activeWorkspace, userRole }: { activeWorkspace: any;
                           className="text-xs font-semibold px-2 py-1 rounded-full border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50"
                           style={{ background: roleStyle.bg, color: roleStyle.color }}
                         >
-                          {/* <option value="member">MEMBER</option> */}
                           <option value="viewer">VIEWER</option>
                           <option value="annotator">ANNOTATOR</option>
                           <option value="developer">DEVELOPER</option>
@@ -489,9 +529,9 @@ function WorkspaceSection({ activeWorkspace, userRole }: { activeWorkspace: any;
                         {member.role?.toUpperCase()}
                       </span>
                     )}
-                    {/* Remove button */}
+                    {/* Remove button — calls triggerRemoveConfirmation state handler now */}
                     {isAdminOrManager && (
-                      <button onClick={() => handleRemoveMember(member.user_id, name)} disabled={isRemoving}
+                      <button onClick={() => triggerRemoveConfirmation(member.user_id, name)} disabled={isRemoving}
                         className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-all disabled:opacity-50 flex-shrink-0">
                         {isRemoving
                           ? <div className="w-3.5 h-3.5 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
