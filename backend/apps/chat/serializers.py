@@ -23,7 +23,7 @@ class UserMinimalSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ['id', 'username', 'full_name', 'email']
+        fields = ['id', 'username', 'full_name', 'email', 'avatar']
         read_only_fields = fields
 
     def get_full_name(self, obj):

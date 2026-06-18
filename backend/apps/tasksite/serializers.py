@@ -52,7 +52,7 @@ def trigger_task_attachment_conversion(document):
 class AssignedByUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'first_name', 'last_name', 'email', 'role']
+        fields = ['id', 'username', 'first_name', 'last_name', 'email', 'role','avatar']
         read_only_fields = fields
 
 
@@ -65,7 +65,7 @@ class LabelSimpleSerializer(serializers.ModelSerializer):
 class UserManagementSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role', 'avatar']
 
 
 class TaskLinkSerializer(serializers.ModelSerializer):
@@ -134,7 +134,7 @@ class TaskAttachmentSerializer(serializers.ModelSerializer):
 class UserSimpleSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'first_name', 'last_name', 'email']
+        fields = ['id', 'username', 'first_name', 'last_name', 'email', 'avatar']
 
 
 class TaskCommentSerializer(serializers.ModelSerializer):
