@@ -77,9 +77,34 @@ function Sparkline({ color = '#1663F6', data }: { color?: string; data: number[]
 // Donut
 function DonutChart({ data, total }: { data: Array<{ label: string; value: number; color: string }>; total: number }) {
   const R = 72; const r = 50; const cx = 82; const cy = 82;
-  if (total === 0) return <div style={{ width: 164, height: 164, borderRadius: '50%', background: '#F3F4F6', flexShrink: 0 }} />;
+
+  if (total === 0) return (
+    <svg width={164} height={164} viewBox="0 0 164 164" style={{ flexShrink: 0 }}>
+      {/* Outer ring - dark grey */}
+      <circle cx={cx} cy={cy} r={R} fill="#E5E7EB" />
+      {/* Inner hole */}
+      <circle cx={cx} cy={cy} r={r} fill="white" />
+      {/* 0 text */}
+      <text x={cx} y={cy - 6} textAnchor="middle" fontSize={28} fontWeight="800" fill="#9CA3AF">0</text>
+      <text x={cx} y={cy + 14} textAnchor="middle" fontSize={11} fill="#9CA3AF">Total Tasks</text>
+    </svg>
+  );
+
   let cum = 0;
   function arc(s: number, pct: number) {
+    // If single slice taking 100%, render as full circle instead of degenerate arc
+    if (pct >= 0.999) {
+      // Draw as two semicircle arcs to avoid degenerate full-circle path
+      return [
+        `M${cx} ${cy - R}`,
+        `A${R} ${R} 0 0 1 ${cx} ${cy + R}`,
+        `A${R} ${R} 0 0 1 ${cx} ${cy - R}`,
+        `L${cx} ${cy - r}`,
+        `A${r} ${r} 0 0 0 ${cx} ${cy + r}`,
+        `A${r} ${r} 0 0 0 ${cx} ${cy - r}`,
+        'Z'
+      ].join(' ');
+    }
     const a1 = s * Math.PI * 2 - Math.PI / 2;
     const a2 = (s + pct) * Math.PI * 2 - Math.PI / 2;
     const x1 = cx + R * Math.cos(a1); const y1 = cy + R * Math.sin(a1);
@@ -92,9 +117,11 @@ function DonutChart({ data, total }: { data: Array<{ label: string; value: numbe
   const inflated = data.map(d => Math.max(d.value / total, 0.03));
   const inflatedSum = inflated.reduce((a, b) => a + b, 0);
   const normalized = inflated.map(v => v / inflatedSum);
-  const slices = data.map((d, i) => { const start = cum; cum += normalized[i]; return { ...d, start, pct: normalized[i] }; }); return (
+  const slices = data.map((d, i) => { const start = cum; cum += normalized[i]; return { ...d, start, pct: normalized[i] }; });
+
+  return (
     <svg width={164} height={164} viewBox="0 0 164 164" style={{ flexShrink: 0 }}>
-      {slices.map((s, i) => s.pct > 0 ? <path key={i} d={arc(s.start, s.pct)} fill={s.color} /> : null)}
+      {slices.map((s, i) => s.pct > 0 ? <path key={i} d={arc(s.start, s.pct)} fill={s.color} fillRule="evenodd" /> : null)}
       <circle cx={cx} cy={cy} r={r - 2} fill="white" />
       <text x={cx} y={cy - 6} textAnchor="middle" fontSize={28} fontWeight="800" fill="#172033">{total}</text>
       <text x={cx} y={cy + 14} textAnchor="middle" fontSize={11} fill="#667085">Total Tasks</text>

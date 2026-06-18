@@ -166,7 +166,7 @@ export function TeamChatModern() {
   ] as const;
 
   return (
-    <div className="flex h-screen bg-[#f3f2f1] overflow-hidden border-2 border-gray-200">
+<div className="flex bg-[#f3f2f1] overflow-hidden border-2 border-gray-200" style={{ height: 'calc(100vh - 56px)' }}>
 
       {/* Document Preview Overlay */}
       {chat.previewDoc && (
@@ -710,8 +710,17 @@ export function TeamChatModern() {
                       </div>
                     ) : chat.selectedUser ? (
                       <div className="relative">
-                        <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center font-semibold text-blue-700 text-sm">
-                          {((chat.selectedUser.first_name?.charAt(0) || '') + (chat.selectedUser.last_name?.charAt(0) || '')).toUpperCase() || chat.selectedUser.username.charAt(0).toUpperCase()}
+                        <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center font-semibold text-blue-700 text-sm overflow-hidden">
+                          {chat.selectedUser.avatar ? (
+                            <img
+                              src={chat.selectedUser.avatar}
+                              alt={`${chat.selectedUser.first_name} ${chat.selectedUser.last_name}`}
+                              className="w-full h-full object-cover"
+                              onError={e => { e.currentTarget.style.display = 'none'; }}
+                            />
+                          ) : (
+                            ((chat.selectedUser.first_name?.charAt(0) || '') + (chat.selectedUser.last_name?.charAt(0) || '')).toUpperCase() || chat.selectedUser.username.charAt(0).toUpperCase()
+                          )}
                         </div>
                         <PresenceIndicator status={chat.userPresence.get(chat.selectedUser.id) ?? 'offline'} size="md" />
                       </div>
