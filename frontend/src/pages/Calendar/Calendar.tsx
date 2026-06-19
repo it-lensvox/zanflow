@@ -3615,39 +3615,10 @@ export const Calendar: React.FC = () => {
     }
 
     return (
-        <div className="w-full p-8 space-y-6">
-            {/* Header Area */}
-            {/* <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                        <CalendarIcon className="w-8 h-8 text-blue-600" />
-                        Calendar
-                    </h1>
-                    <p className="text-lg text-gray-600 mt-1">View and manage your task schedules</p>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full xl:w-auto">
-                    {[
-                        // CHANGE "/task-board" BELOW TO WHATEVER YOUR ACTUAL URL PATH IS
-                        { label: 'Total', value: taskStats.total, color: 'text-gray-900', filterUrl: '/taskboard' },
-                        { label: 'Done', value: taskStats.completed, color: 'text-green-600', filterUrl: '/taskboard' },
-                        { label: 'Active', value: taskStats.inProgress, color: 'text-blue-600', filterUrl: '/taskboard' },
-                        { label: 'Pending', value: taskStats.pending, color: 'text-yellow-600', filterUrl: '/taskboard?status=pending' },
-                    ].map((stat) => (
-                        <div
-                            key={stat.label}
-                            onClick={() => navigate(stat.filterUrl)}
-                            className="flex flex-col items-center justify-center px-6 py-3 bg-white rounded-xl border border-gray-200 shadow-sm min-w-[100px] cursor-pointer hover:shadow-md hover:border-blue-200 transition-all duration-200 hover:-translate-y-0.5"
-                        >
-                            <span className={`text-2xl font-bold ${stat.color}`}>{stat.value}</span>
-                            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{stat.label}</span>
-                        </div>
-                    ))}
-                </div>
-            </div> */}
+        <div className="w-full p-4 space-y-6">
 
             {/* Controls Bar */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm sticky top-0 z-30">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-2 bg-white p-3 rounded-xl border border-gray-200 shadow-sm sticky top-0 z-30">
                 <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
                     <h5 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
                         <CalendarIcon className="w-6 h-6 text-blue-600" />
@@ -3874,7 +3845,7 @@ export const Calendar: React.FC = () => {
                     </div>
                 </div>
             </div>
-            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+            <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
                 <div className="flex items-center gap-3">
                     <div className="relative flex-1">
                         <input
