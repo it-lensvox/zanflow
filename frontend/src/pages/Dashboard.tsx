@@ -218,7 +218,7 @@ export function Dashboard() {
   });
   const [showChartMonthPicker, setShowChartMonthPicker] = useState(false);
   const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d' | 'all'>('all');
-    const [showRangePicker, setShowRangePicker] = useState(false);
+  const [showRangePicker, setShowRangePicker] = useState(false);
 
   const DATE_RANGE_LABELS = { '7d': 'Last 7 days', '30d': 'Last 30 days', '90d': 'Last 90 days', 'all': 'All time' };
 
@@ -279,25 +279,25 @@ export function Dashboard() {
   const completedTasks = allTasks.filter(t => t.status === 'completed' || t.status === 'deployed').length;
   const now = new Date();
   const overdueTasks = allTasks.filter(t => t.end_date && new Date(t.end_date) < now && t.status !== 'completed' && t.status !== 'deployed').length;
-  
+
 
   const tasksByStatus = [
     { label: 'In Progress', value: allTasks.filter(t => t.status === 'in_progress').length, color: '#6366F1' },
-    { label: 'Pending',     value: allTasks.filter(t => t.status === 'pending' || t.status === 'backlog').length, color: '#F59E0B' },
-    { label: 'Completed',   value: allTasks.filter(t => t.status === 'completed' || t.status === 'deployed').length, color: '#22C55E' },
-    { label: 'Overdue',     value: allTasks.filter(t => t.end_date && new Date(t.end_date) < now && t.status !== 'completed' && t.status !== 'deployed').length, color: '#EF4444' },
+    { label: 'Pending', value: allTasks.filter(t => t.status === 'pending' || t.status === 'backlog').length, color: '#F59E0B' },
+    { label: 'Completed', value: allTasks.filter(t => t.status === 'completed' || t.status === 'deployed').length, color: '#22C55E' },
+    { label: 'Overdue', value: allTasks.filter(t => t.end_date && new Date(t.end_date) < now && t.status !== 'completed' && t.status !== 'deployed').length, color: '#EF4444' },
   ].filter(d => d.value > 0);
 
   const donut = tasksByStatus.length > 0 ? tasksByStatus : [
     { label: 'In Progress', value: allTasks.filter(t => t.status === 'in_progress').length, color: '#6366F1' },
-    { label: 'Pending',     value: allTasks.filter(t => t.status === 'pending' || t.status === 'backlog').length, color: '#F59E0B' },
-    { label: 'Completed',   value: allTasks.filter(t => t.status === 'completed' || t.status === 'deployed').length, color: '#22C55E' },
-    { label: 'Overdue',     value: allTasks.filter(t => t.end_date && new Date(t.end_date) < now && t.status !== 'completed' && t.status !== 'deployed').length, color: '#EF4444' },
+    { label: 'Pending', value: allTasks.filter(t => t.status === 'pending' || t.status === 'backlog').length, color: '#F59E0B' },
+    { label: 'Completed', value: allTasks.filter(t => t.status === 'completed' || t.status === 'deployed').length, color: '#22C55E' },
+    { label: 'Overdue', value: allTasks.filter(t => t.end_date && new Date(t.end_date) < now && t.status !== 'completed' && t.status !== 'deployed').length, color: '#EF4444' },
   ].filter(d => d.value > 0);
   const donutTotal = donut.reduce((s, d) => s + d.value, 0);
 
   const myTasks = allTasks.filter(t => user?.id && (t.assigned_to || []).some(id => String(id) === String(user.id)));
-    const upcoming = myTasks.filter(t => t.status !== 'completed' && t.status !== 'deployed' && t.status !== 'deferred' && (!t.end_date || new Date(t.end_date) >= now)).slice(0, 8);
+  const upcoming = myTasks.filter(t => t.status !== 'completed' && t.status !== 'deployed' && t.status !== 'deferred' && (!t.end_date || new Date(t.end_date) >= now)).slice(0, 8);
   const inProgressMy = myTasks.filter(t => t.status === 'in_progress').slice(0, 8);
   const overdueMy = myTasks.filter(t => t.end_date && new Date(t.end_date) < now && t.status !== 'completed' && t.status !== 'deployed').slice(0, 8);
   const completedMy = myTasks.filter(t => t.status === 'completed' || t.status === 'deployed').slice(0, 8);
@@ -345,15 +345,17 @@ export function Dashboard() {
       const d = new Date(dateStr);
       return d.getFullYear() === selectedMonth.year && d.getMonth() === selectedMonth.month && d.getDate() <= day && filter(t);
     }).length;
-    const chartSeries = [
-      { label: 'In Progress', color: '#6366F1', data: points.map(d => countByDay(d, t => t.status === 'in_progress')) },
-      { label: 'Completed',   color: '#22C55E', data: points.map(d => countByDay(d, t => t.status === 'completed' || t.status === 'deployed', true)) },
-      { label: 'Overdue', color: '#EF4444', data: points.map(d => {
-          const cutoff = new Date(selectedMonth.year, selectedMonth.month, d);
-          return allTasks.filter(t => t.end_date && new Date(t.end_date) < cutoff && t.status !== 'completed' && t.status !== 'deployed').length;
-      })},
-      { label: 'Pending', color: '#F59E0B', data: points.map(d => countByDay(d, t => t.status === 'pending' || t.status === 'backlog')) },
-    ];
+  const chartSeries = [
+    { label: 'In Progress', color: '#6366F1', data: points.map(d => countByDay(d, t => t.status === 'in_progress')) },
+    { label: 'Completed', color: '#22C55E', data: points.map(d => countByDay(d, t => t.status === 'completed' || t.status === 'deployed', true)) },
+    {
+      label: 'Overdue', color: '#EF4444', data: points.map(d => {
+        const cutoff = new Date(selectedMonth.year, selectedMonth.month, d);
+        return allTasks.filter(t => t.end_date && new Date(t.end_date) < cutoff && t.status !== 'completed' && t.status !== 'deployed').length;
+      })
+    },
+    { label: 'Pending', color: '#F59E0B', data: points.map(d => countByDay(d, t => t.status === 'pending' || t.status === 'backlog')) },
+  ];
 
   const handleDocumentClick = async (doc: Document) => {
     try {
@@ -364,7 +366,7 @@ export function Dashboard() {
 
   const firstName = user?.first_name || user?.username || 'there';
 
-  
+
 
   return (
     <div style={{ width: '100%', height: '100%', background: '#F7F8FB', fontFamily: '-apple-system,BlinkMacSystemFont,"Inter",system-ui,sans-serif', overflowY: 'auto' }}>
@@ -448,16 +450,23 @@ export function Dashboard() {
             <div style={{ fontSize: 26, fontWeight: 800, color: '#172033', letterSpacing: '-0.02em' }}>{getGreeting()}, {firstName} </div>
             <div style={{ fontSize: 13, color: '#667085', marginTop: 4 }}>Here's what's happening with your workspace today.</div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
             <button onClick={() => setSearchOpen(true)} style={{ ...monthBtn, minWidth: 180, gap: 8 }}>
-              <Search size={13} color="#667085" /> Search anything… <kbd style={{ marginLeft: 'auto', background: '#F3F4F6', border: '1px solid #E3E8EF', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700, color: '#6B7280' }}>⌘K</kbd>
+              <Search size={13} color="#667085" /> Search anything… <kbd style={{ marginLeft: 'auto', background: '#F3F4F6', border: '1px solid #E3E8EF', borderRadius: 4, padding: '4px 8px', fontSize: 10, fontWeight: 700, color: '#6B7280' }}>⌘K</kbd>
             </button>
             <div style={{ position: 'relative' }}>
               {/* close on outside click */}
               {showRangePicker && (
                 <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setShowRangePicker(false)} />
               )}
-              <button onClick={() => setShowRangePicker(v => !v)} style={{ ...monthBtn, gap: 6 }}>
+              <button
+                onClick={() => setShowRangePicker(v => !v)}
+                style={{
+                  ...monthBtn,         // Spread first!
+                  padding: '4px 8px',   // This will now successfully override monthBtn's padding
+                  gap: 6
+                }}
+              >
                 <Calendar size={13} color="#667085" />
                 {DATE_RANGE_LABELS[dateRange]}
                 <ChevronDown size={11} color="#667085" />
@@ -476,9 +485,9 @@ export function Dashboard() {
                 </div>
               )}
             </div>
-            <button onClick={() => setIsCreateProjectModalOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, height: 36, padding: '0 18px', background: '#1663F6', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#fff' }}>
+            {/* <button onClick={() => setIsCreateProjectModalOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, height: 36, padding: '0 18px', background: '#1663F6', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#fff' }}>
               <Plus size={14} /> New project
-            </button>
+            </button> */}
             <button onClick={() => setIsActivityOpen(!isActivityOpen)} style={{ position: 'relative', width: 36, height: 36, border: '1px solid #E6EBF2', borderRadius: 8, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Bell size={15} color="#344054" />
               {unreadCount > 0 && <span style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, background: '#EF4444', borderRadius: '50%', fontSize: 9, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{unreadCount > 9 ? '9+' : unreadCount}</span>}
@@ -490,11 +499,11 @@ export function Dashboard() {
         {/* ── Row 2: Stat Cards ── */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 16, marginBottom: 16 }}>
           {[
-            { label: 'Total Projects',  value: totalProjects,   change: `${totalProjects} total`,          up: true,                  color: '#1663F6', icon: <FolderKanban size={16} color="#1663F6" />, sub: `${projects.filter((p: any) => p.is_active).length || totalProjects} active`, sparkData: [2, 3, 4, 5, 6, 7, 8, totalProjects || 9] },
-            { label: 'Total Documents', value: totalDocsCount,  change: dateRange === 'all' ? `${totalDocsCount} total` : `${filteredDocs.length} in period`, up: true, color: '#22C55E', icon: <FileText size={16} color="#22C55E" />, sub: dateRange === 'all' ? 'all time' : DATE_RANGE_LABELS[dateRange], sparkData: [10, 15, 20, 30, 35, 40, 50, totalDocsCount || 1] },
-            { label: 'Total Tasks',     value: totalTasks,      change: `${pendingTasks} pending`,           up: true,                color: '#F59E0B', icon: <CheckCircle size={16} color="#F59E0B" />,       sub: `Across ${totalProjects} projects`,                                            sparkData: [1, 2, 3, 4, 5, 6, 7, totalTasks || 9] },
-            { label: 'Completed',       value: completedTasks,  change: `${completedPct}% done`,             up: true,                color: '#8B5CF6', icon: <CheckCircle size={16} color="#8B5CF6" />,       sub: `On time: ${Math.max(completedTasks - 1, 0)}`,                                 sparkData: [0, 1, 1, 2, 2, 2, 3, completedTasks || 3] },
-            { label: 'Overdue Tasks',   value: overdueTasks,    change: `${overduePct}% of total`,           up: overdueTasks === 0,  color: '#EF4444', icon: <AlertTriangle size={16} color="#EF4444" />,     sub: `vs. total tasks`,                                                             sparkData: [5, 5, 4, 4, 3, 3, 3, overdueTasks || 2] },
+            { label: 'Total Projects', value: totalProjects, change: `${totalProjects} total`, up: true, color: '#1663F6', icon: <FolderKanban size={16} color="#1663F6" />, sub: `${projects.filter((p: any) => p.is_active).length || totalProjects} active`, sparkData: [2, 3, 4, 5, 6, 7, 8, totalProjects || 9] },
+            { label: 'Total Documents', value: totalDocsCount, change: dateRange === 'all' ? `${totalDocsCount} total` : `${filteredDocs.length} in period`, up: true, color: '#22C55E', icon: <FileText size={16} color="#22C55E" />, sub: dateRange === 'all' ? 'all time' : DATE_RANGE_LABELS[dateRange], sparkData: [10, 15, 20, 30, 35, 40, 50, totalDocsCount || 1] },
+            { label: 'Total Tasks', value: totalTasks, change: `${pendingTasks} pending`, up: true, color: '#F59E0B', icon: <CheckCircle size={16} color="#F59E0B" />, sub: `Across ${totalProjects} projects`, sparkData: [1, 2, 3, 4, 5, 6, 7, totalTasks || 9] },
+            { label: 'Completed', value: completedTasks, change: `${completedPct}% done`, up: true, color: '#8B5CF6', icon: <CheckCircle size={16} color="#8B5CF6" />, sub: `On time: ${Math.max(completedTasks - 1, 0)}`, sparkData: [0, 1, 1, 2, 2, 2, 3, completedTasks || 3] },
+            { label: 'Overdue Tasks', value: overdueTasks, change: `${overduePct}% of total`, up: overdueTasks === 0, color: '#EF4444', icon: <AlertTriangle size={16} color="#EF4444" />, sub: `vs. total tasks`, sparkData: [5, 5, 4, 4, 3, 3, 3, overdueTasks || 2] },
           ].map((c, i) => (
             <div key={i} style={{ ...card, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 0 }}>
               {/* icon + label */}
@@ -552,7 +561,7 @@ export function Dashboard() {
               <span style={{ fontSize: 14, fontWeight: 700, color: '#172033' }}>Tasks Over Time</span>
               <div style={{ position: 'relative' }}>
                 <button onClick={() => setShowChartMonthPicker(v => !v)} style={{ ...monthBtn, gap: 6 }}>
-                {new Date(selectedMonth.year, selectedMonth.month).toLocaleString('en-US', { month: 'long', year: 'numeric' })}
+                  {new Date(selectedMonth.year, selectedMonth.month).toLocaleString('en-US', { month: 'long', year: 'numeric' })}
                   <ChevronDown size={11} />
                 </button>
                 {showChartMonthPicker && (
@@ -562,8 +571,8 @@ export function Dashboard() {
                       return { year: d.getFullYear(), month: d.getMonth(), label: d.toLocaleString('en-US', { month: 'long', year: 'numeric' }) };
                     }).map(opt => (
                       <button key={`${opt.year}-${opt.month}`}
-                      onClick={() => { setSelectedMonth({ year: opt.year, month: opt.month }); setShowChartMonthPicker(false); }}
-                      style={{
+                        onClick={() => { setSelectedMonth({ year: opt.year, month: opt.month }); setShowChartMonthPicker(false); }}
+                        style={{
                           width: '100%', padding: '9px 14px', border: 'none',
                           background: selectedMonth.year === opt.year && selectedMonth.month === opt.month ? '#EEF4FF' : '#fff',
                           color: selectedMonth.year === opt.year && selectedMonth.month === opt.month ? '#1663F6' : '#172033',
@@ -582,7 +591,7 @@ export function Dashboard() {
                   <span style={{ fontSize: 12, color: '#667085' }}>{s.label}</span>
                 </div>
               ))}
-              </div>
+            </div>
             <LineChart series={chartSeries} labels={chartLabels} />
           </div>
         </div>
@@ -704,7 +713,7 @@ export function Dashboard() {
               </div>
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <AvatarStack
-users={(p.members || []).map((m: any) => ({ name: m.user?.first_name || m.user?.username || '?', avatar: m.user?.avatar || m.avatar || null }))}
+                  users={(p.members || []).map((m: any) => ({ name: m.user?.first_name || m.user?.username || '?', avatar: m.user?.avatar || m.avatar || null }))}
                   max={3}
                 />
               </div>
