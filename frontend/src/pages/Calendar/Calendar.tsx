@@ -293,7 +293,11 @@ const MiniCalendar: React.FC<MiniCalendarProps> = ({
 }) => {
     // Internal state to track which month the mini calendar is currently viewing
     const [navDate, setNavDate] = useState(new Date(currentDate.getFullYear(), currentDate.getMonth(), 1));
-    const month = navDate.getMonth();
+
+    // ADD THIS right after the useState:
+    useEffect(() => {
+        setNavDate(new Date(currentDate.getFullYear(), currentDate.getMonth(), 1));
+    }, [currentDate]);    const month = navDate.getMonth();
     const year = navDate.getFullYear();
 
     const changeMonth = (offset: number) => {
@@ -3613,7 +3617,7 @@ export const Calendar: React.FC = () => {
     return (
         <div className="w-full p-8 space-y-6">
             {/* Header Area */}
-            <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6">
+            {/* <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
                         <CalendarIcon className="w-8 h-8 text-blue-600" />
@@ -3640,11 +3644,15 @@ export const Calendar: React.FC = () => {
                         </div>
                     ))}
                 </div>
-            </div>
+            </div> */}
 
             {/* Controls Bar */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm sticky top-0 z-30">
                 <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
+                    <h5 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
+                        <CalendarIcon className="w-6 h-6 text-blue-600" />
+                        Calendar
+                    </h5>
                     <button
                         onClick={goToToday}
                         className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
