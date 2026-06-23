@@ -2,13 +2,7 @@ import React, { useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import { Link } from 'react-router-dom';
 import {
-  ArrowLeft,
-  Loader2,
-  Upload,
-  List,
-  Grid3X3,
-  Settings,
-  MessageCircle,
+  ArrowLeft, Loader2, Upload, List, Grid3X3, Settings, MessageCircle, Copy, Check,
   Search, FileText, Info, X, Calendar, User, NotebookPen, Pencil, Plus, Trash2
 } from 'lucide-react';
 import { DualView, ViewToggle } from '@/components/layout/DualView';
@@ -25,6 +19,7 @@ import Threads from '../Project/Thread';
 import { useProjectDetails, TabType } from '@/hooks/useTaskDetails';
 import type { Task, FilteredDocument, QuickNote } from '@/types';
 import { taskApi } from '@/services/api';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 
 //Date Field Dropdown
 function DateFieldDropdown({
@@ -225,9 +220,9 @@ export function TaskDetails() {
   const bulkFileInputRef = React.useRef<HTMLInputElement>(null);
   const [isBulkUploading, setIsBulkUploading] = React.useState(false);
   const [uploadResultModal, setUploadResultModal] = React.useState<{ type: 'success' | 'error', message: string } | null>(null);
-
   const [isBulkUploadModalOpen, setIsBulkUploadModalOpen] = React.useState(false);
   const [pastedJson, setPastedJson] = React.useState("");
+  const { copied: jsonExampleCopied, copy: copyJsonExample } = useCopyToClipboard();
 
   const dummyJsonExample = `{
   "tasks": [
@@ -243,7 +238,7 @@ export function TaskDetails() {
       "description": "Ensure WebSocket connections handle disconnects gracefully.",
       "priority": "medium",
       "status": "backlog",
-      "assignee_emails": ["megha@example.com"]
+      "assignee_emails": ["lensvox@example.com"]
     }
   ]
 }`;
@@ -257,8 +252,8 @@ export function TaskDetails() {
         ctx.queryClient.invalidateQueries();
       }
       setUploadResultModal({ type: 'success', message: 'Tasks successfully created from JSON!' });
-      setIsBulkUploadModalOpen(false); // Close the input modal on success
-      setPastedJson(""); // Clear pasted text
+      setIsBulkUploadModalOpen(false);
+      setPastedJson("");
     } catch (error: any) {
       console.error('Bulk upload error:', error);
       const errorMessage = error.response?.data?.error || error.response?.data?.message || 'Failed to upload tasks.';
@@ -290,8 +285,6 @@ export function TaskDetails() {
     const file = new File([pastedJson], 'pasted_tasks.json', { type: 'application/json' });
     await processBulkFile(file);
   };
-
-  // DateFieldLabel
 
   // DateFieldLabel 
   const DateFieldLabel = useMemo(
@@ -398,7 +391,7 @@ export function TaskDetails() {
               </button>
             ))}
 
-            {/* List / Grid toggle (tasks only) */}
+            {/* List / Grid toggle */}
             {ctx.activeTab === 'tasks' && (
               <div className="flex items-center bg-white p-1 gap-1 ml-auto">
                 <button
@@ -844,7 +837,7 @@ export function TaskDetails() {
         </div>
       )}
 
-      {/* Document Share Modal — same as /documents page */}
+      {/* Document Share Modal */}
       <DocumentShareModal
         isOpen={!!ctx.shareDoc}
         onClose={() => ctx.setShareDoc(null)}
@@ -1097,9 +1090,30 @@ export function TaskDetails() {
                 <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
                   <Info className="w-4 h-4 text-blue-500" /> Expected Format
                 </h3>
-                <pre className="bg-slate-900 text-green-400 p-4 rounded-lg text-[12px] overflow-x-auto font-mono leading-relaxed">
-                  {dummyJsonExample}
-                </pre>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => copyJsonExample(dummyJsonExample)}
+                    aria-label={jsonExampleCopied ? 'Copied' : 'Copy sample JSON'}
+                    className={`absolute top-2 right-2 z-10 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${jsonExampleCopied
+                      ? 'bg-green-500/20 text-green-300'
+                      : 'bg-white/10 text-gray-200 hover:bg-white/20'
+                      }`}
+                  >
+                    {jsonExampleCopied ? (
+                      <>
+                        <Check className="w-3.5 h-3.5" /> Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" /> Copy
+                      </>
+                    )}
+                  </button>
+                  <pre className="bg-slate-900 text-green-400 p-4 rounded-lg text-[12px] overflow-x-auto font-mono leading-relaxed">
+                    {dummyJsonExample}
+                  </pre>
+                </div>
               </div>
 
               {/* Paste or Upload Section */}
@@ -1172,8 +1186,8 @@ export function TaskDetails() {
               <button
                 onClick={() => setUploadResultModal(null)}
                 className={`w-full py-2.5 px-4 rounded-lg font-bold text-white transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 ${uploadResultModal.type === 'success'
-                    ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500 hover:shadow-lg hover:-translate-y-0.5'
-                    : 'bg-red-600 hover:bg-red-700 focus:ring-red-500 hover:shadow-lg hover:-translate-y-0.5'
+                  ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500 hover:shadow-lg hover:-translate-y-0.5'
+                  : 'bg-red-600 hover:bg-red-700 focus:ring-red-500 hover:shadow-lg hover:-translate-y-0.5'
                   }`}
               >
                 Continue
