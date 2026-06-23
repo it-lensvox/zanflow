@@ -6,14 +6,17 @@ import { Button, Input, Card, CardHeader, CardTitle, CardContent } from '@/compo
 import { getCredentials } from '@/services/authStorage';
 import { authApi, api } from '@/services/api';
 import { API_URL } from '@/services/api';
+import { SocialAuthButtons } from '@/components/auth/SocialAuthButtons';
+import { useSocialAuth } from '@/hooks/useSocialAuth';
+
 
 // Toast Notification Component
 function Toast({ message, type, onClose }: { message: string; type: 'success' | 'error'; onClose: () => void }) {
   return (
     <div className="fixed top-4 right-4 z-[100] animate-in slide-in-from-top-5 duration-300">
       <div className={`rounded-lg shadow-lg p-4 min-w-[300px] max-w-md ${type === 'success'
-          ? 'bg-green-50 border border-green-200'
-          : 'bg-red-50 border border-red-200'
+        ? 'bg-green-50 border border-green-200'
+        : 'bg-red-50 border border-red-200'
         }`}>
         <div className="flex items-start gap-3">
           <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${type === 'success' ? 'bg-green-500' : 'bg-red-500'
@@ -37,8 +40,8 @@ function Toast({ message, type, onClose }: { message: string; type: 'success' | 
           <button
             onClick={onClose}
             className={`flex-shrink-0 ${type === 'success'
-                ? 'text-green-400 hover:text-green-600'
-                : 'text-red-400 hover:text-red-600'
+              ? 'text-green-400 hover:text-green-600'
+              : 'text-red-400 hover:text-red-600'
               }`}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -68,6 +71,9 @@ export function Login() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const { loginWithUser } = useAuth();
+  const { isLoading: isSocialLoading, handleGoogleSuccess, handleGoogleError, handleMicrosoftLogin } =
+    useSocialAuth({ mode: 'login', loginWithUser });
 
   // Toast state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -82,7 +88,7 @@ export function Login() {
   const handleSendOTP = async () => {
     // 1. Show the success message immediately when the button is clicked
     showToast("If this email is registered, an OTP has been sent.", "success", false);
-    
+
     try {
       // 2. Perform the 5-6 second API call in the background
       await authApi.forgotPassword(forgotEmail);
@@ -132,7 +138,7 @@ export function Login() {
     e.preventDefault();
     setError('');
     setIsLoading(true);
-  
+
     try {
       const response = await fetch(`${API_URL}/auth/login/`, {
         method: 'POST',
@@ -143,49 +149,43 @@ export function Login() {
           password: password
         })
       });
-  
+
       const data = await response.json();
-      
+
       if (response.ok && data.access) {
         // ✅ Save tokens
         localStorage.setItem('access_token', data.access);
         localStorage.setItem('refresh_token', data.refresh);
-        
-        console.log('✅ Login successful! Token saved.');
-        
+
         // ✅ FETCH WORKSPACES AND SET DEFAULT
         try {
           // Set auth header for axios before making the call
           api.defaults.headers.common['Authorization'] = `Bearer ${data.access}`;
-          
+
           const workspacesResponse = await api.get('/organizations/workspaces/');
           const workspacesData = workspacesResponse.data;
-          
+
           // Handle array response
           let workspaces = Array.isArray(workspacesData) ? workspacesData : workspacesData.workspaces;
-          
+
           if (workspaces && workspaces.length > 0) {
             // Use stored ID if valid, otherwise default workspace
             const defaultWorkspace = workspaces.find((w: any) => w.is_default);
             const activeId = defaultWorkspace?.id || workspaces[0]?.id;
-            
+
             if (activeId) {
               localStorage.setItem('active_workspace_id', String(activeId));
               api.defaults.headers.common['X-Workspace-ID'] = String(activeId);
-              console.log('✅ Active workspace set:', activeId);
             }
           }
         } catch (wsError) {
           console.warn('Could not fetch workspaces, will load on dashboard:', wsError);
         }
-        
-        // ✅ KEEP THIS - Use the proper login function that sets the user
+
         try {
           await login(username, password);
-          // login() already navigates to '/', so no need to navigate again
         } catch (err) {
           console.error('Failed to fetch user data:', err);
-          // If user fetch fails, still redirect
           queryClient.clear();
           window.location.href = '/dashboard';
         }
@@ -264,9 +264,18 @@ export function Login() {
                 Forgot password?
               </button>
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
+           <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? 'Signing in...' : 'Sign in'}
             </Button>
+
+            <SocialAuthButtons
+              mode="login"
+              isLoading={isSocialLoading}
+              onGoogleSuccess={handleGoogleSuccess}
+              onGoogleError={handleGoogleError}
+              onMicrosoftClick={handleMicrosoftLogin}
+            />
+
             <p className="text-center text-sm text-muted-foreground">
               Don't have an account?{' '}
               <button
@@ -307,14 +316,12 @@ export function Login() {
             <CardContent>
               {/* Inline Notification */}
               {toast && (
-                <div className={`mb-4 flex items-start gap-3 rounded-lg p-3 animate-in fade-in zoom-in duration-200 ${
-                  toast.type === 'success' 
-                    ? 'bg-green-50 text-green-900 border border-green-200' 
+                <div className={`mb-4 flex items-start gap-3 rounded-lg p-3 animate-in fade-in zoom-in duration-200 ${toast.type === 'success'
+                    ? 'bg-green-50 text-green-900 border border-green-200'
                     : 'bg-red-50 text-red-900 border border-red-200'
-                }`}>
-                  <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${
-                    toast.type === 'success' ? 'bg-green-500' : 'bg-red-500'
                   }`}>
+                  <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${toast.type === 'success' ? 'bg-green-500' : 'bg-red-500'
+                    }`}>
                     {toast.type === 'success' ? (
                       <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                     ) : (
@@ -322,9 +329,8 @@ export function Login() {
                     )}
                   </div>
                   <div className="flex-1 text-sm font-medium mt-0.5">{toast.message}</div>
-                  <button onClick={() => setToast(null)} className={`flex-shrink-0 mt-0.5 ${
-                    toast.type === 'success' ? 'text-green-400 hover:text-green-600' : 'text-red-400 hover:text-red-600'
-                  }`}>
+                  <button onClick={() => setToast(null)} className={`flex-shrink-0 mt-0.5 ${toast.type === 'success' ? 'text-green-400 hover:text-green-600' : 'text-red-400 hover:text-red-600'
+                    }`}>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                   </button>
                 </div>
@@ -343,18 +349,18 @@ export function Login() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Enter OTP</label>
                     <div className="flex gap-2 items-center">
-                      <Input 
-                        placeholder="4-digit code" 
-                        maxLength={4} 
-                        className="text-center tracking-widest" 
-                        value={otp} 
+                      <Input
+                        placeholder="4-digit code"
+                        maxLength={4}
+                        className="text-center tracking-widest"
+                        value={otp}
                         onChange={(e) => {
                           setOtp(e.target.value);
                           // Clear the success message as soon as the user starts typing
                           if (toast?.type === 'success') {
                             setToast(null);
                           }
-                        }} 
+                        }}
                       />
                     </div>
                   </div>
@@ -384,6 +390,13 @@ export function Login() {
                   >
                     Submit
                   </Button>
+                  <SocialAuthButtons
+                    mode="login"
+                    isLoading={isSocialLoading}
+                    onGoogleSuccess={handleGoogleSuccess}
+                    onGoogleError={handleGoogleError}
+                    onMicrosoftClick={handleMicrosoftLogin}
+                  />
                 </div>
               )}
             </CardContent>

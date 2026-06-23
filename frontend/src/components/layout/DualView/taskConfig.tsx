@@ -229,7 +229,7 @@ export function TaskGridCard({ task, onTaskClick }: TaskGridCardProps) {
   );
 }
 
-// ─── Shared pin logic — used by both table cell and grid card ────────────────
+// Shared pin logic 
 function usePinTask(task: Task, queryClient: ReturnType<typeof useQueryClient>) {
   const [isPinned, setIsPinned] = useState<boolean>(!!task.is_pinned);
   const [isPending, setIsPending] = useState(false);
@@ -292,7 +292,7 @@ function usePinTask(task: Task, queryClient: ReturnType<typeof useQueryClient>) 
   return { isPinned, isPending, handlePin };
 }
 
-// ─── Shared pin button — rendered identically in table and grid ──────────────
+// Shared pin button 
 function PinButton({
   isPinned,
   isPending,
@@ -326,7 +326,7 @@ function PinButton({
   );
 }
 
-// ─── Pin cell used in the Task Title table column ────────────────────────────
+// Pin cell 
 function TaskTitleCell({
   task,
   queryClient,
@@ -363,21 +363,17 @@ interface TaskTableColumnsProps {
 }
 
 export const createTasksTableColumns = ({ onTaskClick, queryClient, user, navigate, dateField = 'end_date', personField = 'assigned_to' }: TaskTableColumnsProps & { dateField?: 'end_date' | 'start_date' | 'created_at'; personField?: 'assigned_to' | 'created_by' | 'updated_by' }): TableColumn<Task>[] => {
-  // Helper: update ALL ['tasks-list', *] caches that exist in the cache
-  // This ensures project pages update instantly, not just the TaskBoard
+
   const updateAllTaskListCaches = (updatedTask: Task) => {
     const allTaskListQueries = queryClient.getQueryCache().findAll({ queryKey: ['tasks-list'], exact: false });
-    console.log('[taskConfig] updateAllTaskListCaches — found caches:', allTaskListQueries.map(q => q.queryKey));
     allTaskListQueries.forEach((query) => {
       queryClient.setQueryData(query.queryKey, (old: any) => {
         if (!old) return old;
         const list: Task[] = old.tasks ?? old.results ?? (Array.isArray(old) ? old : []);
-        // Only update if this task exists in this project's list
         const exists = list.some((t: Task) => t.id === updatedTask.id);
         if (!exists) return old;
         const withoutTask = list.filter((t: Task) => t.id !== updatedTask.id);
         const merged = [updatedTask, ...withoutTask];
-        console.log('[taskConfig] updateAllTaskListCaches — updated cache key:', query.queryKey);
         if (old.tasks) return { ...old, tasks: merged };
         if (old.results) return { ...old, results: merged };
         if (Array.isArray(old)) return merged;
@@ -389,10 +385,8 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
   const StatusDropdown = ({ task }: { task: Task }) => {
     const [activeDropdown, setActiveDropdown] = useState(false);
     const statusConfig = getStatusConfig(task.status);
-
     const handleStatusChange = (newStatus: string) => {
-      console.log('[StatusChange] 🔍 Writing to cache key: ["tasks"]');
-      console.log('[StatusChange] 🔍 Task ID:', task.id, '| New status:', newStatus);
+
       const taskListKeys = queryClient.getQueryCache().findAll({ queryKey: ['tasks-list'] });
       console.log('[StatusChange] 🔍 Other task caches that exist (tasks-list):', taskListKeys.map(q => q.queryKey));
       queryClient.setQueryData(['tasks'], (old: any) => {
@@ -439,7 +433,6 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
       setActiveDropdown(false);
       taskApi.update(task.id, { status: newStatus } as any)
         .then((response) => {
-          // Update cache with the full task data from the API response (includes status_updated_by_details)
           const updatedTaskFromServer = response.task || response;
           queryClient.setQueryData(['tasks'], (old: any) => {
             if (!old) return old;
@@ -523,8 +516,6 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     const priorityOption = priorityOptions.find(opt => opt.value === task.priority);
 
     const handlePriorityChange = (newPriority: string) => {
-      console.log('[PriorityChange] 🔍 Writing to cache key: ["tasks"]');
-      console.log('[PriorityChange] 🔍 Task ID:', task.id, '| New priority:', newPriority);
       const taskListKeys = queryClient.getQueryCache().findAll({ queryKey: ['tasks-list'] });
       console.log('[PriorityChange] 🔍 Other task caches (tasks-list):', taskListKeys.map(q => q.queryKey));
       queryClient.setQueryData(['tasks'], (old: any) => {

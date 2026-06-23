@@ -9,10 +9,10 @@ export function Profile() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // Profile image (local only for now)
+  // Profile image
   const [profileImage, setProfileImage] = useState<string | null>((user as any)?.avatar || null);
-const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
 
   // Projects
   const [projects, setProjects] = useState<any[]>([]);
@@ -38,7 +38,7 @@ const [avatarError, setAvatarError] = useState<string | null>(null);
         setTempSkills(data.skills || []);
         setOriginalSkills(data.skills || []);
         if (data.avatar) {
-          setProfileImage(data.avatar); 
+          setProfileImage(data.avatar);
         }
       } catch (error) {
         console.error('Failed to fetch user data:', error);
@@ -72,18 +72,18 @@ const [avatarError, setAvatarError] = useState<string | null>(null);
   const handleProfileImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-  
+
     // Instant local preview
     const reader = new FileReader();
     reader.onloadend = () => setProfileImage(reader.result as string);
     reader.readAsDataURL(file);
-  
+
     // Upload to S3 via backend
     setIsUploadingAvatar(true);
     const formData = new FormData();
     formData.append('avatar', file);
-    const updatedUser = await authApi.updateProfile(formData); // ✅ PATCH /me/
-    if (updatedUser?.avatar) setProfileImage(updatedUser.avatar); // ✅ use S3 URL
+    const updatedUser = await authApi.updateProfile(formData);
+    if (updatedUser?.avatar) setProfileImage(updatedUser.avatar);
     setIsUploadingAvatar(false);
   };
 
@@ -351,11 +351,10 @@ const [avatarError, setAvatarError] = useState<string | null>(null);
                     <button
                       onClick={handleSaveSkills}
                       disabled={!canSaveSkills}
-                      className={`px-4 py-2 text-sm font-medium rounded-xl transition ${
-                        canSaveSkills
+                      className={`px-4 py-2 text-sm font-medium rounded-xl transition ${canSaveSkills
                           ? 'bg-green-600 text-white hover:bg-green-700 cursor-pointer'
                           : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                      }`}
+                        }`}
                     >
                       Save
                     </button>

@@ -401,15 +401,15 @@ export function TaskDetailPage() {
             // PDF preview URL when conversion is ready (instead of the
             // cached PPTX/DOCX URL from the task data).
             const projectIdNum = task.project || (task as any).project_details?.id;
-            
+
             let fileUrl = attachment.file_url;  // Cached URL as fallback
-            
+
             if (projectIdNum) {
                 try {
                     const downloadResponse = await documentsApi.getDownloadUrl(projectIdNum, {
                         document_id: attachment.id.toString()
                     });
-                    
+
                     if (downloadResponse?.url) {
                         fileUrl = downloadResponse.url;  // Fresh URL — PDF if ready
                     }
@@ -418,19 +418,19 @@ export function TaskDetailPage() {
                     // Fall through and use cached URL
                 }
             }
-            
+
             if (!fileUrl) {
                 alert('Unable to open attachment: Download URL not available.');
                 return;
             }
-            
+
             // Determine fileType from the URL we're actually using (which may be PDF)
             // The DocumentPreview component also detects PDF from URL path itself
             const urlPath = fileUrl.split('?')[0].toLowerCase();
-            const detectedFileType = urlPath.endsWith('.pdf') 
-                ? 'pdf' 
+            const detectedFileType = urlPath.endsWith('.pdf')
+                ? 'pdf'
                 : (attachment.file_name?.split('.').pop()?.toLowerCase() || '');
-            
+
             // Open in-app preview
             setPreviewDocument({
                 url: fileUrl,
@@ -534,7 +534,7 @@ export function TaskDetailPage() {
     }
 
     return (
-        <div className="w-full py-8 px-20 space-y-10">
+        <div className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 py-8 space-y-10">
             {/* Header */}
             <div className="flex items-start justify-between">
                 <div className="flex items-center gap-4">
@@ -946,7 +946,7 @@ export function TaskDetailPage() {
                 </div>
 
                 {/* 4. Documents */}
-                <div className="documents bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+                <div className="documents bg-white rounded-xl p-6 border border-gray-200 shadow-sm overflow-x-auto">
                     <label className="text-sm font-semibold text-gray-700 block mb-4">Attachment</label>
 
                     {/* Dropzone with auto-trigger */}

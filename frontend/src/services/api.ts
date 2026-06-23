@@ -1,11 +1,11 @@
-import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import axios, { InternalAxiosRequestConfig } from 'axios';
 import type {
   AuthTokens, User as AppUser, PaginatedResponse, PaginatedProjectsResponse, GetUploadUrlPayload, GetUploadUrlResponse, ConfirmUploadResponse, GetDownloadUrlPayload, ConfirmUploadPayload, GetDownloadUrlResponse, AllDocumentsResponse,
   TaskComment, CreateTaskCommentPayload, AITaskSuggestionResponse, AITaskSuggestionPayload, ProjectCreatePayload, Label, DocumentStatus, ChatMessage, ChatRoom, ChatRoomMessagesResponse, CreatePrivateChatPayload,
   GatewaySendMessagePayload, GatewayIncomingMessage, RefineTextPayload, RefineTextResponse, TaskResponse, TeamTypeChoicesResponse, PinTaskResponse,
   CreateTeamPayload, ProjectChatRoom, TeamChatRoom, ChatUnreadResponse, NotificationData, NotificationCallback, Team, ThreadRoom, ThreadSession, ThreadStorage, ThreadUIMessage, CreateThreadRoomPayload, WSJoinRoomCommand, WSSendMessageCommand, WSIncomingThreadMessage, WSUnreadUpdateSignal, ThreadMessagesResponse,
   InviteUserPayload, InviteUserResponse, InviteVerifyResponse, InviteAcceptPayload, InviteAcceptResponse, AIBotSendPayload, AIBotIncomingMessage, OrganizationSignupPayload, OrganizationSignupResponse,
-  DailyUpdate, DailyUpdatePayload, DailyUpdateListResponse, TaskFilterParams, Event as CalendarEventType,
+  DailyUpdate, DailyUpdatePayload, DailyUpdateListResponse, TaskFilterParams, Event as CalendarEventType, SocialAuthPayload, SocialAuthResponse,
 } from '@/types';
 
 export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.164:8000/api/v1';
@@ -35,14 +35,6 @@ api.interceptors.request.use(
     if (workspaceId) {
       config.headers['X-Workspace-ID'] = workspaceId;
     }
-
-    console.log('🌐 API Request:', {
-      method: config.method?.toUpperCase(),
-      url: config.url,
-      workspaceId: config.headers['X-Workspace-ID'],
-      hasAuth: !!token,
-    });
-
     return config;
   },
   (error) => {
@@ -51,7 +43,6 @@ api.interceptors.request.use(
 );
 
 // ✅ Response interceptor for token refresh with queue
-// Only refreshes on ACTUAL auth failures, not permission errors
 let isRefreshingToken = false;
 let failedRequestsQueue: Array<{
   resolve: (value: any) => void;
@@ -72,16 +63,16 @@ const processQueue = (error: any, token: string | null = null) => {
 // Check if a 403 is an auth issue (expired token) vs a permission issue
 const isAuthError = (error: any): boolean => {
   const status = error.response?.status;
-  
+
   // 401 is always an auth issue
   if (status === 401) return true;
-  
+
   // For 403, check the response body to distinguish auth vs permission
   if (status === 403) {
     const data = error.response?.data;
     const detail = (data?.detail || '').toLowerCase();
     const code = data?.code || '';
-    
+
     // These indicate expired/missing token (should refresh)
     if (
       code === 'not_authenticated' ||
@@ -92,12 +83,12 @@ const isAuthError = (error: any): boolean => {
     ) {
       return true;
     }
-    
+
     // Everything else is a permission error (don't refresh)
     // e.g. "Only admins can create workspaces", "You are not a member"
     return false;
   }
-  
+
   return false;
 };
 
@@ -221,12 +212,10 @@ function scheduleProactiveRefresh() {
   const expMs = decodeTokenExp(accessToken);
   if (!expMs) return;
 
-  // Refresh 2 minutes before expiry (or halfway if token lives < 4 min)
+  // Refresh 2 minutes before expiry
   const now = Date.now();
   const timeUntilExpiry = expMs - now;
   const refreshIn = Math.max(timeUntilExpiry - 120000, timeUntilExpiry / 2, 5000);
-
-  console.log(`🔄 Token refresh scheduled in ${Math.round(refreshIn / 1000)}s`);
 
   proactiveRefreshTimer = setTimeout(async () => {
     try {
@@ -246,8 +235,6 @@ function scheduleProactiveRefresh() {
       }
       setTokens({ access, refresh: refresh || refreshToken });
       api.defaults.headers.common['Authorization'] = `Bearer ${access}`;
-
-      console.log('🔄 Token proactively refreshed');
 
       // Schedule next refresh
       scheduleProactiveRefresh();
@@ -1251,10 +1238,10 @@ export class NotificationWebSocketService {
 
           // Check if this is a notification event
           if (message.type === 'SIGNAL' && message.event === 'NEW_NOTIFICATION') {
-    const notificationData: NotificationData = message.data;
-    const currentWorkspaceId = parseInt(localStorage.getItem('active_workspace_id') || '0');
-    notificationData._isCurrentWorkspace = notificationData.workspace_id === currentWorkspaceId;
-    this.notificationCallbacks.forEach(callback => {
+            const notificationData: NotificationData = message.data;
+            const currentWorkspaceId = parseInt(localStorage.getItem('active_workspace_id') || '0');
+            notificationData._isCurrentWorkspace = notificationData.workspace_id === currentWorkspaceId;
+            this.notificationCallbacks.forEach(callback => {
               try {
                 callback(notificationData);
               } catch (err) {
@@ -1793,10 +1780,7 @@ export const eventApi = {
     window.URL.revokeObjectURL(url);
   },
 
-  // ═══════════════════════════════════════════════════════════════════════
   // INVITATION API FUNCTIONS
-  // ═══════════════════════════════════════════════════════════════════════
-
   acceptInvitation: async (invitationId: number): Promise<void> => {
     await api.patch(`/daily-updates/events/invitations/${invitationId}/accept/`, {});
   },
@@ -1811,10 +1795,7 @@ export const eventApi = {
     });
   },
 
-  // ═══════════════════════════════════════════════════════════════════════
   // RSVP STATUS API - Get all attendees' response status for an event
-  // ═══════════════════════════════════════════════════════════════════════
-
   getEventRsvpStatus: async (eventId: number): Promise<{
     event_id: number;
     organizer: string;
@@ -1829,7 +1810,6 @@ export const eventApi = {
     const { data } = await api.get(`/daily-updates/events/${eventId}/rsvp-status/`);
     return data;
   },
-  // Suggest available time slots for a group of attendees
   suggestSlots: async (
     attendeeIds: number[],
     targetDate: string,
@@ -1847,10 +1827,8 @@ export const eventApi = {
     return data;
   },
 };
-// ═══════════════════════════════════════════════════════════════════════
-// DYUKSA AI SCHEDULING ASSISTANT
-// ═══════════════════════════════════════════════════════════════════════
 
+// DYUKSA AI SCHEDULING ASSISTANT
 export const dyuksaAI = {
   // Send a natural language scheduling request to the AI
   chat: async (message: string): Promise<{
@@ -1871,7 +1849,6 @@ export const dyuksaAI = {
   },
 };
 
-// Add to your api.ts exports
 export const calendarShareApi = {
   list: async () => {
     const response = await api.get('/daily-updates/calendar-shares/');
@@ -1890,10 +1867,7 @@ export const calendarShareApi = {
   },
 };
 
-// ═══════════════════════════════════════════════════════════════════════
 // CALENDAR PUBLIC LINK API
-// ═══════════════════════════════════════════════════════════════════════
-
 export const calendarLinkApi = {
   list: async () => {
     const response = await api.get('/daily-updates/calendar-links/');
@@ -1911,7 +1885,6 @@ export const calendarLinkApi = {
   getPublicCalendar: async (token: string) => {
     const response = await api.get(`/daily-updates/shared-calendar/${token}/`, {
       headers: {
-        // Remove auth header for public endpoint
         Authorization: undefined
       }
     });
@@ -2001,17 +1974,11 @@ export const workspaceApi = {
   async getWorkspaces() {
     const response = await api.get('/organizations/workspaces/');
     const data = response.data;
-
-    console.log('✅ Raw backend response:', data);
-
     let normalizedData;
 
     if (Array.isArray(data)) {
-      console.log('⚠️ Backend returned array, normalizing...');
-
       const storedId = localStorage.getItem('active_workspace_id');
       const storedIdNum = storedId ? parseInt(storedId) : null;
-
       const storedExists = storedIdNum && data.some((w: any) => w.id === storedIdNum);
 
       let activeId;
@@ -2022,13 +1989,11 @@ export const workspaceApi = {
         activeId = defaultWorkspace?.id || data[0]?.id;
 
         if (storedIdNum && !storedExists) {
-          console.log(`⚠️ Stored workspace ${storedIdNum} not found, using ${activeId}`);
         }
       }
 
       if (activeId && activeId !== storedIdNum) {
         localStorage.setItem('active_workspace_id', String(activeId));
-        console.log(`🔄 Updated workspace ID from ${storedIdNum} to ${activeId}`);
       }
 
       normalizedData = {
@@ -2041,11 +2006,8 @@ export const workspaceApi = {
       const storedId = localStorage.getItem('active_workspace_id');
       if (data.active_workspace_id && storedId !== String(data.active_workspace_id)) {
         localStorage.setItem('active_workspace_id', String(data.active_workspace_id));
-        console.log(`🔄 Updated workspace ID to ${data.active_workspace_id}`);
       }
     }
-
-    console.log('✅ Normalized data:', normalizedData);
     return normalizedData;
   },
 
@@ -2069,18 +2031,10 @@ export const workspaceApi = {
 
     // ✅ 2. Update axios default header immediately
     api.defaults.headers.common['X-Workspace-ID'] = String(workspaceId);
-
-    console.log(`✅ Workspace switched to ${workspaceId}, axios header updated`);
     return data;
   },
 
   // 4️⃣ GET WORKSPACE DETAILS
-  // async getWorkspaceDetails(workspaceId: number) {
-  //   const response = await api.get(`/organizations/workspaces/${workspaceId}/`);
-  //   return response.data;
-  // },
-
-  // Helper methods
   setActiveWorkspace(workspaceId: number): void {
     localStorage.setItem('active_workspace_id', String(workspaceId));
   },
@@ -2088,13 +2042,17 @@ export const workspaceApi = {
   clearActiveWorkspace(): void {
     localStorage.removeItem('active_workspace_id');
   }
-
-  
 };
 
-// ✅ Auto-start proactive refresh if user is already logged in (page reload)
+// ✅ Auto-start proactive refresh if user is already logged
 if (localStorage.getItem('access_token')) {
   startProactiveRefresh();
 }
+
+// ── Social Auth API 
+export const socialAuthApi = {
+  authenticate: (payload: SocialAuthPayload): Promise<SocialAuthResponse> =>
+    api.post<SocialAuthResponse>('/auth/social-auth/', payload).then((res) => res.data),
+};
 
 export default api;

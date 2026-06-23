@@ -131,10 +131,7 @@ export function useNotifications() {
         notification.notification_type === 'document_shared' ||
         notification.notification_type === 'DOCUMENT_SHARED';
 
-      console.log('[useNotifications] 📄 isDocumentNotification:', isDocumentNotification, '| relatedType:', relatedType, '| notification_type:', notification.notification_type);
-
       if (isDocumentNotification) {
-        console.log('[useNotifications] 📄 >>> Invalidating documents queries for receiver...');
         queryClient.invalidateQueries({ queryKey: ['documents'] });
       }
     });

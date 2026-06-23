@@ -1466,3 +1466,36 @@ export interface DyuksaAIResponse {
 }
 
 
+// ── Social Auth Types 
+
+export type SocialProvider = 'google' | 'microsoft';
+
+// company_name is optional — present for Signup, absent for Login.
+export interface SocialAuthPayload {
+  provider: SocialProvider;
+  token: string;
+  company_name?: string;
+}
+
+// Matches the success response from POST /api/auth/social-auth/
+export interface SocialAuthResponse {
+  message: string;
+  user: {
+    id: number;
+    username: string;
+    email: string;
+    role: User['role'];
+    auth_provider: SocialProvider;
+  };
+  tokens: {
+    access: string;
+    refresh: string;
+  };
+  // Only present in Signup (201) response
+  organization?: {
+    id: number;
+    name: string;
+    slug: string;
+  };
+}
+

@@ -31,7 +31,6 @@ function sanitiseTaskCache(queryClient: import('@tanstack/react-query').QueryCli
     const existing = queryClient.getQueryData(['tasks']);
 
     if (!existing) {
-        console.log('%c[Cache:tasks] ✅ No existing cache — clean start', 'color:#22c55e;font-weight:bold');
         return;
     }
 
@@ -47,12 +46,6 @@ function sanitiseTaskCache(queryClient: import('@tanstack/react-query').QueryCli
         );
 
     if (isValidInfiniteShape) {
-        console.log(
-            '%c[Cache:tasks] ✅ Valid InfiniteQuery shape',
-            'color:#22c55e;font-weight:bold',
-            `| pages: ${pageCount}`,
-            `| total tasks: ${(existing as any).pages.reduce((acc: number, p: any) => acc + (p.results?.length ?? 0), 0)}`
-        );
     } else {
         console.warn(
             '%c[Cache:tasks] ⚠️ CORRUPT / FLAT cache detected — clearing now',
@@ -129,38 +122,25 @@ export const MyTask: React.FC = () => {
     } = useInfiniteQuery({
         queryKey: ['tasks'],
         queryFn: async ({ pageParam = 1 }) => {
-            console.log('%c[InfiniteQuery:tasks] 📦 Fetching page', 'color:#6366f1;font-weight:bold', pageParam);
             const result = await taskApi.listPaginated(pageParam as number);
-            console.log(
-                '%c[InfiniteQuery:tasks] ✅ Page fetched',
-                'color:#22c55e;font-weight:bold',
-                `| page: ${pageParam}`,
-                `| count: ${result?.results?.length ?? 0}`,
-                `| hasNext: ${!!result?.next}`
-            );
             return result;
         },
         getNextPageParam: (lastPage) => {
             if (!lastPage || typeof lastPage !== 'object' || Array.isArray(lastPage)) {
-                console.log('%c[InfiniteQuery:tasks] getNextPageParam → undefined (invalid lastPage)', 'color:#94a3b8');
                 return undefined;
             }
             if (!('next' in lastPage) || !lastPage.next) {
-                console.log('%c[InfiniteQuery:tasks] getNextPageParam → undefined (no next URL)', 'color:#94a3b8');
                 return undefined;
             }
             if (!Array.isArray((lastPage as any).results)) {
-                console.log('%c[InfiniteQuery:tasks] getNextPageParam → undefined (results not array)', 'color:#94a3b8');
                 return undefined;
             }
             try {
                 const url = new URL(lastPage.next);
                 const p = url.searchParams.get('page');
                 const nextPage = p ? Number(p) : undefined;
-                console.log('%c[InfiniteQuery:tasks] getNextPageParam →', 'color:#6366f1', nextPage);
                 return nextPage;
             } catch {
-                console.log('%c[InfiniteQuery:tasks] getNextPageParam → undefined (URL parse error)', 'color:#f87171');
                 return undefined;
             }
         },
@@ -329,13 +309,11 @@ export const MyTask: React.FC = () => {
         });
     }, [hookFilteredTasks, activeFilter, searchQuery, columnFilters]);
     const handleFilter = useCallback((key: string) => {
-        console.log('[handleFilter] called with key:', key, '| dateField:', dateField, '| will reset showDateFieldDropdown');
         setShowDateFieldDropdown(false);
         setActiveFilterKey(prev => prev === key ? null : key);
     }, [setActiveFilterKey, dateField]);
 
     const handleAITaskGenerate = useCallback(async (projectId: number, description: string) => {
-        console.log('Generating AI task for project:', projectId, 'with description:', description);
     }, []);
 
     // Create table columns configuration

@@ -127,8 +127,6 @@ export function CreateWorkspaceModal({ isOpen, onClose }: CreateWorkspaceModalPr
         payload.members,
       );
 
-      console.log('✅ Workspace created:', response);
-
       // Show skipped members if any
       if (response.members_skipped?.length > 0) {
         setSkippedMembers(response.members_skipped);

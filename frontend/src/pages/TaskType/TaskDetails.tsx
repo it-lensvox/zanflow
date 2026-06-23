@@ -372,8 +372,8 @@ export function TaskDetails() {
   return (
     <>
       {/* ── Outer layout wrapper ── */}
-      <div className="flex min-h-screen bg-[#f8fafc] text-black">
-        <div className="flex-1 w-full p-8">
+      <div className="min-h-screen bg-[#f8fafc] text-black">
+        <div className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 py-8">
 
           {/* ── Header ── */}
           <div className="flex items-center gap-4 mb-8">
@@ -493,10 +493,11 @@ export function TaskDetails() {
                   <>
                     {ctx.viewMode === 'list' ? (
                       <div className="bg-white rounded-lg shadow-sm">
-                        <DualView
-                          viewMode="table"
-                          gridProps={{
-                            data: ctx.filteredTasks,
+                        <div className="overflow-x-auto pb-4">
+                          <DualView
+                            viewMode="table"
+                            gridProps={{
+                              data: ctx.filteredTasks,
                             renderCard: (task: Task) => (
                               <TaskGridCard task={task} onTaskClick={ctx.setSelectedTask} />
                             ),
@@ -636,6 +637,7 @@ export function TaskDetails() {
                             onFilter: ctx.handleFilter,
                           }}
                         />
+                        </div>
 
                         {/* Inline create row  */}
                         {ctx.viewMode === 'list' && !ctx.isInlineCreating && (

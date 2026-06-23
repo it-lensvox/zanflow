@@ -694,25 +694,12 @@ const justLeftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { data: messagesData, isLoading: isLoadingMessages } = useQuery({
     queryKey: ['chat-messages', activeRoom?.id || selectedProjectRoom?.id || selectedTeamRoom?.id || urlRoomId],
     queryFn: async () => {
-      // ✅ FIX: Check URL roomId as fallback
       const roomId = activeRoom?.id || selectedProjectRoom?.id || selectedTeamRoom?.id || urlRoomId;
-
-      console.log('🔍 [MESSAGES QUERY] Fetching messages:', {
-        roomId,
-        activeRoomId: activeRoom?.id,
-        selectedProjectRoomId: selectedProjectRoom?.id,
-        selectedTeamRoomId: selectedTeamRoom?.id,
-        urlRoomId,
-      });
-
       if (!roomId) {
         console.warn('⚠️ [MESSAGES QUERY] No roomId available, returning empty');
         return Promise.resolve({ messages: [], count: 0, has_more: false });
       }
-
-      console.log('✅ [MESSAGES QUERY] Fetching from API:', roomId);
       const messages = await chatApi.getRoomMessages(roomId);
-      console.log('✅ [MESSAGES QUERY] Received messages:', messages.messages.length);
 
       try {
         await chatApi.markAsRead(roomId);
@@ -744,27 +731,17 @@ const justLeftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
       } catch (error) {
         console.error('Failed to mark messages as read:', error);
       }
-
       return messages;
     },
-    // ✅ FIX: Enable query if urlRoomId is present
     enabled: !!(activeRoom || selectedProjectRoom || selectedTeamRoom || urlRoomId),
-    // ✅ FIX: Remove staleTime: Infinity to allow refetching
     staleTime: 0,
-    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+    gcTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: true,
   });
 
   // Debug log to see query state
   useEffect(() => {
-    console.log('🔍 [MESSAGES STATE]', {
-      messagesCount: messagesData?.messages.length || 0,
-      isLoading: isLoadingMessages,
-      activeRoomId: activeRoom?.id,
-      urlRoomId,
-      enabled: !!(activeRoom || selectedProjectRoom || selectedTeamRoom || urlRoomId),
-    });
   }, [messagesData, isLoadingMessages, activeRoom?.id, urlRoomId]);
 
   // ─── 5. Clear unread on room open 
@@ -1400,7 +1377,6 @@ const justLeftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     mutationFn: ({ roomId, isFavourite }: { roomId: string; isFavourite: boolean }) =>
       chatApi.updateRoomSettings(roomId, { is_favourite: isFavourite }),
     onSuccess: async (response, { roomId, isFavourite }) => {
-      console.log('✅ Favourite updated successfully:', { roomId, isFavourite, response });
       const updatedRoomDetails = await chatApi.getRoomDetails(roomId);
       queryClient.setQueryData(['chat-room-details', roomId], updatedRoomDetails);
       queryClient.invalidateQueries({ queryKey: ['private-chat-rooms'] });

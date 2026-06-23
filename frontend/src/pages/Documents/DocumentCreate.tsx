@@ -97,14 +97,12 @@ export function DocumentCreate() {
       await documentsApi.uploadFileToS3(s3Url, s3Fields, file);
       // Step 3: CONFIRM UPLOAD original_file_name
       const fileNameWithoutPath = file_key.split('/').pop() || file.name;
-      console.log(`[DocumentCreate] Step 3: Confirming upload with file_key: ${file_key}, file_name: ${fileNameWithoutPath}`);
       const confirmResponse = await documentsApi.confirmUpload(projectIdNum, {
         file_key: file_key,
         file_name: file.name,
         file_type: formData.file_type,
       });
 
-      console.log('[DocumentCreate] Step 3 Success: Confirm upload complete.', confirmResponse);
       queryClient.invalidateQueries({ queryKey: ['documents'] });
       queryClient.invalidateQueries({ queryKey: ['projects'] });
 
@@ -204,7 +202,7 @@ export function DocumentCreate() {
                   type="file"
                   className="hidden"
                   onChange={handleFileChange}
-                  accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.json,.txt,**video/*,.mp4,.mov,.avi,.webm**" // UPDATED ACCEPT
+                  accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.json,.txt,**video/*,.mp4,.mov,.avi,.webm**" 
                 />
               </label>
             ) : (

@@ -14,6 +14,7 @@ interface AuthContextType {
   logout: () => void;
   hasRole: (role: User['role']) => boolean;
   isAllowed: (roles: User['role'][]) => boolean;
+  loginWithUser: (user: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -112,19 +113,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [scheduleTokenRefresh]);
 
-  // // Schedule refresh whenever the user changes (login/logout)
-  // useEffect(() => {
-  //   if (user) {
-  //     scheduleTokenRefresh();
-  //   }
-
-  //   return () => {
-  //     if (refreshTimerRef.current) {
-  //       clearTimeout(refreshTimerRef.current);
-  //       refreshTimerRef.current = null;
-  //     }
-  //   };
-  // }, [user, scheduleTokenRefresh]);
 
   // Schedule refresh whenever the user changes (login/logout)
   useEffect(() => {
@@ -135,6 +123,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  const loginWithUser = (userData: User) => {
+    setUser(userData);
+  };
 
   const login = async (username: string, password: string) => {
     await authApi.login(username, password);
@@ -175,6 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logout,
         hasRole,
         isAllowed,
+        loginWithUser,
       }}
     >
       {children}

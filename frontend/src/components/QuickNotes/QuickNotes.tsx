@@ -597,7 +597,6 @@ export function FolderSidebar({
                     <button
                       key={project.id}
                       onClick={() => {
-                        console.log('Selected project:', project);
                         onSelectFolder(`project-${project.id}` as `project-${number}`);
                       }}
                       className={cn(

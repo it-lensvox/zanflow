@@ -1,8 +1,13 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState, } from 'react';
+import { useNavigate, } from 'react-router-dom';
 import { Button, Input, Card, CardHeader, CardTitle, CardContent } from '@/components/common';
 import { authApi, startProactiveRefresh } from '@/services/api';
 import type { OrganizationSignupPayload } from '@/types';
+import { SocialAuthButtons } from '@/components/auth/SocialAuthButtons';
+import { CompanyNameModal } from '@/components/auth/CompanyNameModal';
+import { useSocialAuth } from '@/hooks/useSocialAuth';
+import { useAuth } from '@/hooks/useAuth';
+import type { SocialProvider } from '@/types';
 
 function Toast({ message, type, onClose }: { message: string; type: 'success' | 'error'; onClose: () => void }) {
     return (
@@ -62,6 +67,22 @@ export function Signup() {
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [showPassword, setShowPassword] = useState(false);
     const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
+    const [pendingOAuthToken, setPendingOAuthToken] = useState<{ provider: SocialProvider; token: string } | null>(null);
+    const [oauthModalError, setOauthModalError] = useState<string | null>(null);
+
+    const { loginWithUser } = useAuth();
+    const {
+        isLoading: isSocialLoading,
+        handleGoogleSuccess,
+        handleGoogleError,
+        handleMicrosoftLogin,
+        completeSocialSignup,
+    } = useSocialAuth({
+        mode: 'signup',
+        loginWithUser,
+        onTokenReceived: (provider, token) => setPendingOAuthToken({ provider, token }),
+    });
+
 
     useEffect(() => {
         setCompanyName('');
@@ -231,7 +252,7 @@ export function Signup() {
                                     </div>
                                 </div>
 
-                                <div className="space-y-2"> 
+                                <div className="space-y-2">
                                     <div className="relative">
                                         <input
                                             id="password_confirm"
@@ -298,6 +319,42 @@ export function Signup() {
                                 : (isLoading ? 'Creating account…' : 'Create Account')
                             }
                         </Button>
+                        <SocialAuthButtons
+                            mode="signup"
+                            isLoading={isSocialLoading}
+                            onGoogleSuccess={handleGoogleSuccess}
+                            onGoogleError={handleGoogleError}
+                            onMicrosoftClick={handleMicrosoftLogin}
+                        />
+
+                        <CompanyNameModal
+                            isOpen={!!pendingOAuthToken}
+                            provider={pendingOAuthToken?.provider ?? null}
+                            isLoading={isSocialLoading}
+                            backendError={oauthModalError}
+                            onClearBackendError={() => setOauthModalError(null)}
+                            onConfirm={async (companyName) => {
+                                if (pendingOAuthToken) {
+                                    const error = await completeSocialSignup(
+                                        pendingOAuthToken.provider,
+                                        pendingOAuthToken.token,
+                                        companyName
+                                    );
+                                    if (error) {
+                                        // Show error inline in the modal — keep modal open
+                                        setOauthModalError(error);
+                                    } else {
+                                        // Success — clear everything
+                                        setPendingOAuthToken(null);
+                                        setOauthModalError(null);
+                                    }
+                                }
+                            }}
+                            onCancel={() => {
+                                setPendingOAuthToken(null);
+                                setOauthModalError(null);
+                            }}
+                        />
 
                         {step === 2 && (
                             <button
