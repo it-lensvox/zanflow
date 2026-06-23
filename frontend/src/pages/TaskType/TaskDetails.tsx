@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { Link } from 'react-router-dom';
 import {
@@ -20,6 +20,8 @@ import { useProjectDetails, TabType } from '@/hooks/useTaskDetails';
 import type { Task, FilteredDocument, QuickNote } from '@/types';
 import { taskApi } from '@/services/api';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
+import { useJsonPreview } from '@/hooks/useJsonPreview';
+import { JsonTaskPreviewList } from '@/components/common/JsonTaskPreviewList';
 
 //Date Field Dropdown
 function DateFieldDropdown({
@@ -223,6 +225,19 @@ export function TaskDetails() {
   const [isBulkUploadModalOpen, setIsBulkUploadModalOpen] = React.useState(false);
   const [pastedJson, setPastedJson] = React.useState("");
   const { copied: jsonExampleCopied, copy: copyJsonExample } = useCopyToClipboard();
+  const { tasks: parsedTasks, error: previewError } = useJsonPreview(pastedJson);
+  const [previewTasks, setPreviewTasks] = useState(parsedTasks);
+
+  // Re-sync preview whenever the textarea JSON changes
+  useEffect(() => {
+    setPreviewTasks(parsedTasks);
+  }, [parsedTasks]);
+
+  const handleDeletePreviewTask = (index: number) => {
+    const updated = previewTasks.filter((_, i) => i !== index);
+    setPreviewTasks(updated);
+    setPastedJson(JSON.stringify({ tasks: updated }, null, 2));
+  };
 
   const dummyJsonExample = `{
   "tasks": [
@@ -267,7 +282,10 @@ export function TaskDetails() {
   const handleBulkUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    await processBulkFile(file);
+
+    // Read file content into pastedJson so the preview renders
+    const text = await file.text();
+    setPastedJson(text);
   };
 
   const handlePasteUpload = async () => {
@@ -300,7 +318,6 @@ export function TaskDetails() {
         </svg>
       </button>
     ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [ctx.showDateFieldDropdown, ctx.dateField, ctx.activeDateLabel],
   );
   // PersonFieldLabel
@@ -1125,6 +1142,16 @@ export function TaskDetails() {
                   placeholder="Paste your JSON array here..."
                   className="w-full h-48 p-3 text-[13px] text-gray-700 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#65408b] font-mono resize-y bg-gray-50"
                 />
+
+                {/* JSON Preview Panel */}
+                {previewTasks.length > 0 && (
+                  <JsonTaskPreviewList tasks={previewTasks} onDelete={handleDeletePreviewTask} />
+                )}
+
+                {/* Inline syntax error hint */}
+                {pastedJson.trim() && previewError && (
+                  <p className="text-[11px] text-red-500 mt-1">{previewError}</p>
+                )}
 
                 <div className="flex items-center justify-between mt-2 pt-4 border-t border-gray-100">
                   <div className="flex items-center gap-3">
