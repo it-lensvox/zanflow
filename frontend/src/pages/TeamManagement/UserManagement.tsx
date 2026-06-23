@@ -162,12 +162,12 @@ const AddUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient
       setShowSuccess(true);
       setTimeout(() => {
         setShowSuccess(false);
-        setForm({ username: '', email: '', password: '', confirmPassword: '', firstName: '', lastName: '', role: 'viewer' }); // ✅ ADD THIS
-        setErrors({});  // ✅ AND THIS
+        setForm({ username: '', email: '', password: '', confirmPassword: '', firstName: '', lastName: '', role: 'viewer' });
+        setErrors({});
         onClose();
       }, 2500);
     },
-    // AFTER — handles username, email, and generic errors
+
     onError: (error: any) => {
       const data = error?.response?.data;
       if (data?.username) {
@@ -323,8 +323,8 @@ const AddUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient
 
       <div className="flex justify-end gap-3 pt-6 mt-2 border-t">
         <Button variant="outline" className="px-6" onClick={() => {
-          setErrors({});        // ✅ clear errors
-          setForm({ username: '', email: '', password: '', confirmPassword: '', firstName: '', lastName: '', role: 'viewer' }); // ✅ clear form
+          setErrors({});
+          setForm({ username: '', email: '', password: '', confirmPassword: '', firstName: '', lastName: '', role: 'viewer' });
           onClose();
         }}>Cancel</Button>
         <Button
@@ -387,7 +387,7 @@ const InviteUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryCli
     queryFn: () => (usersApi as any).getWorkspaces(), enabled: isOpen,
   });
   const workspaces = Array.isArray(workspacesData?.workspaces)
-    ? workspacesData.workspaces   // ✅ extract from { active_workspace_id, workspaces: [...] }
+    ? workspacesData.workspaces
     : [];
   const inviteUserMutation = useMutation({
     mutationFn: usersApi.invite,
@@ -397,7 +397,7 @@ const InviteUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryCli
       setTimeout(() => {
         setShowSuccess(false);
         onClose();
-        setForm({ email: '', role: 'viewer', workspace_id: null }); // ✅ 3. Reset workspace_id too
+        setForm({ email: '', role: 'viewer', workspace_id: null });
       }, 2500);
     },
     onError: (error: any) => {
@@ -492,8 +492,7 @@ const InviteUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryCli
             )}
           </div>
         </div>
-
-      </div>  {/* ← this closes the scrollable container */}
+      </div> 
 
       <div className="flex justify-end gap-3 pt-6 mt-2 border-t">
         <Button variant="outline" className="px-6" onClick={() => { onClose(); setForm({ email: '', role: 'viewer', workspace_id: activeWorkspaceId }); setErrors({}); }}>Cancel</Button>
@@ -553,8 +552,8 @@ export function UserManagement() {
   const { data: usersData, isLoading } = useQuery<PaginatedResponse<AppUser>, Error>({
     queryKey: ['users'],
     queryFn: () => usersApi.list(),
-    staleTime: 0,        // ✅ always fetch fresh
-    refetchOnMount: 'always',  // ✅ refetch every time page mounts
+    staleTime: 0,
+    refetchOnMount: 'always'
   });
 
   const deleteUserMutation = useMutation({
@@ -565,15 +564,17 @@ export function UserManagement() {
   const users = usersData?.results || [];
 
   return (
-    <div className="flex w-full min-h-screen">
-      <div className="flex-1 min-w-0 p-8">
-        <div className="space-y-8">
-          <div className="flex items-center justify-between">
+    <div className="flex w-full min-h-screen bg-[#F7F8FB] px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 pt-6 pb-8">
+      {/* Inner Card Container */}
+      <div className="flex flex-col flex-1 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        
+        {/* Header */}
+        <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold">User Management</h1>
-              <p className="text-muted-foreground">Manage system users, access levels, and roles</p>
+              <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
+              <p className="text-muted-foreground text-sm">Manage system users, access levels, and roles</p>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <Button onClick={() => setIsAddUserModalOpen(true)}>
                 <UserPlus className="h-4 w-4 mr-2" /> Add New User
               </Button>
@@ -581,8 +582,10 @@ export function UserManagement() {
                 <Send className="h-4 w-4 mr-2" /> Invite User
               </Button>
             </div>
-          </div>
+        </div>
 
+        {/* Workspace */}
+        <div className="flex-1 overflow-auto p-6">
           <DualView
             viewMode="table"
             isLoading={isLoading}

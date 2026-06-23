@@ -80,11 +80,8 @@ function DonutChart({ data, total }: { data: Array<{ label: string; value: numbe
 
   if (total === 0) return (
     <svg width={164} height={164} viewBox="0 0 164 164" style={{ flexShrink: 0 }}>
-      {/* Outer ring - dark grey */}
       <circle cx={cx} cy={cy} r={R} fill="#E5E7EB" />
-      {/* Inner hole */}
       <circle cx={cx} cy={cy} r={r} fill="white" />
-      {/* 0 text */}
       <text x={cx} y={cy - 6} textAnchor="middle" fontSize={28} fontWeight="800" fill="#9CA3AF">0</text>
       <text x={cx} y={cy + 14} textAnchor="middle" fontSize={11} fill="#9CA3AF">Total Tasks</text>
     </svg>
@@ -92,7 +89,6 @@ function DonutChart({ data, total }: { data: Array<{ label: string; value: numbe
 
   let cum = 0;
   function arc(s: number, pct: number) {
-    // If single slice taking 100%, render as full circle instead of degenerate arc
     if (pct >= 0.999) {
       // Draw as two semicircle arcs to avoid degenerate full-circle path
       return [
@@ -203,7 +199,6 @@ function StatusBadge({ status }: { status: string }) {
 const card: React.CSSProperties = { background: '#fff', border: '1px solid #E6EBF2', borderRadius: 12, boxShadow: '0 1px 3px rgba(16,24,40,.05)' };
 const monthBtn: React.CSSProperties = { fontSize: 12, fontWeight: 500, color: '#344054', background: '#fff', border: '1px solid #E6EBF2', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 };
 
-// ═══════════════════════════════════════════════════════
 export function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -320,7 +315,7 @@ export function Dashboard() {
 
   const pendingTasks = allTasks.filter(t => t.status === 'pending' || t.status === 'backlog').length;
   const completedPct = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-  const overduePct = totalTasks > 0 ? Math.round((overdueTasks / totalTasks) * 100) : 0;  // Range-filtered data for stat cards
+  const overduePct = totalTasks > 0 ? Math.round((overdueTasks / totalTasks) * 100) : 0;
 
 
   const filteredDocs = rangeStart
@@ -369,7 +364,7 @@ export function Dashboard() {
 
 
   return (
-    <div style={{ width: '100%', height: '100%', background: '#F7F8FB', fontFamily: '-apple-system,BlinkMacSystemFont,"Inter",system-ui,sans-serif', overflowY: 'auto' }}>
+    <div style={{ width: '100%', background: '#F7F8FB', fontFamily: '-apple-system,BlinkMacSystemFont,"Inter",system-ui,sans-serif' }}>
 
       {searchOpen && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.4)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 80 }}
@@ -441,17 +436,28 @@ export function Dashboard() {
         </div>
       )}
 
-      {/* ─── Inner padding wrapper ─── */}
-      <div style={{ padding: '28px 160px' }}>
-
+      {/* ─── Fixed Greeting Bar ─── */}
+      <div
+        className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40"
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 25,
+          background: '#F7F8FB',
+          paddingTop: 16,
+          paddingBottom: 16,
+          borderBottom: '1px solid #E6EBF2',
+        }}
+      >
         {/* ── Row 1: Greeting + actions ── */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
-          <div>
-            <div style={{ fontSize: 26, fontWeight: 800, color: '#172033', letterSpacing: '-0.02em' }}>{getGreeting()}, {firstName} </div>
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          {/* On mobile */}
+          <div className="pl-12 sm:pl-0">
+            <div style={{ fontSize: 26, fontWeight: 800, color: '#172033', letterSpacing: '-0.02em' }}>{getGreeting()}, {firstName}</div>
             <div style={{ fontSize: 13, color: '#667085', marginTop: 4 }}>Here's what's happening with your workspace today.</div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
-            <button onClick={() => setSearchOpen(true)} style={{ ...monthBtn, minWidth: 180, gap: 8 }}>
+          <div className="flex items-center flex-wrap gap-2" style={{ padding: '4px 0' }}>
+            <button onClick={() => setSearchOpen(true)} className="hidden sm:flex" style={{ ...monthBtn, minWidth: 180, gap: 8 }}>
               <Search size={13} color="#667085" /> Search anything… <kbd style={{ marginLeft: 'auto', background: '#F3F4F6', border: '1px solid #E3E8EF', borderRadius: 4, padding: '4px 8px', fontSize: 10, fontWeight: 700, color: '#6B7280' }}>⌘K</kbd>
             </button>
             <div style={{ position: 'relative' }}>
@@ -495,9 +501,13 @@ export function Dashboard() {
             <QuickCreateButton />
           </div>
         </div>
+      </div>{ }
+
+      {/* ─── Scrollable content below greeting ─── */}
+      <div className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 pt-6" style={{ paddingBottom: 24 }}>
 
         {/* ── Row 2: Stat Cards ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 16, marginBottom: 16 }}>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-4">
           {[
             { label: 'Total Projects', value: totalProjects, change: `${totalProjects} total`, up: true, color: '#1663F6', icon: <FolderKanban size={16} color="#1663F6" />, sub: `${projects.filter((p: any) => p.is_active).length || totalProjects} active`, sparkData: [2, 3, 4, 5, 6, 7, 8, totalProjects || 9] },
             { label: 'Total Documents', value: totalDocsCount, change: dateRange === 'all' ? `${totalDocsCount} total` : `${filteredDocs.length} in period`, up: true, color: '#22C55E', icon: <FileText size={16} color="#22C55E" />, sub: dateRange === 'all' ? 'all time' : DATE_RANGE_LABELS[dateRange], sparkData: [10, 15, 20, 30, 35, 40, 50, totalDocsCount || 1] },
@@ -527,8 +537,8 @@ export function Dashboard() {
           ))}
         </div>
 
-        {/* ── Row 3: Charts 40/60 ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 3fr', gap: 16, marginBottom: 16 }}>
+        {/* ── Row 3: Charts ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
 
           {/* Tasks by Status */}
           <div style={{ ...card, padding: '20px 22px' }}>
@@ -583,12 +593,13 @@ export function Dashboard() {
                     ))}
                   </div>
                 )}
-              </div>            </div>
-            <div style={{ display: 'flex', gap: 20, marginBottom: 12 }}>
+              </div>            
+              </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px', marginBottom: 12 }}>
               {chartSeries.map((s, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ width: 20, height: 2.5, borderRadius: 2, background: s.color }} />
-                  <span style={{ fontSize: 12, color: '#667085' }}>{s.label}</span>
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                  <span style={{ width: 16, height: 2.5, borderRadius: 2, background: s.color, flexShrink: 0 }} />
+                  <span style={{ fontSize: 11, color: '#667085', whiteSpace: 'nowrap' }}>{s.label}</span>
                 </div>
               ))}
             </div>
@@ -597,10 +608,10 @@ export function Dashboard() {
         </div>
 
         {/* ── Row 4: My Tasks + Recent Activity ── */}
-        <div style={{ display: 'grid', gridTemplateColumns: '5.5fr 4.5fr', gap: 16, marginBottom: 16 }}>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-4">
 
           {/* My Tasks */}
-          <div style={{ ...card, padding: '20px 22px 20px 28px' }}>
+          <div style={{ ...card, padding: '20px 22px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
               <span style={{ fontSize: 14, fontWeight: 700, color: '#172033' }}>My Tasks</span>
               <Link to="/taskboard" style={{ fontSize: 12, fontWeight: 600, color: '#1663F6', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>View all <ArrowRight size={12} /></Link>
@@ -614,13 +625,13 @@ export function Dashboard() {
                 { key: 'completed', label: 'Completed', count: completedMy.length },
               ] as const).map(tab => (
                 <button key={tab.key} onClick={() => setMyTasksTab(tab.key)} style={{
-                  padding: '8px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'none',
+                  flex: 1, padding: '8px 4px', fontSize: 12, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'none',
                   color: myTasksTab === tab.key ? '#1663F6' : '#667085',
                   borderBottom: myTasksTab === tab.key ? '2px solid #1663F6' : '2px solid transparent',
-                  marginBottom: -1, display: 'flex', alignItems: 'center', gap: 7
+                  marginBottom: -1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, whiteSpace: 'nowrap'
                 }}>
                   {tab.label}
-                  <span style={{ fontSize: 11, fontWeight: 700, background: myTasksTab === tab.key ? '#EEF2FF' : '#F3F4F6', color: myTasksTab === tab.key ? '#1663F6' : '#9CA3AF', borderRadius: 12, padding: '1px 7px' }}>{tab.count}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, background: myTasksTab === tab.key ? '#EEF2FF' : '#F3F4F6', color: myTasksTab === tab.key ? '#1663F6' : '#9CA3AF', borderRadius: 12, padding: '1px 6px' }}>{tab.count}</span>
                 </button>
               ))}
             </div>
@@ -628,23 +639,33 @@ export function Dashboard() {
               <div style={{ textAlign: 'center', padding: '32px 0', color: '#9CA3AF', fontSize: 13 }}>No {myTasksTab} tasks</div>
             ) : tabTasks.map(task => (
               <div key={task.id} onClick={() => navigate('/taskboard')}
-                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 6px', borderBottom: '1px solid #F3F4F6', cursor: 'pointer' }}
+                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 6px', borderBottom: '1px solid #F3F4F6', cursor: 'pointer' }}
                 onMouseEnter={e => (e.currentTarget.style.background = '#F7F8FB')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
+                {/* Status circle */}
                 <div style={{ width: 17, height: 17, borderRadius: '50%', border: `2px solid ${task.status === 'completed' ? '#22C55E' : '#D1D5DB'}`, background: task.status === 'completed' ? '#22C55E' : 'transparent', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   {task.status === 'completed' && <CheckCircle size={10} color="#fff" strokeWidth={3} />}
                 </div>
+
+                {/* Task name + project — takes all remaining space, truncates */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#172033', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{task.heading}</div>
-                  <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontWeight: 600, color: '#667085' }}>{task.project_name || 'DYUKSA'}</span>
-                    {task.end_date && <><span>·</span><span>📅 {new Date(task.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span></>}
+                  <div style={{ fontSize: 11, color: '#667085', marginTop: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                    {task.project_name || 'DYUKSA'}
                   </div>
                 </div>
-                <StatusBadge status={task.status} />
+
+                {/* Status badge — always visible, flexShrink:0 so it never collapses */}
+                <div style={{ flexShrink: 0 }}>
+                  <StatusBadge status={task.status} />
+                </div>
+
+                {/* Avatar — hidden on very small screens via Tailwind */}
                 {task.assigned_to_user_details?.length > 0 && (
-                  <AvatarStack users={(task.assigned_to_user_details || []).map(u => ({ name: u.first_name || u.username, avatar: u.avatar || null }))} max={1} />
+                  <div className="hidden sm:block" style={{ flexShrink: 0 }}>
+                    <AvatarStack users={(task.assigned_to_user_details || []).map(u => ({ name: u.first_name || u.username, avatar: u.avatar || null }))} max={1} />
+                  </div>
                 )}
               </div>
             ))}
@@ -686,45 +707,57 @@ export function Dashboard() {
             <span style={{ fontSize: 14, fontWeight: 700, color: '#172033' }}>Projects Overview</span>
             <Link to="/projects" style={{ fontSize: 12, fontWeight: 600, color: '#1663F6', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>All projects <ArrowRight size={12} /></Link>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 80px 1.2fr 90px 120px', gap: 10, padding: '0 6px 10px', borderBottom: '1px solid #E6EBF2' }}>
-            {['PROJECT', 'TASKS', 'PROGRESS', 'TEAM', 'STATUS'].map(h => (
-              <span key={h} style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', letterSpacing: '0.05em' }}>{h}</span>
-            ))}
-          </div>
-          {projectsOverview.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '28px 0', color: '#9CA3AF', fontSize: 13 }}>No projects yet</div>
-          ) : projectsOverview.map((p, i) => (
-            <div key={p.id} onClick={() => navigate(`/projects/${p.id}`)}
-              style={{ display: 'grid', gridTemplateColumns: '2fr 80px 1.2fr 90px 120px', gap: 10, padding: '12px 6px', borderBottom: i < projectsOverview.length - 1 ? '1px solid #F3F4F6' : 'none', cursor: 'pointer', borderRadius: 8 }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#F7F8FB')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 28, height: 28, borderRadius: 7, background: p.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: '#fff', flexShrink: 0 }}>{(p.name || '?')[0].toUpperCase()}</div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#172033' }}>{p.name}</div>
-                  <div style={{ fontSize: 11, color: '#9CA3AF' }}>{(p as any).description?.slice(0, 28) || 'No description'}</div>
+
+          {/* Horizontally scrollable wrapper on mobile */}
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <div style={{ minWidth: 560 }}>
+
+              {/* Header row */}
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 80px 1.2fr 90px 120px', gap: 10, padding: '0 6px 10px', borderBottom: '1px solid #E6EBF2' }}>
+                {['PROJECT', 'TASKS', 'PROGRESS', 'TEAM', 'STATUS'].map(h => (
+                  <span key={h} style={{ fontSize: 11, fontWeight: 700, color: '#9CA3AF', letterSpacing: '0.05em' }}>{h}</span>
+                ))}
+              </div>
+
+              {projectsOverview.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '28px 0', color: '#9CA3AF', fontSize: 13 }}>No projects yet</div>
+              ) : projectsOverview.map((p, i) => (
+                <div key={p.id} onClick={() => navigate(`/projects/${p.id}`)}
+                  style={{ display: 'grid', gridTemplateColumns: '2fr 80px 1.2fr 90px 120px', gap: 10, padding: '12px 6px', borderBottom: i < projectsOverview.length - 1 ? '1px solid #F3F4F6' : 'none', cursor: 'pointer', borderRadius: 8, alignItems: 'center' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = '#F7F8FB')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: 7, background: p.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: '#fff', flexShrink: 0 }}>
+                      {(p.name || '?')[0].toUpperCase()}
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#172033', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{p.name}</div>
+                      <div style={{ fontSize: 11, color: '#9CA3AF' }}>{(p as any).description?.slice(0, 28) || 'No description'}</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', fontSize: 13, fontWeight: 600, color: '#344054' }}>{p.taskCount}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <ProgressBar pct={p.pct} color={p.color} />
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#344054', flexShrink: 0, width: 32, textAlign: 'right' }}>{p.pct}%</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <AvatarStack
+                      users={(p.members || []).map((m: any) => ({ name: m.user?.first_name || m.user?.username || '?', avatar: m.user?.avatar || m.avatar || null }))}
+                      max={3}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <StatusBadge status={p.status} />
+                  </div>
                 </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', fontSize: 13, fontWeight: 600, color: '#344054' }}>{p.taskCount}</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <ProgressBar pct={p.pct} color={p.color} />
-                <span style={{ fontSize: 12, fontWeight: 700, color: '#344054', flexShrink: 0, width: 32, textAlign: 'right' }}>{p.pct}%</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <AvatarStack
-                  users={(p.members || []).map((m: any) => ({ name: m.user?.first_name || m.user?.username || '?', avatar: m.user?.avatar || m.avatar || null }))}
-                  max={3}
-                />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <StatusBadge status={p.status} />
-              </div>
+              ))}
+
             </div>
-          ))}
+          </div>
         </div>
 
-      </div>{/* end padding wrapper */}
+      </div>{ }
 
       {/* Modals */}
       {isActivityOpen && <NotificationsPage onClose={() => setIsActivityOpen(false)} defaultFilter="unread" />}

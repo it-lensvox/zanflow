@@ -84,21 +84,9 @@ export const ShareCalendarModal: React.FC<ShareCalendarModalProps> = ({
         enabled: isOpen,
     });
 
-    // Filter to get shares where current user is the owner
-    // Handle paginated response - ensure sharesData is an array
     const sharesArray = Array.isArray(sharesData) ? sharesData : (sharesData?.results || []);
     const myShares = sharesArray.filter((share: any) => share.owner === currentUserId);
 
-    // DEBUG - Remove after testing
-    console.log('=== ShareCalendarModal Debug ===');
-    console.log('currentUserId:', currentUserId);
-    console.log('sharesArray:', sharesArray);
-    console.log('myShares (I am owner):', myShares);
-    console.log('sharedWithMe:', sharesArray.filter((share: any) => share.shared_with === currentUserId));
-
-    // ═══════════════ MUTATIONS ═══════════════
-
-    // Create share mutation
     const { mutate: createShare, isPending: isCreating } = useMutation({
         mutationFn: calendarShareApi.create,
         onSuccess: () => {

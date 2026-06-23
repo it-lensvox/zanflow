@@ -5,7 +5,7 @@ import { taskApi, eventApi } from '@/services/api';
 import { useAuth } from '@/hooks/useAuth';
 import { Plus, Calendar, CheckCircle, Clock, AlertCircle, ChevronRight, Video, MapPin } from 'lucide-react';
 
-// ── Design tokens ──────────────────────────────────────────────────────────────
+// Design tokens 
 const BLUE = '#1663F6';
 const GREEN = '#22C55E';
 const YELLOW = '#F59E0B';
@@ -19,7 +19,7 @@ const SURFACE = '#FFFFFF';
 const EVENT_COLORS = [BLUE, PURPLE, YELLOW, GREEN, RED];
 function eventColor(idx: number) { return EVENT_COLORS[idx % EVENT_COLORS.length]; }
 
-// ── Status helpers ─────────────────────────────────────────────────────────────
+// Status helpers
 const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
   in_progress: { label: 'In Progress', color: BLUE, bg: '#EEF4FF' },
   pending: { label: 'Pending', color: YELLOW, bg: '#FFFBEB' },
@@ -37,7 +37,7 @@ function isOverdue(task: any) {
   return new Date(task.end_date) < new Date() && task.status !== 'completed' && task.status !== 'deployed';
 }
 
-// ── Time / date helpers ────────────────────────────────────────────────────────
+// ── Time / date helpers
 function formatTime(iso: string) {
   if (!iso) return '';
   return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
@@ -55,7 +55,6 @@ function eventDuration(start: string, end: string) {
 }
 function isToday(iso: string) {
   if (!iso) return false;
-  // Handle date-only strings like "2026-06-15" without timezone shift
   const dateStr = iso.includes('T') ? iso : iso + 'T00:00:00';
   const d = new Date(dateStr);
   const t = new Date();
@@ -76,7 +75,6 @@ function Avatar({ name, size = 28, color = BLUE, avatarUrl }: { name: string; si
           border: `1.5px solid ${color}44`,
         }}
         onError={e => {
-          // fallback to initials if image fails
           e.currentTarget.style.display = 'none';
         }}
       />
@@ -103,7 +101,7 @@ function StatusPill({ status }: { status: string }) {
   );
 }
 
-// ── Reschedule modal ───────────────────────────────────────────────────────────
+// ── Reschedule modal
 function RescheduleModal({ event, onClose, onSave }: { event: any; onClose: () => void; onSave: (id: number, start: string, end: string) => void }) {
   const durationMs = event.end_time && event.start_time
     ? new Date(event.end_time).getTime() - new Date(event.start_time).getTime()
@@ -157,7 +155,7 @@ function RescheduleModal({ event, onClose, onSave }: { event: any; onClose: () =
   );
 }
 
-// ── Main component ─────────────────────────────────────────────────────────────
+// ── Main component
 export function MyWork() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -188,18 +186,16 @@ export function MyWork() {
     return Math.round((done / projectTasks.length) * 100);
   }, [activeTask, myTasks]);
   const today = new Date();
-  const todayStr = today.toISOString().split('T')[0]; // YYYY-MM-DD
+  const todayStr = today.toISOString().split('T')[0];
 
-  // ── Queries ──────────────────────────────────────────────────────────────────
-
-
+  // ── Queries 
   const { data: eventsResponse, isLoading: eventsLoading } = useQuery({
     queryKey: ['my-work-events', todayStr],
     queryFn: () => eventApi.list({ start_date: todayStr, end_date: todayStr }),
     staleTime: 0,
   });
 
-  // ── Reschedule mutation ───────────────────────────────────────────────────────
+  // ── Reschedule mutation
   const rescheduleMutation = useMutation({
     mutationFn: ({ id, start_time, end_time }: { id: number; start_time: string; end_time: string }) =>
       eventApi.update(id, { start_time, end_time } as any),
@@ -209,10 +205,9 @@ export function MyWork() {
     },
   });
 
-  // ── Derived data ──────────────────────────────────────────────────────────────
+  // ── Derived data
 
-
-  // Today's meetings/events — from eventApi, filtered to today
+  // Today's meetings/events
   const todayMeetings: any[] = useMemo(() => {
     const raw = eventsResponse?.results || eventsResponse?.events || (Array.isArray(eventsResponse) ? eventsResponse : []);
     return raw
@@ -258,7 +253,7 @@ export function MyWork() {
   };
 
   return (
-    <div style={{ padding: '28px 32px', background: '#F7F8FB', minHeight: '100vh' }}>
+    <div className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 pt-6 pb-8" style={{ background: '#F8FAFC', minHeight: '100vh'}}>
 
       {/* ── Header ── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
@@ -322,7 +317,7 @@ export function MyWork() {
               {scheduleItems.map((item: any, idx: number) => {
                 const isLast = idx === scheduleItems.length - 1;
 
-                // ── Meeting row ──────────────────────────────────────────────
+                // ── Meeting row
                 if (item._type === 'meeting') {
                   const color = eventColor(idx);
                   const attendees: any[] = item.attendees_details || item.attendees || [];
@@ -385,7 +380,7 @@ export function MyWork() {
                   );
                 }
 
-                // ── Task row ─────────────────────────────────────────────────
+                // ── Task row 
                 const overdue = isOverdue(item);
                 return (
                   <div

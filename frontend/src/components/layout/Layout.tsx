@@ -12,6 +12,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import logoImage from '../../public/assets/logo.png';
 import { QuickCreateButton } from '@/components/QuickCreateButton';
+import { cn } from '@/lib/utils';
 
 // Page titles per route
 const PAGE_TITLES: Record<string, string> = {
@@ -30,9 +31,7 @@ const PAGE_TITLES: Record<string, string> = {
 };
 
 function getPageTitle(pathname: string) {
-  // Exact match first
   if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname];
-  // Prefix match (e.g. /projects/123)
   const prefix = Object.keys(PAGE_TITLES).find(k => pathname.startsWith(k + '/'));
   return prefix ? PAGE_TITLES[prefix] : '';
 }
@@ -71,6 +70,7 @@ function PageSkeleton() {
 
 export function Layout() {
   const [isActivityOpen, setIsActivityOpen] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const isProjectDetailPage = useMatch('/projects/:id');
   const { unreadCount }     = useNotifications();
   const { user }            = useAuth();
@@ -78,13 +78,12 @@ export function Layout() {
   const location            = useLocation();
   const faviconImgRef       = useRef<HTMLImageElement | null>(null);
 
-  const firstName = (user as any)?.first_name || (user as any)?.username || 'User';
   const pageTitle = getPageTitle(location.pathname);
 
-  // Hide top bar on Dashboard (it has its own header)
+  // Hide top bar on Dashboard
   const isDashboard = location.pathname === '/dashboard';
 
-  // ── Favicon with notification badge ────────────────────────────────────────
+  // ── Favicon with notification badge
   useEffect(() => {
     const drawFavicon = (img: HTMLImageElement) => {
       const canvas = document.createElement('canvas');
@@ -118,24 +117,51 @@ export function Layout() {
     }
   }, [unreadCount]);
 
-  return (
-    <div className="flex h-screen bg-background">
-      <Sidebar />
+   return (
+    <div className="flex h-screen bg-background overflow-hidden">
 
-      <main className="flex-1 overflow-auto flex flex-col">
+      {/* Mobile sidebar backdrop */}
+      {isMobileSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-40 md:hidden"
+          onClick={() => setIsMobileSidebarOpen(false)}
+        />
+      )}
 
-        {/* ── Global Top Bar (hidden on Dashboard which has its own) ── */}
+      {/* Sidebar */}
+      <div className={cn(
+        "fixed inset-y-0 left-0 z-50 md:relative md:flex md:flex-shrink-0 transition-transform duration-300",
+        isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+      )}>
+        <Sidebar onMobileClose={() => setIsMobileSidebarOpen(false)} />
+      </div>
+
+      {/* Main area */}
+      <main className="flex-1 min-w-0 overflow-auto flex flex-col">
+
+        {/* ── Global Top Bar ── */}
         {!isDashboard && (
           <div style={{
             height: 56, flexShrink: 0,
             display: 'flex', alignItems: 'center',
-            padding: '0 28px', gap: 16,
+            padding: '0 16px', gap: 12,
             background: '#fff',
             borderBottom: '1px solid #E6EBF2',
             position: 'sticky', top: 0, zIndex: 100,
           }}>
+            {/* Hamburger — mobile only */}
+            <button
+              className="md:hidden flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors flex-shrink-0"
+              onClick={() => setIsMobileSidebarOpen(true)}
+              aria-label="Open menu"
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <path d="M2 4h14M2 9h14M2 14h14" stroke="#344054" strokeWidth="1.75" strokeLinecap="round"/>
+              </svg>
+            </button>
+
             {/* Page title */}
-            <span style={{ fontSize: 16, fontWeight: 700, color: '#172033', flex: 1 }}>
+            <span className="text-sm font-bold text-[#172033] flex-1 truncate">
               {pageTitle}
             </span>
 
@@ -159,8 +185,21 @@ export function Layout() {
           </div>
         )}
 
+        {/* Dashboard gets its own hamburger */}
+        {isDashboard && (
+          <button
+            className="md:hidden fixed top-3 left-3 z-30 flex items-center justify-center w-9 h-9 rounded-md bg-white border border-[#E6EBF2] shadow-sm"
+            onClick={() => setIsMobileSidebarOpen(true)}
+            aria-label="Open menu"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <path d="M2 4h14M2 9h14M2 14h14" stroke="#344054" strokeWidth="1.75" strokeLinecap="round"/>
+            </svg>
+          </button>
+        )}
+
         {/* ── Page content ── */}
-        <div id="layout-wrapper" className="container flex-1 flex flex-col">
+        <div id="layout-wrapper" className="flex-1 flex flex-col min-w-0">
           <Suspense fallback={<PageSkeleton />}>
             <Outlet context={{ isActivityOpen, setIsActivityOpen }} />
           </Suspense>

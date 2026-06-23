@@ -165,11 +165,12 @@ const [avatarError, setAvatarError] = useState<string | null>(null);
   const getInitials = (name?: string) => name?.charAt(0)?.toUpperCase() || '?';
 
   return (
-    <div className="min-h-screen">
-      <div className="w-full p-8 space-y-8">
+    <div className="min-h-screen bg-[#F7F8FB] px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 pt-6 pb-8">
+      {/* ── Inner Card Container ── */}
+      <div className="flex flex-col flex-1 space-y-6">
 
         {/* Header Card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 mb-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
           <div className="flex items-start space-x-6">
             {/* Profile Picture */}
             <div className="relative flex-shrink-0">

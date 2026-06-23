@@ -106,19 +106,14 @@ function SettingSelect({
 }
 
 // Row
-function SettingRow({
-  icon,
-  label,
-  description,
-  control,
-}: {
-  icon: React.ReactNode;
+function SettingRow({ icon, label, description, control }: {
+  icon?: React.ReactNode;
   label: string;
   description?: string;
-  control: React.ReactNode;
+  control?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between py-4 border-b border-border last:border-0">
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-4 border-b border-border last:border-0">
       <div className="flex items-start gap-3">
         <span className="mt-0.5 text-muted-foreground">{icon}</span>
         <div>
@@ -261,11 +256,11 @@ function WorkspaceSection({ activeWorkspace, userRole }: { activeWorkspace: any;
   const handleConfirmRemoveMember = async () => {
     if (!userToDelete) return;
     const { id: userId, name: userName } = userToDelete;
-    
+
     setShowConfirmDelete(false);
     setUserToDelete(null);
     setRemovingUserId(userId);
-    
+
     try {
       await workspaceApi.removeMember(workspaceId, userId);
       showToast(`✓ ${userName} removed from workspace`);
@@ -289,10 +284,10 @@ function WorkspaceSection({ activeWorkspace, userRole }: { activeWorkspace: any;
   };
 
   const roleColors: Record<string, { bg: string; color: string }> = {
-    admin:     { bg: '#dcfce7', color: '#16a34a' },
-    manager:   { bg: '#dbeafe', color: '#2563eb' },
+    admin: { bg: '#dcfce7', color: '#16a34a' },
+    manager: { bg: '#dbeafe', color: '#2563eb' },
     developer: { bg: '#f3e8ff', color: '#7c3aed' },
-    viewer:    { bg: '#f3f4f6', color: '#6b7280' },
+    viewer: { bg: '#f3f4f6', color: '#6b7280' },
     annotator: { bg: '#fef9c3', color: '#ca8a04' },
   };
 

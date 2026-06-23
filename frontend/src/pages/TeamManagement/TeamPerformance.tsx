@@ -1,14 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-    TrendingUp,
-    CheckCircle,
-    Clock,
-    ListTodo,
-    Activity,
-    BarChart3,
-    Users,
-    ArrowLeft,
-    Loader2
+    TrendingUp, CheckCircle, Clock, ListTodo, Activity, BarChart3, Users, ArrowLeft, Loader2
 } from 'lucide-react';
 import { usersApi, taskApi } from '@/services/api'; 
 import type { User as AppUser } from '@/types'; 
@@ -43,7 +35,7 @@ interface TeamMember extends AppUser {
 const getInitials = (first: string, last: string) => 
     `${(first[0] || '').toUpperCase()}${(last[0] || '').toUpperCase()}`;
 
-// --- Main Component ---
+// Main Component
 export const TeamPerformance: React.FC = () => {
     const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
     const [loading, setLoading] = useState(true);
@@ -60,7 +52,6 @@ export const TeamPerformance: React.FC = () => {
                 )
             );
             
-            // Update the selected member state as well
             setSelectedMember(prevSelected => 
                 prevSelected && prevSelected.id === userId ? { ...prevSelected, performance: data } : prevSelected
             );
@@ -111,11 +102,9 @@ export const TeamPerformance: React.FC = () => {
         fetchTeamMembers();
     }, [fetchTeamMembers]);
 
-    // Handle member selection and trigger new API call
     const handleSelectMember = (member: TeamMember) => {
         setSelectedMember(member);
         
-        // If performance data is not already loaded for this member, fetch it
         if (!member.performance) {
             fetchPerformanceData(member.id);
         }
@@ -145,12 +134,12 @@ export const TeamPerformance: React.FC = () => {
     const showNoDataPlaceholder = !performance && !isPerformanceLoading;
 
     return (
-        <div className="w-full h-full p-8 bg-gray-50">
+        <div className="w-full h-full pt-6 pb-8 bg-[#F7F8FB] px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 overflow-x-hidden">
 
             {/* Adjusted height for main container */}
-            <div className="flex w-full h-[calc(100vh-100px)] rounded-xl overflow-hidden shadow-2xl border border-slate-200"> 
+            <div className="flex flex-col lg:flex-row w-full max-w-full min-h-[600px] rounded-xl shadow-sm border border-slate-200 bg-white overflow-hidden">
                 {/* Left Sidebar: Team Member List */}
-                <div className="min-w-[300px] max-w-[350px] w-1/3 bg-white border-r border-slate-200 overflow-y-auto">
+                <div className="w-full lg:min-w-[300px] lg:max-w-[350px] lg:w-1/3 bg-white border-r border-slate-200 overflow-y-auto max-h-[50vh] lg:max-h-none border-b lg:border-b-0">
                     <div className="p-6 border-b border-slate-200">
                         <div className="flex items-center gap-3 mb-2">
                             <Users className="w-6 h-6 text-slate-700" />
@@ -285,7 +274,7 @@ export const TeamPerformance: React.FC = () => {
                                             {(performance.project_distribution ?? []).length > 0 ? (
                                                 <div className="space-y-5">
                                                     {(performance.project_distribution ?? []).map((project, idx) => {
-                                                        const projectTotal = project.total_project_tasks || 1; // Avoid division by zero
+                                                        const projectTotal = project.total_project_tasks || 1;
                                                         const percentage = Math.round((project.task_count / projectTotal) * 100);
 
                                                         return (

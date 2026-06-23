@@ -15,7 +15,7 @@ export function WorkSpace() {
         staleTime: 30_000,
     });
 
-    // ─── Delete state ─────────────────────────────────────────────────────────
+    // Delete state
     const [deleteTarget, setDeleteTarget] = useState<Tenant | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
@@ -99,18 +99,23 @@ export function WorkSpace() {
                 isDeleting={isDeleting}
             />
 
-            <div className="flex flex-col h-full">
-                {/* ── Header — matches Teams page exactly ── */}
-                <div className="px-6 pt-6 pb-4 shrink-0">
-                    <h1 className="text-2xl font-bold text-foreground">Workspace</h1>
-                    <p className="text-sm text-muted-foreground mt-0.5">
-                        Manage all registered organizations on the platform
-                    </p>
-                </div>
+            {/* ── Main Responsive Wrapper ── */}
+            <div className="flex flex-col h-full bg-[#F7F8FB] px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 pt-6 pb-8">
+                
+                {/* ── Inner Card Container ── */}
+                <div className="flex flex-col flex-1 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
 
-                {/* ── Table ── */}
-                <div className="flex-1 min-h-0 px-6 pb-6">
-                    {isError ? (
+                    {/* ── Header ── */}
+                    <div className="px-6 pt-6 pb-4 border-b border-gray-200">
+                        <h1 className="text-2xl font-bold text-foreground">Workspace</h1>
+                        <p className="text-sm text-muted-foreground mt-0.5">
+                            Manage all registered organizations on the platform
+                        </p>
+                    </div>
+
+                    {/* ── Table ── */}
+                    <div className="flex-1 min-h-0 overflow-hidden">
+                        {isError ? (
                         <div className="flex items-center justify-center py-16 text-sm text-red-500">
                             Failed to load organizations. Please try again.
                         </div>
@@ -129,6 +134,7 @@ export function WorkSpace() {
                         />
                     )}
                 </div>
+            </div>
             </div>
         </>
     );

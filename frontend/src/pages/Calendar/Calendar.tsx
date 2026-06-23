@@ -1,41 +1,15 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { ShareCalendarModal } from '@/components/Calendar/ShareCalendarModal';
 import {
-    ChevronLeft,
-    ChevronRight,
-    ChevronDown,
-    Calendar as CalendarIcon,
-    Users,
-    Grid3X3,
-    List,
-    ClipboardList,
-    Send,
-    Loader2,
-    CheckSquare,
-    Clock,
-    Download,
-    MapPin,
-    Video,
-    X,
-    CalendarPlus,
-    Trash2,
-    Check,
-    XCircle,
-    RefreshCw,
-    Crown,
-    AlertCircle,
-    Sparkles,
-    Copy,
-    Settings,
-    Share2,
-
+    ChevronLeft, ChevronRight, ChevronDown, Calendar as CalendarIcon, Users, Grid3X3, List, ClipboardList, Send, Loader2, CheckSquare, Clock, Download, MapPin, Video, X,
+    CalendarPlus, Trash2, Check, XCircle, RefreshCw, Crown, AlertCircle, Sparkles, Copy, Settings, Share2,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { taskApi, dailyUpdateApi, eventApi, usersApi, notificationSocket, dyuksaAI, calendarShareApi } from '@/services/api';
 import { useAuth } from '@/hooks/useAuth';
 import { TaskDetailModal } from '../MyTask/TaskDetailModal';
-import type { Task, DailyUpdate, DailyUpdatePayload, Event as CalendarEventType, InvitationStatus } from '@/types';
+import type { Task, DailyUpdate, Event as CalendarEventType, InvitationStatus } from '@/types';
 import { getStatusConfig } from '@/components/layout/DualView/taskConfig';
 import DeclineModal from '@/components/Calendar/DeclineModal';
 import RescheduleModal from '@/components/Calendar/RescheduleModal';
@@ -66,7 +40,7 @@ const getPriorityColor = (priority: string) => {
     }
 };
 
-// ═══════════════ INVITATION STATUS HELPERS ═══════════════
+// INVITATION STATUS HELPERS 
 const getEventStatusColors = (status?: InvitationStatus) => {
     switch (status) {
         case 'ORGANIZER':
@@ -152,8 +126,7 @@ interface CalendarDay {
     events: CalendarEventType[];
 }
 
-// --- Components ---
-
+// --- Components 
 interface CalendarEventUIProps {
     event: CalendarEventType;
     onClick: (event: CalendarEventType) => void;
@@ -169,10 +142,8 @@ const CalendarEventUI: React.FC<CalendarEventUIProps> = ({
     event,
     onClick,
     compact = false,
-    currentUserId,
     onAccept,
     onDecline,
-    onReschedule,
     isAccepting
 }) => {
     const statusColors = getEventStatusColors(event.my_invitation_status);
@@ -291,13 +262,11 @@ const MiniCalendar: React.FC<MiniCalendarProps> = ({
     selectedUserIds,
     onToggleUser
 }) => {
-    // Internal state to track which month the mini calendar is currently viewing
     const [navDate, setNavDate] = useState(new Date(currentDate.getFullYear(), currentDate.getMonth(), 1));
 
-    // ADD THIS right after the useState:
     useEffect(() => {
         setNavDate(new Date(currentDate.getFullYear(), currentDate.getMonth(), 1));
-    }, [currentDate]);    const month = navDate.getMonth();
+    }, [currentDate]); const month = navDate.getMonth();
     const year = navDate.getFullYear();
 
     const changeMonth = (offset: number) => {
@@ -374,7 +343,6 @@ const MiniCalendar: React.FC<MiniCalendarProps> = ({
                 })}
             </div>
 
-            {/* 👇👇👇 ADD THE ENTIRE SECTION BELOW HERE 👇👇👇 */}
             {/* View Shared Calendars Section */}
             <div className="mt-4 pt-4 border-t border-gray-200">
                 {/* Header with toggle */}
@@ -392,7 +360,7 @@ const MiniCalendar: React.FC<MiniCalendarProps> = ({
                     </div>
                 </button>
 
-                {/* User checkboxes - only shown when toggle is ON */}
+                {/* User checkboxes  */}
                 {includeSharedEvents && (
                     <div className="mt-2 space-y-1 max-h-48 overflow-y-auto">
                         {/* Select All checkbox */}
@@ -402,10 +370,8 @@ const MiniCalendar: React.FC<MiniCalendarProps> = ({
                                 checked={selectedUserIds.length === sharedWithMeUsers.length && sharedWithMeUsers.length > 0}
                                 onChange={() => {
                                     if (selectedUserIds.length === sharedWithMeUsers.length) {
-                                        // Deselect all
                                         sharedWithMeUsers.forEach(u => onToggleUser(u.id));
                                     } else {
-                                        // Select all
                                         sharedWithMeUsers.forEach(u => {
                                             if (!selectedUserIds.includes(u.id)) {
                                                 onToggleUser(u.id);
@@ -456,8 +422,6 @@ const MiniCalendar: React.FC<MiniCalendarProps> = ({
                     </div>
                 )}
             </div>
-            {/* 👆👆👆 END OF ADDED SECTION 👆👆👆 */}
-
         </div>
     );
 };
@@ -600,7 +564,6 @@ const DaysView: React.FC<DaysViewProps> = ({
     React.useEffect(() => {
         if (!selectedSlot) return;
         const handleClickOutside = () => setSelectedSlot(null);
-        // Small delay so the click that created the slot doesn't immediately close it
         const timer = setTimeout(() => {
             document.addEventListener('click', handleClickOutside);
         }, 100);
@@ -610,14 +573,12 @@ const DaysView: React.FC<DaysViewProps> = ({
         };
     }, [selectedSlot]);
 
-    // Clear drag preview when drag ends anywhere
     React.useEffect(() => {
         const handleDragEnd = () => setDragPreview(null);
         document.addEventListener('dragend', handleDragEnd);
         return () => document.removeEventListener('dragend', handleDragEnd);
     }, []);
 
-    // Clear selected slot when dragging starts
     React.useEffect(() => {
         const handleDragStart = () => setSelectedSlot(null);
         document.addEventListener('dragstart', handleDragStart);
@@ -696,7 +657,7 @@ const DaysView: React.FC<DaysViewProps> = ({
 
     return (
         <div className="flex flex-col h-full bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden relative">
-            {/* Header Row (Weekday Names & Numbers) */}
+            {/* Header Row */}
             <div className="flex border-b border-gray-200 bg-gray-50">
                 <div className="w-16 flex-shrink-0 border-r border-gray-200 bg-gray-50"></div>
                 <div className={`grid ${gridColsClass} flex-1`}>
@@ -717,7 +678,7 @@ const DaysView: React.FC<DaysViewProps> = ({
                     })}
                 </div>
             </div>
-            {/* All Day / Tasks Row (Top Sticky Area) */}
+            {/* All Day / Tasks Row */}
             <div className="flex border-b border-gray-300 bg-gray-50/30 max-h-32 overflow-y-auto">
                 <div className="w-16 flex-shrink-0 border-r border-gray-200 flex items-center justify-center text-[11px] font-medium text-gray-500 p-2 text-center bg-gray-50">
                     All Day / Tasks
@@ -747,8 +708,8 @@ const DaysView: React.FC<DaysViewProps> = ({
                 </div>
             </div>
 
-            {/* Hourly Timeline Grid (Main Scrollable Area) */}
-            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden bg-white relative border-t border-gray-200" style={{ height: '550px', maxHeight: 'calc(100vh - 450px)' }}>
+            {/* Hourly Timeline Grid */}
+            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden bg-white relative border-t border-gray-200" style={{ minHeight: 0 }}>
                 <div className="flex min-w-full relative bg-white">
                     {/* Time Axis */}
                     <div className="w-16 flex-shrink-0 flex flex-col border-r border-gray-200 bg-white sticky left-0 z-20 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
@@ -783,7 +744,7 @@ const DaysView: React.FC<DaysViewProps> = ({
                             const isToday = day.toDateString() === today.toDateString();
                             const isSelected = selectedDate?.toDateString() === day.toDateString();
 
-                            // Visual positioning logic (handling recurrence and overlaps)
+                            // Visual positioning logic 
                             const dailyPositionedEvents = hourlyEvents.map(event => {
                                 const start = new Date(event.start_time);
                                 const end = new Date(event.end_time);
@@ -861,37 +822,11 @@ const DaysView: React.FC<DaysViewProps> = ({
                                         newStart.setHours(droppedHour, droppedMinute, 0, 0);
 
                                         if (newStart < new Date()) {
-                                            // alert("Cannot move an event to a past time.");
                                             return;
                                         }
 
                                         const duration = new Date(draggedEvent.end_time).getTime() - new Date(draggedEvent.start_time).getTime();
                                         const newEnd = new Date(newStart.getTime() + duration);
-
-                                        // // ─── IMPROVED CONFLICT CHECK ───
-                                        // // Check conflict for Organizer AND all Attendees
-                                        // const peopleToCheck = [draggedEvent.organizer, ...(draggedEvent.attendees || [])];
-
-                                        // const conflict = events.find(ev => {
-                                        //     if (ev.id === draggedEvent.id) return false;
-
-                                        //     const evStart = new Date(ev.start_time);
-                                        //     const evEnd = new Date(ev.end_time);
-                                        //     const isTimeOverlapping = newStart < evEnd && newEnd > evStart;
-
-                                        //     if (!isTimeOverlapping) return false;
-
-                                        //     // Check if any person in the dragged event is also in this overlapping event
-                                        //     return peopleToCheck.some(personId =>
-                                        //         ev.organizer === personId || ev.attendees?.includes(personId)
-                                        //     );
-                                        // });
-
-                                        // if (conflict) {
-                                        //     alert(`Cannot move here. One or more participants (including organizer) are busy with the event: "${conflict.title}"`);
-                                        //     return;
-                                        // }
-                                        // // ─── END OF CHECK ───
 
                                         updateEvent({
                                             id: draggedEvent.id,
@@ -900,14 +835,13 @@ const DaysView: React.FC<DaysViewProps> = ({
                                         });
                                     }}
                                     onClick={(e) => {
-                                        // Only handle clicks directly on the column (not on events)
                                         if (e.target === e.currentTarget) {
                                             const rect = e.currentTarget.getBoundingClientRect();
                                             const y = e.clientY - rect.top;
                                             const totalMinutes = (y / 64) * 60;
                                             const clickedHour = Math.floor(totalMinutes / 60);
 
-                                            // Toggle selection - if same slot clicked, deselect
+                                            // Toggle selection
                                             if (selectedSlot && selectedSlot.dayIndex === index && selectedSlot.hour === clickedHour) {
                                                 setSelectedSlot(null);
                                             } else {
@@ -965,9 +899,6 @@ const DaysView: React.FC<DaysViewProps> = ({
                                         const topOffset = startMinutes * (64 / 60);
                                         const eventHeight = 32;
                                         const widthPercent = 100 / totalOverlaps;
-
-                                        // Check if this is a shared event (from someone else's calendar, not an invitation)
-                                        // Shared events: organizer is not me AND I'm not an attendee (no invitation status)
                                         const isSharedEvent = event.organizer !== currentUser?.id && !event.my_invitation_status;
                                         const statusColors = isSharedEvent
                                             ? {
@@ -1008,7 +939,6 @@ const DaysView: React.FC<DaysViewProps> = ({
                                                     <div className={`w-1 h-full absolute left-0 top-0 bottom-0 rounded-l-md ${statusColors.accent}`} />
                                                     <div className="flex items-center justify-between w-full ml-1 min-w-0">
                                                         <span className="font-semibold truncate">{event.title}</span>
-                                                        {/* Show owner badge inline for shared events */}
                                                         {event.organizer !== currentUser?.id && (
                                                             <span className="text-[8px] text-black bg-amber-200/80 px-1 rounded flex-shrink-0 whitespace-nowrap">
                                                                 {event.organizer_name?.split(' ')[0]}
@@ -1086,9 +1016,6 @@ interface TaskListSidebarProps {
     isAccepting?: boolean;
 }
 
-// Helper: format date as "2 March 2026"
-
-// Helper: format date as "2 March 2026"
 const formatDateForUpdate = (date: Date): string => {
     return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 };
@@ -2518,7 +2445,6 @@ const TaskListSidebar: React.FC<TaskListSidebarProps> = ({
     const isAdminOrManager = currentUser?.role === 'admin' || currentUser?.role === 'manager';
     const dateStr = selectedDate ? toISODate(selectedDate) : '';
 
-    // Fetch current user's existing update for this date — scoped to their userId
     const { data: myUpdate, isLoading: loadingMyUpdate } = useQuery<DailyUpdate | null>({
         queryKey: ['dailyUpdate', 'mine', dateStr, currentUser?.id],
         queryFn: () => dailyUpdateApi.getMyUpdate(dateStr, currentUser!.id),
@@ -2608,7 +2534,7 @@ const TaskListSidebar: React.FC<TaskListSidebarProps> = ({
     };
 
     return (
-        <div className="w-80 flex-shrink-0 bg-white border border-gray-200 rounded-xl shadow-lg flex flex-col overflow-hidden animate-in slide-in-from-right-4 duration-200">
+        <div className="w-full sm:w-72 lg:w-80 flex-shrink-0 bg-white border border-gray-200 rounded-xl shadow-lg flex flex-col overflow-hidden animate-in slide-in-from-right-4 duration-200">
             {/* Sidebar Header */}
             <div className="flex items-center justify-between p-4 bg-gray-50 border-b border-gray-200">
                 <h3 className="text-sm font-semibold text-gray-900">{formatDateLong(selectedDate)}</h3>
@@ -3215,26 +3141,16 @@ export const Calendar: React.FC = () => {
         queryKey: ['calendar-shares-received'],
         queryFn: async () => {
             const response = await calendarShareApi.list();
-            console.log('📅 Calendar shares API response:', response);
-
-            // Filter: Get shares where I am the recipient (shared_with === my ID)
             const sharesWithMe = response.filter((share: any) => share.shared_with === user?.id);
-
-            console.log('📅 Shares where I am recipient:', sharesWithMe);
-
-            // Map to user objects - extract the OWNER info (person who shared with me)
             const users = sharesWithMe.map((share: any) => ({
-                id: share.owner,           // owner is the user ID
-                name: share.owner_name,    // owner_name is the display name
+                id: share.owner,
+                name: share.owner_name,
                 email: share.owner_email,
             }));
 
-            // Remove duplicates
             const uniqueUsers = users.filter((u: any, index: number, self: any[]) =>
                 index === self.findIndex((x) => x.id === u.id)
             );
-
-            console.log('📅 Final sharedWithMeUsers:', uniqueUsers);
             return uniqueUsers;
         },
         enabled: !!user && includeSharedEvents,
@@ -3253,21 +3169,15 @@ export const Calendar: React.FC = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isSettingsOpen]);
 
-
-
-    // ═══════════════ REAL-TIME CALENDAR UPDATES VIA WEBSOCKET ═══════════════
+    // REAL-TIME CALENDAR UPDATES VIA WEBSOCKET
     React.useEffect(() => {
-        // Subscribe to notification socket for real-time calendar updates
         const unsubscribe = notificationSocket.onNotification((notification) => {
-            // Check if it's an event-related notification
             if (notification.related_object?.type === 'event') {
-                console.log('📅 New event notification received, refreshing calendar...');
                 queryClient.invalidateQueries({ queryKey: ['events-calendar'] });
                 queryClient.invalidateQueries({ queryKey: ['events-rsvp-bulk'] });
             }
         });
 
-        // Cleanup on unmount
         return () => {
             unsubscribe();
         };
@@ -3286,16 +3196,12 @@ export const Calendar: React.FC = () => {
 
     const filteredEvents = useMemo(() => {
         if (!includeSharedEvents) return events;
-
-        // If no specific users are selected, show only your own events
         if (selectedUserIds.length === 0) {
             return events.filter(event => event.organizer === user?.id);
         }
 
         return events.filter((event: CalendarEventType) => {
             const isMyEvent = event.organizer === user?.id;
-
-            // Check if the organizer is in our selected list OR if any attendee is in our selected list
             const isSelectedUserInvolved = selectedUserIds.includes(event.organizer) ||
                 event.attendees?.some(attendeeId => selectedUserIds.includes(attendeeId));
 
@@ -3361,7 +3267,7 @@ export const Calendar: React.FC = () => {
         return null;
     };
 
-    // Automatically open event from URL parameters (e.g., from notifications)
+    // Automatically open event from URL parameters 
     React.useEffect(() => {
         const eventId = searchParams.get('eventId');
         if (eventId && events.length > 0) {
@@ -3369,7 +3275,6 @@ export const Calendar: React.FC = () => {
             if (eventToOpen) {
                 setSelectedEvent(eventToOpen);
 
-                // Clean up URL to prevent reopening on refresh
                 const newParams = new URLSearchParams(searchParams);
                 newParams.delete('eventId');
                 setSearchParams(newParams, { replace: true });
@@ -3415,7 +3320,6 @@ export const Calendar: React.FC = () => {
         }
     }, [hasNextTasksPage, isFetchingNextTasksPage, fetchNextTasksPage]);
 
-    // Add this inside your component
     useEffect(() => {
         if (dyuksaResponse) {
             const timer = setTimeout(() => {
@@ -3461,7 +3365,6 @@ export const Calendar: React.FC = () => {
 
         const currentDateIter = new Date(startDate);
         while (currentDateIter <= endDate) {
-            // Use local timezone formatting instead of UTC to prevent day-shifting
             const dateStr = `${currentDateIter.getFullYear()}-${String(currentDateIter.getMonth() + 1).padStart(2, '0')}-${String(currentDateIter.getDate()).padStart(2, '0')}`;
             const dayTasks = tasks.filter((task: Task) => {
                 const startDateStr = toLocalDateStr(task.start_date);
@@ -3521,8 +3424,6 @@ export const Calendar: React.FC = () => {
     const handleEventClick = useCallback((event: CalendarEventType) => {
         setSelectedEvent(event);
         setIsEventModalOpen(true);
-
-        // This makes the dot disappear
         setSeenEventIds((prev) => {
             if (!prev.includes(event.id)) {
                 const newSeen = [...prev, event.id];
@@ -3615,7 +3516,7 @@ export const Calendar: React.FC = () => {
     }
 
     return (
-        <div className="w-full p-4 space-y-6">
+        <div className="w-full px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 pt-6 pb-8 space-y-6">
 
             {/* Controls Bar */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-2 bg-white p-3 rounded-xl border border-gray-200 shadow-sm sticky top-0 z-30">
@@ -3655,7 +3556,7 @@ export const Calendar: React.FC = () => {
                     {getHeaderTitle()}
                 </h2>
 
-                <div className="flex items-center gap-3 w-full sm:w-auto">
+                <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
                     <div className="flex flex-wrap bg-gray-100 p-1 rounded-lg border border-gray-200 w-full sm:w-auto">
                         {(['day', 'work_week', 'week', 'month'] as ViewMode[]).map((mode) => (
                             <button
@@ -3673,175 +3574,177 @@ export const Calendar: React.FC = () => {
                             </button>
                         ))}
                     </div>
-                    <button
-                        onClick={() => {
-                            setSelectedDate(null);
-                            setIsEventModalOpen(true);
-                        }}
-                        className="flex items-center justify-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 hover:text-indigo-700 rounded-lg border border-indigo-200 transition-colors shadow-sm"
-                        title="New event"
-                    >
-                        <CalendarPlus size={18} />
-                        <span className="text-sm font-medium">New event</span>
-                    </button>
-                    {/* Settings Dropdown */}
-                    <div className="relative" ref={settingsDropdownRef}>
+                    <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
                         <button
-                            onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-                            className={`flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg border transition-colors shadow-sm ${isSettingsOpen || includeSharedEvents
-                                ? 'bg-gray-100 text-gray-700 border-gray-300'
-                                : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
-                                }`}
-                            title="Calendar Settings"
+                            onClick={() => {
+                                setSelectedDate(null);
+                                setIsEventModalOpen(true);
+                            }}
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 hover:text-indigo-700 rounded-lg border border-indigo-200 transition-colors shadow-sm"
+                            title="New event"
                         >
-                            <Settings size={18} />
-                            <span className="text-sm font-medium">Settings</span>
-                            <ChevronDown size={14} className={`transition-transform ${isSettingsOpen ? 'rotate-180' : ''}`} />
+                            <CalendarPlus size={18} />
+                            <span className="text-sm font-medium">New event</span>
                         </button>
+                        {/* Settings Dropdown */}
+                        <div className="relative flex-1 sm:flex-none" ref={settingsDropdownRef}>
+                            <button
+                                onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                                className={`w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg border transition-colors shadow-sm ${isSettingsOpen || includeSharedEvents
+                                    ? 'bg-gray-100 text-gray-700 border-gray-300'
+                                    : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
+                                    }`}
+                                title="Calendar Settings"
+                            >
+                                <Settings size={18} />
+                                <span className="text-sm font-medium">Settings</span>
+                                <ChevronDown size={14} className={`transition-transform ${isSettingsOpen ? 'rotate-180' : ''}`} />
+                            </button>
 
-                        {/* Settings Dropdown Menu */}
-                        {isSettingsOpen && (
-                            <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl shadow-xl border border-gray-200 z-50 overflow-hidden">
-                                {/* Header */}
-                                <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-                                    <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-                                        <Settings size={16} />
-                                        Calendar Settings
-                                    </h3>
-                                </div>
+                            {/* Settings Dropdown Menu */}
+                            {isSettingsOpen && (
+                                <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-xl shadow-xl border border-gray-200 z-50 overflow-hidden">
+                                    {/* Header */}
+                                    <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+                                        <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                                            <Settings size={16} />
+                                            Calendar Settings
+                                        </h3>
+                                    </div>
 
-                                {/* Show Shared Events Toggle */}
-                                <div className="px-4 py-3 border-b border-gray-100">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-sm font-medium text-gray-700">Show Shared Events</span>
-                                        <button
-                                            onClick={() => {
-                                                setIncludeSharedEvents(!includeSharedEvents);
-                                                if (includeSharedEvents) {
-                                                    setSelectedUserIds([]);
-                                                }
-                                            }}
-                                            className={`relative w-11 h-6 rounded-full transition-colors ${includeSharedEvents ? 'bg-purple-600' : 'bg-gray-300'
-                                                }`}
-                                        >
-                                            <span
-                                                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${includeSharedEvents ? 'translate-x-5' : 'translate-x-0'
+                                    {/* Show Shared Events Toggle */}
+                                    <div className="px-4 py-3 border-b border-gray-100">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm font-medium text-gray-700">Show Shared Events</span>
+                                            <button
+                                                onClick={() => {
+                                                    setIncludeSharedEvents(!includeSharedEvents);
+                                                    if (includeSharedEvents) {
+                                                        setSelectedUserIds([]);
+                                                    }
+                                                }}
+                                                className={`relative w-11 h-6 rounded-full transition-colors ${includeSharedEvents ? 'bg-purple-600' : 'bg-gray-300'
                                                     }`}
-                                            />
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Share My Calendar */}
-                                <button
-                                    onClick={() => {
-                                        setIsShareModalOpen(true);
-                                        setIsSettingsOpen(false);
-                                    }}
-                                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-b border-gray-100"
-                                >
-                                    <Share2 size={18} className="text-green-600" />
-                                    <span className="text-sm font-medium text-gray-700">Share My Calendar</span>
-                                </button>
-
-                                {/* View Shared Calendars */}
-                                {includeSharedEvents && (
-                                    <div className="px-4 py-3">
-                                        <div className="flex items-center gap-2 mb-3">
-                                            <Users size={16} className="text-purple-600" />
-                                            <span className="text-sm font-semibold text-gray-700">View Shared Calendars</span>
-                                        </div>
-
-                                        <div className="space-y-1 max-h-48 overflow-y-auto">
-                                            {/* All Option */}
-                                            <label className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-50 cursor-pointer border-b border-gray-100 mb-1">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedUserIds.length === sharedWithMeUsers.length && sharedWithMeUsers.length > 0}
-                                                    onChange={() => {
-                                                        if (selectedUserIds.length === sharedWithMeUsers.length) {
-                                                            setSelectedUserIds([]); // Clear All
-                                                        } else {
-                                                            setSelectedUserIds(sharedWithMeUsers.map((u: any) => u.id)); // Select All
-                                                        }
-                                                    }}
-                                                    className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                                            >
+                                                <span
+                                                    className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${includeSharedEvents ? 'translate-x-5' : 'translate-x-0'
+                                                        }`}
                                                 />
-                                                <span className="text-sm font-semibold text-gray-700">All Shared Calendars</span>
-                                            </label>
-
-                                            {/* View Shared Calendars */}
-                                            {includeSharedEvents && (
-                                                <div className="px-4 py-3">
-                                                    <div className="flex items-center gap-2 mb-3">
-                                                        <Users size={16} className="text-purple-600" />
-                                                        <span className="text-sm font-semibold text-gray-700">View Shared Calendars</span>
-                                                    </div>
-
-                                                    <div className="space-y-1 max-h-48 overflow-y-auto">
-                                                        {sharedWithMeUsers.length > 0 ? (
-                                                            <>
-                                                                {/* Select All Member Toggle */}
-                                                                <label className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-50 cursor-pointer border-b border-gray-100 mb-1">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={selectedUserIds.length === sharedWithMeUsers.length}
-                                                                        onChange={() => {
-                                                                            if (selectedUserIds.length === sharedWithMeUsers.length) {
-                                                                                setSelectedUserIds([]); // Clear All
-                                                                            } else {
-                                                                                setSelectedUserIds(sharedWithMeUsers.map((u: any) => u.id)); // Select All
-                                                                            }
-                                                                        }}
-                                                                        className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
-                                                                    />
-                                                                    <span className="text-sm font-medium text-gray-700">Select All Members</span>
-                                                                </label>
-
-                                                                {/* Individual Users List */}
-                                                                {sharedWithMeUsers.map((u: any) => {
-                                                                    const isSelected = selectedUserIds.includes(u.id);
-                                                                    return (
-                                                                        <label
-                                                                            key={u.id}
-                                                                            className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-50 cursor-pointer"
-                                                                        >
-                                                                            <input
-                                                                                type="checkbox"
-                                                                                checked={isSelected}
-                                                                                onChange={() => {
-                                                                                    setSelectedUserIds(prev =>
-                                                                                        isSelected
-                                                                                            ? prev.filter(id => id !== u.id)
-                                                                                            : [...prev, u.id]
-                                                                                    );
-                                                                                }}
-                                                                                className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
-                                                                            />
-                                                                            <div className="flex items-center gap-2 flex-1">
-                                                                                <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-[10px] font-bold">
-                                                                                    {u.name?.charAt(0)?.toUpperCase()}
-                                                                                </div>
-                                                                                <span className="text-sm text-gray-700">{u.name}</span>
-                                                                            </div>
-                                                                            {isSelected && <Check size={14} className="text-purple-600" />}
-                                                                        </label>
-                                                                    );
-                                                                })}
-                                                            </>
-                                                        ) : (
-                                                            <div className="px-2 py-3 text-center text-sm text-gray-500 italic">
-                                                                No calendars shared with you
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            )}
+                                            </button>
                                         </div>
                                     </div>
-                                )}
-                            </div>
-                        )}
+
+                                    {/* Share My Calendar */}
+                                    <button
+                                        onClick={() => {
+                                            setIsShareModalOpen(true);
+                                            setIsSettingsOpen(false);
+                                        }}
+                                        className="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors border-b border-gray-100"
+                                    >
+                                        <Share2 size={18} className="text-green-600" />
+                                        <span className="text-sm font-medium text-gray-700">Share My Calendar</span>
+                                    </button>
+
+                                    {/* View Shared Calendars */}
+                                    {includeSharedEvents && (
+                                        <div className="px-4 py-3">
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <Users size={16} className="text-purple-600" />
+                                                <span className="text-sm font-semibold text-gray-700">View Shared Calendars</span>
+                                            </div>
+
+                                            <div className="space-y-1 max-h-48 overflow-y-auto">
+                                                {/* All Option */}
+                                                <label className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-50 cursor-pointer border-b border-gray-100 mb-1">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedUserIds.length === sharedWithMeUsers.length && sharedWithMeUsers.length > 0}
+                                                        onChange={() => {
+                                                            if (selectedUserIds.length === sharedWithMeUsers.length) {
+                                                                setSelectedUserIds([]); // Clear All
+                                                            } else {
+                                                                setSelectedUserIds(sharedWithMeUsers.map((u: any) => u.id)); // Select All
+                                                            }
+                                                        }}
+                                                        className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                                                    />
+                                                    <span className="text-sm font-semibold text-gray-700">All Shared Calendars</span>
+                                                </label>
+
+                                                {/* View Shared Calendars */}
+                                                {includeSharedEvents && (
+                                                    <div className="px-4 py-3">
+                                                        <div className="flex items-center gap-2 mb-3">
+                                                            <Users size={16} className="text-purple-600" />
+                                                            <span className="text-sm font-semibold text-gray-700">View Shared Calendars</span>
+                                                        </div>
+
+                                                        <div className="space-y-1 max-h-48 overflow-y-auto">
+                                                            {sharedWithMeUsers.length > 0 ? (
+                                                                <>
+                                                                    {/* Select All Member Toggle */}
+                                                                    <label className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-50 cursor-pointer border-b border-gray-100 mb-1">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={selectedUserIds.length === sharedWithMeUsers.length}
+                                                                            onChange={() => {
+                                                                                if (selectedUserIds.length === sharedWithMeUsers.length) {
+                                                                                    setSelectedUserIds([]);
+                                                                                } else {
+                                                                                    setSelectedUserIds(sharedWithMeUsers.map((u: any) => u.id));
+                                                                                }
+                                                                            }}
+                                                                            className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                                                                        />
+                                                                        <span className="text-sm font-medium text-gray-700">Select All Members</span>
+                                                                    </label>
+
+                                                                    {/* Individual Users List */}
+                                                                    {sharedWithMeUsers.map((u: any) => {
+                                                                        const isSelected = selectedUserIds.includes(u.id);
+                                                                        return (
+                                                                            <label
+                                                                                key={u.id}
+                                                                                className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-50 cursor-pointer"
+                                                                            >
+                                                                                <input
+                                                                                    type="checkbox"
+                                                                                    checked={isSelected}
+                                                                                    onChange={() => {
+                                                                                        setSelectedUserIds(prev =>
+                                                                                            isSelected
+                                                                                                ? prev.filter(id => id !== u.id)
+                                                                                                : [...prev, u.id]
+                                                                                        );
+                                                                                    }}
+                                                                                    className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                                                                                />
+                                                                                <div className="flex items-center gap-2 flex-1">
+                                                                                    <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-[10px] font-bold">
+                                                                                        {u.name?.charAt(0)?.toUpperCase()}
+                                                                                    </div>
+                                                                                    <span className="text-sm text-gray-700">{u.name}</span>
+                                                                                </div>
+                                                                                {isSelected && <Check size={14} className="text-purple-600" />}
+                                                                            </label>
+                                                                        );
+                                                                    })}
+                                                                </>
+                                                            ) : (
+                                                                <div className="px-2 py-3 text-center text-sm text-gray-500 italic">
+                                                                    No calendars shared with you
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -3901,7 +3804,7 @@ export const Calendar: React.FC = () => {
 
             {/* Calendar Content Area */}
             <div className="flex gap-6 min-h-[600px]">
-                {/* Left Sidebar: Mini Calendar (Teams Style) */}
+                {/* Left Sidebar: Mini Calendar */}
                 <div className="hidden lg:flex flex-col w-56 flex-shrink-0 space-y-6">
                     <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
                         <MiniCalendar
@@ -4011,7 +3914,7 @@ export const Calendar: React.FC = () => {
 
                     />
                 )}
-            </div> {/* <-- THIS IS THE MISSING DIV THAT CLOSES THE FLEX CONTAINER */}
+            </div> { }
 
             {/* Status Legend Footer */}
             <div className="flex flex-wrap items-center gap-4 px-6 py-4 bg-white rounded-xl border border-gray-200 shadow-sm">
@@ -4043,13 +3946,13 @@ export const Calendar: React.FC = () => {
                     setSelectedEvent(null);
                     setSelectedDate(null);
                     setSelectedHour(null);
-                    setDyuksaEventData(null); // Clear Dyuksa data on close
+                    setDyuksaEventData(null);
                 }}
                 selectedDate={selectedDate}
                 selectedHour={selectedHour}
                 event={selectedEvent}
                 currentUser={user ? { id: user.id, role: user.role } : null}
-                allEvents={events} // Passing the events array here
+                allEvents={events}
                 onAcceptInvitation={handleAcceptInvitation}
                 onDeclineInvitation={handleDeclineClick}
                 onRescheduleInvitation={handleRescheduleClick}
@@ -4095,7 +3998,7 @@ export const Calendar: React.FC = () => {
                 currentUserId={user?.id || 0}
             />
 
-            {/* ═══════════════ EVENT CONTEXT MENU ═══════════════ */}
+            {/* EVENT CONTEXT MENU */}
             {contextMenu && (
                 <div
                     className="fixed z-[100] bg-white rounded-xl shadow-2xl border border-gray-200 py-2 min-w-[200px]"
@@ -4105,7 +4008,7 @@ export const Calendar: React.FC = () => {
                     }}
                     onClick={(e) => e.stopPropagation()}
                 >
-                    {/* Repeat Event - with submenu */}
+                    {/* Repeat Event */}
                     <div
                         className="relative"
                         onMouseEnter={() => setShowRepeatSubmenu(true)}
@@ -4194,7 +4097,6 @@ export const Calendar: React.FC = () => {
                                 <button
                                     className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
                                     onClick={() => {
-                                        // TODO: Open custom repeat modal
                                         closeContextMenu();
                                     }}
                                 >
@@ -4298,7 +4200,6 @@ export const Calendar: React.FC = () => {
                                         for (const evt of similarEvents) {
                                             await eventApi.delete(evt.id);
                                         }
-                                        // Force refetch the events
                                         await queryClient.invalidateQueries({ queryKey: ['events-calendar'] });
                                         await queryClient.refetchQueries({ queryKey: ['events-calendar'] });
                                     } catch (error) {

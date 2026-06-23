@@ -13,13 +13,13 @@ import { CreateProjectModal } from './CreateProjectModal';
 import { useNotifications } from '@/hooks/useNotifications';
 import { formatRelativeTime } from '@/lib/utils';
 
-// ─── Design tokens (match HTML reference) ────────────────────────────────────
+//  Design tokens
 const BLUE = '#1663f6';
 const LINE = '#e6ebf2';
 const TEXT = '#172033';
 const MUTED = '#667085';
 
-// ─── Project colour from name (consistent hash) ───────────────────────────────
+// Project colour from name
 function projectColor(name: string): string {
   const colors = ['#22c36a', '#3b82f6', '#8b5cf6', '#fb923c', '#35c7bd', '#ef4444', '#ec5da8', '#f59e0b', '#1663f6', '#dc2626'];
   let h = 0;
@@ -27,7 +27,7 @@ function projectColor(name: string): string {
   return colors[Math.abs(h) % colors.length];
 }
 
-// ─── Status pill ──────────────────────────────────────────────────────────────
+// Status pill
 const STATUS_MAP: Record<string, { bg: string; color: string; border: string; label: string }> = {
   active: { bg: '#eafaf3', color: '#09925e', border: '#bee8d3', label: 'Active' },
   in_review: { bg: '#fff6e5', color: '#b86600', border: '#ffd28b', label: 'In Review' },
@@ -44,7 +44,7 @@ function StatusPill({ status }: { status?: string }) {
   );
 }
 
-// ─── Type pill ────────────────────────────────────────────────────────────────
+// Type pill
 const TYPE_MAP: Record<string, { bg: string; color: string; border: string }> = {
   client: { bg: '#eef4ff', color: BLUE, border: '#cde0ff' },
   internal: { bg: '#f4efff', color: '#7c3aed', border: '#dfd2ff' },
@@ -62,7 +62,7 @@ function TypePill({ type }: { type?: string }) {
   );
 }
 
-// ─── Member avatars stack ──────────────────────────────────────────────────────
+// Member avatars stack 
 function MemberAvatars({ members, max = 3 }: { members: any[]; max?: number }) {
   const shown = members.slice(0, max);
   const extra = members.length - max;
@@ -77,23 +77,19 @@ function MemberAvatars({ members, max = 3 }: { members: any[]; max?: number }) {
       {shown.map((m, i) => {
         const name = m.user?.full_name || m.username || m.first_name || '?';
         const init = name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
-        // ✅ Check avatar on member object or nested user object
         const avatarUrl = m.user?.avatar || m.avatar || null;
         return (
           <div key={i} title={name} style={{ width: 22, height: 22, borderRadius: '50%', border: '2px solid #fff', marginLeft: i === 0 ? 0 : -6, background: grads[i % grads.length], display: 'grid', placeItems: 'center', fontSize: 9, fontWeight: 700, color: '#fff', zIndex: max - i, position: 'relative', overflow: 'hidden' }}>
             {avatarUrl ? (
-              // ✅ Show profile image if available
               <img
                 src={avatarUrl}
                 alt={name}
                 style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
                 onError={e => {
-                  // ✅ If image fails to load, hide it — initials show through background
                   (e.target as HTMLImageElement).style.display = 'none';
                 }}
               />
             ) : (
-              // ✅ Fallback to first letter only (not two letters — matches your request)
               name[0]?.toUpperCase()
             )}
           </div>
@@ -109,7 +105,7 @@ function MemberAvatars({ members, max = 3 }: { members: any[]; max?: number }) {
   );
 }
 
-// ─── Tree panel ───────────────────────────────────────────────────────────────
+// Tree panel 
 const TREE_GROUPS = [
   { label: 'Client Projects', types: ['client'], color: '#3b82f6' },
   { label: 'Internal Projects', types: ['internal'], color: '#8b5cf6' },
@@ -120,8 +116,8 @@ const TREE_GROUPS = [
 
 function TreePanel({ projects, selected, selectedGroup, onSelect, onSelectGroup, isOpen, onToggle }: {
   projects: Project[];
-  selected: number | null;           // single project selected
-  selectedGroup: string | null;      // group label selected e.g. "Client Projects"
+  selected: number | null; 
+  selectedGroup: string | null;
   onSelect: (id: number | null) => void;
   onSelectGroup: (label: string | null) => void;
   isOpen: boolean;
@@ -242,21 +238,11 @@ function TreePanel({ projects, selected, selectedGroup, onSelect, onSelectGroup,
           );
         })}
       </div>
-
-      {/* New Folder */}
-      {/* <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: BLUE, fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Plus className="w-3.5 h-3.5" />New Folder
-        </span>
-        <div style={{ width: 32, height: 32, border: `1px solid ${LINE}`, borderRadius: 8, display: 'grid', placeItems: 'center', color: MUTED }}>
-          <Settings className="w-3.5 h-3.5" />
-        </div>
-      </div> */}
     </div>
   );
 }
 
-// ─── Bulk action toolbar ───────────────────────────────────────────────────────
+// ─── Bulk action toolbar
 function BulkToolbar({ count, onClear, onDelete, onMove }: { count: number; onClear: () => void; onDelete: () => void; onMove: () => void }) {
   const btn: React.CSSProperties = { height: 30, border: `1px solid ${LINE}`, borderRadius: 6, background: '#fff', padding: '0 11px', fontSize: 12, fontWeight: 700, display: 'inline-flex', gap: 6, alignItems: 'center', cursor: 'pointer', color: TEXT };
   return (
@@ -277,7 +263,7 @@ function BulkToolbar({ count, onClear, onDelete, onMove }: { count: number; onCl
   );
 }
 
-// ─── Detail side panel ─────────────────────────────────────────────────────────
+// ─── Detail side panel
 function DetailPanel({ project, onClose, onOpen }: { project: Project; onClose: () => void; onOpen: () => void }) {
   const [tab, setTab] = useState<'overview' | 'activity' | 'files'>('overview');
   const members = (project as any).members || [];
@@ -354,7 +340,7 @@ function DetailPanel({ project, onClose, onOpen }: { project: Project; onClose: 
   );
 }
 
-// ─── Grid card ────────────────────────────────────────────────────────────────
+// ─── Grid card 
 function ProjectGridCard({ project, selected, onSelect, onFav, onClick }: {
   project: Project; selected: boolean;
   onSelect: (e: React.MouseEvent) => void;
@@ -390,7 +376,7 @@ function ProjectGridCard({ project, selected, onSelect, onFav, onClick }: {
   );
 }
 
-// ─── Main Projects page ────────────────────────────────────────────────────────
+// Main Projects page 
 const PROJECT_TYPE_FILTERS = [
   { label: 'Client', value: 'client', dotColor: '#3b82f6' },
   { label: 'Internal', value: 'internal', dotColor: '#22c55e' },
@@ -398,7 +384,7 @@ const PROJECT_TYPE_FILTERS = [
   { label: 'Ideas', value: 'ideas', dotColor: '#eab308' },
 ] as const;
 
-// ─── Move Project Type Modal ──────────────────────────────────────────────────
+// Move Project Type Modal
 const PROJECT_TYPES = [
   { value: 'client', label: 'Client Projects', color: '#3b82f6', desc: 'External client work' },
   { value: 'internal', label: 'Internal Projects', color: '#8b5cf6', desc: 'Internal team projects' },
@@ -522,7 +508,7 @@ export function Projects() {
   const navigate = useNavigate();
   const { unreadCount } = useNotifications();
 
-  // ── State ──────────────────────────────────────────────────────────────────
+  // State
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -537,7 +523,7 @@ export function Projects() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const rowsPerPage = 25;
 
-  // ── Data ───────────────────────────────────────────────────────────────────
+  // Data
   const { data, isLoading } = useQuery({
     queryKey: ['projects', typeFilter],
     queryFn: () => projectsApi.list(typeFilter ? { task_type: typeFilter } : undefined),
@@ -553,7 +539,7 @@ export function Projects() {
     return [];
   })();
 
-  // ── Real-time sync (kept exactly as before) ─────────────────────────────────
+  // Real-time sync
   useEffect(() => {
     const seen = new Set<string>();
     const handle = (rel: { type: string; id: string | number }) => {
@@ -568,7 +554,7 @@ export function Projects() {
     return () => { u1(); u2(); seen.clear(); };
   }, [queryClient]);
 
-  // ── Favourite toggle (optimistic, kept exactly as before) ──────────────────
+  // Favourite toggle
   const toggleFavorite = (e: React.MouseEvent, project: Project) => {
     e.preventDefault();
     e.stopPropagation();
@@ -590,16 +576,14 @@ export function Projects() {
     });
   };
 
-  // ── Prefetch on hover (kept exactly as before) ─────────────────────────────
+  // Prefetch on hover 
   const handleRowHover = useCallback((project: any) => {
     queryClient.prefetchQuery({ queryKey: ['project', String(project.id)], queryFn: () => projectsApi.get(project.id), staleTime: 1000 * 60 * 5 });
   }, [queryClient]);
 
-  // ── Filter ─────────────────────────────────────────────────────────────────
+  // Filter 
   const filtered = allProjects.filter(p => {
-    // Single project selected in tree
     if (treeFilter && p.id !== treeFilter) return false;
-    // Group folder selected in tree — filter by task_type
     if (treeGroupFilter) {
       const group = TREE_GROUPS.find(g => g.label === treeGroupFilter);
       if (group && !group.types.includes(((p as any).task_type || '').toLowerCase())) return false;
@@ -623,7 +607,7 @@ export function Projects() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#fff', overflow: 'hidden' }}>
 
       {/* ── TOP BAR ────────────────────────────────────────────────────────── */}
-      <div style={{ flexShrink: 0, background: '#fff', borderBottom: `1px solid ${LINE}`, padding: '16px 24px' }}>
+      <div className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40" style={{ flexShrink: 0, background: '#fff', borderBottom: `1px solid ${LINE}`, paddingTop: 16, paddingBottom: 16 }}>
 
         {/* Title row */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
@@ -698,8 +682,8 @@ export function Projects() {
         )}
       </div>
 
-      {/* ── WORKSPACE ──────────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      {/* WORKSPACE */}
+      <div className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40" style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
         {/* Tree panel */}
         <TreePanel
@@ -723,7 +707,7 @@ export function Projects() {
                 <p style={{ color: MUTED, fontSize: 14, fontWeight: 500 }}>Loading projects...</p>
               </div>
             ) : viewMode === 'tree' ? (
-              /* ── TREE VIEW ─────────────────────────────────────────── */
+              /* TREE VIEW */
               <div style={{ padding: 20 }}>
                 {TREE_GROUPS.map(group => {
                   const groupProjects = filtered.filter(p =>
@@ -774,7 +758,7 @@ export function Projects() {
                     </div>
                   );
                 })}
-                {/* Ungrouped projects (no task_type or unknown type) */}
+                {/* Ungrouped projects */}
                 {(() => {
                   const knownTypes = TREE_GROUPS.flatMap(g => g.types);
                   const ungrouped = filtered.filter(p => !knownTypes.includes(((p as any).task_type || '').toLowerCase()));
@@ -814,7 +798,7 @@ export function Projects() {
                   );
                 })()}
               </div>
-            ) : viewMode === 'grid' ? (              /* ── GRID ───────────────────────────────────────────────────── */
+            ) : viewMode === 'grid' ? (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px,1fr))', gap: 16, padding: 20 }}>
                 {paginated.length === 0
                   ? <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 48, color: MUTED }}><FolderKanban style={{ margin: '0 auto 12px', opacity: 0.3, width: 48, height: 48 }} /><p>No projects found</p></div>
@@ -828,7 +812,7 @@ export function Projects() {
                 }
               </div>
             ) : (
-              /* ── TABLE ──────────────────────────────────────────────────── */
+              /* TABLE */
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 8 }}>
                 <thead>
                   <tr style={{ background: '#f9fafb' }}>
@@ -876,7 +860,7 @@ export function Projects() {
                             <div style={{ width: 30, height: 30, borderRadius: 7, background: color, display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 800, fontSize: 14, flexShrink: 0 }}>
                               {p.name[0].toUpperCase()}
                             </div>
-                            <span style={{ color: TEXT, fontWeight: 400}}>{p.name}</span>
+                            <span style={{ color: TEXT, fontWeight: 400 }}>{p.name}</span>
                           </div>
                         </td>
                         <td style={td}><TypePill type={(p as any).task_type} /></td>
@@ -897,7 +881,7 @@ export function Projects() {
             )}
           </div>
 
-          {/* ── PAGINATION ─────────────────────────────────────────────────── */}
+          {/* PAGINATION  */}
           {filtered.length > 0 && (
             <div style={{ height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', borderTop: `1px solid ${LINE}`, background: '#fff', flexShrink: 0, fontSize: 12, color: TEXT }}>
               <span>Showing {Math.min((currentPage - 1) * rowsPerPage + 1, filtered.length)}–{Math.min(currentPage * rowsPerPage, filtered.length)} of {filtered.length} projects</span>
@@ -912,7 +896,7 @@ export function Projects() {
           )}
         </div>
 
-        {/* ── DETAIL PANEL ───────────────────────────────────────────────── */}
+        {/* DETAIL PANEL */}
         {detailProject && (
           <div style={{ padding: 12, borderLeft: `1px solid ${LINE}`, overflowY: 'auto', flexShrink: 0 }}>
             <DetailPanel
@@ -928,7 +912,7 @@ export function Projects() {
 
       <CreateProjectModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} navigateOnSuccess={false} />
 
-      {/* ✅ Move Project Type Modal */}
+      {/* Project Type Modal */}
       {showMoveModal && (
         <MoveProjectModal
           selectedIds={selectedIds}

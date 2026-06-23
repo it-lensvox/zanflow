@@ -133,19 +133,14 @@ export function TeamChatModern() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
 
-  // Derive the active tab from the URL
-  // 'all' has no dedicated URL — it maps to the base /team-chat path
-  // existing URLs are preserved: /team-chat/chat → direct, /team-chat/project or /team-chat/teams → channels
   const derivedTab = (() => {
     if (pathname.startsWith('/team-chat/chat')) return 'direct';
     if (pathname.startsWith('/team-chat/project')) return 'channels';
     if (pathname.startsWith('/team-chat/teams')) return 'channels';
     if (pathname.startsWith('/team-chat/unread')) return 'unread';
-    // base /team-chat path → all
     return 'all';
   })();
 
-  // Sync the active tab whenever the URL changes (sidebar navigation)
   useEffect(() => {
     if (derivedTab && derivedTab !== chat.activeTab) {
       chat.setActiveTab(derivedTab);
@@ -157,7 +152,7 @@ export function TeamChatModern() {
     + (chat.tabUnreadCounts['teams' as keyof typeof chat.tabUnreadCounts] || 0);
   const allUnreadCount = chat.tabUnreadCounts['unread' as keyof typeof chat.tabUnreadCounts] || 0;
 
-  // Tab config: label, value, unread count
+  // Tab config
   const tabConfig = [
     { value: 'all', label: 'All', count: allUnreadCount },
     { value: 'channels', label: 'Channels', count: channelsUnreadCount },
@@ -166,9 +161,10 @@ export function TeamChatModern() {
   ] as const;
 
   return (
-<div className="flex bg-[#f3f2f1] overflow-hidden border-2 border-gray-200" style={{ height: 'calc(100vh - 56px)' }}>
+    <div className="flex h-[calc(100vh-56px)] overflow-hidden px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 pt-6 pb-8 bg-[#F7F8FB]">
+      <div className="flex flex-1 w-full bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden relative">
 
-      {/* Document Preview Overlay */}
+        {/* Document Preview Overlay */}
       {chat.previewDoc && (
         <div className="fixed inset-0 z-[200]">
           <DocumentPreview
@@ -189,7 +185,13 @@ export function TeamChatModern() {
       </div>
 
       {/* Left Sidebar */}
-      <div className="w-80 bg-[#f3f2f1] border-r border-gray-200 flex flex-col h-full overflow-hidden">
+      <div className={cn(
+        "bg-[#f3f2f1] border-r border-gray-200 flex flex-col h-full overflow-hidden flex-shrink-0 transition-all duration-200",
+        "w-full md:w-80",
+        (chat.activeRoom || chat.selectedProjectRoom || chat.selectedTeamRoom)
+          ? "hidden md:flex"
+          : "flex"
+      )}>
 
         {/* Sidebar Header */}
         <div className="h-14 px-4 flex items-center justify-between bg-white border-b border-gray-200">
@@ -224,7 +226,6 @@ export function TeamChatModern() {
           value={chat.activeTab}
           onValueChange={(tab) => {
             chat.setActiveTab(tab);
-            // Keep URL in sync — preserve existing URL routing, 'all' goes to base path
             const tabToUrl: Record<string, string> = {
               all: '/team-chat',
               channels: '/team-chat/project',
@@ -441,7 +442,7 @@ export function TeamChatModern() {
               </div>
             </Tabs.Content>
 
-            {/* ── Channels Tab — Projects first (with label), then Teams (with label) */}
+            {/* Channels Tab */}
             <Tabs.Content value="channels">
               <div className="bg-white">
 
@@ -558,7 +559,7 @@ export function TeamChatModern() {
               </div>
             </Tabs.Content>
 
-            {/* ── Direct Tab — 1-to-1 user conversations (was "chats") */}
+            {/* ── Direct Tab — 1-to-1 user conversations */}
             <Tabs.Content value="direct">
               <div className="bg-white">
                 <div className="border-t border-gray-100">
@@ -692,7 +693,12 @@ export function TeamChatModern() {
       </div>
 
       {/* ── Right Panel - Chat View */}
-      <div className="flex-1 flex flex-col bg-white h-full overflow-hidden">
+      <div className={cn(
+        "flex-1 flex flex-col bg-white h-full overflow-hidden min-w-0",
+        !(chat.activeRoom || chat.selectedProjectRoom || chat.selectedTeamRoom)
+          ? "hidden md:flex"
+          : "flex"
+      )}>
         {(chat.activeRoom || chat.selectedProjectRoom || chat.selectedTeamRoom) ? (
           <>
             {/* Chat Header */}
@@ -727,9 +733,26 @@ export function TeamChatModern() {
                     ) : null}
                   </div>
                   <div>
-                    <h3 className="font-semibold text-sm text-gray-900">
-                      {chat.selectedProjectRoom?.name || chat.selectedTeamRoom?.name || (chat.selectedUser ? `${chat.selectedUser.first_name || chat.selectedUser.username}` : '')}
-                    </h3>
+                   <div className="flex items-center gap-2 min-w-0">
+                      {/* Back to sidebar — mobile only */}
+                      <button
+                        className="md:hidden p-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
+                        onClick={() => navigate('/team-chat')}
+                        aria-label="Back to chat list"
+                      >
+                        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                          <path d="M11 14l-5-5 5-5" stroke="#374151" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                      <h3 className="font-semibold text-gray-900 truncate">
+                        {chat.selectedProjectRoom?.name
+                          || chat.selectedTeamRoom?.name
+                          || chat.activeRoom?.name
+                          || chat.selectedUser
+                            ? `${chat.selectedUser?.first_name || ''} ${chat.selectedUser?.last_name || ''}`.trim() || chat.selectedUser?.username
+                            : 'Select a conversation'}
+                      </h3>
+                    </div>
                     {chat.selectedProjectRoom && <p className="text-xs text-gray-500" />}
                     {chat.selectedTeamRoom && <p className="text-xs text-gray-500" />}
                   </div>
@@ -1256,7 +1279,7 @@ export function TeamChatModern() {
               <div className="h-20 w-20 rounded-full bg-blue-100 flex items-center justify-center mx-auto mb-4">
                 <MessageSquare className="h-10 w-10 text-blue-600" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Welcome to Chat</h3>
+             <h3 className="text-xl font-semibold text-gray-900 mb-2">Welcome to Chat</h3>
               <p className="text-gray-600 text-sm">Select a user from the list to start messaging</p>
               <p className="text-xs text-gray-400 mt-4">
                 {chat.users.length} {chat.users.length === 1 ? 'user' : 'users'} available
@@ -1264,7 +1287,8 @@ export function TeamChatModern() {
             </div>
           </div>
         )}
-      </div>
+        </div>
+      </div> 
 
       {/* Create Team Modal */}
       {chat.isCreateTeamModalOpen && (

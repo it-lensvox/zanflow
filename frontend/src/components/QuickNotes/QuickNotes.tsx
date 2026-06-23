@@ -18,7 +18,7 @@ export interface QuickNotesState {
   selectedFolderId: number | 'all' | `project-${number}`;
   selectedNoteId: number | 'pending' | null;
   isLoading: boolean;
-  pendingNote: { folderId: number | null; projectId?: number | null } | null;  // ✅ ADD projectId
+  pendingNote: { folderId: number | null; projectId?: number | null } | null;
   currentUserId: number | null;
   users: import('@/types').User[];
 }
@@ -40,7 +40,6 @@ function getDefaultState(): QuickNotesState {
 export function useQuickNotes() {
   const [state, setState] = useState<QuickNotesState>(getDefaultState);
 
-  // Load folders + notes from backend on mount
   useEffect(() => {
     let cancelled = false;
     async function load() {
@@ -87,14 +86,11 @@ export function useQuickNotes() {
   const getNoteTitle = (note: QuickNote): string =>
     note.title && note.title.trim() ? note.title : 'Untitled';
 
-  // "New Note" click — just marks a pending note, no API call yet
-  // "New Note" click — just marks a pending note, no API call yet
   const createNote = (folderId: number | 'all' | `project-${number}`): void => {
     let targetFolder: number | null = null;
     let targetProject: number | null = null;
-    
+
     if (typeof folderId === 'string' && folderId.startsWith('project-')) {
-      // Extract project ID from string like "project-155"
       targetProject = parseInt(folderId.replace('project-', ''));
       targetFolder = null;
     } else if (folderId === 'all') {
@@ -104,7 +100,7 @@ export function useQuickNotes() {
       targetFolder = folderId;
       targetProject = null;
     }
-    
+
     setState((prev) => ({
       ...prev,
       pendingNote: { folderId: targetFolder, projectId: targetProject },
@@ -120,10 +116,10 @@ export function useQuickNotes() {
       });
       const targetFolder = currentState.pendingNote?.folderId ?? null;
       const targetProject = currentState.pendingNote?.projectId ?? null;
-      
+
       try {
-        const newNote = await quickNotesApi.createNote({ 
-          content, 
+        const newNote = await quickNotesApi.createNote({
+          content,
           folder: targetFolder,
           project: targetProject
         });
@@ -138,15 +134,14 @@ export function useQuickNotes() {
       }
       return;
     }
-  
-    // ✅ ADD THIS BACK - Normal update for existing note (optimistic update)
+
     setState((prev) => ({
       ...prev,
       notes: prev.notes.map((n) =>
         n.id === id ? { ...n, content, updated_at: new Date().toISOString() } : n,
       ),
     }));
-    
+
     try {
       const updated = await quickNotesApi.updateNote(id, { content });
       setState((prev) => ({
@@ -361,7 +356,7 @@ export function FolderSidebar({
   const [inputVal, setInputVal] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Ellipsis menu state — reusing same pattern as NotesList
+  // Ellipsis menu state
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [renamingId, setRenamingId] = useState<number | null>(null);
   const [renameValue, setRenameValue] = useState('');
@@ -373,14 +368,12 @@ export function FolderSidebar({
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [projectsError, setProjectsError] = useState<string | null>(null);
 
-  // ADD THIS EFFECT TO FETCH PROJECTS:
   useEffect(() => {
     if (showAllProjects && projects.length === 0) {
       fetchProjects();
     }
   }, [showAllProjects]);
 
-  // ADD THIS FUNCTION TO FETCH PROJECTS:
   const fetchProjects = async () => {
     setLoadingProjects(true);
     setProjectsError(null);
@@ -411,7 +404,6 @@ export function FolderSidebar({
     if (renamingId) renameInputRef.current?.focus();
   }, [renamingId]);
 
-  // Close dropdown on outside click
   useEffect(() => {
     if (!openMenuId) return;
     const handler = (e: MouseEvent) => {
@@ -475,7 +467,7 @@ export function FolderSidebar({
         {allFolderItems.map((folder) => {
           const isMenuOpen = openMenuId === folder.id;
           const isRenaming = renamingId === folder.id;
-          const isReal = folder.id !== 'all'; // 'All Notes' is virtual — no rename/delete
+          const isReal = folder.id !== 'all';
           const isReadOnlyFolder = folder.name === 'Team Member Updates';
 
           return (
@@ -563,7 +555,7 @@ export function FolderSidebar({
           );
         })}
 
-        {/* ADD THIS NEW SECTION - ALL PROJECTS DROPDOWN */}
+        {/*  ALL PROJECTS DROPDOWN */}
         <div className="pt-2 border-t border-border mt-2">
           <button
             onClick={() => setShowAllProjects(!showAllProjects)}
@@ -606,7 +598,6 @@ export function FolderSidebar({
                       key={project.id}
                       onClick={() => {
                         console.log('Selected project:', project);
-                        // Now this will work without type errors
                         onSelectFolder(`project-${project.id}` as `project-${number}`);
                       }}
                       className={cn(
@@ -672,8 +663,7 @@ export function FolderSidebar({
 }
 
 // Notes list
-
-// --- Project Attach Modal Component ---
+// Project Attach Modal
 function AttachProjectModal({
   isOpen,
   onClose,
@@ -1022,7 +1012,7 @@ export function NoteEditor({
   const [attachmentToDelete, setAttachmentToDelete] = useState<{ id: number; name: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // --- Title Editing Logic ---
+  // Title Editing Logic
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleVal, setTitleVal] = useState('');
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -1199,12 +1189,10 @@ export function NoteEditor({
     }
   };
 
-  // Sync local content when selected note changes
   useEffect(() => {
     setLocalContent(selectedNote?.content ?? '');
   }, [selectedNote?.id]);
 
-  // Reset local content when a fresh pending note is opened
   useEffect(() => {
     if (isPending) setLocalContent('');
   }, [isPending]);
@@ -1225,7 +1213,6 @@ export function NoteEditor({
     };
   }, []);
 
-  // Neither a saved note nor a pending new note
   if (!selectedNote && !isPending) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground/40 bg-background gap-3">
@@ -1391,7 +1378,6 @@ export function NoteEditor({
   );
 }
 //Full 3-column notes UI
-
 interface QuickNotesContentProps {
   onNewNote: () => void;
   onCreateFolder: (name: string) => void;
@@ -1480,7 +1466,6 @@ export function QuickNotesContent({
   );
 }
 
-// Mini window
 
 interface MiniWindowProps {
   selectedNote: QuickNote | null;
@@ -1604,7 +1589,6 @@ function MiniWindow({
 }
 
 // FAB + mini window 
-
 const FAB_SIZE = 48;
 const MINI_W = 340;
 const MINI_H = 260;
@@ -1615,7 +1599,6 @@ function clamp(val: number, min: number, max: number) {
 }
 
 function getInitialFabPos(): { x: number; y: number } {
-  // ✅ Always default to bottom right corner
   return {
     x: window.innerWidth - FAB_SIZE - 24,
     y: window.innerHeight - FAB_SIZE - 132,
@@ -1684,7 +1667,6 @@ export function QuickNotes() {
     setIsMiniOpen((prev) => !prev);
   };
 
-  // Flush any unsaved mini content to backend, then navigate carrying the active note 
   const handleFlushAndMaximize = (pendingContent: string) => {
     if (pendingContent.trim()) {
       const id = selectedNote ? selectedNote.id : 'pending' as const;
@@ -1725,9 +1707,11 @@ export function QuickNotes() {
         <NotebookPen className="h-5 w-5 pointer-events-none" />
       </button>
 
-      {/* Mini window */}
       {isMiniOpen && (
-        <div style={{ position: 'fixed', left: miniLeft, top: miniTop, zIndex: 60 }}>
+        <div
+          className="fixed z-[60] px-2 sm:px-0"
+          style={{ left: miniLeft, top: miniTop, maxWidth: '100vw' }}
+        >
           <MiniWindow
             selectedNote={selectedNote}
             isReadOnly={selectedNote ? (state.folders.find(f => f.id === selectedNote.folder)?.name === 'Team Member Updates' || getNoteTitle(selectedNote) === 'Team Member Updates') : false}

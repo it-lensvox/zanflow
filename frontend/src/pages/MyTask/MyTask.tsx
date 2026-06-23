@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import ReactDOM, { createPortal } from 'react-dom';
-import { Plus, Grid3X3, List, Search, Bell } from 'lucide-react';
+import { Plus, Grid3X3, List, Search } from 'lucide-react';
 import { useNavigate, Outlet, useLocation, useOutletContext } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { taskApi, usersApi } from '@/services/api';
@@ -12,7 +12,6 @@ import { DualView } from '@/components/layout/DualView/DualView';
 import { createTasksTableColumns, TaskGridCard, getStatusConfig, priorityOptions, statusOptions, } from '@/components/layout/DualView/taskConfig';
 import { useTableFilters, ColumnFilterConfig } from '@/hooks/useTableFilters';
 import { SearchFilter, ListFilter, DateFilter, FilterHeaderWrapper } from '@/components/layout/DualView/FilterComponents';
-import { Button } from '@/components/common/Button';
 import { InlineCreateRow } from '@/components/layout/CreateTask/InlineCreateRow';
 import { useNotifications } from '@/hooks/useNotifications';
 import { NotificationsPage } from '../NotificationsPage';
@@ -28,11 +27,9 @@ const PERSON_FIELD_OPTIONS: { value: 'assigned_to' | 'created_by' | 'updated_by'
     { value: 'updated_by', label: 'Updated By' },
 ];
 
-// ── Sanitise the tasks cache on every mount to prevent InfiniteQuery crashes ──
 function sanitiseTaskCache(queryClient: import('@tanstack/react-query').QueryClient) {
     const existing = queryClient.getQueryData(['tasks']);
 
-    // undefined / null = no cached data yet → perfectly fine, let RQ start fresh
     if (!existing) {
         console.log('%c[Cache:tasks] ✅ No existing cache — clean start', 'color:#22c55e;font-weight:bold');
         return;
@@ -64,10 +61,7 @@ function sanitiseTaskCache(queryClient: import('@tanstack/react-query').QueryCli
             '| hasPages:', hasPages,
             '| keys:', Object.keys(existing as object).join(', ')
         );
-        // removeQueries fully removes the entry so useInfiniteQuery starts with state.data = undefined
-        // NOTE: setQueryData(undefined) is a NO-OP in React Query v5 — it must NOT be used here
         queryClient.removeQueries({ queryKey: ['tasks'], exact: true });
-        console.log('%c[Cache:tasks] 🧹 Cache cleared — useInfiniteQuery will start fresh', 'color:#f97316;font-weight:bold');
     }
 }
 
@@ -95,13 +89,9 @@ export const MyTask: React.FC = () => {
 
         const handleClickOutside = (event: MouseEvent) => {
             const target = event.target as Node;
-
-            // Don't close if clicking on the trigger button
             if (personTriggerRef.current?.contains(target)) {
                 return;
             }
-
-            // Don't close if clicking inside the dropdown portal
             const dropdownElement = document.querySelector('[data-person-dropdown="true"]');
             if (dropdownElement?.contains(target)) {
                 return;
@@ -196,7 +186,7 @@ export const MyTask: React.FC = () => {
                 task.assigned_to.includes(user?.id ?? -1)
             );
         }
-        // Add status_label for search (converts in_progress → in progress)
+        // Add status_label for search
         return filtered.map(task => ({
             ...task,
             status_label: (task.status || '').toLowerCase().replace(/_/g, ' '),
@@ -258,7 +248,7 @@ export const MyTask: React.FC = () => {
         data: tasks,
         columns: filterConfig,
         globalSearchFields: ['heading', 'description', 'status', 'priority', 'project_name', 'status_label'],
-        });
+    });
 
     const handleTaskClick = useCallback((task: Task) => setSelectedTask(task), []);
     const handleCloseTaskDetail = useCallback(() => setSelectedTask(null), []);
@@ -424,19 +414,19 @@ export const MyTask: React.FC = () => {
     ), [showPersonFieldDropdown, personField, activePersonLabel]);
 
     return (
-        <div className="w-full flex flex-col h-screen overflow-hidden">
+        <div className="w-full flex flex-col flex-1 min-h-0 overflow-hidden">
             {location.pathname.startsWith('/taskboard') && !location.pathname.endsWith('/create') ? (
                 <>
                     {/* ── Sticky header — never scrolls ── */}
-                    <div className="flex-shrink-0 px-8 pt-8 pb-0 bg-white z-10">
+                    <div className="flex-shrink-0 px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 pt-6 pb-0 bg-white z-10">
                         <div className="flex flex-col gap-6">
                             {/* Header Section */}
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                                 <div>
-                                    <h1 className="text-3xl font-bold text-gray-900">Task Board</h1>
-                                    <p className="text-lg text-muted-foreground mt-1">Manage and track your tasks efficiently</p>
+                                    <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Task Board</h1>
+                                    <p className="text-sm sm:text-base text-muted-foreground mt-1">Manage and track your tasks efficiently</p>
                                 </div>
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2 flex-wrap">
                                     {['admin', 'manager', 'annotator'].includes(user?.role || '') && (
                                         <>
                                             <button
@@ -453,17 +443,6 @@ export const MyTask: React.FC = () => {
                                             </button>
                                         </>
                                     )}
-                                    {/* <Button
-                                        className="relative bg-[#F7EC8D]"
-                                        onClick={() => setIsActivityOpen(!isActivityOpen)}
-                                    >
-                                        <Bell className="h-5 w-5 text-gray-800" />
-                                        {unreadCount > 0 && (
-                                            <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                                                {unreadCount}
-                                            </span>
-                                        )}
-                                    </Button> */}
                                 </div>
                             </div>
 
@@ -500,7 +479,7 @@ export const MyTask: React.FC = () => {
                     </div>
 
                     {/* ── Scrollable content area ── */}
-                    <div className="flex-1 min-h-0 overflow-y-auto px-8 pb-8">
+                    <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 pb-8">
                         {/* Content Section*/}
                         <div className="space-y-0 mt-6 flex flex-col">
                             <DualView
@@ -509,7 +488,7 @@ export const MyTask: React.FC = () => {
                                 gridProps={{
                                     data: filteredTasks,
                                     renderCard: (task: Task) => <TaskGridCard task={task} onTaskClick={handleTaskClick} />,
-                                    gridClassName: "grid gap-4 grid-cols-4",
+                                    gridClassName: "grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
                                 }}
                                 tableProps={{
                                     data: filteredTasks,
@@ -603,7 +582,7 @@ export const MyTask: React.FC = () => {
                                     onFilter: handleFilter,
                                 }}
                             />
-                            {/* Infinite-scroll sentinel — triggers next-page fetch when visible */}
+                            {/* Infinite-scroll sentinel */}
                             <div ref={sentinelRef} className="h-1" aria-hidden="true" />
 
                             {/* Loading indicator while fetching more pages */}
@@ -689,7 +668,7 @@ export const MyTask: React.FC = () => {
             {/* Person Field Dropdown */}
             {showPersonFieldDropdown && dropdownPos && createPortal(
                 <div
-                    data-person-dropdown="true" // ✅ ADD THIS
+                    data-person-dropdown="true"
                     style={{ position: 'absolute', top: dropdownPos.top, left: dropdownPos.left, zIndex: 9999 }}
                     className="bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[140px]"
                     onMouseDown={(e) => e.stopPropagation()}
@@ -699,7 +678,6 @@ export const MyTask: React.FC = () => {
                             key={opt.value}
                             onMouseDown={(e) => {
                                 e.stopPropagation();
-                                // Clear all filters when switching
                                 clearFilter('assigned_to');
                                 clearFilter('created_by');
                                 clearFilter('updated_by');

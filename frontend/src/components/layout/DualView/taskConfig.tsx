@@ -702,7 +702,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     {
       key: 'heading',
       label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Task Title</span>,
-      width: '20%',
+      width: '10%',
       render: (task: Task) => <TaskTitleCell task={task} queryClient={queryClient} />,
     },
     {

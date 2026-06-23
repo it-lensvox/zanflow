@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   LayoutDashboard, FolderKanban, FileText, Settings, LogOut, Users, ChevronDown, ChevronUp, Plus, CheckSquare, CheckCircle, Clock, PlayCircle, Pause,
-  TrendingUp, ListTodo, Calendar,Share2, Eye, MessageSquare, UserPlus, NotebookPen, Building2, Briefcase, EyeOff
+  TrendingUp, ListTodo, Calendar, Eye, MessageSquare, UserPlus, NotebookPen, Building2, Briefcase,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -24,7 +24,6 @@ import {
 } from '@/components/common/diaog';
 
 const ADMIN_ROLES = ['admin', 'manager', 'annotator', 'superuser', 'developer'];
-// ✅ Add Workspace interface
 interface Workspace {
   id: number;
   name: string;
@@ -86,12 +85,12 @@ const FavouriteProjectsAccordion = ({ projects }: { projects: Project[] }) => {
   );
 };
 
-export function Sidebar() {
+export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const { unreadCount, chatUnreadCount } = useNotifications();
-    // const [chatUnreadCount, setChatUnreadCount] = useState<number>(0);
+  // const [chatUnreadCount, setChatUnreadCount] = useState<number>(0);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] = useState(false);
 
@@ -134,13 +133,12 @@ export function Sidebar() {
     }
   }, [location.pathname]);
   const isTasksOpen = activeAccordion === 'tasks';
-  // Add this useEffect wherever your other useEffects are:
-useEffect(() => {
-  if (!location.pathname.startsWith('/taskboard')) {
-    // Close tasks accordion when navigating away from taskboard
-    if (isTasksOpen) toggleAccordion('tasks');
-  }
-}, [location.pathname]);
+
+  useEffect(() => {
+    if (!location.pathname.startsWith('/taskboard')) {
+      if (isTasksOpen) toggleAccordion('tasks');
+    }
+  }, [location.pathname]);
   const isAdminOpen = activeAccordion === 'admin';
   const isChatsOpen = activeAccordion === 'chats';
 
@@ -149,13 +147,12 @@ useEffect(() => {
   const toggleSection = (section: 'chats' | 'projects' | 'teams' | 'unread') =>
     setActiveSection(prev => (prev === section ? null : section));
 
-  // ✅ Fetch workspaces
+  // Fetch workspaces
   const { data: workspacesData } = useQuery({
     queryKey: ['workspaces'],
     queryFn: workspaceApi.getWorkspaces,
   });
 
-  // ✅ Get active workspace with fallback
   const storedWorkspaceId = workspaceApi.getActiveWorkspaceId();
 
   const activeWorkspace = useMemo(() => {
@@ -183,23 +180,13 @@ useEffect(() => {
       workspace = workspacesData.workspaces[0];
     }
 
-    // ✅ Update localStorage if we found a different workspace
+    // Update localStorage
     if (workspace && workspace.id !== storedWorkspaceId) {
-      console.log(`🔄 Updating stored workspace from ${storedWorkspaceId} to ${workspace.id}`);
       localStorage.setItem('active_workspace_id', String(workspace.id));
     }
 
     return workspace;
   }, [workspacesData, storedWorkspaceId]);
-
-  // ✅ Debug log
-  console.log('🔍 Active Workspace Debug:', {
-    workspacesData,
-    storedWorkspaceId,
-    activeWorkspace,
-    allWorkspaces: workspacesData?.workspaces,
-  });
-
   const { data: allRoomsData } = useQuery<ChatRoomListItem[]>({
     queryKey: ['sidebar-all-chat-rooms'],
     queryFn: () => chatApi.getAllRooms(),
@@ -252,43 +239,16 @@ useEffect(() => {
     return [];
   }, [teamsData]);
 
-  // useEffect(() => {
-  //   let unsubscribe: (() => void) | null = null;
-
-  //   const fetchInitialUnread = async () => {
-  //     try {
-  //       const { chatApi, notificationSocket } = await import('@/services/api');
-  //       const data = await chatApi.getUnreadCount();
-  //       setChatUnreadCount(data.total_unread);
-
-  //       if (!notificationSocket.isConnected()) {
-  //         notificationSocket.connect();
-  //       }
-
-  //       // ✅ Store unsubscribe outside async so cleanup works correctly
-  //       unsubscribe = notificationSocket.onChatUnreadUpdate((updateData) => {
-  //         // ✅ Just use total_unread directly — backend already calculated correct count
-  //         if (updateData.total_unread !== undefined) {
-  //           setChatUnreadCount(Math.max(0, updateData.total_unread));
-  //         }
-  //       });
-  //     } catch (error) {
-  //       console.error('Failed to fetch chat unread count:', error);
-  //     }
-  //   };
-
-  //   fetchInitialUnread();
-
-  //   // ✅ Proper cleanup — unsubscribes WebSocket listener on unmount
-  //   return () => {
-  //     if (unsubscribe) unsubscribe();
-  //   };
-  // }, []);
+  // Close mobile sidebar on navigation
+  useEffect(() => {
+    if (onMobileClose) onMobileClose();
+  }, [location.pathname]);
 
   return (
     <div
       className={cn(
         "relative flex h-full flex-col border-r bg-card transition-all duration-300 ease-in-out z-50",
+        "h-screen",
         isExpanded ? "w-64" : "w-20"
       )}
       onMouseEnter={() => setIsHovered(true)}
@@ -315,12 +275,12 @@ useEffect(() => {
             DYUKSA
 
             {isExpanded && (
-          <div className="border-b px-0 py-0">
-            <WorkspaceSwitcher onCreateWorkspace={() => setShowCreateWorkspaceModal(true)} />
-          </div>
-        )}
+              <div className="border-b px-0 py-0">
+                <WorkspaceSwitcher onCreateWorkspace={() => setShowCreateWorkspaceModal(true)} />
+              </div>
+            )}
           </span>
-          
+
         )}
       </div>
 
@@ -436,7 +396,7 @@ useEffect(() => {
           { name: 'My Work', href: '/my-work', icon: Briefcase },
           { name: 'Documents', href: '/documents', icon: FileText },
           { name: 'Calendar', href: '/calendar', icon: Calendar },
-          { name: 'Team Chat', href: '/team-chat', icon: MessageSquare, badge: chatUnreadCount }, // ✅ Badge with count
+          { name: 'Team Chat', href: '/team-chat', icon: MessageSquare, badge: chatUnreadCount },
           { name: 'Quick Notes', href: '/quick-notes', icon: NotebookPen },
         ].map((item) => (
           <NavLink
@@ -568,31 +528,12 @@ useEffect(() => {
             </div>
           )}
         </div>
-
-        
-        
-
-        {/* ✅ New Workspace Button - Only for admin/manager */}
         {isExpanded && (
-  <div className="mt-4 space-y-2 animate-in fade-in slide-in-from-bottom-2">
+          <div className="mt-4 space-y-2 animate-in fade-in slide-in-from-bottom-2">
 
-
-    {/* NEW WORKSPACE BUTTON MOVED TO WORKSPACE SWITCHER DROPDOWN
-    {activeWorkspace && (
-      ['admin', 'manager'].includes(activeWorkspace.role) ||
-      ['admin', 'manager'].includes(user?.role || '')
-    ) && (
-      <button
-        onClick={() => setShowCreateWorkspaceModal(true)}
-        className="flex w-full items-center justify-center gap-2 rounded-lg border p-2 text-white bg-black hover:bg-gray-600 transition-colors"
-      >
-        <Plus className="h-4 w-4" /> New Workspace
-      </button>
-    )} */}
-
-    <div className="flex gap-2">
-      <button
-        onClick={() => navigate('/settings')}
+            <div className="flex gap-2">
+              <button
+                onClick={() => navigate('/settings')}
                 className="flex flex-1 items-center justify-center gap-2 rounded-lg border p-2 text-muted-foreground hover:bg-accent"
               >
                 <Settings className="h-4 w-4" /> Settings

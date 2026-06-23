@@ -33,7 +33,7 @@ export interface TableViewProps<T> {
   className?: string;
   rowClassName?: (item: T) => string;
   maxHeight?: string | number;
-  rowProps?: (item: T) => React.HTMLAttributes<HTMLTableRowElement>;  // ✅ ADD THIS LINE
+  rowProps?: (item: T) => React.HTMLAttributes<HTMLTableRowElement>; 
 }
 
 export function TableView<T>({
@@ -48,89 +48,88 @@ export function TableView<T>({
   className = '',
   rowClassName,
   maxHeight = '70vh',
-  rowProps,  // ✅ ADD THIS LINE
+  rowProps,
 }: TableViewProps<T>) {
   return (
-    <div 
+    <div
       className={`bg-white border border-[#dfe1e6] rounded-md shadow-sm font-sans text-[13px] ${className}`}
-      style={{ 
-        display: 'flex',
-        flexDirection: 'column',
+      style={{
+        overflowX: 'auto',
+        overflowY: 'auto',
         maxHeight: typeof maxHeight === 'number' ? `${maxHeight}px` : maxHeight,
+        WebkitOverflowScrolling: 'touch' as any,
       }}
     >
-      {/* Sticky Header  */}
-      <div className="flex-shrink-0 bg-[#fafbfc] border-b border-[#dfe1e6] z-20">
-        <table className="w-full border-collapse table-fixed">
-          <thead>
-            <tr>
-              {columns.map((column) => (
-                <th
-                  key={column.key}
-                  className={`group/header text-left py-[12px] px-3 font-semibold text-[13px] text-[#5e6c84] border-r border-[#dfe1e6] last:border-r-0 whitespace-nowrap relative ${activeFilterKey === column.key ? 'z-[100]' : ''} ${column.headerClassName || ''}`}                  style={column.width ? { width: column.width } : undefined}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex-1 min-w-0">{column.label}</div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover/header:opacity-100 transition-opacity">
-                      {onSort && (
-                        <button
-                          className="hover:bg-gray-200 p-0.5 rounded transition-colors"
-                          onClick={(e) => { e.stopPropagation(); onSort(column.key); }}
-                        >
-                          <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
-                          </svg>
-                        </button>
-                      )}
-                      {onFilter && (
-                        <button
-                          className="hover:bg-gray-200 p-0.5 rounded transition-colors"
-                          onClick={(e) => { e.stopPropagation(); onFilter(column.key); }}
-                        >
-                          <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
+      <table
+        className="border-collapse w-full"
+        style={{ width: '100%', tableLayout: 'fixed', minWidth: '1000px' }}
+      >
+        {/* Sticky header */}
+        <thead className="sticky top-0 z-20">
+          <tr>
+            {columns.map((column) => (
+              <th
+                key={column.key}
+                className={`group/header text-left py-[12px] px-3 font-semibold text-[13px] text-[#5e6c84] bg-[#fafbfc] border-b border-r border-[#dfe1e6] last:border-r-0 whitespace-nowrap relative ${activeFilterKey === column.key ? 'z-[100]' : ''} ${column.headerClassName || ''}`}
+                style={column.width ? { width: column.width } : undefined}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex-1 min-w-0">{column.label}</div>
+                  <div className="flex items-center gap-1 opacity-0 group-hover/header:opacity-100 transition-opacity">
+                    {onSort && (
+                      <button
+                        className="hover:bg-gray-200 p-0.5 rounded transition-colors"
+                        onClick={(e) => { e.stopPropagation(); onSort(column.key); }}
+                      >
+                        <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+                        </svg>
+                      </button>
+                    )}
+                    {onFilter && (
+                      <button
+                        className="hover:bg-gray-200 p-0.5 rounded transition-colors"
+                        onClick={(e) => { e.stopPropagation(); onFilter(column.key); }}
+                      >
+                        <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                        </svg>
+                      </button>
+                    )}
                   </div>
-                </th>
-              ))}
-            </tr>
-          </thead>
-        </table>
-      </div>
-      {/* Scrollable Body */}
-      <div className="flex-1 min-h-0 overflow-auto scrollbar-hide">
-        <table className="w-full border-collapse table-fixed">
-          <tbody>
-            {data.map((item, index) => {
-              // ✅ GET CUSTOM ROW PROPS IF PROVIDED
-              const customRowProps = rowProps ? rowProps(item) : {};
-              const customClassName = customRowProps.className || '';
-              
-              return (
-                <tr
-                  key={rowKey(item)}
-                  onClick={() => onRowClick?.(item)}
-                  onMouseEnter={() => onRowMouseEnter?.(item)}
-                  {...customRowProps}  // ✅ SPREAD CUSTOM PROPS (includes drag handlers)
-                  className={`group border-b border-[#f4f5f7] last:border-b-0 hover:bg-[#f4f5f7] transition-colors cursor-pointer relative hover:z-[50] ${rowClassName ? rowClassName(item) : ''} ${customClassName}`}
-                >
-                  {columns.map((column) => (
-                    <td
-                      key={column.key}
-                      className={`py-3 px-3 h-14 align-middle text-[14px] border-r border-[#f4f5f7] group-hover:border-r-[#dfe1e6] last:border-r-0 relative ${column.className || ''}`}                      style={column.width ? { width: column.width } : undefined}
-                    >
-                      {column.render ? column.render(item, index) : (item as any)[column.key]}
-                    </td>
-                  ))}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                </div>
+              </th>
+            ))}
+          </tr>
+        </thead>
+
+        {/* Body */}
+        <tbody>
+          {data.map((item, index) => {
+            const customRowProps = rowProps ? rowProps(item) : {};
+            const customClassName = customRowProps.className || '';
+            return (
+              <tr
+                key={rowKey(item)}
+                onClick={() => onRowClick?.(item)}
+                onMouseEnter={() => onRowMouseEnter?.(item)}
+                {...customRowProps}
+                className={`group border-b border-[#f4f5f7] last:border-b-0 hover:bg-[#f4f5f7] transition-colors cursor-pointer relative hover:z-[50] ${rowClassName ? rowClassName(item) : ''} ${customClassName}`}
+              >
+                {columns.map((column) => (
+                  <td
+                    key={column.key}
+                    className={`py-3 px-3 h-14 align-middle text-[14px] border-r border-[#f4f5f7] group-hover:border-r-[#dfe1e6] last:border-r-0 relative ${column.className || ''}`}
+                    style={column.width ? { width: column.width } : undefined}
+                  >
+                    {column.render ? column.render(item, index) : (item as any)[column.key]}
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

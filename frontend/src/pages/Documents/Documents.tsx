@@ -3,36 +3,20 @@ import { useState } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useSearchParams, useNavigate, useOutletContext } from 'react-router-dom';
 import {
-  FileText, Search, Filter, ChevronDown, Bell, ChevronLeft, ChevronRight,
-  Info, X, Calendar, User, HardDrive, Tag, Hash, Upload, Plus, List,
-  Grid3X3, Network, FolderOpen, Folder, ChevronRight as ChevronRightIcon,
-  ArrowLeft, Move, Share, Trash2, Share2, MoreHorizontal, SortDesc, Settings,
-  Bookmark, Layers, Clock, Sparkles, HelpCircle, ExternalLink, ZoomIn, ZoomOut,
-  MessageSquare, Pencil
+  FileText, Search, Filter, ChevronLeft, ChevronRight, Info, X, Calendar, User, Tag, Upload, Plus, List, Grid3X3, Network, FolderOpen, 
+  Folder, ChevronRight as ChevronRightIcon, ArrowLeft, Move, Share, Trash2, Share2, SortDesc, Clock, ExternalLink, ZoomIn, ZoomOut, MessageSquare, Pencil
 } from 'lucide-react';
 import { API_URL } from '@/services/api';
-import { Button, Card, CardContent, Input } from '@/components/common';
+import { Button, Card, CardContent } from '@/components/common';
 import { documentsApi, projectsApi, usersApi } from '@/services/api';
 import type { Document, Project, DocumentStatus, Label } from '@/types';
-import { ViewToggle, DualView, useViewMode } from '@/components/layout/DualView';
+import {  DualView, useViewMode } from '@/components/layout/DualView';
 import type { TableColumn } from '@/components/layout/DualView';
 import { createDocumentsTableColumns, DocumentGridCard } from '@/components/layout/DualView/documentsConfig';
 import { useNotifications } from '@/hooks/useNotifications';
 import { NotificationsPage } from '../NotificationsPage';
 import { DocumentPreview } from '@/components/common/DocumentPreview';
 import { DocumentShareModal } from '@/pages/Documents/DocumentShareModal';
-
-/*  EXACT tree_view.html theme:
-    --primary-blue:#4169FF  --text-primary:#1a1a1a  --text-secondary:#6b7280
-    --bg-primary:#ffffff    --bg-secondary:#f9fafb  --border-color:#e5e7eb
-    --hover-bg:#f3f4f6      active-bg:#EEF2FF       primary-hover:#3554CC
-    status-review:#FFF4E6/#D97706  status-draft:#F3F4F6/#6B7280  status-approved:#E8F5E9/#16A34A
-    filter-project:#DBEAFE/#2563EB filter-type:#F3E8FF/#7C3AED filter-tag:#D1FAE5/#059669
-    doc-pdf:#EF4444 doc-docx:#2563EB doc-xlsx:#16A34A doc-pptx:#EA580C
-    project-badge:#EEF2FF/#4F46E5  checkbox-accent:#4169FF
-    feature-green:#D1FAE5/#059669 feature-purple:#E9D5FF/#7C3AED
-    feature-orange:#FED7AA/#EA580C feature-blue:#BFDBFE/#2563EB feature-yellow:#FEF3C7/#D97706
-    why-tree:#EEF2FF comment-badge:#EF4444  */
 
 const FILE_TYPE_OPTIONS = [
   { value: '', label: 'All Types' },
@@ -47,13 +31,13 @@ interface TreeFolder {
   id?: string;
   name: string;
   count: number;
-  folderCount?: number;        // ✅ ADD THIS - number of subfolders
+  folderCount?: number;
   isOpen?: boolean;
   projectId?: number;
   isSystemGenerated?: boolean;
   children?: TreeFolder[];
 }
-// ---- TreePanel (collapsible, inline create + rename) ----
+//  TreePanel
 function TreePanel({
   folders,
   onFolderClick,
@@ -64,8 +48,6 @@ function TreePanel({
   onCreateFolder,
   onRenameFolder,
   onDeleteFolder,
-  selectedDocs,
-  setSelectedDocs,
   setMoveConfirmModal,
   setToast,
   showSharedWithMe,
@@ -83,8 +65,8 @@ function TreePanel({
   onCreateFolder: (projectId: number, parentId: string | null, name: string) => void;
   onRenameFolder: (folderId: string, newName: string) => void;
   onDeleteFolder: (folderId: string) => void;
-  selectedDocs: Set<string>;        // ✅ ADD THIS
-  setSelectedDocs: (docs: Set<string>) => void;  // ✅ ADD THIS
+  selectedDocs: Set<string>;
+  setSelectedDocs: (docs: Set<string>) => void;
   setMoveConfirmModal: (modal: any) => void;
   setToast: (toast: any) => void;
   showSharedWithMe: boolean;
@@ -93,11 +75,10 @@ function TreePanel({
   setSelectedTreeFolderId: (id: string | null) => void;
   sharedWithMeCount: number;
 }) {
-  const queryClient = useQueryClient();  // ✅ Make sure this is here
+  const queryClient = useQueryClient();
   const [openNodes, setOpenNodes] = useState<Record<string, boolean>>({ 'All Documents': true });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
-  // New folder inline state: which project node to show the input under
   const [creatingUnder, setCreatingUnder] = useState<{ projectId: number; nodeKey: string; parentFolderId: string | null } | null>(null);
   const [deleteFolderConfirm, setDeleteFolderConfirm] = useState<{ id: string; name: string } | null>(null);
   const [contextMenu, setContextMenu] = useState<{
@@ -132,15 +113,12 @@ function TreePanel({
   };
 
   const startCreateFolder = (projectId: number, nodeKey: string, parentFolderId: string | null = null) => {
-    // Open the parent node so the input is visible
     setOpenNodes((p) => ({ ...p, [nodeKey]: true }));
-    // ✅ Store parentFolderId so commitCreateFolder knows where to create
     setCreatingUnder({ projectId, nodeKey, parentFolderId });
     setNewFolderName('');
   };
   const commitCreateFolder = () => {
     if (creatingUnder && newFolderName.trim()) {
-      // ✅ Pass parentFolderId — null for root, folder UUID for subfolder
       onCreateFolder(creatingUnder.projectId, creatingUnder.parentFolderId, newFolderName.trim());
     }
     setCreatingUnder(null); setNewFolderName('');
@@ -149,13 +127,10 @@ function TreePanel({
     setCreatingUnder(null); setNewFolderName('');
   };
 
-
-  // ✅ ADD THIS - Reset auto-opened folders when drag ends globally
   React.useEffect(() => {
     const handleDragEnd = () => {
       if (isDragging) {
         setIsDragging(false);
-        // Close all auto-opened folders
         setOpenNodes((prev) => {
           const next = { ...prev };
           autoOpenedNodes.forEach((nodeKey) => {
@@ -176,7 +151,6 @@ function TreePanel({
     };
   }, [isDragging, autoOpenedNodes]);
 
-  // ✅ ADD THIS - Cleanup timer on unmount
   React.useEffect(() => {
     return () => {
       if (dragHoverTimer) {
@@ -189,7 +163,7 @@ function TreePanel({
     const nodeKey = f.id || f.name;
     const isO = openNodes[nodeKey] ?? false;
     const hasC = !!(f.children?.length) || (creatingUnder?.nodeKey === nodeKey);
-    const isSel = (f.id && selectedFolderId === f.id) || (!f.id && selectedFolder === f.name);  // ✅ FIXED
+    const isSel = (f.id && selectedFolderId === f.id) || (!f.id && selectedFolder === f.name);
     const isEditing = editingId === f.id;
     const showNewInput = creatingUnder?.nodeKey === nodeKey;
 
@@ -201,7 +175,6 @@ function TreePanel({
           onMouseEnter={(e) => { if (!isSel) e.currentTarget.style.background = '#f3f4f6'; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = isSel ? '#EEF2FF' : 'transparent'; }}
           onClick={() => { if (hasC) toggleNode(nodeKey); onFolderClick(f.name, f.id, f.projectId); }}
-          // ✅ Right-click opens context menu
           onContextMenu={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -222,7 +195,6 @@ function TreePanel({
             e.currentTarget.style.background = '#D1FAE5';
             e.currentTarget.style.borderLeft = '3px solid #10B981';
 
-            // ✅ AUTO-EXPAND: If folder has children and is closed, open it after 800ms hover
             if (hasC && !isO && !dragHoverTimer) {
               const timer = setTimeout(() => {
                 setOpenNodes((prev) => ({ ...prev, [nodeKey]: true }));
@@ -235,8 +207,6 @@ function TreePanel({
           onDragLeave={(e) => {
             e.preventDefault();
             e.stopPropagation();
-
-            // Check if we're leaving the folder entirely (not just entering a child)
             const rect = e.currentTarget.getBoundingClientRect();
             const x = e.clientX;
             const y = e.clientY;
@@ -248,7 +218,6 @@ function TreePanel({
               y > rect.bottom
             );
 
-            // Remove visual feedback
             e.currentTarget.style.background = isSel ? '#EEF2FF' : 'transparent';
             e.currentTarget.style.borderLeft = 'none';
 
@@ -258,13 +227,10 @@ function TreePanel({
               setDragHoverTimer(null);
             }
 
-            // ✅ AUTO-CLOSE: Close this folder and all its children if they were auto-opened
             if (isLeavingFolder && autoOpenedNodes.has(nodeKey)) {
               setTimeout(() => {
                 setOpenNodes((prev) => {
                   const next = { ...prev };
-
-                  // Close this node
                   delete next[nodeKey];
 
                   // Also close any child nodes that were auto-opened
@@ -315,19 +281,8 @@ function TreePanel({
             if (!documentIdsJson) return;
 
             const documentIds: string[] = JSON.parse(documentIdsJson);
-
-            // Determine target project and folder
-            // Determine target project and folder
             const targetProjectId = f.projectId;
             const targetFolderId = f.id;
-
-            // ✅ DEBUG - remove after fix
-            console.log('🎯 Drop target debug:', {
-              folderName: f.name,
-              folderId: f.id,
-              projectId: f.projectId,
-              isSubfolder: !!f.id,
-            });
 
             if (!targetProjectId) {
               setToast({
@@ -388,22 +343,18 @@ function TreePanel({
 
         </div>
 
-        {/* Children + inline new folder input */}
-        {/* Children + inline new folder input */}
         {isO && (
           <div className="mt-1">
-            {/* ✅ Input shows at TOP so user sees it immediately */}
-            {/* ✅ Input indented to show it's INSIDE the project */}
             {showNewInput && (
               <div
                 className="flex items-center gap-2 py-1 rounded-md text-sm"
                 style={{
-                  marginLeft: 36,   // ✅ pushed right — clearly inside the project
+                  marginLeft: 36,
                   marginBottom: 4,
                   marginRight: 4,
                 }}
               >
-                {/* ✅ Small folder icon to show it's a child */}
+                {/* Small folder icon to show it's a child */}
                 <Folder className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#4169FF' }} />
                 <input
                   autoFocus
@@ -421,8 +372,8 @@ function TreePanel({
                     outline: 'none',
                     background: '#fff',
                     color: '#1a1a1a',
-                    fontSize: 12,      // ✅ slightly smaller than project name
-                    height: 26,        // ✅ compact height
+                    fontSize: 12,
+                    height: 26,
                   }}
                 />
                 <button
@@ -433,7 +384,7 @@ function TreePanel({
                 </button>
               </div>
             )}
-            {/* ✅ Children sorted alphabetically */}
+            {/* Children sorted alphabetically */}
             {[...(f.children || [])].sort((a, b) => a.name.localeCompare(b.name)).map((c) => renderFolder(c, depth + 1))}
           </div>
         )}
@@ -442,9 +393,10 @@ function TreePanel({
   };
 
   return (
-    <div className="flex-shrink-0 overflow-hidden"
-      style={{ width: isOpen ? 280 : 44, minWidth: isOpen ? 280 : 44, borderRight: '1px solid #e5e7eb', background: '#fff', transition: 'width 0.3s ease, min-width 0.3s ease' }}>
-      {/* Collapsed */}
+    <div
+      className={`flex-shrink-0 overflow-hidden ${isOpen ? "block" : "hidden sm:block"}`}
+      style={{ width: isOpen ? 280 : 44, minWidth: isOpen ? 280 : 44, borderRight: '1px solid #e5e7eb', background: '#fff', transition: 'width 0.3s ease, min-width 0.3s ease' }}
+    >
       {!isOpen && (
         <div className="flex flex-col items-center py-4 h-full">
           <button onClick={onToggle} className="p-1.5 rounded-md" style={{ color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer' }}
@@ -466,14 +418,12 @@ function TreePanel({
           </div>
           <div className="space-y-1">{folders.map((f) => renderFolder(f))}</div>
 
-          {/* ✅ Shared With Me section — below All Documents tree */}
+          {/* Shared With Me section */}
           <div
             onClick={() => {
               setShowSharedWithMe(true);
-              // Clear other selections
               setSelectedFolder('Shared With Me');
               setSelectedTreeFolderId(null);
-              // setTreeGroupFilter && setTreeGroupFilter(null);
             }}
             className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer text-sm mt-2"
             style={{
@@ -493,10 +443,7 @@ function TreePanel({
               <span style={{ fontSize: 11, color: '#6b7280' }}>{sharedWithMeCount}</span>
             )}
           </div>
-          {/* + New Folder button */}
-          {/* + New Folder button */}
           {(() => {
-            // ✅ Find currently selected node
             const findSelected = (ff: TreeFolder[]): TreeFolder | undefined => {
               for (const f of ff) {
                 if ((f.id && selectedFolderId === f.id) || (!f.id && selectedFolder === f.name)) {
@@ -510,8 +457,6 @@ function TreePanel({
               return undefined;
             };
             const selected = findSelected(folders);
-
-            // ✅ Disable if "All Documents" is selected (no projectId)
             const isDisabled = !selected?.projectId;
 
             return (
@@ -531,8 +476,6 @@ function TreePanel({
                 onClick={() => {
                   if (isDisabled) return;
                   if (selected?.projectId) {
-                    // ✅ If a subfolder is selected, pass its ID as parentFolderId
-                    // If a project root is selected (no f.id), parentFolderId is null
                     const parentFolderId = selected.id || null;
                     startCreateFolder(selected.projectId, selected.id || selected.name, parentFolderId);
                   }
@@ -542,12 +485,9 @@ function TreePanel({
               </button>
             );
           })()}
-          {/* <button style={{ color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: 4, marginTop: 4 }}><Settings className="w-4 h-4" /></button> */}
-
         </div>
       )}
 
-      {/* ✅ RIGHT-CLICK CONTEXT MENU */}
       {contextMenu && (
         <>
           {/* Backdrop to close on click */}
@@ -576,7 +516,7 @@ function TreePanel({
               </p>
             </div>
 
-            {/* ✅ Create Subfolder */}
+            {/* Create Subfolder */}
             {contextMenu.folder.id && !contextMenu.folder.isSystemGenerated && (
               <button
                 onClick={() => {
@@ -595,7 +535,7 @@ function TreePanel({
               </button>
             )}
 
-            {/* ✅ Rename */}
+            {/* Rename */}
             {contextMenu.folder.id && !contextMenu.folder.isSystemGenerated && (
               <button
                 onClick={() => {
@@ -615,7 +555,7 @@ function TreePanel({
               <div style={{ height: 1, background: '#f3f4f6', margin: '4px 0' }} />
             )}
 
-            {/* ✅ Delete */}
+            {/* Delete */}
             {contextMenu.folder.id && !contextMenu.folder.isSystemGenerated && (
               <button
                 onClick={() => {
@@ -681,15 +621,15 @@ function TreePanel({
   );
 }
 
-// ---- ActiveFiltersBar ----
+// ActiveFiltersBar
 function ActiveFiltersBar({
   projectFilter,
   projectName,
   statusFilter,
   fileTypeFilter,
   searchTerm,
-  ownerFilter,        // ✅ ADD THIS
-  ownerName,          // ✅ ADD THIS
+  ownerFilter,
+  ownerName,
   onClearAll,
   onRemoveFilter
 }: {
@@ -698,14 +638,14 @@ function ActiveFiltersBar({
   statusFilter: string;
   fileTypeFilter: string;
   searchTerm: string;
-  ownerFilter?: string;    // ✅ ADD THIS
-  ownerName?: string;      // ✅ ADD THIS
+  ownerFilter?: string; 
+  ownerName?: string;
   onClearAll: () => void;
   onRemoveFilter: (k: string) => void;
 }) {
   if (!(projectFilter || statusFilter || fileTypeFilter || searchTerm || ownerFilter)) return null;
 
-  // ✅ Helper function for owner avatar
+  // Helper function for owner avatar
   const getOwnerAvatar = (name: string) => {
     const initials = name
       .split(' ')
@@ -730,7 +670,7 @@ function ActiveFiltersBar({
   };
 
   return (
-    <div className="flex items-center gap-2 px-6 py-3" style={{ background: '#fff', borderBottom: '1px solid #e5e7eb' }}>
+    <div className="flex items-center gap-2 px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 py-3" style={{ background: '#fff', borderBottom: '1px solid #e5e7eb' }}>
       <span style={{ fontWeight: 600, fontSize: 13, color: '#1a1a1a' }}>Active Filters:</span>
 
       {projectFilter && (
@@ -754,7 +694,7 @@ function ActiveFiltersBar({
         </span>
       )}
 
-      {/* ✅ NEW: Owner Filter with Avatar */}
+      {/* Owner Filter with Avatar */}
       {ownerFilter && ownerName && (() => {
         const avatar = getOwnerAvatar(ownerName);
         return (
@@ -793,7 +733,7 @@ function ActiveFiltersBar({
   );
 }
 
-// ---- BulkToolbar (all actions wired) ----
+// BulkToolbar 
 function ToolbarBtn({ icon, label, onClick, disabled, title }: { icon: React.ReactNode; label: string; onClick?: () => void; disabled?: boolean; title?: string }) {
   return (
     <button onClick={disabled ? undefined : onClick} title={title} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-medium" style={{ color: disabled ? '#d1d5db' : '#6b7280', border: '1px solid #e5e7eb', background: '#fff', cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.6 : 1 }}
@@ -850,7 +790,7 @@ function BulkMoveDropdown({ projects, onSelect, onClose }: { projects: Project[]
 function BulkToolbar({ selectedCount, onClear, onDeleteSelected, onChangeStatus, onShare, onMove, onAddTags, projects }: {
   selectedCount: number; onClear: () => void; onDeleteSelected: () => void;
   onChangeStatus: (status: DocumentStatus) => void; onShare: () => void; onMove: (projectId: number) => void;
-  onAddTags: () => void;  // ✅ ADD THIS LINE
+  onAddTags: () => void;
   projects: Project[];
 }) {
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
@@ -887,7 +827,8 @@ function BulkToolbar({ selectedCount, onClear, onDeleteSelected, onChangeStatus,
         >
           <Tag className="w-3.5 h-3.5" />
           Add Tags
-        </button>     {/* Change Status */}
+        </button>     
+        {/* Change Status */}
         <div className="relative">
           <ToolbarBtn icon={<SortDesc className="w-3.5 h-3.5" />} label="Change Status" onClick={() => setShowStatusDropdown(!showStatusDropdown)} />
           {showStatusDropdown && <BulkStatusDropdown onSelect={onChangeStatus} onClose={() => setShowStatusDropdown(false)} />}
@@ -897,18 +838,17 @@ function BulkToolbar({ selectedCount, onClear, onDeleteSelected, onChangeStatus,
         {/* Delete */}
         <ToolbarBtn icon={<Trash2 className="w-3.5 h-3.5" />} label="Delete" onClick={onDeleteSelected} />
         <div style={{ width: 1, height: 24, background: '#e5e7eb', margin: '0 4px' }} />
-        {/* <button className="flex items-center px-3 py-1.5 rounded-md" style={{ color: '#6b7280', border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer' }}><MoreHorizontal className="w-3.5 h-3.5" /></button> */}
       </>) : <span style={{ fontSize: 13, color: '#6b7280' }}>Select documents to perform bulk actions</span>}
     </div>
   );
 }
 
-// ---- DetailRow ----
+// DetailRow 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
   return <div className="flex items-center justify-between" style={{ padding: '10px 0', borderBottom: '1px solid #e5e7eb' }}><span style={{ fontSize: 13, color: '#6b7280' }}>{label}</span><span style={{ fontSize: 13, color: '#1a1a1a', fontWeight: 500, textAlign: 'right' as const, maxWidth: '60%' }}>{value}</span></div>;
 }
 
-// ---- SidePreviewPanel ----
+// SidePreviewPanel
 type PreviewTab = 'preview' | 'details' | 'activity' | 'comments';
 function SidePreviewPanel({ doc, previewUrl, onClose, onOpenFull }: { doc: Document; previewUrl: string | null; onClose: () => void; onOpenFull: () => void }) {
   const [tab, setTab] = useState<PreviewTab>('preview');
@@ -973,13 +913,12 @@ function SidePreviewPanel({ doc, previewUrl, onClose, onOpenFull }: { doc: Docum
     const cursorPos = textareaRef.current?.selectionStart || 0;
     const textBeforeCursor = commentText.slice(0, cursorPos);
     const textAfterCursor = commentText.slice(cursorPos);
-
     const words = textBeforeCursor.split(/\s/);
     const lastWord = words[words.length - 1];
     const atSymbolPos = textBeforeCursor.lastIndexOf(lastWord);
     const beforeAt = commentText.slice(0, atSymbolPos);
 
-    // Format: FirstnameLastname (no spaces)
+    // Format: FirstnameLastname 
     const fullName = `${member.first_name || ''}${member.last_name || ''}`.trim() || member.username || '';
     const formattedName = fullName.replace(/\s+/g, '');
 
@@ -988,8 +927,6 @@ function SidePreviewPanel({ doc, previewUrl, onClose, onOpenFull }: { doc: Docum
     setCommentText(newText);
     setShowMentions(false);
     setMentionSearch('');
-
-    // ✅ ADD THIS - Track the user ID (avoid duplicates)
     setMentionedUserIds(prev => {
       if (!prev.includes(member.id)) {
         return [...prev, member.id];
@@ -1008,12 +945,11 @@ function SidePreviewPanel({ doc, previewUrl, onClose, onOpenFull }: { doc: Docum
     if (!commentText.trim()) return;
 
     try {
-      // ✅ SEND mentions array with user IDs
       await documentsApi.addComment(doc.id, commentText.trim(), mentionedUserIds);
 
       setCommentText('');
       setShowMentions(false);
-      setMentionedUserIds([]); // ✅ Clear tracked IDs after posting
+      setMentionedUserIds([]);
 
       queryClient.invalidateQueries({ queryKey: ['document-comments', doc.id] });
     } catch (error) {
@@ -1117,7 +1053,6 @@ function SidePreviewPanel({ doc, previewUrl, onClose, onOpenFull }: { doc: Docum
             <DetailRow label="Location" value={<span className="flex items-center gap-1" style={{ color: '#6b7280', fontSize: 13 }}><Folder className="w-3 h-3" />/ {doc.project_name || 'General'}</span>} />
           </div>
           <button onClick={onOpenFull} className="w-full mt-5 rounded-lg flex items-center justify-center gap-2" style={{ padding: 12, background: '#4169FF', color: '#fff', border: 'none', fontWeight: 600, fontSize: 14, cursor: 'pointer' }} onMouseEnter={(e) => { e.currentTarget.style.background = '#3554CC'; }} onMouseLeave={(e) => { e.currentTarget.style.background = '#4169FF'; }}><ExternalLink className="w-4 h-4" />Open Document</button>
-          {/* <button className="w-full mt-4 rounded-lg flex items-center justify-center" style={{ padding: 10, border: '1px solid #e5e7eb', color: '#6b7280', background: 'none', cursor: 'pointer' }}><MoreHorizontal className="w-4 h-4" /></button> */}
         </>)}
 
         {tab === 'details' && <div>
@@ -1238,11 +1173,9 @@ function SidePreviewPanel({ doc, previewUrl, onClose, onOpenFull }: { doc: Docum
   );
 }
 
-// ---- DocumentInfoPanel ----
+// DocumentInfoPanel 
 function DocumentInfoPanel({ doc, onClose }: { doc: Document | null; onClose: () => void }) {
-  const panelRef = React.useRef<HTMLDivElement>(null);  // ✅ ADD THIS
-
-  // ✅ ADD THIS ENTIRE useEffect
+  const panelRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
     if (!doc) return;
 
@@ -1252,7 +1185,6 @@ function DocumentInfoPanel({ doc, onClose }: { doc: Document | null; onClose: ()
       }
     };
 
-    // Small delay to prevent immediate closing
     const timer = setTimeout(() => {
       document.addEventListener('mousedown', handleClickOutside);
     }, 100);
@@ -1296,7 +1228,7 @@ function DocumentInfoPanel({ doc, onClose }: { doc: Document | null; onClose: ()
   );
 }
 
-// ---- ConfirmationModal ----
+// ConfirmationModal 
 function ConfirmationModal({ isOpen, onClose, onConfirm, title }: ConfirmationModalProps) {
   if (!isOpen) return null;
   return (
@@ -1318,7 +1250,7 @@ function ConfirmationModal({ isOpen, onClose, onConfirm, title }: ConfirmationMo
   );
 }
 
-// ---- Upload Document Modal (auto-uses current project/folder from tree) ----
+// Upload Document Modal
 function UploadDocumentModal({ isOpen, onClose, projectId, projectName, folderId, folderName, onSuccess }: {
   isOpen: boolean; onClose: () => void; projectId: number | null; projectName: string; folderId: string | null; folderName: string | null; onSuccess: () => void;
 }) {
@@ -1467,7 +1399,6 @@ function TagSelectorModal({
   projects: any[];
 }) {
   const queryClient = useQueryClient();
-  // ✅ ADD THIS - Fetch labels directly in modal
   const { data: freshLabels, refetch: refetchLabels } = useQuery({
     queryKey: ['labels-modal'],
     queryFn: async () => {
@@ -1478,7 +1409,7 @@ function TagSelectorModal({
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
-          'X-Workspace-ID': workspaceId || '',  // ✅ fetch all workspace labels
+          'X-Workspace-ID': workspaceId || '', 
         }
       });
       if (!response.ok) throw new Error('Failed to fetch labels');
@@ -1487,7 +1418,7 @@ function TagSelectorModal({
     },
     enabled: isOpen,
     staleTime: 0,
-    refetchOnMount: true,  // ✅ always refetch when modal opens
+    refetchOnMount: true, 
   });
   const [selectedTags, setSelectedTags] = useState<number[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -1504,8 +1435,8 @@ function TagSelectorModal({
     if (isOpen) {
       setSelectedTags([]);
       setSearchTerm('');
-      setSuccessMessage('');  // ✅ ADD THIS
-      setIsSubmitting(false);  // ✅ ADD THIS
+      setSuccessMessage('');
+      setIsSubmitting(false);
     }
   }, [isOpen]);
 
@@ -1573,12 +1504,10 @@ function TagSelectorModal({
       const urlParams = new URLSearchParams(window.location.search);
       const projectIdFromUrl = urlParams.get('project');
 
-      // ✅ Get project ID from URL or first available project
       let currentProjectId: number | null = null;
       if (projectIdFromUrl) {
         currentProjectId = Number(projectIdFromUrl);
       } else if (projects && projects.length > 0) {
-        // ✅ projects is a plain array from API
         const firstProject = Array.isArray(projects) ? projects[0] : (projects as any)?.results?.[0];
         currentProjectId = firstProject?.id || null;
       }
@@ -1598,7 +1527,7 @@ function TagSelectorModal({
           'X-Workspace-ID': workspaceId || '',
         },
         body: JSON.stringify({
-          project: currentProjectId,  // ✅ always send project
+          project: currentProjectId,
           name: newLabelName.trim(),
           color: newLabelColor
         })
@@ -1623,8 +1552,6 @@ function TagSelectorModal({
       const newLabel = await response.json();
       await refetchLabels();
       await queryClient.invalidateQueries({ queryKey: ['labels'] });
-
-      // ✅ Small delay for state to update
       await new Promise(resolve => setTimeout(resolve, 300));
 
       // Reset form
@@ -1693,7 +1620,7 @@ function TagSelectorModal({
               onBlur={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
             />
           </div>
-          {/* ✅ ADD THIS: Create New Label Button */}
+          {/* Create New Label Button */}
           <button
             onClick={() => setShowCreateForm(!showCreateForm)}
             className="w-full mb-4 py-2 px-4 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-500 hover:text-blue-500 transition-colors flex items-center justify-center gap-2"
@@ -1702,7 +1629,7 @@ function TagSelectorModal({
             Create New Label
           </button>
 
-          {/* ✅ ADD THIS: Create Label Form */}
+          {/* Create Label Form */}
           {showCreateForm && (
             <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
               <div className="space-y-3">
@@ -1807,7 +1734,7 @@ function TagSelectorModal({
               </p>
               <div className="flex flex-wrap gap-2">
                 {selectedTags.map((tagId) => {
-                  const tag = labelsToUse.find((t) => t.id === tagId);  // ✅ Use labelsToUse
+                  const tag = labelsToUse.find((t) => t.id === tagId);
                   if (!tag) return null;
                   return (
                     <span
@@ -1919,7 +1846,7 @@ function TagSelectorModal({
           </div>
         </div>
 
-        {/* ✅ Delete confirmation modal */}
+        {/* Delete confirmation modal */}
         {deleteConfirm && (
           <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl"
             style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(2px)' }}>
@@ -1983,11 +1910,7 @@ function TagSelectorModal({
 
               try {
                 await onConfirm(selectedTags);
-
-                // ✅ Show success message in modal
                 setSuccessMessage(`Successfully added ${selectedTags.length} tag(s) to ${selectedCount} document(s)!`);
-
-                // ✅ Auto-close after 2 seconds
                 setTimeout(() => {
                   onClose();
                 }, 2000);
@@ -2022,7 +1945,7 @@ function TagSelectorModal({
   );
 }
 
-// ---- MoveConfirmationModal ----
+// MoveConfirmationModal 
 function MoveConfirmationModal({
   isOpen,
   onClose,
@@ -2097,7 +2020,7 @@ function MoveConfirmationModal({
   );
 }
 
-// ---- Toast Notification ----
+// Toast Notification 
 function Toast({
   isOpen,
   type,
@@ -2113,7 +2036,7 @@ function Toast({
     if (isOpen) {
       const timer = setTimeout(() => {
         onClose();
-      }, 4000); // Auto-close after 4 seconds
+      }, 4000);
 
       return () => clearTimeout(timer);
     }
@@ -2191,7 +2114,7 @@ function Toast({
   );
 }
 
-// ========== MAIN COMPONENT ==========
+// MAIN COMPONENT
 export function Documents() {
   const queryClient = useQueryClient();
   const { unreadCount } = useNotifications();
@@ -2253,18 +2176,14 @@ export function Documents() {
       setShowSharedWithMe(true);
       setSelectedFolder('Shared With Me');
       setSelectedTreeFolderId(null);
-      // ✅ Save highlight ID to state before clearing URL
       if (highlightDocId) {
         setActiveHighlightId(highlightDocId);
-        // ✅ Auto-clear highlight after 4 seconds
         setTimeout(() => setActiveHighlightId(''), 4000);
       }
-      // ✅ Clean up URL params
       setSearchParams({}, { replace: true });
     }
   }, [sharedParam]);
   const { data: projectsData } = useQuery({ queryKey: ['projects'], queryFn: () => projectsApi.list() });
-  // Fetch available tags/labels
   const { data: tagsData } = useQuery({
     queryKey: ['labels'],
     queryFn: async () => {
@@ -2283,25 +2202,22 @@ export function Documents() {
       }
 
       const data = await response.json();
-      console.log('✅ Parent loaded labels:', data.results?.length || data.length);
       return data.results || data || [];
     },
-    staleTime: 0,  // ✅ CHANGED - Always fetch fresh
-    refetchOnMount: 'always',  // ✅ ADDED
-    refetchOnWindowFocus: true,  // ✅ ADDED
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
   React.useEffect(() => {
     if (tagsData) {
       setAvailableTags(tagsData);
-      console.log('✅ Loaded', tagsData.length, 'labels:', tagsData);
     }
   }, [tagsData]);
-  // Existing query for displaying documents (filtered)
+
   const { data: allDocumentsData, isLoading } = useQuery({
     queryKey: ['documents', 'all', projectFilter, fileTypeFilter, currentPage, selectedTreeFolderId, searchTerm],
     queryFn: () => {
-      // When searching — fetch ALL docs across all folders, ignore pagination
       if (searchTerm.trim()) {
         const params: any = {
           page_size: 500,
@@ -2338,7 +2254,7 @@ export function Documents() {
     staleTime: 30000,
   });
 
-  // ✅ Fetch shared-with-me documents when that section is selected
+  // Fetch shared-with-me documents when that section is selected
   const { data: sharedWithMeData } = useQuery({
     queryKey: ['documents-shared-with-me', 1],
     queryFn: () => documentsApi.sharedWithMe({ page: 1 }),
@@ -2541,31 +2457,30 @@ export function Documents() {
       if (statusFilter && d.status !== statusFilter) return false;
       if (searchTerm) {
         const q = searchTerm.toLowerCase();
-        const matchesName     = (d.name || '').toLowerCase().includes(q);
-        const matchesProject  = (d as any).project_name?.toLowerCase().includes(q) || 
-                                (d as any).project_details?.name?.toLowerCase().includes(q);
-                                const matchesTags = (d.labels || []).some((t: Label) => 
-                                  (t.name || '').toLowerCase().includes(q)
-                                );
-        const matchesStatus   = (d.status || '').toLowerCase().includes(q);
-        const matchesOwner    = (d as any).uploaded_by_details?.username?.toLowerCase().includes(q) ||
-                                (d as any).uploaded_by_details?.first_name?.toLowerCase().includes(q) ||
-                                (d as any).uploaded_by_details?.last_name?.toLowerCase().includes(q) ||
-                                (d as any).owner?.username?.toLowerCase().includes(q);
-        const matchesShared   = (d as any).shared_with?.some((u: any) => 
-                                  (u.username || u.first_name || '').toLowerCase().includes(q));
-        const matchesUpdated  = (d.updated_at || '').toLowerCase().includes(q);
+        const matchesName = (d.name || '').toLowerCase().includes(q);
+        const matchesProject = (d as any).project_name?.toLowerCase().includes(q) ||
+          (d as any).project_details?.name?.toLowerCase().includes(q);
+        const matchesTags = (d.labels || []).some((t: Label) =>
+          (t.name || '').toLowerCase().includes(q)
+        );
+        const matchesStatus = (d.status || '').toLowerCase().includes(q);
+        const matchesOwner = (d as any).uploaded_by_details?.username?.toLowerCase().includes(q) ||
+          (d as any).uploaded_by_details?.first_name?.toLowerCase().includes(q) ||
+          (d as any).uploaded_by_details?.last_name?.toLowerCase().includes(q) ||
+          (d as any).owner?.username?.toLowerCase().includes(q);
+        const matchesShared = (d as any).shared_with?.some((u: any) =>
+          (u.username || u.first_name || '').toLowerCase().includes(q));
+        const matchesUpdated = (d.updated_at || '').toLowerCase().includes(q);
         if (!matchesName && !matchesProject && !matchesTags && !matchesStatus && !matchesOwner && !matchesShared && !matchesUpdated) return false;
       }
       return true;
-        }).sort((a: Document, b: Document) => new Date(b[sortBy]).getTime() - new Date(a[sortBy]).getTime());
+    }).sort((a: Document, b: Document) => new Date(b[sortBy]).getTime() - new Date(a[sortBy]).getTime());
   })();
 
   const backendFolders = (foldersData || []) as { id: string; project: number; parent: string | null; name: string; is_system_generated?: boolean; document_count?: number; created_at: string }[];
 
   const treeFolders: TreeFolder[] = (() => {
     const projectChildren: TreeFolder[] = projects.map((p) => {
-      // AFTER ✅ — recursively build children with projectId
       const buildChildren = (parentId: string, projectId: number): TreeFolder[] => {
         return backendFolders
           .filter((f) => f.parent === parentId)
@@ -2574,9 +2489,9 @@ export function Documents() {
             name: f.name,
             count: f.document_count ?? 0,
             folderCount: backendFolders.filter(sub => sub.parent === f.id).length,
-            projectId: projectId,  // ✅ pass projectId down to every child
+            projectId: projectId,
             isSystemGenerated: f.is_system_generated || false,
-            children: buildChildren(f.id, projectId), // ✅ recursive
+            children: buildChildren(f.id, projectId),
           }));
       };
 
@@ -2587,9 +2502,9 @@ export function Documents() {
           name: f.name,
           count: f.document_count ?? 0,
           folderCount: backendFolders.filter(sub => sub.parent === f.id).length,
-          projectId: p.id,  // ✅ top-level folder has projectId
+          projectId: p.id,
           isSystemGenerated: f.is_system_generated || false,
-          children: buildChildren(f.id, p.id),  // ✅ children also get projectId
+          children: buildChildren(f.id, p.id),
         }));
 
       const projectDocCount = (p as any).document_count ?? allDocsForTree.filter(
@@ -2622,7 +2537,6 @@ export function Documents() {
   const handleCreateFolder = async (projectId: number, parentId: string | null, folderName: string) => {
     try {
       await documentsApi.createFolder({ project: projectId, name: folderName, parent: parentId });
-      // ✅ Refetch folders — tree will re-sort alphabetically automatically
       await queryClient.invalidateQueries({ queryKey: ['document-folders'] });
       await queryClient.invalidateQueries({ queryKey: ['documents'] });
       await queryClient.invalidateQueries({ queryKey: ['projects'] });
@@ -2675,7 +2589,7 @@ export function Documents() {
     queryClient.invalidateQueries({ queryKey: ['documents'] });
   };
 
-  // Bulk share — opens share modal for the first selected doc (or could loop)
+  // Bulk share 
   const handleBulkShare = () => {
     const firstId = Array.from(selectedDocs)[0];
     if (firstId) {
@@ -2684,7 +2598,7 @@ export function Documents() {
     }
   };
 
-  // Bulk move — update project for all selected docs
+  // Bulk move
   const handleBulkMove = async (targetProjectId: number) => {
     const ids = Array.from(selectedDocs);
     for (const id of ids) {
@@ -2707,7 +2621,6 @@ export function Documents() {
     try {
       const token = localStorage.getItem('access_token');
       const workspaceId = localStorage.getItem('active_workspace_id');
-      // ✅ Fixed: backticks instead of single quotes so API_URL is interpolated
       const response = await fetch(`${API_URL}/documents/bulk-add-labels/`, {
         method: 'POST',
         credentials: 'include',
@@ -2722,12 +2635,10 @@ export function Documents() {
         }),
       });
       if (!response.ok) {
-        // ✅ Handle empty error response safely
         const text = await response.text();
         const error = text ? JSON.parse(text) : {};
         throw new Error(error.error || error.detail || 'Failed to add tags');
       }
-      // ✅ Handle empty response body (204 No Content) safely
       const text = await response.text();
       const result = text ? JSON.parse(text) : { updated_count: documentIds.length, skipped_count: 0 };
 
@@ -2736,7 +2647,7 @@ export function Documents() {
       queryClient.invalidateQueries({ queryKey: ['documents'] });
       queryClient.invalidateQueries({ queryKey: ['documents-tree-counts'] });
 
-      // ✅ No alert — modal handles success message internally
+      // ✅ No alert 
     } catch (error: any) {
       console.error('Bulk add tags failed:', error);
       alert(error.message || 'Failed to add tags. Please try again.');
@@ -2772,10 +2683,10 @@ export function Documents() {
   const totalPages = Math.ceil(totalCount / rowsPerPage) || 1;
 
   return (
-    <div className="flex w-full h-screen">
+    <div className="flex w-full h-full min-h-0">
       <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden" style={{ background: '#fff' }}>
         {/* TOPBAR */}
-        <div className="flex-shrink-0" style={{ background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '16px 24px' }}>
+        <div className="flex-shrink-0 px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40" style={{ background: '#fff', borderBottom: '1px solid #e5e7eb', paddingTop: 16, paddingBottom: 16 }}>
           <div className="flex items-center justify-between mb-4">
             <div><h1 style={{ fontSize: 24, fontWeight: 700, color: '#1a1a1a', marginBottom: 4 }}>Documents</h1><p style={{ fontSize: 14, color: '#6b7280' }}>Manage all your documents across projects</p></div>
             <div className="flex items-center gap-3">
@@ -2839,13 +2750,10 @@ export function Documents() {
                   <Network className="w-4 h-4" />
                 </button>
               </div>
-              {/* <button className="relative" style={{ padding: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }} onClick={() => setIsActivityOpen(!isActivityOpen)}>
-                <Bell className="h-5 w-5" />{unreadCount > 0 && <span className="absolute rounded-full" style={{ top: 4, right: 4, width: 8, height: 8, background: '#EF4444' }} />}
-              </button> */}
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-            {/* Search — 65% width */}
+            {/* Search  */}
             <div style={{ flex: '0 0 65%', position: 'relative' }}>
               <Search className="absolute h-4 w-4" style={{ left: 12, top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
               <input type="text" placeholder="Search documents by name, content, tags, or owner..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
@@ -2855,7 +2763,7 @@ export function Documents() {
               <span className="absolute rounded" style={{ right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: '#6b7280', background: '#fff', padding: '2px 6px', border: '1px solid #e5e7eb' }}>⌘ K</span>
             </div>
 
-            {/* Filters — remaining 35% */}
+            {/* Filters */}
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
               <select value={projectFilter} onChange={(e) => updateFilter('project', e.target.value)} style={{ flex: 1, padding: '10px 28px 10px 10px', border: '1px solid #e5e7eb', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 13, appearance: 'none' as const, backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M3 5L6 8L9 5' stroke='%236B7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")", backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', fontFamily: 'inherit', color: '#1a1a1a' }}>
                 <option value="">All Projects</option>{projects.map((p: Project) => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -2879,12 +2787,12 @@ export function Documents() {
           statusFilter={statusFilter}
           fileTypeFilter={fileTypeFilter}
           searchTerm={searchTerm}
-          ownerFilter={searchParams.get('owner') || ''}           // ✅ ADD THIS
-          ownerName={searchParams.get('owner_name') || ''}        // ✅ ADD THIS
+          ownerFilter={searchParams.get('owner') || ''} 
+          ownerName={searchParams.get('owner_name') || ''} 
           onClearAll={clearFilters}
           onRemoveFilter={removeFilter}
         />
-        <div className="flex-1 flex overflow-hidden" style={{ background: '#fff' }}>
+        <div className="flex-1 flex overflow-hidden px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40" style={{ background: '#fff' }}>
           <TreePanel
             folders={treeFolders}
             showSharedWithMe={showSharedWithMe}
@@ -2893,7 +2801,6 @@ export function Documents() {
             setSelectedTreeFolderId={setSelectedTreeFolderId}
             sharedWithMeCount={sharedWithMeCount}
             onFolderClick={(name, folderId, folderProjectId) => {
-              // ✅ Reset shared with me when clicking any folder
               setShowSharedWithMe(false);
               const pr = projects.find((p) => p.name === name);
               if (pr) {
@@ -2912,12 +2819,12 @@ export function Documents() {
                   updateFilter('project', String(folderProjectId));
                 }
                 setSelectedFolder(name);
-                setSelectedTreeFolderId(folderId); // ✅ This triggers folder filtering
+                setSelectedTreeFolderId(folderId);
                 setSelectedTreeFolderName(name);
               }
             }}
             selectedFolder={selectedFolder}
-            selectedFolderId={selectedTreeFolderId}  // ✅ ADD THIS LINE
+            selectedFolderId={selectedTreeFolderId}
             isOpen={isTreeOpen}
             onToggle={() => setIsTreeOpen((p) => !p)}
             onCreateFolder={handleCreateFolder}
@@ -2939,7 +2846,7 @@ export function Documents() {
                 }
               }
             }}
-            selectedDocs={selectedDocs}              // ✅ ADD THIS
+            selectedDocs={selectedDocs}
             setSelectedDocs={setSelectedDocs}
             setMoveConfirmModal={setMoveConfirmModal}
             setToast={setToast}
@@ -2953,7 +2860,7 @@ export function Documents() {
               onChangeStatus={handleBulkChangeStatus}
               onShare={handleBulkShare}
               onMove={handleBulkMove}
-              onAddTags={() => setShowTagSelector(true)}  // ✅ ADD THIS LINE
+              onAddTags={() => setShowTagSelector(true)}
               projects={projects}
             />
             <div className="flex-1 overflow-auto">
@@ -3009,7 +2916,6 @@ export function Documents() {
                     onRowClick: (d: Document) => handleDocumentClick(d),
                     emptyState,
 
-                    // ✅ ADD THIS
                     rowProps: (doc: Document) => ({
                       draggable: true,
                       className: selectedDocs.has(doc.id) ? 'cursor-grab active:cursor-grabbing' : '',
@@ -3032,13 +2938,12 @@ export function Documents() {
                         if (!selectedDocs.has(doc.id)) {
                           e.dataTransfer.setData('documentIds', JSON.stringify([doc.id]));
                         } else {
-                          // ✅ If doc IS selected, drag all selected docs together
                           e.dataTransfer.setData('documentIds', JSON.stringify(Array.from(selectedDocs)));
                         }
 
                         e.dataTransfer.effectAllowed = 'move';
 
-                        // Visual feedback - custom drag image
+                        // Visual feedback 
                         const dragImage = document.createElement('div');
                         dragImage.style.cssText = `
                           position: absolute;
@@ -3070,10 +2975,6 @@ export function Documents() {
               <div className="flex items-center justify-between flex-shrink-0" style={{ padding: '16px 24px', borderTop: '1px solid #e5e7eb', background: '#fff' }}>
                 <div style={{ fontSize: 13, color: '#6b7280' }}>{displayedDocuments.length > 0 ? `Showing 1 to ${Math.min(rowsPerPage, displayedDocuments.length)} of ${totalCount} documents` : 'No documents found'}</div>
                 <div className="flex items-center gap-3">
-                  {/* <label style={{ fontSize: 13, color: '#6b7280' }}>Rows per page:</label>
-                  <select value={rowsPerPage} onChange={(e) => setRowsPerPage(Number(e.target.value))} style={{ padding: '6px 32px 6px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 13, background: '#fff', cursor: 'pointer', appearance: 'none' as const, backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M3 5L6 8L9 5' stroke='%236B7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")", backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center', fontFamily: 'inherit' }}>
-                    <option value={25}>25</option><option value={50}>50</option><option value={100}>100</option>
-                  </select> */}
                   <div className="flex gap-1.5">
                     <button className="flex items-center justify-center rounded-md" style={{ width: 32, height: 32, border: '1px solid #e5e7eb', background: '#fff', cursor: !hasPreviousPage ? 'not-allowed' : 'pointer', color: !hasPreviousPage ? '#e5e7eb' : '#6b7280' }} onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={!hasPreviousPage}><ChevronLeft className="w-3.5 h-3.5" /></button>
                     {Array.from({ length: Math.min(5, totalPages) }, (_, i) => i + 1).map((pg) => <button key={pg} className="flex items-center justify-center rounded-md" style={{ width: 32, height: 32, fontSize: 13, fontWeight: 500, cursor: 'pointer', background: currentPage === pg ? '#4169FF' : '#fff', color: currentPage === pg ? '#fff' : '#6b7280', border: `1px solid ${currentPage === pg ? '#4169FF' : '#e5e7eb'}` }} onClick={() => setCurrentPage(pg)}>{pg}</button>)}
@@ -3113,22 +3014,19 @@ export function Documents() {
           targetName={moveConfirmModal.targetName}
           isMoving={false}
           onConfirm={async () => {
-            // ✅ Helper to fully reset and refetch everything
             const refreshAll = async () => {
               setSelectedDocs(new Set());
               setSelectedTreeFolderId(null);
               setSelectedTreeFolderName(null);
               setSelectedFolder('All Documents');
-              // ✅ invalidateQueries marks as stale AND triggers immediate refetch
+
               await queryClient.invalidateQueries({ queryKey: ['documents'] });
               await queryClient.invalidateQueries({ queryKey: ['document-folders'] });
               await queryClient.invalidateQueries({ queryKey: ['documents-tree-counts'] });
-              // ✅ Also refetch the tree counts query specifically
               await queryClient.refetchQueries({ queryKey: ['documents-tree-counts'] });
             };
 
             try {
-              // Move each document one by one
               for (const docId of moveConfirmModal.documentIds) {
                 await documentsApi.update(docId, {
                   project: moveConfirmModal.targetProjectId,
@@ -3136,7 +3034,6 @@ export function Documents() {
                 } as any);
               }
 
-              // ✅ Refresh ALL document state after successful move
               await refreshAll();
 
               setMoveConfirmModal(null);
@@ -3149,16 +3046,12 @@ export function Documents() {
 
             } catch (error: any) {
               console.error('Failed to move documents:', error);
-
-              // ✅ Always refresh on error too — UI must show real backend state
               await refreshAll();
 
               setMoveConfirmModal(null);
 
               const detail = error.response?.data?.detail || '';
               const status = error.response?.status;
-
-              // ✅ Specific messages for known error types
               let message = 'Failed to move documents. Please try again.';
               if (status === 404 || detail.toLowerCase().includes('no document')) {
                 message = 'Document not found — it may have already been moved. Page refreshed.';
@@ -3405,17 +3298,10 @@ export function Documents() {
                     const file = new File([blob], fullName, { type: 'text/plain' });
 
                     // Determine which project to use
-                    // If projectFilter is set, use it; otherwise, we need a default project
                     let targetProjectId = projectFilter ? Number(projectFilter) : null;
 
-                    // If no project selected and user is in "All Documents", use the first available project
-                    // OR your backend should handle documents without a project
                     if (!targetProjectId && projects.length > 0) {
-                      // Option 1: Use first project as default
                       targetProjectId = projects[0].id;
-
-                      // Option 2: If your backend supports null project_id, remove this line
-                      // and pass null to the API
                     }
 
                     if (!targetProjectId) {

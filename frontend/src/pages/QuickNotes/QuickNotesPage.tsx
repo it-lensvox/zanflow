@@ -25,7 +25,7 @@ export function QuickNotesPage() {
     attachNoteToProject,
   } = useQuickNotes();
 
-  // When navigating from mini view, auto-select the note that was active there
+  // When navigating from mini view, 
   useEffect(() => {
     const incoming = (location.state as { selectedNoteId?: number } | null)?.selectedNoteId;
     if (incoming && !state.isLoading) {
@@ -46,7 +46,7 @@ export function QuickNotesPage() {
       <div className="flex-1 flex flex-col w-full overflow-hidden">
 
         {/* Page header */}
-        <div className="px-8 pt-8 pb-4 shrink-0 flex items-center justify-between">
+        <div className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 pt-6 sm:pt-8 pb-4 shrink-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold">Quick Notes</h1>
             <p className="text-muted-foreground">Your personal notes and folders.</p>
@@ -70,7 +70,7 @@ export function QuickNotesPage() {
         </div>
 
         {/* 3-column notes UI */}
-        <div className="flex-1 overflow-hidden mx-8 mb-8 rounded-xl border border-border">
+        <div className="flex-1 overflow-hidden mx-4 sm:mx-8 md:mx-12 lg:mx-16 xl:mx-24 2xl:mx-40 mb-6 sm:mb-8 rounded-xl border border-border">
           <QuickNotesContent
             state={state}
             getNotesForFolder={getNotesForFolder}
