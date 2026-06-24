@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ExternalLink, MoreHorizontal, Clock, FileText } from 'lucide-react';
 import type { Project } from '@/types';
 import { formatRelativeTime } from '@/lib/utils';
-import { BLUE, LINE, TEXT, MUTED, projectColor } from '../projectConstants';
+import { BLUE, LINE, TEXT, MUTED, getTypeHex, getTypeBg } from '../projectConstants';
 import { StatusPill, TypePill, MemberAvatars } from './ProjectPills';
 
 interface DetailPanelProps {
@@ -13,7 +13,10 @@ interface DetailPanelProps {
 
 export function DetailPanel({ project, onClose, onOpen }: DetailPanelProps) {
   const [tab, setTab] = useState<'overview' | 'activity' | 'files'>('overview');
-  const members = (project as any).members || [];
+  const members    = (project as any).members || [];
+  const accentHex  = getTypeHex((project as any).task_type);
+  const tintBg     = getTypeBg((project as any).task_type);
+  const lightAccent = `${accentHex}cc`;
 
   return (
     <div style={{ width: 305, minWidth: 305, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 10, padding: '18px 14px', overflow: 'auto', flexShrink: 0, boxShadow: '0 2px 8px rgba(16,24,40,.04)' }}>
@@ -23,9 +26,9 @@ export function DetailPanel({ project, onClose, onOpen }: DetailPanelProps) {
       </div>
 
       {/* Folder art */}
-      <div style={{ height: 128, margin: '20px 0 12px', borderRadius: 8, background: 'linear-gradient(180deg,#f4f8ff,#fff)', display: 'grid', placeItems: 'center' }}>
-        <div style={{ width: 120, height: 74, borderRadius: 12, background: 'linear-gradient(#5ca0ff,#2477f2)', boxShadow: '0 12px 24px rgba(22,99,246,.22)', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ position: 'absolute', width: 55, height: 20, borderRadius: '9px 9px 0 0', left: 12, top: -15, background: '#63a5ff' }} />
+      <div style={{ height: 128, margin: '20px 0 12px', borderRadius: 8, background: tintBg, display: 'grid', placeItems: 'center' }}>
+        <div style={{ width: 120, height: 74, borderRadius: 12, background: `linear-gradient(135deg, ${lightAccent}, ${accentHex})`, boxShadow: `0 12px 24px ${accentHex}33`, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ position: 'absolute', width: 55, height: 20, borderRadius: '9px 9px 0 0', left: 12, top: -15, background: lightAccent }} />
           <span style={{ fontSize: 34, color: 'white', position: 'relative', zIndex: 1 }}>▥</span>
         </div>
       </div>
@@ -33,7 +36,7 @@ export function DetailPanel({ project, onClose, onOpen }: DetailPanelProps) {
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 25, borderBottom: `1px solid ${LINE}`, marginBottom: 12 }}>
         {(['overview', 'activity', 'files'] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: tab === t ? BLUE : MUTED, borderBottom: tab === t ? `3px solid ${BLUE}` : '3px solid transparent', paddingBottom: 10, textTransform: 'capitalize' }}>
+          <button key={t} onClick={() => setTab(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: tab === t ? accentHex : MUTED, borderBottom: tab === t ? `3px solid ${accentHex}` : '3px solid transparent', paddingBottom: 10, textTransform: 'capitalize' }}>
             {t}{t === 'files' && <span style={{ background: '#f0f2f5', color: MUTED, borderRadius: 10, padding: '1px 6px', fontSize: 11, marginLeft: 4 }}>0</span>}
           </button>
         ))}
@@ -75,7 +78,7 @@ export function DetailPanel({ project, onClose, onOpen }: DetailPanelProps) {
 
       {/* Actions */}
       <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-        <button onClick={onOpen} style={{ flex: 1, height: 41, background: BLUE, color: '#fff', borderRadius: 7, border: 'none', fontWeight: 800, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+        <button onClick={onOpen} style={{ flex: 1, height: 41, background: accentHex, color: '#fff', borderRadius: 7, border: 'none', fontWeight: 800, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
           <ExternalLink className="w-4 h-4" />Open Project
         </button>
         <button style={{ width: 45, border: `1px solid ${LINE}`, borderRadius: 7, background: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>

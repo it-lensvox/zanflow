@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ChevronRight, ChevronDown, FolderOpen, ArrowLeft, Folder } from 'lucide-react';
 import type { Project } from '@/types';
-import { BLUE, LINE, TEXT, MUTED, TREE_GROUPS, projectColor } from '../projectConstants';
+import { BLUE, LINE, TEXT, MUTED, TREE_GROUPS, getTypeHex } from '../projectConstants';
 
 interface TreePanelProps {
   projects: Project[];
@@ -109,7 +109,7 @@ export function TreePanel({ projects, selected, selectedGroup, onSelect, onSelec
                         onSelectGroup(null);
                       }}
                     >
-                      <Folder className="w-3 h-3" style={{ color: projectColor(p.name), flexShrink: 0 }} />
+                      <Folder className="w-3 h-3" style={{ color: getTypeHex((p as any).task_type), flexShrink: 0 }} />
                       <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {p.name}
                       </span>

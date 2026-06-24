@@ -90,13 +90,16 @@ export function truncate(str: string, length: number): string {
   return str.slice(0, length) + '...';
 }
 
+// Tailwind class map — used by Sidebar & Profile avatars (Tailwind only)
 export const PROJECT_TYPE_COLORS: Record<string, string> = {
-  client: "bg-blue-500",
-  internal: "bg-green-500",
-  content_creation: "bg-pink-500",
-  ideas: "bg-yellow-500",
-  default: "bg-gray-400",
+  client:           'bg-blue-500',
+  internal:         'bg-violet-500',
+  content_creation: 'bg-pink-500',
+  ideas:            'bg-amber-400',
+  demo:             'bg-emerald-500',
+  default:          'bg-gray-400',
 };
 export const getProjectTypeColor = (type?: string) => {
-  return PROJECT_TYPE_COLORS[type as keyof typeof PROJECT_TYPE_COLORS] || PROJECT_TYPE_COLORS.default;
+  const key = (type || '').toLowerCase().replace(/-/g, '_');
+  return PROJECT_TYPE_COLORS[key] || PROJECT_TYPE_COLORS.default;
 };

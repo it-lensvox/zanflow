@@ -1,21 +1,10 @@
-// ─── Design Tokens ────────────────────────────────────────────────────────────
+// ─── Design Tokens
 export const BLUE = '#1663f6';
 export const LINE = '#e6ebf2';
 export const TEXT = '#172033';
 export const MUTED = '#667085';
 
-// ─── Project colour from name (deterministic hash) ────────────────────────────
-const COLOR_PALETTE = [
-  '#22c36a', '#3b82f6', '#8b5cf6', '#fb923c', '#35c7bd',
-  '#ef4444', '#ec5da8', '#f59e0b', '#1663f6', '#dc2626',
-];
-export function projectColor(name: string): string {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
-  return COLOR_PALETTE[Math.abs(h) % COLOR_PALETTE.length];
-}
-
-// ─── Status pill config ───────────────────────────────────────────────────────
+// ─── Status pill config 
 export const STATUS_MAP: Record<string, { bg: string; color: string; border: string; label: string }> = {
   active:    { bg: '#eafaf3', color: '#09925e', border: '#bee8d3', label: 'Active' },
   in_review: { bg: '#fff6e5', color: '#b86600', border: '#ffd28b', label: 'In Review' },
@@ -24,7 +13,7 @@ export const STATUS_MAP: Record<string, { bg: string; color: string; border: str
   completed: { bg: '#eafaf3', color: '#09925e', border: '#bee8d3', label: 'Completed' },
 };
 
-// ─── Type pill config ─────────────────────────────────────────────────────────
+// ─── Type pill config
 export const TYPE_MAP: Record<string, { bg: string; color: string; border: string }> = {
   client:           { bg: '#eef4ff', color: BLUE,      border: '#cde0ff' },
   internal:         { bg: '#f4efff', color: '#7c3aed', border: '#dfd2ff' },
@@ -33,7 +22,7 @@ export const TYPE_MAP: Record<string, { bg: string; color: string; border: strin
   ideas:            { bg: '#fff8e8', color: '#b86600', border: '#ffd28b' },
 };
 
-// ─── Tree sidebar groups ──────────────────────────────────────────────────────
+// ─── Tree sidebar groups 
 export const TREE_GROUPS = [
   { label: 'Client Projects',  types: ['client'],           color: '#3b82f6' },
   { label: 'Internal Projects',types: ['internal'],         color: '#8b5cf6' },
@@ -42,7 +31,7 @@ export const TREE_GROUPS = [
   { label: 'Demo Projects',    types: ['demo'],             color: '#22c36a' },
 ];
 
-// ─── Type filter chips (toolbar) ─────────────────────────────────────────────
+// ─── Type filter chips 
 export const PROJECT_TYPE_FILTERS = [
   { label: 'Client',           value: 'client',           dotColor: '#3b82f6' },
   { label: 'Internal',         value: 'internal',         dotColor: '#22c55e' },
@@ -50,7 +39,7 @@ export const PROJECT_TYPE_FILTERS = [
   { label: 'Ideas',            value: 'ideas',            dotColor: '#eab308' },
 ] as const;
 
-// ─── Move modal destination types ─────────────────────────────────────────────
+// ─── Move modal destination types
 export const PROJECT_TYPES = [
   { value: 'client',           label: 'Client Projects',  color: '#3b82f6', desc: 'External client work' },
   { value: 'internal',         label: 'Internal Projects',color: '#8b5cf6', desc: 'Internal team projects' },
@@ -58,3 +47,25 @@ export const PROJECT_TYPES = [
   { value: 'ideas',            label: 'Ideas',            color: '#f59e0b', desc: 'Brainstorming and concepts' },
   { value: 'demo',             label: 'Demo Projects',    color: '#22c36a', desc: 'Demo and showcase' },
 ];
+// ─── Single-source project type 
+export const PROJECT_TYPE_HEX: Record<string, string> = {
+  client:           '#3b82f6', 
+  internal:         '#8b5cf6',
+  content_creation: '#ec4899', 
+  content:          '#ec4899', 
+  ideas:            '#f59e0b', 
+  demo:             '#22c36a',
+  default:          '#667085', 
+};
+
+/** Returns the canonical hex accent color for a project type. */
+export function getTypeHex(taskType?: string): string {
+  const key = (taskType || '').toLowerCase().replace(/-/g, '_');
+  return PROJECT_TYPE_HEX[key] || PROJECT_TYPE_HEX.default;
+}
+
+/** Returns a light tinted background for a project type  */
+export function getTypeBg(taskType?: string): string {
+  const hex = getTypeHex(taskType);
+  return `${hex}1f`;
+}

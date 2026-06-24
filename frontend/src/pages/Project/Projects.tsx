@@ -3,7 +3,7 @@ import { Search, Plus, List, Grid3X3, Network, X, FolderKanban, Folder, ChevronD
 import { formatRelativeTime } from '@/lib/utils';
 import { CreateProjectModal } from './CreateProjectModal';
 import { useProjects } from './hooks/useProjects';
-import { BLUE, LINE, TEXT, MUTED, STATUS_MAP, PROJECT_TYPE_FILTERS, TREE_GROUPS, projectColor } from './projectConstants';
+import { BLUE, LINE, TEXT, MUTED, STATUS_MAP, TREE_GROUPS, getTypeHex, getTypeBg } from './projectConstants';
 import { TreePanel }        from './components/TreePanel';
 import { BulkToolbar }      from './components/BulkToolbar';
 import { DetailPanel }      from './components/DetailPanel';
@@ -166,11 +166,11 @@ export function Projects() {
                         <span style={{ fontSize: 12, color: MUTED, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, padding: '2px 10px', fontWeight: 600 }}>{groupProjects.length} {groupProjects.length === 1 ? 'project' : 'projects'}</span>
                       </div>
                       {groupProjects.map((proj, idx) => {
-                        const color = projectColor(proj.name); const members = (proj as any).members || []; const isSel = p.selectedIds.has(proj.id);
+                        const color = getTypeHex((proj as any).task_type); const tint = getTypeBg((proj as any).task_type); const members = (proj as any).members || []; const isSel = p.selectedIds.has(proj.id);
                         return (
                           <div key={proj.id} onClick={() => p.handleDetailProject(proj)} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderBottom: idx < groupProjects.length - 1 ? `1px solid ${LINE}` : 'none', background: isSel ? '#f7faff' : '#fff', cursor: 'pointer', paddingLeft: 36, minHeight: 56 }} onMouseOver={e => { if (!isSel) e.currentTarget.style.background = '#f3f4f6'; }} onMouseOut={e => { e.currentTarget.style.background = isSel ? '#f7faff' : '#fff'; }}>
-                            <input type="checkbox" checked={isSel} onChange={() => p.toggleSelect(proj.id)} onClick={e => e.stopPropagation()} style={{ accentColor: BLUE, width: 16, height: 16, cursor: 'pointer', flexShrink: 0 }} />
-                            <div style={{ width: 32, height: 32, borderRadius: 7, background: color, display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 800, fontSize: 14, flexShrink: 0 }}>{proj.name[0].toUpperCase()}</div>
+                            <input type="checkbox" checked={isSel} onChange={() => p.toggleSelect(proj.id)} onClick={e => e.stopPropagation()} style={{ accentColor: color, width: 16, height: 16, cursor: 'pointer', flexShrink: 0 }} />
+                            <div style={{ width: 32, height: 32, borderRadius: 7, background: tint, border: `1.5px solid ${color}33`, display: 'grid', placeItems: 'center', color: color, fontWeight: 800, fontSize: 14, flexShrink: 0 }}>{proj.name[0].toUpperCase()}</div>
                             <span style={{ flex: 1, fontWeight: 600, fontSize: 14, color: TEXT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{proj.name}</span>
                             <span style={{ fontSize: 13, color: MUTED, minWidth: 70 }}>{(proj as any).document_count ?? 0} docs</span>
                             <div style={{ minWidth: 90 }}><MemberAvatars members={members} /></div>
@@ -195,11 +195,11 @@ export function Projects() {
                         <span style={{ fontSize: 12, color: MUTED, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, padding: '2px 10px', fontWeight: 600 }}>{ungrouped.length}</span>
                       </div>
                       {ungrouped.map((proj, idx) => {
-                        const color = projectColor(proj.name); const members = (proj as any).members || []; const isSel = p.selectedIds.has(proj.id);
+                        const color = getTypeHex((proj as any).task_type); const tint = getTypeBg((proj as any).task_type); const members = (proj as any).members || []; const isSel = p.selectedIds.has(proj.id);
                         return (
                           <div key={proj.id} onClick={() => p.handleDetailProject(proj)} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderBottom: idx < ungrouped.length - 1 ? `1px solid ${LINE}` : 'none', background: isSel ? '#f7faff' : '#fff', cursor: 'pointer', paddingLeft: 36, minHeight: 56 }} onMouseOver={e => { if (!isSel) e.currentTarget.style.background = '#f3f4f6'; }} onMouseOut={e => { e.currentTarget.style.background = isSel ? '#f7faff' : '#fff'; }}>
-                            <input type="checkbox" checked={isSel} onChange={() => p.toggleSelect(proj.id)} onClick={e => e.stopPropagation()} style={{ accentColor: BLUE, width: 16, height: 16, cursor: 'pointer', flexShrink: 0 }} />
-                            <div style={{ width: 32, height: 32, borderRadius: 7, background: color, display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 800, fontSize: 14, flexShrink: 0 }}>{proj.name[0].toUpperCase()}</div>
+                            <input type="checkbox" checked={isSel} onChange={() => p.toggleSelect(proj.id)} onClick={e => e.stopPropagation()} style={{ accentColor: color, width: 16, height: 16, cursor: 'pointer', flexShrink: 0 }} />
+                            <div style={{ width: 32, height: 32, borderRadius: 7, background: tint, border: `1.5px solid ${color}33`, display: 'grid', placeItems: 'center', color: color, fontWeight: 800, fontSize: 14, flexShrink: 0 }}>{proj.name[0].toUpperCase()}</div>
                             <span style={{ flex: 1, fontWeight: 600, fontSize: 14, color: TEXT }}>{proj.name}</span>
                             <span style={{ fontSize: 13, color: MUTED, minWidth: 70 }}>{(proj as any).document_count ?? 0} docs</span>
                             <div style={{ minWidth: 90 }}><MemberAvatars members={members} /></div>
@@ -243,11 +243,11 @@ export function Projects() {
                       </div>
                     </td></tr>
                   ) : p.paginated.map((proj, idx) => {
-                    const color = projectColor(proj.name); const members = (proj as any).members || []; const isSel = p.selectedIds.has(proj.id); const isDetail = p.detailProject?.id === proj.id;
+                    const color = getTypeHex((proj as any).task_type); const tint = getTypeBg((proj as any).task_type); const members = (proj as any).members || []; const isSel = p.selectedIds.has(proj.id); const isDetail = p.detailProject?.id === proj.id;
                     return (
-                      <tr key={proj.id} onClick={() => p.handleDetailProject(proj)} onMouseEnter={() => p.handleRowHover(proj)} style={{ background: isSel ? '#f7faff' : idx % 2 === 0 ? '#fff' : '#fafbfc', cursor: 'pointer', borderLeft: isDetail ? `3px solid ${BLUE}` : '3px solid transparent' }} onMouseOver={e => { if (!isSel && !isDetail) e.currentTarget.style.background = '#f3f4f6'; }} onMouseOut={e => { e.currentTarget.style.background = isSel ? '#f7faff' : idx % 2 === 0 ? '#fff' : '#fafbfc'; }}>
-                        <td style={{ ...td, width: 40 }}><input type="checkbox" checked={isSel} onChange={() => p.toggleSelect(proj.id)} onClick={e => e.stopPropagation()} style={{ accentColor: BLUE, width: 15, height: 15, cursor: 'pointer' }} /></td>
-                        <td style={td}><div style={{ display: 'flex', alignItems: 'center', gap: 10, fontWeight: 700 }}><div style={{ width: 30, height: 30, borderRadius: 7, background: color, display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 800, fontSize: 14, flexShrink: 0 }}>{proj.name[0].toUpperCase()}</div><span style={{ color: TEXT, fontWeight: 400 }}>{proj.name}</span></div></td>
+                      <tr key={proj.id} onClick={() => p.handleDetailProject(proj)} onMouseEnter={() => p.handleRowHover(proj)} style={{ background: isSel ? '#f7faff' : idx % 2 === 0 ? '#fff' : '#fafbfc', cursor: 'pointer', borderLeft: isDetail ? `3px solid ${color}` : '3px solid transparent' }} onMouseOver={e => { if (!isSel && !isDetail) e.currentTarget.style.background = '#f3f4f6'; }} onMouseOut={e => { e.currentTarget.style.background = isSel ? '#f7faff' : idx % 2 === 0 ? '#fff' : '#fafbfc'; }}>
+                        <td style={{ ...td, width: 40 }}><input type="checkbox" checked={isSel} onChange={() => p.toggleSelect(proj.id)} onClick={e => e.stopPropagation()} style={{ accentColor: color, width: 15, height: 15, cursor: 'pointer' }} /></td>
+                        <td style={td}><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ width: 30, height: 30, borderRadius: 7, background: tint, border: `1.5px solid ${color}33`, display: 'grid', placeItems: 'center', color: color, fontWeight: 800, fontSize: 14, flexShrink: 0 }}>{proj.name[0].toUpperCase()}</div><span style={{ color: TEXT, fontWeight: 500 }}>{proj.name}</span></div></td>
                         <td style={td}><TypePill type={(proj as any).task_type} /></td>
                         <td style={{ ...td, color: MUTED }}>{(proj as any).document_count ?? 0} docs</td>
                         <td style={td}><MemberAvatars members={members} /></td>
