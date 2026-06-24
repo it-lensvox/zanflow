@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { X, Calendar, CheckCircle, AlertCircle, Briefcase, User, Flag, Paperclip, Type, Sparkles, Plus, Link, Trash2, Minus, Square } from 'lucide-react';
+import { X, Calendar, CheckCircle, AlertCircle, Briefcase, User, Flag, Paperclip, Type, Sparkles, Plus, Link, Trash2, Minus } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { taskApi, usersApi, projectsApi } from '@/services/api';
 import { ProjectMinimal, AITaskSuggestionResponse, Label, Task } from '@/types';

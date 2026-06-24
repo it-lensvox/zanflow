@@ -1,4 +1,4 @@
-export { Dashboard } from './Dashboard';
+export { Dashboard } from './Dashboard/Dashboard';
 export { Login } from './Login';
 export { Projects } from './Project/Projects';
 export { DocumentCreate } from './Documents/DocumentCreate';

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Download, Loader2, FileText, AlertCircle, ZoomIn, ZoomOut, Maximize2, Minimize2, ExternalLink } from 'lucide-react';
+import { X, Download, Loader2, FileText, AlertCircle, ZoomIn, ZoomOut, Maximize2, Minimize2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 /**
  * Supports: Images, PDF, DOCX, PPTX, TXT, Code files, and more.

@@ -1,14 +1,12 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
-  FolderKanban, Bell, Search, Plus, Upload, List, Grid3X3, Network,
-  ChevronRight, ChevronDown, FolderOpen, ArrowLeft, Folder, Settings, Move, Tag, Share, Trash2,
+  FolderKanban, Search, Plus, List, Grid3X3, Network, ChevronRight, ChevronDown, FolderOpen, ArrowLeft, Folder, Settings, Move,
   MoreHorizontal, X, Star, ExternalLink, Clock, FileText, Filter,
 } from 'lucide-react';
 import { projectsApi, notificationSocket, gatewaySocket } from '@/services/api';
 import type { Project } from '@/types';
-import { cn } from '@/lib/utils';
 import { CreateProjectModal } from './CreateProjectModal';
 import { useNotifications } from '@/hooks/useNotifications';
 import { formatRelativeTime } from '@/lib/utils';
@@ -176,7 +174,7 @@ function TreePanel({ projects, selected, selectedGroup, onSelect, onSelectGroup,
           const groupProjects = projects.filter(p =>
             group.types.includes(((p as any).task_type || '').toLowerCase())
           );
-          if (groupProjects.length === 0) return null; // hide empty groups
+          if (groupProjects.length === 0) return null;
 
           const isOpen = openGroups.has(group.label);
           const isGroupSelected = selectedGroup === group.label && selected === null;

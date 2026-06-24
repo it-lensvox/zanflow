@@ -388,7 +388,6 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     const handleStatusChange = (newStatus: string) => {
 
       const taskListKeys = queryClient.getQueryCache().findAll({ queryKey: ['tasks-list'] });
-      console.log('[StatusChange] 🔍 Other task caches that exist (tasks-list):', taskListKeys.map(q => q.queryKey));
       queryClient.setQueryData(['tasks'], (old: any) => {
         if (!old) {
           console.warn('[StatusChange] Cache is empty — cannot reorder.');
@@ -517,7 +516,6 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
 
     const handlePriorityChange = (newPriority: string) => {
       const taskListKeys = queryClient.getQueryCache().findAll({ queryKey: ['tasks-list'] });
-      console.log('[PriorityChange] 🔍 Other task caches (tasks-list):', taskListKeys.map(q => q.queryKey));
       queryClient.setQueryData(['tasks'], (old: any) => {
         if (!old) {
           console.warn('[PriorityChange] Cache is empty — cannot reorder.');

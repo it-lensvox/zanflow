@@ -11,7 +11,7 @@ import { TaskDraftsProvider } from '@/pages/MyTask/Taskdrafts';
 import { MyWork } from '@/pages/MyWork';
 
 // Lazy-loaded page components for route-level code splitting
-const Dashboard = lazy(() => import('@/pages/Dashboard').then(m => ({ default: m.Dashboard })));
+const Dashboard = lazy(() => import('@/pages/Dashboard/Dashboard').then(m => ({ default: m.Dashboard })));
 const Login = lazy(() => import('@/pages/Login').then(m => ({ default: m.Login })));
 const Projects = lazy(() => import('@/pages/Project/Projects').then(m => ({ default: m.Projects })));
 const ProjectSettings = lazy(() => import('@/pages/Project/ProjectSettings').then(m => ({ default: m.ProjectSettings })));
@@ -270,7 +270,7 @@ function AppRoutes() {
   );
 }
 
-const preloadDashboard = () => import('@/pages/Dashboard');
+const preloadDashboard = () => import('@/pages/Dashboard/Dashboard');
 
 function WebSocketProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();

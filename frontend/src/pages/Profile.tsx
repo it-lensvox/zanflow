@@ -90,7 +90,6 @@ export function Profile() {
   // Certificate upload
   const handleCertificateUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) console.log('Certificate upload feature coming soon');
   };
 
   const handleAddSkill = () => {
@@ -352,8 +351,8 @@ export function Profile() {
                       onClick={handleSaveSkills}
                       disabled={!canSaveSkills}
                       className={`px-4 py-2 text-sm font-medium rounded-xl transition ${canSaveSkills
-                          ? 'bg-green-600 text-white hover:bg-green-700 cursor-pointer'
-                          : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        ? 'bg-green-600 text-white hover:bg-green-700 cursor-pointer'
+                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                         }`}
                     >
                       Save

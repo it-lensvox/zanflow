@@ -2,15 +2,14 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
-  FileText, Search, ChevronLeft, ChevronRight, X, Bell,
-  ExternalLink, ZoomIn, ZoomOut, Folder,
+  FileText, Search, ChevronLeft, ChevronRight, X, Bell, ExternalLink, Folder,
 } from 'lucide-react';
 import { documentsApi } from '@/services/api';
 import type { Document } from '@/types';
 import { useNotifications } from '@/hooks/useNotifications';
 import { DocumentPreview } from '@/components/common/DocumentPreview';
 
-// ─── Design tokens ────────────────────────────────────────────────────────────
+// Design tokens
 const BLUE = '#4169FF';
 const LINE = '#e5e7eb';
 const TEXT = '#1a1a1a';

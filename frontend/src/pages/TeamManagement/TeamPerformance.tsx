@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-    TrendingUp, CheckCircle, Clock, ListTodo, Activity, BarChart3, Users, ArrowLeft, Loader2
+    TrendingUp, CheckCircle, Clock, ListTodo, Activity, BarChart3, Users, Loader2
 } from 'lucide-react';
 import { usersApi, taskApi } from '@/services/api'; 
 import type { User as AppUser } from '@/types'; 

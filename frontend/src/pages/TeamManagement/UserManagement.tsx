@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { UserPlus, Loader2, User, Mail, X, Lock, ChevronDown, Building, CheckCircle, Crown, Send, Eye, EyeOff } from 'lucide-react';
+import { UserPlus, Loader2, User, Mail, X, Lock, ChevronDown, CheckCircle, Crown, Send, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/common';
-import { usersApi, api } from '@/services/api';
+import { usersApi } from '@/services/api';
 import type { User as AppUser, PaginatedResponse } from '@/types';
-import { DualView, useViewMode, ViewToggle } from '@/components/layout/DualView';
+import { DualView } from '@/components/layout/DualView';
 import { createUserTableColumns } from '@/components/layout/DualView/userManagementConfig';
 
 const CustomModal: React.FC<{ isOpen: boolean; onClose: () => void; children: React.ReactNode; title: string }> = ({ isOpen, onClose, children, title }) => {
