@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
-  FileText, Search, ChevronLeft, ChevronRight, X, Bell, ExternalLink, Folder,
+  FileText, Search, X, Bell, ExternalLink, Folder,
 } from 'lucide-react';
 import { documentsApi } from '@/services/api';
 import type { Document } from '@/types';
 import { useNotifications } from '@/hooks/useNotifications';
 import { DocumentPreview } from '@/components/common/DocumentPreview';
+import { Pagination } from '@/components/ui/Pagination';
 
 // Design tokens
 const BLUE = '#4169FF';
@@ -285,20 +286,14 @@ export function SharedWithMe() {
 
           {/* ── PAGINATION ─────────────────────────────────────────────────── */}
           {totalCount > 0 && (
-            <div style={{ height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', borderTop: `1px solid ${LINE}`, background: '#fff', flexShrink: 0, fontSize: 12, color: TEXT }}>
-              <span>Showing {Math.min((currentPage - 1) * rowsPerPage + 1, totalCount)}–{Math.min(currentPage * rowsPerPage, totalCount)} of {totalCount} documents</span>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={!hasPrev} style={{ height: 31, minWidth: 31, border: `1px solid ${LINE}`, borderRadius: 6, background: '#fff', cursor: !hasPrev ? 'not-allowed' : 'pointer', color: !hasPrev ? '#d1d5db' : MUTED, fontWeight: 600, display: 'grid', placeItems: 'center' }}>
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => i + 1).map(pg => (
-                  <button key={pg} onClick={() => setCurrentPage(pg)} style={{ height: 31, minWidth: 31, border: `1px solid ${currentPage === pg ? '#88acff' : LINE}`, borderRadius: 6, background: currentPage === pg ? '#f6f9ff' : '#fff', color: currentPage === pg ? BLUE : MUTED, fontWeight: 600, cursor: 'pointer', display: 'grid', placeItems: 'center' }}>{pg}</button>
-                ))}
-                <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={!hasNext} style={{ height: 31, minWidth: 31, border: `1px solid ${LINE}`, borderRadius: 6, background: '#fff', cursor: !hasNext ? 'not-allowed' : 'pointer', color: !hasNext ? '#d1d5db' : MUTED, fontWeight: 600, display: 'grid', placeItems: 'center' }}>
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={totalCount}
+              pageSize={rowsPerPage}
+              onPageChange={setCurrentPage}
+              itemLabel="documents"
+            />
           )}
         </div>
 

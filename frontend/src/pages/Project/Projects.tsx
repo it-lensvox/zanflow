@@ -1,9 +1,11 @@
 import React from 'react';
-import { Search, Plus, List, Grid3X3, Network, X, FolderKanban, Folder, ChevronDown, Check } from 'lucide-react';
+import { Search, Plus, X, FolderKanban, Folder, ChevronDown, Check } from 'lucide-react';
+import { ViewToggle } from '@/components/layout/DualView';
+import { Pagination } from '@/components/ui/Pagination';
 import { formatRelativeTime } from '@/lib/utils';
 import { CreateProjectModal } from './CreateProjectModal';
 import { useProjects } from './hooks/useProjects';
-import { BLUE, LINE, TEXT, MUTED, STATUS_MAP, TREE_GROUPS, getTypeHex, getTypeBg } from './projectConstants';
+import { BLUE, LINE, TEXT, MUTED, STATUS_MAP, PROJECT_TYPE_FILTERS, TREE_GROUPS, getTypeHex, getTypeBg } from './projectConstants';
 import { TreePanel }        from './components/TreePanel';
 import { BulkToolbar }      from './components/BulkToolbar';
 import { DetailPanel }      from './components/DetailPanel';
@@ -117,13 +119,11 @@ export function Projects() {
               </div>
             )}
           </div>
-          <div style={{ height: 40, border: `1px solid ${LINE}`, borderRadius: 8, display: 'flex', alignItems: 'center', padding: 3, gap: 2, flexShrink: 0 }}>
-            {([['list', List, 'List'], ['grid', Grid3X3, 'Grid'], ['tree', Network, 'Tree']] as [string, any, string][]).map(([m, Icon, label]) => (
-              <button key={m} onClick={() => p.setViewMode(m as any)} title={label} style={{ height: 32, padding: '0 10px', borderRadius: 6, border: p.viewMode === m ? '1px solid #a7c1ff' : 'none', background: p.viewMode === m ? '#f5f8ff' : 'transparent', color: p.viewMode === m ? BLUE : MUTED, fontWeight: p.viewMode === m ? 800 : 600, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
-                <Icon className="w-3.5 h-3.5" />{label}
-              </button>
-            ))}
-          </div>
+          <ViewToggle
+            viewMode={p.viewMode as any}
+            onViewModeChange={v => p.setViewMode(v as any)}
+            modes={['table', 'grid', 'tree']}
+          />
         </div>
 
         {(p.statusFilter || p.typeFilter || p.searchTerm) && (
@@ -263,16 +263,14 @@ export function Projects() {
           </div>
 
           {p.filtered.length > 0 && (
-            <div style={{ height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', borderTop: `1px solid ${LINE}`, background: '#fff', flexShrink: 0, fontSize: 12, color: TEXT }}>
-              <span>Showing {Math.min((p.currentPage - 1) * p.rowsPerPage + 1, p.filtered.length)}–{Math.min(p.currentPage * p.rowsPerPage, p.filtered.length)} of {p.filtered.length} projects</span>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button onClick={() => p.setCurrentPage(prev => Math.max(1, prev - 1))} disabled={p.currentPage === 1} style={{ height: 31, minWidth: 31, border: `1px solid ${LINE}`, borderRadius: 6, background: '#fff', cursor: p.currentPage === 1 ? 'not-allowed' : 'pointer', color: p.currentPage === 1 ? '#d1d5db' : MUTED, fontWeight: 600, display: 'grid', placeItems: 'center' }}>‹</button>
-                {Array.from({ length: Math.min(5, p.totalPages) }, (_, i) => i + 1).map(pg => (
-                  <button key={pg} onClick={() => p.setCurrentPage(pg)} style={{ height: 31, minWidth: 31, border: `1px solid ${p.currentPage === pg ? '#88acff' : LINE}`, borderRadius: 6, background: p.currentPage === pg ? '#f6f9ff' : '#fff', color: p.currentPage === pg ? BLUE : MUTED, fontWeight: 600, cursor: 'pointer', display: 'grid', placeItems: 'center' }}>{pg}</button>
-                ))}
-                <button onClick={() => p.setCurrentPage(prev => Math.min(p.totalPages, prev + 1))} disabled={p.currentPage === p.totalPages} style={{ height: 31, minWidth: 31, border: `1px solid ${LINE}`, borderRadius: 6, background: '#fff', cursor: p.currentPage === p.totalPages ? 'not-allowed' : 'pointer', color: p.currentPage === p.totalPages ? '#d1d5db' : MUTED, fontWeight: 600, display: 'grid', placeItems: 'center' }}>›</button>
-              </div>
-            </div>
+            <Pagination
+              currentPage={p.currentPage}
+              totalPages={p.totalPages}
+              totalItems={p.filtered.length}
+              pageSize={p.rowsPerPage}
+              onPageChange={p.setCurrentPage}
+              itemLabel="projects"
+            />
           )}
         </div>
 

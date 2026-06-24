@@ -16,12 +16,12 @@ interface ProjectGridCardProps {
 
 export function ProjectGridCard({ project, selected, onSelect, onFav, onClick }: ProjectGridCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const taskType  = (project as any).task_type || '';
+  const taskType = (project as any).task_type || '';
   const accentHex = getTypeHex(taskType);
-  const tintBg    = getTypeBg(taskType);
-  const members   = (project as any).members   || [];
-  const docCount  = (project as any).document_count ?? 0;
-  const initial   = (project.name?.[0] || '?').toUpperCase();
+  const tintBg = getTypeBg(taskType);
+  const members = (project as any).members || [];
+  const docCount = (project as any).document_count ?? 0;
+  const initial = (project.name?.[0] || '?').toUpperCase();
 
   return (
     <div
@@ -57,7 +57,7 @@ export function ProjectGridCard({ project, selected, onSelect, onFav, onClick }:
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
 
           {/* Checkbox  */}
-          <input
+          {/* <input
             type="checkbox"
             checked={selected}
             onClick={onSelect}
@@ -67,14 +67,21 @@ export function ProjectGridCard({ project, selected, onSelect, onFav, onClick }:
               accentColor: accentHex, width: 14, height: 14,
               cursor: 'pointer', zIndex: 2,
             }}
-          />
+          /> */}
 
+          {/* Avatar circle */}
+          {/* <div style={{
+            width: 40, height: 40, borderRadius: 10,
+            background: tintBg, border: `1.5px solid ${accentHex}33`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0, marginLeft: 18,
+          }}> */}
           {/* Avatar circle */}
           <div style={{
             width: 40, height: 40, borderRadius: 10,
             background: tintBg, border: `1.5px solid ${accentHex}33`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0, marginLeft: 18,
+            flexShrink: 0,
           }}>
             <span style={{ fontSize: 17, fontWeight: 800, color: accentHex }}>
               {initial}
@@ -115,7 +122,7 @@ export function ProjectGridCard({ project, selected, onSelect, onFav, onClick }:
                   boxShadow: '0 8px 24px rgba(16,24,40,.12)', minWidth: 160, overflow: 'hidden',
                 }}>
                   {[
-                    { label: 'Open Project',    action: (e: React.MouseEvent) => { e.stopPropagation(); setMenuOpen(false); onClick(); } },
+                    { label: 'Open Project', action: (e: React.MouseEvent) => { e.stopPropagation(); setMenuOpen(false); onClick(); } },
                     { label: (project as any).is_favourite ? 'Remove Favourite' : 'Add to Favourites', action: (e: React.MouseEvent) => { setMenuOpen(false); onFav(e); } },
                   ].map(item => (
                     <button key={item.label} onClick={item.action}
