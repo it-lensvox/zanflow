@@ -81,6 +81,7 @@ export interface ProjectMember {
 export interface ProjectMinimal {
   id: number;
   name: string;
+  task_type?: string;
 }
 
 // In project listing page with pagination

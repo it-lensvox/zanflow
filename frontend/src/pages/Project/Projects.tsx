@@ -1,13 +1,13 @@
 import React from 'react';
-import { Search, Plus, X, FolderKanban, Folder, ChevronDown, Check } from 'lucide-react';
+import { Search, Plus, X, FolderKanban, Folder, ChevronDown, Check, Move, Settings } from 'lucide-react';
 import { ViewToggle } from '@/components/layout/DualView';
 import { Pagination } from '@/components/ui/Pagination';
 import { formatRelativeTime } from '@/lib/utils';
 import { CreateProjectModal } from './CreateProjectModal';
 import { useProjects } from './hooks/useProjects';
-import { BLUE, LINE, TEXT, MUTED, STATUS_MAP, PROJECT_TYPE_FILTERS, TREE_GROUPS, getTypeHex, getTypeBg } from './projectConstants';
+import { BLUE, LINE, TEXT, MUTED, STATUS_MAP, TREE_GROUPS, getTypeHex, getTypeBg } from './projectConstants';
 import { TreePanel }        from './components/TreePanel';
-import { BulkToolbar }      from './components/BulkToolbar';
+import { BulkToolbar } from '@/components/ui/BulkToolbar';
 import { DetailPanel }      from './components/DetailPanel';
 import { ProjectGridCard }  from './components/ProjectGridCard';
 import { MoveProjectModal } from './components/MoveProjectModal';
@@ -144,7 +144,18 @@ export function Projects() {
 
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
 
-          <BulkToolbar count={p.selectedIds.size} onClear={() => p.setSelectedIds(new Set())} onDelete={() => {}} onMove={() => p.setShowMoveModal(true)} />
+          <BulkToolbar
+            count={p.selectedIds.size}
+            onClear={() => p.setSelectedIds(new Set())}
+            emptyHint="Select projects to perform bulk actions"
+          >
+            <button onClick={() => p.setShowMoveModal(true)} style={{ height: 34, border: `1px solid ${LINE}`, borderRadius: 6, background: '#fff', padding: '0 14px', fontSize: 16, fontWeight: 600, display: 'inline-flex', gap: 7, alignItems: 'center', cursor: 'pointer', color: TEXT }}>
+              <Move size={14} />Move
+            </button>
+            <button style={{ height: 34, border: `1px solid ${LINE}`, borderRadius: 6, background: '#fff', padding: '0 14px', fontSize: 16, fontWeight: 600, display: 'inline-flex', gap: 7, alignItems: 'center', cursor: 'pointer', color: TEXT }}>
+              <Settings size={14} />Edit
+            </button>
+          </BulkToolbar>
 
           <div style={{ flex: 1, overflow: 'auto' }}>
             {p.isLoading ? (
