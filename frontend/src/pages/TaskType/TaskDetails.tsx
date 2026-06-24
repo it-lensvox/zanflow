@@ -22,6 +22,7 @@ import { taskApi } from '@/services/api';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { useJsonPreview } from '@/hooks/useJsonPreview';
 import { JsonTaskPreviewList } from '@/components/common/JsonTaskPreviewList';
+import { TaskPreviewOverlay } from '@/pages/Project/components/TaskPreviewOverlay';
 
 //Date Field Dropdown
 function DateFieldDropdown({
@@ -227,16 +228,46 @@ export function TaskDetails() {
   const { copied: jsonExampleCopied, copy: copyJsonExample } = useCopyToClipboard();
   const { tasks: parsedTasks, error: previewError } = useJsonPreview(pastedJson);
   const [previewTasks, setPreviewTasks] = useState(parsedTasks);
+  const [showPreviewOverlay, setShowPreviewOverlay] = useState(false);
 
   // Re-sync preview whenever the textarea JSON changes
+  // (only when the overlay is NOT open, to avoid resetting edits mid-preview)
   useEffect(() => {
-    setPreviewTasks(parsedTasks);
-  }, [parsedTasks]);
+    if (!showPreviewOverlay) {
+      setPreviewTasks(parsedTasks);
+    }
+  }, [parsedTasks, showPreviewOverlay]);
 
   const handleDeletePreviewTask = (index: number) => {
     const updated = previewTasks.filter((_, i) => i !== index);
     setPreviewTasks(updated);
     setPastedJson(JSON.stringify({ tasks: updated }, null, 2));
+  };
+
+  const handleEditPreviewTaskTitle = (index: number, newTitle: string) => {
+    const updated = previewTasks.map((t, i) => i === index ? { ...t, heading: newTitle } : t);
+    setPreviewTasks(updated);
+    setPastedJson(JSON.stringify({ tasks: updated }, null, 2));
+  };
+
+  const handleShowPreview = () => {
+    if (previewTasks.length === 0) return;
+    setIsBulkUploadModalOpen(false);
+    setShowPreviewOverlay(true);
+  };
+
+  const handleBackToImport = () => {
+    setShowPreviewOverlay(false);
+    setIsBulkUploadModalOpen(true);
+  };
+
+  const handleCreateFromPreview = async () => {
+    if (previewTasks.length === 0) return;
+    const json = JSON.stringify({ tasks: previewTasks }, null, 2);
+    const file = new File([json], 'pasted_tasks.json', { type: 'application/json' });
+    setShowPreviewOverlay(false);
+    await processBulkFile(file);
+    setPreviewTasks([]);
   };
 
   const dummyJsonExample = `{
@@ -1086,6 +1117,18 @@ export function TaskDetails() {
         </div>
       )}
 
+      {/* ── Task Preview Overlay ── */}
+      {showPreviewOverlay && (
+        <TaskPreviewOverlay
+          tasks={previewTasks}
+          onRemoveTask={handleDeletePreviewTask}
+          onEditTitle={handleEditPreviewTaskTitle}
+          onBack={handleBackToImport}
+          onCreateTasks={handleCreateFromPreview}
+          isCreating={isBulkUploading}
+        />
+      )}
+
       {/* ── Import Tasks Modal ── */}
       {isBulkUploadModalOpen && (
         <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
@@ -1145,9 +1188,14 @@ export function TaskDetails() {
                   className="w-full h-48 p-3 text-[13px] text-gray-700 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#65408b] font-mono resize-y bg-gray-50"
                 />
 
-                {/* JSON Preview Panel */}
-                {previewTasks.length > 0 && (
-                  <JsonTaskPreviewList tasks={previewTasks} onDelete={handleDeletePreviewTask} />
+                {/* Inline count + preview hint */}
+                {previewTasks.length > 0 && !previewError && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
+                    <Check className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
+                    <span className="text-[12px] font-semibold text-green-700">
+                      {previewTasks.length} {previewTasks.length === 1 ? 'task' : 'tasks'} detected — click Preview to review before creating.
+                    </span>
+                  </div>
                 )}
 
                 {/* Inline syntax error hint */}
@@ -1176,12 +1224,12 @@ export function TaskDetails() {
                   </div>
 
                   <button
-                    onClick={handlePasteUpload}
-                    disabled={isBulkUploading || !pastedJson.trim()}
+                    onClick={handleShowPreview}
+                    disabled={isBulkUploading || previewTasks.length === 0 || !!previewError}
                     className="px-6 py-2 bg-[#65408b] hover:bg-[#553675] text-white text-sm font-bold rounded-lg transition-all shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                   >
-                    {isBulkUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                    Create Tasks
+                    <Search className="w-4 h-4" />
+                    Preview
                   </button>
                 </div>
               </div>
