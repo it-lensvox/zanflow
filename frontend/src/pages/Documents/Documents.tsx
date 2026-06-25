@@ -182,11 +182,12 @@ export function Documents() {
   const backendFolders = (foldersData || []) as { id: string; project: number; parent: string | null; name: string; is_system_generated?: boolean; document_count?: number; created_at: string }[];
   const treeFolders: TreeFolder[] = (() => {
     const projectChildren: TreeFolder[] = projects.map(p => {
+      const taskType = (p as any).task_type || '';
       const buildChildren = (parentId: string, projectId: number): TreeFolder[] =>
-        backendFolders.filter(f => f.parent === parentId).map(f => ({ id: f.id, name: f.name, count: f.document_count ?? 0, folderCount: backendFolders.filter(sub => sub.parent === f.id).length, projectId, isSystemGenerated: f.is_system_generated || false, children: buildChildren(f.id, projectId) }));
-      const projectFolders = backendFolders.filter(f => f.project === p.id && f.parent === null).map(f => ({ id: f.id, name: f.name, count: f.document_count ?? 0, folderCount: backendFolders.filter(sub => sub.parent === f.id).length, projectId: p.id, isSystemGenerated: f.is_system_generated || false, children: buildChildren(f.id, p.id) }));
+        backendFolders.filter(f => f.parent === parentId).map(f => ({ id: f.id, name: f.name, count: f.document_count ?? 0, folderCount: backendFolders.filter(sub => sub.parent === f.id).length, projectId, isSystemGenerated: f.is_system_generated || false, taskType, children: buildChildren(f.id, projectId) }));
+      const projectFolders = backendFolders.filter(f => f.project === p.id && f.parent === null).map(f => ({ id: f.id, name: f.name, count: f.document_count ?? 0, folderCount: backendFolders.filter(sub => sub.parent === f.id).length, projectId: p.id, isSystemGenerated: f.is_system_generated || false, taskType, children: buildChildren(f.id, p.id) }));
       const projectDocCount = (p as any).document_count ?? allDocsForTree.filter((doc: Document) => doc.project === p.id && !doc.folder).length;
-      return { id: undefined, name: p.name, count: projectDocCount, folderCount: projectFolders.length, projectId: p.id, children: projectFolders };
+      return { id: undefined, name: p.name, count: projectDocCount, folderCount: projectFolders.length, projectId: p.id, taskType, children: projectFolders };
     });
     return [{ name: 'All Documents', count: projectChildren.reduce((s, p) => s + p.count, 0), folderCount: projectChildren.length, children: projectChildren }];
   })();
@@ -398,7 +399,6 @@ export function Documents() {
               try { await documentsApi.deleteFolder(folderId); queryClient.invalidateQueries({ queryKey: ['document-folders'] }); queryClient.invalidateQueries({ queryKey: ['documents'] }); queryClient.invalidateQueries({ queryKey: ['documents-tree-counts'] }); setToast({ isOpen: true, type: 'success', message: 'Folder deleted successfully' }); }
               catch (error: any) { setToast({ isOpen: true, type: 'error', message: error?.response?.status === 403 ? 'Cannot delete system folders.' : 'Failed to delete folder. Please try again.' }); }
             }}
-            selectedDocs={selectedDocs} setSelectedDocs={setSelectedDocs}
             setMoveConfirmModal={setMoveConfirmModal} setToast={setToast}
           />
 
@@ -420,7 +420,7 @@ export function Documents() {
                   <p style={{ fontSize: 16, fontWeight: 500, color: MUTED }} className="animate-pulse">Loading documents...</p>
                 </div>
               ) : viewMode === 'tree' ? (
-                <TreeDocumentView documents={allDocs} projects={projects} onDocumentClick={handleDocumentClick} selectedDocs={selectedDocs} toggleSelect={toggleSelect} />
+                <TreeDocumentView documents={allDocs} projects={projects} onDocumentClick={handleDocumentClick} />
               ) : (
                 <DualView
                   viewMode={viewMode} isLoading={isLoading}

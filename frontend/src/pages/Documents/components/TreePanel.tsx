@@ -1,10 +1,7 @@
 import React, { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import {
-  FileText, X, Plus, FolderOpen,
-  Folder, ChevronRight, ChevronRight as ChevronRightIcon,
-  ArrowLeft, Share2, Trash2, Pencil,
+import { X, Plus, Folder, ChevronRight, ArrowLeft, Share2, Trash2, Pencil,
 } from 'lucide-react';
+import { getTypeHex } from '@/pages/Project/projectConstants';
 
 // ─── Types 
 export interface TreeFolder {
@@ -15,8 +12,18 @@ export interface TreeFolder {
   isOpen?: boolean;
   projectId?: number;
   isSystemGenerated?: boolean;
+  taskType?: string;
   children?: TreeFolder[];
 }
+
+// ─── Project type colour 
+const TYPE_LEGEND = [
+  { label: 'Client',   color: '#3b82f6' },
+  { label: 'Internal', color: '#8b5cf6' },
+  { label: 'Content',  color: '#ec4899' },
+  { label: 'Ideas',    color: '#f59e0b' },
+  { label: 'Demo',     color: '#22c36a' },
+];
 
 // ─── Props 
 interface TreePanelProps {
@@ -29,9 +36,7 @@ interface TreePanelProps {
   onCreateFolder: (projectId: number, parentId: string | null, name: string) => void;
   onRenameFolder: (folderId: string, newName: string) => void;
   onDeleteFolder: (folderId: string) => void;
-  selectedDocs: Set<string>;
-  setSelectedDocs: (docs: Set<string>) => void;
-  setMoveConfirmModal: (modal: any) => void;
+setMoveConfirmModal: (modal: any) => void;
   setToast: (toast: any) => void;
   showSharedWithMe: boolean;
   setShowSharedWithMe: (v: boolean) => void;
@@ -59,7 +64,6 @@ export function TreePanel({
   setSelectedTreeFolderId,
   sharedWithMeCount,
 }: TreePanelProps) {
-  const queryClient = useQueryClient();
   const [openNodes, setOpenNodes] = useState<Record<string, boolean>>({ 'All Documents': true });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
@@ -136,14 +140,21 @@ export function TreePanel({
     const isSel = (f.id && selectedFolderId === f.id) || (!f.id && selectedFolder === f.name);
     const isEditing = editingId === f.id;
     const showNewInput = creatingUnder?.nodeKey === nodeKey;
+    const typeHex = f.taskType ? getTypeHex(f.taskType) : (depth === 0 ? '#4169FF' : '#667085');
+    const showAccent = depth >= 1; 
+
+    const rowBg = isSel
+      ? (f.taskType ? `${typeHex}14` : '#edf4ff')
+      : 'transparent';
+    const rowBorder = showAccent ? `3px solid ${typeHex}` : 'none';
 
     return (
-      <div key={nodeKey} style={{ marginLeft: depth > 0 ? 20 : 0 }}>
+      <div key={nodeKey} style={{ marginLeft: depth > 0 ? 16 : 0 }}>
         <div
-          className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer text-sm group/folder"
-          style={{ background: isSel ? '#EEF2FF' : 'transparent', color: isSel ? '#4169FF' : '#1a1a1a', fontWeight: isSel ? 600 : 400 }}
-          onMouseEnter={(e) => { if (!isSel) e.currentTarget.style.background = '#f3f4f6'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = isSel ? '#EEF2FF' : 'transparent'; }}
+          className="flex items-center gap-2 cursor-pointer group/folder"
+          style={{ background: rowBg, borderLeft: rowBorder, borderRadius: showAccent ? '0 6px 6px 0' : 6, padding: '0 8px', height: 29, marginBottom: 1 }}
+          onMouseEnter={(e) => { if (!isSel) e.currentTarget.style.background = showAccent ? `${typeHex}0a` : '#f3f4f6'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = rowBg; }}
           onClick={() => { if (hasC) toggleNode(nodeKey); onFolderClick(f.name, f.id, f.projectId); }}
           onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, folder: f }); }}
           onDragOver={(e) => {
@@ -164,8 +175,8 @@ export function TreePanel({
             e.preventDefault(); e.stopPropagation();
             const rect = e.currentTarget.getBoundingClientRect();
             const isLeavingFolder = (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom);
-            e.currentTarget.style.background = isSel ? '#EEF2FF' : 'transparent';
-            e.currentTarget.style.borderLeft = 'none';
+            e.currentTarget.style.background = rowBg;
+            e.currentTarget.style.borderLeft = rowBorder;
             if (dragHoverTimer) { clearTimeout(dragHoverTimer); setDragHoverTimer(null); }
             if (isLeavingFolder && autoOpenedNodes.has(nodeKey)) {
               setTimeout(() => {
@@ -200,30 +211,37 @@ export function TreePanel({
             setMoveConfirmModal({ isOpen: true, documentIds, targetName: f.id ? f.name : `${f.name} (root)`, targetProjectId: f.projectId, targetFolderId: f.id || null });
           }}
         >
-          {hasC ? <ChevronRightIcon className={`w-3 h-3 flex-shrink-0 transition-transform ${isO ? 'rotate-90' : ''}`} style={{ color: '#6b7280' }} /> : <span className="w-3 flex-shrink-0" />}
-          {isO && hasC
-            ? <FolderOpen className="w-4 h-4 flex-shrink-0" style={{ color: '#6b7280', fill: 'currentColor' }} />
-            : <Folder className="w-4 h-4 flex-shrink-0" style={{ color: '#6b7280', fill: 'currentColor' }} />
-          }
+          {/* Folder icon */}
+          {depth >= 1 && (
+            <Folder
+              className="w-3.5 h-3.5 flex-shrink-0"
+              style={{
+                color: typeHex,
+                fill: isO && hasC ? `${typeHex}30` : 'none',
+                transition: 'fill 0.15s',
+              }}
+            />
+          )}
           {isEditing ? (
             <input autoFocus value={editName} onChange={(e) => setEditName(e.target.value)}
               onBlur={commitRename}
               onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') { setEditingId(null); setEditName(''); } }}
               onClick={(e) => e.stopPropagation()} className="flex-1 text-sm rounded px-1 py-0.5 min-w-0"
-              style={{ border: '1px solid #4169FF', outline: 'none', background: '#fff', color: '#1a1a1a' }} />
-          ) : (
-            <span className="flex-1 truncate" onDoubleClick={(e) => { e.stopPropagation(); if (f.id && !f.isSystemGenerated) startRename(f.id, f.name); }}>{f.name}</span>
-          )}
-          <div className="flex items-center gap-2 text-xs font-medium">
-            {f.folderCount !== undefined && f.folderCount > 0 && (
-              <span className="flex items-center gap-1" style={{ color: '#4169FF' }} title="Subfolders">
-                <Folder className="w-3 h-3" />{f.folderCount}
-              </span>
-            )}
-            <span className="flex items-center gap-1" style={{ color: '#6b7280' }} title="Documents">
-              <FileText className="w-3 h-3" />{f.count}
+              style={{ border: `1px solid ${typeHex}`, outline: 'none', background: '#fff', color: '#1a1a1a' }} />
+         ) : (
+            <span
+              style={{ flex: 1, fontSize: 12, color: isSel ? typeHex : '#27354d', fontWeight: isSel ? 700 : depth === 0 ? 700 : 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              onDoubleClick={(e) => { e.stopPropagation(); if (f.id && !f.isSystemGenerated) startRename(f.id, f.name); }}
+            >
+              {f.name}
             </span>
-          </div>
+          )}
+          {/* Doc count — plain muted number, same as Project tree */}
+          {f.count > 0 && (
+            <span style={{ fontSize: 11, color: '#667085', flexShrink: 0 }}>
+              {f.count}
+            </span>
+          )}
         </div>
 
         {isO && (
@@ -263,7 +281,7 @@ export function TreePanel({
             title="Show Tree View">
             <ChevronRight className="w-4 h-4" />
           </button>
-          <div className="mt-3" style={{ writingMode: 'vertical-rl', fontSize: 11, fontWeight: 600, color: '#6b7280', letterSpacing: '0.05em' }}>Tree View</div>
+         <div className="mt-3" style={{ writingMode: 'vertical-rl', fontSize: 11, fontWeight: 600, color: '#6b7280', letterSpacing: '0.05em' }}>Folders</div>
         </div>
       )}
 
@@ -271,7 +289,7 @@ export function TreePanel({
       {isOpen && (
         <div className="overflow-y-auto p-4 h-full" style={{ width: 280 }}>
           <div className="flex items-center justify-between mb-4">
-            <span style={{ fontWeight: 600, fontSize: 14, color: '#1a1a1a' }}>Tree View</span>
+            <span style={{ fontWeight: 800, fontSize: 14, color: '#172033' }}>Folders</span>
             <button onClick={onToggle} className="p-1 rounded-md"
               style={{ color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer' }}
               onMouseEnter={(e) => { e.currentTarget.style.background = '#f3f4f6'; }}
@@ -286,14 +304,24 @@ export function TreePanel({
           {/* Shared With Me */}
           <div
             onClick={() => { setShowSharedWithMe(true); setSelectedFolder('Shared With Me'); setSelectedTreeFolderId(null); }}
-            className="flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer text-sm mt-2"
-            style={{ background: showSharedWithMe ? '#EEF2FF' : 'transparent', color: showSharedWithMe ? '#4169FF' : '#1a1a1a', fontWeight: showSharedWithMe ? 600 : 400, borderTop: '1px solid #e5e7eb', paddingTop: 10, marginTop: 8 }}
+            className="flex items-center gap-2 cursor-pointer text-sm"
+            style={{ background: showSharedWithMe ? '#EEF2FF' : 'transparent', borderRadius: 7, padding: '6px 10px', color: showSharedWithMe ? '#4169FF' : '#1a1a1a', fontWeight: showSharedWithMe ? 600 : 400, borderTop: '1px solid #e5e7eb', paddingTop: 10, marginTop: 8 }}
             onMouseEnter={e => { if (!showSharedWithMe) e.currentTarget.style.background = '#f3f4f6'; }}
             onMouseLeave={e => { e.currentTarget.style.background = showSharedWithMe ? '#EEF2FF' : 'transparent'; }}
           >
             <Share2 className="w-4 h-4 flex-shrink-0" style={{ color: showSharedWithMe ? '#4169FF' : '#6b7280' }} />
             <span style={{ flex: 1 }}>Shared With Me</span>
             {sharedWithMeCount > 0 && <span style={{ fontSize: 11, color: '#6b7280' }}>{sharedWithMeCount}</span>}
+          </div>
+
+          {/* Project type colour legend */}
+          <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap' as const, gap: '4px 10px', padding: '6px 2px' }}>
+            {TYPE_LEGEND.map(t => (
+              <div key={t.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: t.color, flexShrink: 0 }} />
+                <span style={{ fontSize: 10, color: '#667085' }}>{t.label}</span>
+              </div>
+            ))}
           </div>
 
           {/* New Folder button */}
