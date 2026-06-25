@@ -8,7 +8,7 @@ import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tansta
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { taskApi, dailyUpdateApi, eventApi, usersApi, notificationSocket, dyuksaAI, calendarShareApi } from '@/services/api';
 import { useAuth } from '@/hooks/useAuth';
-import { TaskDetailModal } from '../MyTask/TaskDetailModal';
+import { TaskDetailModal } from '../MyTask/components/TaskDetailModal';
 import type { Task, DailyUpdate, Event as CalendarEventType, InvitationStatus } from '@/types';
 import { getStatusConfig } from '@/components/layout/DualView/taskConfig';
 import DeclineModal from '@/components/Calendar/DeclineModal';

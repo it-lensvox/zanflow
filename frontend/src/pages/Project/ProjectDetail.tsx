@@ -9,7 +9,7 @@ import { DocumentPreview, useDocumentPreviewKeyboard } from '@/components/common
 import { projectsApi, documentsApi } from '@/services/api';
 import { formatDate, getStatusColor } from '@/lib/utils';
 import type { Project, Document } from '@/types';
-import { AITask } from '@/pages/MyTask/AITask';
+import { AITask } from '@/pages/MyTask/components/AITask';
 
 
 export function ProjectDetail() {

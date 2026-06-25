@@ -4,7 +4,7 @@ import { X, Calendar, CheckCircle, AlertCircle, Briefcase, User, Flag, Paperclip
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { taskApi, usersApi, projectsApi } from '@/services/api';
 import { ProjectMinimal, AITaskSuggestionResponse, Label, Task } from '@/types';
-import { AITask } from './AITask';
+import { AITask } from '@/pages/MyTask/components/AITask';
 import { RichTextEditor } from '@/components/common/RichTextEditor';
 import { useTaskDraftsContext } from '@/hooks/useTaskDrafts';
 

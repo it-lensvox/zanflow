@@ -5,7 +5,7 @@ import { NotificationsPage } from '@/pages/NotificationsPage';
 import { QuickNotes } from '@/components/QuickNotes';
 import { AIBot } from '@/pages/AI BOT/AI BOT';
 import { useNotifications } from '@/hooks/useNotifications';
-import { TaskDraftBar } from '@/pages/MyTask/Taskdrafts';
+import { TaskDraftBar } from '@/pages/MyTask/components/Taskdrafts';
 import { GlobalSearchTrigger } from '@/components/GlobalSearch';
 import { Bell } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';

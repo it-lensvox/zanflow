@@ -1,8 +1,8 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
-  Calendar, Users, CheckSquare, Clock, PlayCircle, Pause,
-  Eye, AlertCircle, CheckCircle, ListTodo, Pin
+  Calendar, Users, CheckSquare, Clock, PlayCircle, Pause, Eye, AlertCircle, CheckCircle, ListTodo, Pin
 } from 'lucide-react';
 import type { Task } from '@/types';
 import type { TableColumn } from '@/components/layout/DualView/TableView';
@@ -11,6 +11,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { formatRelativeTime } from '@/lib/utils';
 import { TablePopover } from '@/components/common';
+import { getTypeHex, getTypeBg } from '@/pages/Project/projectConstants';
 
 // Utility function to format dates
 const formatDate = (dateString: string) => {
@@ -133,6 +134,73 @@ export const statusOptions = [
   { value: 'review', label: 'REVIEW', icon: Eye },
 ];
 
+// ─── Assignee popover via portal (escapes all stacking contexts) ──────────────
+function AssigneePopover({ task }: { task: Task }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseEnter = () => {
+    if (!triggerRef.current) return;
+    const r = triggerRef.current.getBoundingClientRect();
+    setPos({ top: r.bottom + window.scrollY + 6, left: r.left + window.scrollX });
+    setOpen(true);
+  };
+  const handleMouseLeave = () => setOpen(false);
+
+  return (
+    <>
+      <div
+        ref={triggerRef}
+        style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onClick={e => e.stopPropagation()}
+      >
+        <Users style={{ width: 12, height: 12 }} />
+        <span style={{ fontWeight: 600, fontSize: 12, color: '#667085' }}>{(task.assigned_to || []).length}</span>
+      </div>
+
+      {open && pos && ReactDOM.createPortal(
+        <div
+          onMouseEnter={() => setOpen(true)}
+          onMouseLeave={() => setOpen(false)}
+          style={{
+            position: 'absolute',
+            top: pos.top,
+            left: pos.left,
+            zIndex: 99999,
+            minWidth: 180,
+            background: '#fff',
+            border: '1px solid #e5e7eb',
+            borderRadius: 10,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.14)',
+            padding: 8,
+          }}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 180, overflowY: 'auto' }}>
+            {(task.assigned_to_user_details || []).length > 0 ? (
+              (task.assigned_to_user_details || []).map(u => (
+                <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 6px', borderRadius: 6 }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <div style={{ width: 22, height: 22, borderRadius: '50%', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: '#fff', background: u.avatar ? 'transparent' : '#3b82f6', flexShrink: 0 }}>
+                    {u.avatar ? <img src={u.avatar} alt={u.first_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <>{u.first_name?.[0]}{u.last_name?.[0]}</>}
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 500, color: '#374151' }}>{u.first_name} {u.last_name}</span>
+                </div>
+              ))
+            ) : (
+              <span style={{ fontSize: 11, color: '#9ca3af', padding: '4px 6px', fontStyle: 'italic' }}>No users assigned</span>
+            )}
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
 // Grid Card Component
 interface TaskGridCardProps {
   task: Task;
@@ -144,86 +212,92 @@ export function TaskGridCard({ task, onTaskClick }: TaskGridCardProps) {
   const queryClient = useQueryClient();
   const { isPinned, isPending, handlePin } = usePinTask(task, queryClient);
 
+  // Project type colour
+  const taskType = (task as any).project_task_type || task.project_details?.task_type || '';
+  const accentHex = getTypeHex(taskType);
+  const tintBg = getTypeBg(taskType);
+  const initial = (task.project_details?.name || task.project_name || 'T')[0].toUpperCase();
+
   return (
     <div
       onClick={() => onTaskClick(task)}
-      className={`${statusConfig.cardClass} rounded-xl p-4 transition-all duration-300 cursor-pointer text-gray-800 hover:shadow-lg hover:-translate-y-0.5 border border-[#d0d5dd] relative hover:z-50 h-full group bg-white`}
+      className="group cursor-pointer"
+      style={{
+        background: '#fff',
+        border: '1px solid #E6EBF2',
+        borderRadius: 14,
+        position: 'relative',
+        boxShadow: '0 1px 4px rgba(16,24,40,.06)',
+        transition: 'box-shadow .2s, transform .2s',
+        minWidth: 0,
+        width: '100%',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 20px rgba(16,24,40,.12)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 1px 4px rgba(16,24,40,.06)'; e.currentTarget.style.transform = 'none'; }}
     >
-      {/* Header */}
-      <div className="flex justify-between items-start gap-2 mb-3">
-        <div className="pr-2 flex flex-col min-w-0 flex-1">
-          {/* Project Name */}
-          <span className="text-sm font-bold text-gray-700 line-clamp-1 mb-0.5" title={task.project_details?.name || task.project_name || undefined}>
-            {task.project_details?.name || task.project_name || 'No Project'}
-          </span>
-          {/* Task Heading */}
-          <span className="text-xs font-medium text-gray-600 line-clamp-2" title={task.heading}>
-            {task.heading || 'No Task'}
-          </span>
-        </div>
-        <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
-          <PinButton
-            isPinned={isPinned}
-            isPending={isPending}
-            handlePin={handlePin}
-            groupHoverClass="group-hover:opacity-100"
-          />
-          {task.updated_at && (
-            <div className="text-[10px] text-gray-400 whitespace-nowrap">
-              {formatRelativeTime(task.updated_at)}
-            </div>
-          )}
-        </div>
-      </div>
+      {/* ── Top accent bar (project type colour) ── */}
+      <div style={{ height: 4, background: accentHex, width: '100%', borderRadius: '14px 14px 0 0' }} />
 
-      {/* Details Section */}
-      <div className="space-y-1 text-xs text-gray-500 mb-6">
-        <div className="flex items-center">
-          <Calendar className="w-3 h-3 mr-1" />
-          <span className="font-medium">Due:</span>
-          <span className="ml-1">{formatDate(task.end_date)}</span>
-        </div>
+      <div style={{ padding: '14px 16px 16px' }}>
+        {/* ── Row 1: Avatar + project name + pin + timestamp ── */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
+          {/* <div style={{
+            width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+            background: tintBg, border: `1.5px solid ${accentHex}33`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <span style={{ fontSize: 16, fontWeight: 800, color: accentHex }}>{initial}</span>
+          </div> */}
 
-        {/* Assigned */}
-        <div
-          className="flex items-center relative group/assigned cursor-pointer hover:text-blue-600 transition-colors w-max"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Users className="w-3 h-3 mr-1" />
-          <span className="font-medium">Assigned:</span>
-          <span className="ml-1 font-bold">{(task.assigned_to || []).length}</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ margin: '0 0 2px', fontWeight: 700, fontSize: 14, color: '#172033', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {task.project_details?.name || task.project_name || 'No Project'}
+            </p>
+            <p style={{ margin: 0, fontSize: 12, color: '#667085', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {task.heading || 'No Task'}
+            </p>
+          </div>
 
-          {/* Hover Dropdown */}
-          <div className="absolute top-full left-0 mt-1 hidden group-hover/assigned:block z-50 min-w-[160px] bg-white border border-gray-200 rounded-lg shadow-xl p-2 animate-in fade-in zoom-in-95 duration-100">
-            <div className="flex flex-col gap-1 max-h-[150px] overflow-y-auto">
-            {(task.assigned_to_user_details || []).length > 0 ? (
-                (task.assigned_to_user_details || []).map((u) => (
-                  <div key={u.id} className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded">
-                    <div className="w-5 h-5 rounded-full overflow-hidden flex items-center justify-center text-[9px] font-bold shrink-0 text-white"
-                      style={{ background: u.avatar ? 'transparent' : '#3b82f6' }}>
-                      {u.avatar
-                        ? <img src={u.avatar} alt={u.first_name} className="w-full h-full object-cover" />
-                        : <>{u.first_name?.[0]}{u.last_name?.[0]}</>
-                      }
-                    </div>
-                    <span className="text-[11px] font-medium text-gray-700 truncate">
-                      {u.first_name} {u.last_name}
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <span className="text-[11px] text-gray-400 px-1 italic">No users assigned</span>
-              )}
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+            <PinButton isPinned={isPinned} isPending={isPending} handlePin={handlePin} groupHoverClass="group-hover:opacity-100" />
+            {task.updated_at && (
+              <span style={{ fontSize: 11, color: '#667085', whiteSpace: 'nowrap' }}>
+                {formatRelativeTime(task.updated_at)}
+              </span>
+            )}
           </div>
         </div>
-      </div>
 
-      {/* Status Badge */}
-      <div className="absolute bottom-3 right-3">
-        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${statusConfig.badge}`}>
-          {statusConfig.label}
-        </span>
+        {/* ── Row 2: Due date + assignee count with hover dropdown ── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12, color: '#667085' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Calendar style={{ width: 12, height: 12 }} />
+            <span>{formatDate(task.end_date)}</span>
+          </div>
+
+          <AssigneePopover task={task} />
+        </div>
+
+        {/* ── Footer: Priority left · Status badge right ── */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          {task.priority ? (() => {
+            const p = priorityOptions.find(o => o.value === task.priority);
+            return (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span className={`w-2 h-2 rounded-full ${p?.dotColor || 'bg-gray-300'}`} />
+                <span style={{ fontSize: 11, fontWeight: 500, color: '#667085', textTransform: 'capitalize' as const }}>{task.priority}</span>
+              </div>
+            );
+          })() :
+            <span />}
+
+          <span
+            className={`inline-flex items-center rounded text-[10px] font-bold ${statusConfig.badge}`}
+            style={{ padding: '3px 10px' }}
+          >
+            {statusConfig.label}
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -680,11 +754,18 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
   return [
     {
       key: 'project',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Project</span>,
+      label: <span className="text-[14px] font-bold tracking-wide text-gray-700">Project</span>,
       width: '10%',
       render: (task: Task) => (
-        <span className="text-[12px] text-gray-700 font-medium">
-          {task.project_details?.name || task.project_name || 'No Project'}
+        <span
+          title={task.project_details?.name || task.project_name || ''}
+          style={{
+            fontSize: 13, fontWeight: 700, color: '#172033',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            display: 'block', maxWidth: 130,
+          }}
+        >
+          {task.project_details?.name || task.project_name || '—'}
         </span>
       ),
     },
@@ -794,7 +875,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
               </span>
             </div>
             <div className="max-h-48 overflow-y-auto p-1">
-            {(task.assigned_to_user_details || []).length > 0 ? (
+              {(task.assigned_to_user_details || []).length > 0 ? (
                 (task.assigned_to_user_details || []).map((u) => (
                   <div key={u.id} className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded">
                     <div className="w-6 h-6 rounded-full overflow-hidden flex items-center justify-center text-[10px] font-semibold shrink-0 text-white"

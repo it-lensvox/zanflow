@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import { useNavigate, useLocation, useOutletContext } from 'react-router-dom';
 import { useQuery, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
-import { taskApi, usersApi } from '@/services/api';
+import { taskApi, usersApi, projectsApi } from '@/services/api';
 import { useTableFilters, ColumnFilterConfig } from '@/hooks/useTableFilters';
 import { statusOptions, priorityOptions } from '@/components/layout/DualView/taskConfig';
 import { useNotifications } from '@/hooks/useNotifications';
@@ -89,6 +89,22 @@ export function useMyTask() {
     enabled:  !!user,
   });
 
+  // ── Data: projects (for project type colour lookup)
+  const { data: projectsData } = useQuery({
+    queryKey: ['projects'],
+    queryFn:  () => projectsApi.list(),
+    staleTime: 60_000,
+  });
+
+  const projectTypeLookup = useMemo(() => {
+    const raw = projectsData?.results || projectsData || [];
+    const arr = Array.isArray(raw) ? raw : [];
+    return arr.reduce((acc: Record<number, string>, p: any) => {
+      acc[p.id] = p.task_type || '';
+      return acc;
+    }, {} as Record<number, string>);
+  }, [projectsData]);
+
   // ── Data: infinite task pages
   const {
     data: infiniteData,
@@ -130,17 +146,27 @@ export function useMyTask() {
   }, [infiniteData, user]);
 
   // ── Infinite scroll sentinel
-  const sentinelRef = useRef<HTMLDivElement>(null);
+ const sentinelRef         = useRef<HTMLDivElement>(null);
+  const isFetchingRef       = useRef(false);
+
+  // Keep ref in sync so the observer callback always reads the latest value
+  // without being re-created on every isFetchingNextPage change
+  useEffect(() => { isFetchingRef.current = isFetchingNextPage; }, [isFetchingNextPage]);
+
   useEffect(() => {
     const el = sentinelRef.current;
-    if (!el) return;
+    if (!el || !hasNextPage) return;
     const observer = new IntersectionObserver(
-      (entries) => { if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) fetchNextPage(); },
-      { threshold: 0.1 }
+      (entries) => {
+        if (entries[0].isIntersecting && !isFetchingRef.current) {
+          fetchNextPage();
+        }
+      },
+      { threshold: 1.0, rootMargin: '0px 0px 100px 0px' }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  }, [hasNextPage, fetchNextPage]);
 
   // ── Column filter config 
   const filterConfig: ColumnFilterConfig[] = [
@@ -168,26 +194,32 @@ export function useMyTask() {
   });
 
   // ── Final filtered list
-  const filteredTasks = useMemo(() => {
+ const filteredTasks = useMemo(() => {
     if (!hookFilteredTasks) return [];
-    return hookFilteredTasks.filter(task => {
-      if (!task?.status) return false;
-      const matchesFilter   = activeFilter === 'ALL' || task.status.toUpperCase() === activeFilter;
-      const q = searchQuery.trim().toLowerCase();
-      const matchesSearch   = !q ||
-        (task.heading || '').toLowerCase().includes(q) ||
-        (task.status  || '').toLowerCase().replace(/_/g, ' ').includes(q) ||
-        (task.project_details?.name || '').toLowerCase().includes(q) ||
-        (task.description || '').replace(/<[^>]*>/g, '').toLowerCase().includes(q) ||
-        (task.priority || '').toLowerCase().includes(q) ||
-        (task.labels || []).some((l: any) => (l.name || l.label || '').toLowerCase().includes(q));
-      const assigneeVal     = columnFilters['assigned_to'];
-      const matchesAssignee = !assigneeVal || (task.assigned_to || []).map(String).includes(String(assigneeVal));
-      const createdByVal    = columnFilters['created_by'];
-      const matchesCreatedBy = !createdByVal || String(task.assigned_by) === String(createdByVal);
-      return matchesFilter && matchesSearch && matchesAssignee && matchesCreatedBy;
-    });
-  }, [hookFilteredTasks, activeFilter, searchQuery, columnFilters]);
+    return hookFilteredTasks
+      .filter(task => {
+        if (!task?.status) return false;
+        const matchesFilter   = activeFilter === 'ALL' || task.status.toUpperCase() === activeFilter;
+        const q = searchQuery.trim().toLowerCase();
+        const matchesSearch   = !q ||
+          (task.heading || '').toLowerCase().includes(q) ||
+          (task.status  || '').toLowerCase().replace(/_/g, ' ').includes(q) ||
+          (task.project_details?.name || '').toLowerCase().includes(q) ||
+          (task.description || '').replace(/<[^>]*>/g, '').toLowerCase().includes(q) ||
+          (task.priority || '').toLowerCase().includes(q) ||
+          (task.labels || []).some((l: any) => (l.name || l.label || '').toLowerCase().includes(q));
+        const assigneeVal     = columnFilters['assigned_to'];
+        const matchesAssignee = !assigneeVal || (task.assigned_to || []).map(String).includes(String(assigneeVal));
+        const createdByVal    = columnFilters['created_by'];
+        const matchesCreatedBy = !createdByVal || String(task.assigned_by) === String(createdByVal);
+        return matchesFilter && matchesSearch && matchesAssignee && matchesCreatedBy;
+      })
+      // Enrich each task with project_task_type for colour inheritance
+      .map(task => ({
+        ...task,
+        project_task_type: projectTypeLookup[(task.project as any)] || projectTypeLookup[task.project_details?.id as any] || '',
+      }));
+  }, [hookFilteredTasks, activeFilter, searchQuery, columnFilters, projectTypeLookup]);
 
   // ── Task event handlers 
   const handleTaskClick = useCallback((task: Task) => setSelectedTask(task), []);

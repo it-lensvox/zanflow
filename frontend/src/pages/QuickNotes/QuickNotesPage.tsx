@@ -1,7 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, FolderPlus } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
-import { useQuickNotes, QuickNotesContent } from '@/components/QuickNotes/QuickNotes';
+import { useQuickNotes }       from './hooks/useQuickNotes';
+import { QuickNotesContent }   from './components/QuickNotesContent';
+
+// ─── Design tokens — same as Projects page ────────────────────────────────────
+const TEXT  = '#172033';
+const MUTED = '#667085';
+const LINE  = '#e6ebf2';
+const BLUE  = '#1663f6';
 
 export function QuickNotesPage() {
   const [triggerFolderCreate, setTriggerFolderCreate] = useState(false);
@@ -25,57 +32,61 @@ export function QuickNotesPage() {
     attachNoteToProject,
   } = useQuickNotes();
 
-  // When navigating from mini view, 
+  // Navigate from mini view — select the right note
   useEffect(() => {
     const incoming = (location.state as { selectedNoteId?: number } | null)?.selectedNoteId;
-    if (incoming && !state.isLoading) {
-      selectNote(incoming);
-    }
+    if (incoming && !state.isLoading) selectNote(incoming);
   }, [location.state, state.isLoading]);
 
-  const handleNewNote = () => {
-    createNote(state.selectedFolderId);
-  };
-
-  const handleNewFolder = () => {
-    setTriggerFolderCreate(true);
-  };
-
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      <div className="flex-1 flex flex-col w-full overflow-hidden">
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#F7F8FB', overflow: 'hidden' }}>
 
-        {/* Page header */}
-        <div className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 pt-6 sm:pt-8 pb-4 shrink-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      {/* ── Header — matches Projects page exactly ── */}
+      <div
+        className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40"
+        style={{ flexShrink: 0, background: '#fff', borderBottom: `1px solid ${LINE}`, paddingTop: 16, paddingBottom: 16 }}
+      >
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-bold">Quick Notes</h1>
-            <p className="text-muted-foreground">Your personal notes and folders.</p>
+            <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: TEXT, letterSpacing: '-.02em' }}>
+              Quick Notes
+            </h1>
+            <p style={{ margin: '4px 0 0', fontSize: 16, color: MUTED }}>
+              Your personal notes and folders
+            </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap" style={{ paddingTop: 4 }}>
             <button
-              onClick={handleNewFolder}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-border bg-background hover:bg-accent text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
+              onClick={() => setTriggerFolderCreate(true)}
+              style={{ height: 40, display: 'flex', alignItems: 'center', gap: 8, padding: '0 18px', border: `1px solid ${LINE}`, borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 16, fontWeight: 600, color: TEXT, whiteSpace: 'nowrap' }}
+              onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+              onMouseLeave={e => e.currentTarget.style.background = '#fff'}
             >
-              <Plus className="h-4 w-4" />
-              New Folder
+              <FolderPlus size={15} /> New Folder
             </button>
             <button
-              onClick={handleNewNote}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary hover:opacity-90 text-primary-foreground text-sm font-medium transition-colors"
+              onClick={() => createNote(state.selectedFolderId)}
+              style={{ height: 40, display: 'flex', alignItems: 'center', gap: 8, padding: '0 20px', border: 'none', borderRadius: 8, background: BLUE, cursor: 'pointer', fontSize: 16, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap' }}
+              onMouseEnter={e => e.currentTarget.style.opacity = '0.9'}
+              onMouseLeave={e => e.currentTarget.style.opacity = '1'}
             >
-              <Plus className="h-4 w-4" />
-              New Note
+              <Plus size={15} /> New Note
             </button>
           </div>
         </div>
+      </div>
 
-        {/* 3-column notes UI */}
-        <div className="flex-1 overflow-hidden mx-4 sm:mx-8 md:mx-12 lg:mx-16 xl:mx-24 2xl:mx-40 mb-6 sm:mb-8 rounded-xl border border-border">
+      {/* ── 3-column notes content — fills remaining height ── */}
+      <div
+        className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40"
+        style={{ flex: 1, overflowY: 'hidden', paddingTop: 20, paddingBottom: 20, display: 'flex' }}
+      >
+        <div style={{ flex: 1, borderRadius: 12, border: `1px solid ${LINE}`, overflow: 'hidden', background: '#fff', display: 'flex', flexDirection: 'column', boxShadow: '0 1px 4px rgba(16,24,40,.06)' }}>
           <QuickNotesContent
             state={state}
             getNotesForFolder={getNotesForFolder}
             getNoteTitle={getNoteTitle}
-            onNewNote={handleNewNote}
+            onNewNote={() => createNote(state.selectedFolderId)}
             onCreateFolder={createFolder}
             onRenameFolder={renameFolder}
             onDeleteFolder={deleteFolder}
@@ -91,7 +102,6 @@ export function QuickNotesPage() {
             onAcknowledgeFolderCreate={() => setTriggerFolderCreate(false)}
           />
         </div>
-
       </div>
     </div>
   );

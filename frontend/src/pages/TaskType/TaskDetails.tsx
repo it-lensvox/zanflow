@@ -8,20 +8,19 @@ import {
 import { DualView, ViewToggle } from '@/components/layout/DualView';
 import { createDocumentsTableColumns, DocumentGridCard } from '@/components/layout/DualView/documentsConfig';
 import { TaskGridCard, createTasksTableColumns, getStatusConfig, priorityOptions, statusOptions } from '@/components/layout/DualView/taskConfig';
-import { TaskDetailModal } from '../MyTask/TaskDetailModal';
+import { TaskDetailModal } from '../MyTask/components/TaskDetailModal';
 import { SearchFilter, ListFilter, DateFilter, FilterHeaderWrapper } from '@/components/layout/DualView/FilterComponents';
-import { CreateTask } from '@/pages/MyTask/CreateTask';
+import { CreateTask } from '@/pages/MyTask/pages/CreateTask';
 import { InlineCreateRow } from '@/components/layout/CreateTask/InlineCreateRow';
 import { DocumentPreview, useDocumentPreviewKeyboard } from '@/components/common/DocumentPreview';
 import { DocumentShareModal } from '@/pages/Documents/DocumentShareModal';
 import DeleteModal from '@/components/common/Deletemodal';
 import Threads from '../Project/Thread';
 import { useProjectDetails, TabType } from '@/hooks/useTaskDetails';
-import type { Task, FilteredDocument, QuickNote } from '@/types';
+import type { Task, QuickNote } from '@/types';
 import { taskApi } from '@/services/api';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { useJsonPreview } from '@/hooks/useJsonPreview';
-import { JsonTaskPreviewList } from '@/components/common/JsonTaskPreviewList';
 import { TaskPreviewOverlay } from '@/pages/Project/components/TaskPreviewOverlay';
 
 //Date Field Dropdown
@@ -854,7 +853,7 @@ export function TaskDetails() {
           onClose={() => ctx.setPreviewDocument(null)}
         />
       )}
-      {/* Document Info Panel — same as /documents page */}
+      {/* Document Info Panel */}
       {ctx.infoDoc && (
         <div className="fixed inset-0 z-50 flex justify-end pointer-events-none">
           <div className="pointer-events-auto w-[340px] h-full bg-white border-l border-gray-200 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">

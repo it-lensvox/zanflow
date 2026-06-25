@@ -5,11 +5,11 @@ import { DualView }           from '@/components/layout/DualView/DualView';
 import { TaskGridCard, createTasksTableColumns, getStatusConfig, priorityOptions, statusOptions } from '@/components/layout/DualView/taskConfig';
 import { FilterHeaderWrapper, SearchFilter, ListFilter, DateFilter } from '@/components/layout/DualView/FilterComponents';
 import { InlineCreateRow }    from '@/components/layout/CreateTask/InlineCreateRow';
-import { TaskDetailModal }    from './TaskDetailModal';
-import { AITask }             from './AITask';
+import { TaskDetailModal }    from './components/TaskDetailModal';
+import { AITask }             from './components/AITask';
 import { NotificationsPage }  from '../NotificationsPage';
 import { TaskBoardHeader }    from './components/TaskBoardHeader';
-import { FieldSwitcherDropdown } from './components/buttons/FieldSwitcherDropdown';
+import { FieldSwitcherDropdown } from './components/FieldSwitcherDropdown';
 import { useMyTask }          from './hooks/useMyTask';
 import { DATE_FIELD_OPTIONS, PERSON_FIELD_OPTIONS, LINE } from './taskBoardConstants';
 import type { Task } from '@/types';
@@ -20,7 +20,7 @@ export const MyTask: React.FC = () => {
 
   const isBoard = location.pathname.startsWith('/taskboard') && !location.pathname.endsWith('/create');
 
-  // Table columns — memoised, depends on field selectors
+  // Table columns 
   const tableColumns = useMemo(() => createTasksTableColumns({
     onTaskClick: t.handleTaskClick,
     queryClient: t.queryClient,
@@ -74,6 +74,14 @@ export const MyTask: React.FC = () => {
         onAITask={() => t.setShowAITaskModal(true)}
       />
 
+      {/* ── Responsive grid CSS ── */}
+      <style>{`
+        .task-grid { display: grid; gap: 16px; padding: 0; grid-template-columns: repeat(1, 1fr); }
+        @media (min-width: 480px)  { .task-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (min-width: 860px)  { .task-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (min-width: 1200px) { .task-grid { grid-template-columns: repeat(4, 1fr); } }
+      `}</style>
+
       {/* ── Scrollable content ── */}
       <div
         className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40"
@@ -85,7 +93,7 @@ export const MyTask: React.FC = () => {
           gridProps={{
             data: t.filteredTasks,
             renderCard: (task: Task) => <TaskGridCard task={task} onTaskClick={t.handleTaskClick} />,
-            gridClassName: 'grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4',
+            gridClassName: 'task-grid',
           }}
           tableProps={{
             data:            t.filteredTasks,
@@ -194,7 +202,7 @@ export const MyTask: React.FC = () => {
           </div>
         )}
 
-        {/* Inline create row (table view only) */}
+        {/* Inline create row */}
         {t.viewMode === 'table' && !t.isInlineCreating && (
           <div
             onClick={() => t.setIsInlineCreating(true)}
