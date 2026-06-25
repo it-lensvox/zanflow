@@ -2,9 +2,9 @@ import axios, { InternalAxiosRequestConfig } from 'axios';
 import type {
   AuthTokens, User as AppUser, PaginatedResponse, PaginatedProjectsResponse, GetUploadUrlPayload, GetUploadUrlResponse, ConfirmUploadResponse, GetDownloadUrlPayload, ConfirmUploadPayload, GetDownloadUrlResponse, AllDocumentsResponse,
   TaskComment, CreateTaskCommentPayload, AITaskSuggestionResponse, AITaskSuggestionPayload, ProjectCreatePayload, Label, DocumentStatus, ChatMessage, ChatRoom, ChatRoomMessagesResponse, CreatePrivateChatPayload,
-  GatewaySendMessagePayload, GatewayIncomingMessage, RefineTextPayload, RefineTextResponse, TaskResponse, TeamTypeChoicesResponse, PinTaskResponse,
-  CreateTeamPayload, ProjectChatRoom, TeamChatRoom, ChatUnreadResponse, NotificationData, NotificationCallback, Team, ThreadRoom, ThreadSession, ThreadStorage, ThreadUIMessage, CreateThreadRoomPayload, WSJoinRoomCommand, WSSendMessageCommand, WSIncomingThreadMessage, WSUnreadUpdateSignal, ThreadMessagesResponse,
-  InviteUserPayload, InviteUserResponse, InviteVerifyResponse, InviteAcceptPayload, InviteAcceptResponse, AIBotSendPayload, AIBotIncomingMessage, OrganizationSignupPayload, OrganizationSignupResponse,
+  GatewaySendMessagePayload, GatewayIncomingMessage, RefineTextPayload, RefineTextResponse, TaskResponse, TeamTypeChoicesResponse, PinTaskResponse, CreateTeamPayload, ProjectChatRoom, TeamChatRoom, ChatUnreadResponse, 
+  NotificationData, NotificationCallback, Team, ThreadRoom, ThreadSession, ThreadStorage, ThreadUIMessage, CreateThreadRoomPayload, WSJoinRoomCommand, WSSendMessageCommand, WSIncomingThreadMessage, WSUnreadUpdateSignal, ThreadMessagesResponse,
+  InviteUserPayload, InviteUserResponse, InviteVerifyResponse, InviteAcceptPayload, InviteAcceptResponse, OrganizationSignupPayload, OrganizationSignupResponse,
   DailyUpdate, DailyUpdatePayload, DailyUpdateListResponse, TaskFilterParams, Event as CalendarEventType, SocialAuthPayload, SocialAuthResponse,
 } from '@/types';
 
@@ -1582,29 +1582,83 @@ export const threadsStorageApi = {
   },
 };
 
-// AI BOT WEBSOCKET API
-export const aiBotApi = {
-  // Connect to the AI Bot WebSocket using JWT token
-  connect: (): WebSocket => {
+// ─── OLD WebSocket AI Bot API (commented — replaced by REST Agent API) ────────
+// export const aiBotApi = {
+//   connect: (): WebSocket => { const tokens = getTokens(); return new WebSocket(`${WS_AI_BOT_URL}?token=${tokens?.access ?? ''}`); },
+//   sendMessage: (socket: WebSocket, payload: AIBotSendPayload): void => { if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(payload)); },
+//   parseMessage: (event: MessageEvent): AIBotIncomingMessage | null => { try { const p = JSON.parse(event.data); return p?.type ? p : null; } catch { return null; } },
+// };
+
+// ─── NEW REST Agent API 
+// X-Workspace-ID is automatically added by the axios request interceptor
+export const agentApi = {
+  query: async (payload: import('@/types').AgentQueryPayload): Promise<import('@/types').AgentQueryResponse> => {
+    const response = await api.post('/agent/query/', payload);
+    return response.data;
+  },
+
+  // list all sessions for current user
+  listSessions: async (): Promise<import('@/types').AgentSession[]> => {
+    const response = await api.get('/agent/sessions/');
+    return response.data;
+  },
+
+  // get full message history
+  getSession: async (sessionId: number): Promise<import('@/types').AgentSessionDetail> => {
+    const response = await api.get(`/agent/sessions/${sessionId}/`);
+    return response.data;
+  },
+
+  stream: async (
+    payload:   import('@/types').AgentQueryPayload,
+    onChunk:   (text: string) => void,
+    onDone:    (event: import('@/types').AgentStreamDone) => void,
+    onError?:  (err: string) => void,
+  ): Promise<void> => {
     const tokens = getTokens();
-    const token = tokens?.access ?? '';
-    return new WebSocket(`${WS_AI_BOT_URL}?token=${token}`);
-  },
+    const workspaceId = localStorage.getItem('active_workspace_id') || '1';
 
-  // Send a message with page context
-  sendMessage: (socket: WebSocket, payload: AIBotSendPayload): void => {
-    if (socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify(payload));
+    const response = await fetch(
+      `${API_URL}/agent/query/stream/`,
+      {
+        method:  'POST',
+        headers: {
+          'Content-Type':   'application/json',
+          'Authorization':  `Bearer ${tokens?.access ?? ''}`,
+          'X-Workspace-ID': workspaceId,
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    if (!response.ok || !response.body) {
+      onError?.(`Request failed: ${response.status}`);
+      return;
     }
-  },
 
-  parseMessage: (event: MessageEvent): AIBotIncomingMessage | null => {
-    try {
-      const parsed = JSON.parse(event.data) as AIBotIncomingMessage;
-      if (parsed?.type) return parsed;
-      return null;
-    } catch {
-      return null;
+    const reader  = response.body.getReader();
+    const decoder = new TextDecoder();
+    let   buffer  = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? ''; 
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) continue;
+        const jsonStr = trimmed.slice(5).trim();
+        if (!jsonStr) continue;
+        try {
+          const event = JSON.parse(jsonStr) as import('@/types').AgentStreamEvent;
+          if (event.type === 'chunk') onChunk(event.text);
+          if (event.type === 'done')  onDone(event);
+        } catch { }
+      }
     }
   },
 };
@@ -1795,7 +1849,7 @@ export const eventApi = {
     });
   },
 
-  // RSVP STATUS API - Get all attendees' response status for an event
+  // RSVP STATUS API 
   getEventRsvpStatus: async (eventId: number): Promise<{
     event_id: number;
     organizer: string;

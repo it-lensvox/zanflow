@@ -1233,39 +1233,77 @@ export interface AIBotContext {
   id: number | string | null;
 }
 
-// Outgoing message payload to WebSocket
-export interface AIBotSendPayload {
-  message: string;
-  context: AIBotContext;
+// ─── OLD WebSocket AI Bot types (commented — replaced by REST Agent API) ──────
+// export interface AIBotSendPayload { message: string; context: AIBotContext; }
+// export type AIBotMessageType = 'system' | 'ai_chunk' | 'ai_done' | 'ai_complete' | 'ai_response' | 'chat_title' | 'error';
+// export interface AIBotIncomingMessage { type: AIBotMessageType; text: string; }
+// export interface AIBotUIMessage { id: string; text: string; sender: 'user' | 'bot'; timestamp: Date; }
+// export interface AIBotSession { id: string; title: string; messages: AIBotUIMessage[]; createdAt: Date; updatedAt: Date; }
+
+// ─── NEW REST Agent API types ─────────────────────────────────────────────────
+
+// POST /api/v1/agent/query/
+export interface AgentQueryPayload {
+  query:      string;
+  session_id: number | null;   // null = new conversation
 }
 
-// Incoming message types from backend WebSocket
-export type AIBotMessageType = 'system' | 'ai_chunk' | 'ai_done' | 'ai_complete' | 'ai_response' | 'chat_title' | 'error';
+// Response from POST /api/v1/agent/query/
+export interface AgentQueryResponse {
+  response:    string;          // display this to the user
+  session_id:  number;          // save and pass back next time
+  tool_called: string | null;   // for debugging
+  tool_result: Record<string, unknown> | null;  // for debugging / UI updates
+}
 
-export interface AIBotIncomingMessage {
-  type: AIBotMessageType;
+// Item from GET /api/v1/agent/sessions/
+export interface AgentSession {
+  id:            number;
+  created_at:    string;
+  updated_at:    string;
+  is_active:     boolean;
+  message_count: number;
+}
+
+// Message inside a session detail
+export interface AgentMessage {
+  role:    'user' | 'assistant';
+  content: string | Array<{ type: string; text?: string; [key: string]: unknown }>;
+}
+
+// GET /api/v1/agent/sessions/<id>/
+export interface AgentSessionDetail {
+  id:         number;
+  is_active:  boolean;
+  messages:   AgentMessage[];
+  created_at: string;
+  updated_at: string;
+}
+
+// Local UI message (what we render in the chat)
+export interface AgentUIMessage {
+  id:        string;
+  role:      'user' | 'assistant';
+  content:   string;
+  timestamp: string;
+}
+
+// ─── Streaming types 
+export interface AgentStreamChunk {
+  type: 'chunk';
   text: string;
 }
 
-// UI message stored in session history
-export interface AIBotUIMessage {
-  id: string;
-  text: string;
-  sender: 'user' | 'bot';
-  timestamp: Date;
+export interface AgentStreamDone {
+  type:        'done';
+  session_id:  number;
+  tool_called: string | null;
+  tool_result: Record<string, unknown> | null;
 }
 
-// AI Bot chat session
-export interface AIBotSession {
-  id: string;
-  title: string;
-  messages: AIBotUIMessage[];
-  createdAt: Date;
-  updatedAt: Date;
-}
+export type AgentStreamEvent = AgentStreamChunk | AgentStreamDone;
 
 // ─── Organization / Workspace Types (Superuser only)
-
 export interface OrgAdmin {
   id: number;
   username: string;

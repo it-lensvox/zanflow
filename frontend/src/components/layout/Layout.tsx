@@ -3,7 +3,7 @@ import { Sidebar } from './Sidebar';
 import { useState, Suspense, useEffect, useRef } from 'react';
 import { NotificationsPage } from '@/pages/NotificationsPage';
 import { QuickNotes } from '@/components/QuickNotes';
-import { AIBot } from '@/pages/AI BOT/AI BOT';
+import { AIBot } from '@/pages/AIBOT/AIBOT';
 import { useNotifications } from '@/hooks/useNotifications';
 import { TaskDraftBar } from '@/pages/MyTask/components/Taskdrafts';
 import { GlobalSearchTrigger } from '@/components/GlobalSearch';
