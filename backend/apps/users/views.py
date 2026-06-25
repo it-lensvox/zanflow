@@ -552,3 +552,225 @@ Problem / Message:
             {"detail": "Thank you! Your message has been sent successfully."}, 
             status=status.HTTP_201_CREATED
         )
+
+# =============================================================================
+# SOCIAL / OAUTH AUTHENTICATION
+# =============================================================================
+
+class SocialAuthView(APIView):
+    """
+    Unified social auth endpoint for Google and Microsoft OAuth.
+
+    POST /api/users/social-auth/
+
+    Request body - two use-cases:
+
+    1. Existing-user sign-in (the user already has an account in Dyuksa):
+       {
+           "provider": "google" | "microsoft",
+           "token":    "<id_token from Google  OR  access_token from Microsoft>"
+       }
+
+    2. NEW organisation signup via OAuth (replaces the normal email+password
+       TenantSignupView when the company wants to sign up with Google/Microsoft):
+       {
+           "provider":      "google" | "microsoft",
+           "token":         "<provider token>",
+           "company_name":  "Acme Corp"
+       }
+
+    All existing functionality (normal email/password login, invitations,
+    workspace middleware, etc.) is completely unchanged.
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        from rest_framework_simplejwt.tokens import RefreshToken
+        from apps.users.oauth_service import verify_google_token, verify_microsoft_token
+
+        provider = request.data.get("provider", "").lower().strip()
+        token = request.data.get("token", "").strip()
+        company_name = request.data.get("company_name", "").strip()
+
+        # 1. Basic validation
+        if provider not in ("google", "microsoft"):
+            return Response(
+                {"detail": "provider must be 'google' or 'microsoft'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not token:
+            return Response(
+                {"detail": "token is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 2. Verify token with the provider
+        try:
+            if provider == "google":
+                profile = verify_google_token(token)
+            else:
+                profile = verify_microsoft_token(token)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_401_UNAUTHORIZED)
+
+        social_uid = profile["sub"]
+        email = profile["email"].lower()
+        display_name = profile.get("name", "")
+
+        if not email:
+            return Response(
+                {"detail": "Your OAuth account did not return a verified email address."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 3. Route to signup or sign-in
+        if company_name:
+            return self._handle_oauth_signup(
+                request, provider, social_uid, email, display_name, company_name
+            )
+        return self._handle_oauth_signin(
+            request, provider, social_uid, email, display_name
+        )
+
+    # ------------------------------------------------------------------
+    # Sign-in: user already has a Dyuksa account
+    # ------------------------------------------------------------------
+    def _handle_oauth_signin(self, request, provider, social_uid, email, display_name):
+        from rest_framework_simplejwt.tokens import RefreshToken
+
+        # Look up by social_uid first (most accurate)
+        user = User.objects.filter(auth_provider=provider, social_uid=social_uid).first()
+
+        if not user:
+            # Fallback: email match — handles invited users signing in via SSO
+            # for the first time (their account was created without social_uid)
+            user = User.objects.filter(email__iexact=email).first()
+            if user:
+                # Link OAuth identity to the existing account going forward
+                user.auth_provider = provider
+                user.social_uid = social_uid
+                user.save(update_fields=["auth_provider", "social_uid"])
+
+        if not user:
+            return Response(
+                {
+                    "detail": (
+                        "No Dyuksa account found for this email. "
+                        "Please sign up or ask your organisation admin to invite you."
+                    )
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not user.is_active:
+            return Response(
+                {"detail": "Your account has been deactivated. Contact your admin."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        refresh = RefreshToken.for_user(user)
+        return Response(
+            {
+                "message": "Login successful.",
+                "user": {
+                    "id": user.id,
+                    "username": user.username,
+                    "email": user.email,
+                    "role": user.role,
+                    "auth_provider": user.auth_provider,
+                },
+                "tokens": {
+                    "access": str(refresh.access_token),
+                    "refresh": str(refresh),
+                },
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    # ------------------------------------------------------------------
+    # Signup: create a brand-new organisation via OAuth
+    # ------------------------------------------------------------------
+    def _handle_oauth_signup(self, request, provider, social_uid, email, display_name, company_name):
+        from rest_framework_simplejwt.tokens import RefreshToken
+        from django.utils.text import slugify
+        from apps.organizations.models import Organization
+        from apps.organizations.services import TenantOnboardingService
+        import secrets as _secrets
+
+        if Organization.objects.filter(name__iexact=company_name.strip()).exists():
+            return Response(
+                {"detail": "An organisation with this name already exists."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if User.objects.filter(email__iexact=email).exists():
+            return Response(
+                {
+                    "detail": (
+                        "A Dyuksa account already exists for this email. "
+                        "Please log in instead."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Derive a unique username from the email local-part
+        base = slugify(email.split("@")[0] or display_name or "user").replace("-", "_")
+        admin_username = base
+        suffix = 1
+        while User.objects.filter(username=admin_username).exists():
+            admin_username = f"{base}_{suffix}"
+            suffix += 1
+
+        # Create org + admin user via the existing service (keeps business logic DRY)
+        # We pass a random unusable password — OAuth users never log in with a password
+        unusable_pw = _secrets.token_hex(32)
+
+        try:
+            result = TenantOnboardingService.create_tenant(
+                name=company_name.strip(),
+                admin_username=admin_username,
+                admin_email=email,
+                admin_password=unusable_pw,
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        org = result["organization"]
+        admin_user = result["admin_user"]
+
+        # Mark as OAuth user and disable local password login
+        admin_user.auth_provider = provider
+        admin_user.social_uid = social_uid
+        if display_name and not admin_user.first_name:
+            parts = display_name.split(" ", 1)
+            admin_user.first_name = parts[0]
+            admin_user.last_name = parts[1] if len(parts) > 1 else ""
+        admin_user.set_unusable_password()
+        admin_user.save(update_fields=["auth_provider", "social_uid", "first_name", "last_name", "password"])
+
+        refresh = RefreshToken.for_user(admin_user)
+
+        return Response(
+            {
+                "message": "Organisation created successfully via OAuth.",
+                "organization": {
+                    "id": org.id,
+                    "name": org.name,
+                    "slug": org.slug,
+                },
+                "user": {
+                    "id": admin_user.id,
+                    "username": admin_user.username,
+                    "email": admin_user.email,
+                    "role": admin_user.role,
+                    "auth_provider": admin_user.auth_provider,
+                },
+                "tokens": {
+                    "access": str(refresh.access_token),
+                    "refresh": str(refresh),
+                },
+            },
+            status=status.HTTP_201_CREATED,
+        )

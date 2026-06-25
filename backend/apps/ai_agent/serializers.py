@@ -6,6 +6,7 @@ class AgentQuerySerializer(serializers.Serializer):
     """Validates the incoming POST body for /agent/query/"""
     query = serializers.CharField(
         max_length=2000,
+        allow_blank=True,  # blank handled gracefully in views.py
         help_text="The natural language query or command from the user",
     )
     session_id = serializers.IntegerField(

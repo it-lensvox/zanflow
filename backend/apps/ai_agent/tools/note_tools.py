@@ -35,8 +35,10 @@ NOTE_TOOL_SCHEMAS = [
     {
         "name": "list_notes",
         "description": (
-            "List or search notes created by the current user only. "
-            "Use when user says 'show my notes', 'find notes about X', etc."
+            "List or search notes created by the current user. "
+            "Use for: 'show my notes', 'find notes about X', 'show notes from project N'. "
+            "Notes are user-created text snippets. "
+            "Do NOT use list_documents for notes — that is for project files/documents only."
         ),
         "input_schema": {
             "type": "object",
@@ -93,10 +95,12 @@ def create_note(args: dict, user, workspace_id: str) -> dict:
         fields = _note_fields()
         payload = {}
 
+        # title is optional — auto-generate from content if not provided
+        title = args.get("title") or (args.get("content", "")[:50] + "...") if args.get("content") else "Untitled"
         if "title" in fields:
-            payload["title"] = args["title"]
+            payload["title"] = title
         elif "heading" in fields:
-            payload["heading"] = args["title"]
+            payload["heading"] = title
 
         if "content" in fields:
             payload["content"] = args["content"]
@@ -144,13 +148,18 @@ def list_notes(args: dict, user, workspace_id: str) -> dict:
         Note = _get_note_model()
         fields = _note_fields()
 
-        # User-scoped — only notes created by this user
-        if "workspace_id" in fields and ("created_by_id" in fields or "created_by" in fields):
+        # User-scoped — Note model uses 'user' FK (confirmed from models.py)
+        # Fallback chain handles other model variants too
+        if "user" in fields and "workspace_id" in fields:
+            qs = Note.objects.filter(workspace_id=workspace_id, user=user)
+        elif "user" in fields:
+            qs = Note.objects.filter(user=user)
+        elif "workspace_id" in fields and ("created_by_id" in fields or "created_by" in fields):
             qs = Note.objects.filter(workspace_id=workspace_id, created_by=user)
         elif "workspace_id" in fields:
             qs = Note.objects.filter(workspace_id=workspace_id)
         else:
-            qs = Note.objects.filter(created_by=user)
+            qs = Note.objects.filter(user=user)
 
         if args.get("search"):
             q = Q()

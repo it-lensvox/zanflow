@@ -62,6 +62,18 @@ class AgentQueryView(APIView):
         session_id = serializer.validated_data.get("session_id")
         workspace_id = get_workspace_id(request)
 
+        # Q071: handle blank/empty query gracefully instead of crashing
+        if not query or not query.strip():
+            return Response(
+                {
+                    "response": "It looks like your message was empty. What would you like to do?",
+                    "session_id": session_id,
+                    "tool_called": None,
+                    "tool_result": None,
+                },
+                status=status.HTTP_200_OK,
+            )
+
         if not workspace_id:
             return Response(
                 {"error": "X-Workspace-Id header is required"},
@@ -106,12 +118,29 @@ class AgentSessionListView(APIView):
 
 class AgentSessionDetailView(APIView):
     """
-    DELETE /api/v1/agent/sessions/<session_id>/
+    GET    /api/v1/agent/sessions/<session_id>/  — returns session + message history
+    DELETE /api/v1/agent/sessions/<session_id>/  — closes the session
 
     Closes/clears a session so it won't appear in the list.
     Does not delete the logs — they're kept for audit.
     """
     permission_classes = [IsAuthenticated]
+
+    def get(self, request, session_id):
+        try:
+            session = AgentSession.objects.get(
+                id=session_id,
+                user=request.user,
+            )
+            return Response({
+                "id": session.id,
+                "is_active": session.is_active,
+                "created_at": session.created_at,
+                "updated_at": session.updated_at,
+                "messages": session.messages,  # full conversation history
+            })
+        except AgentSession.DoesNotExist:
+            return Response({"error": "Session not found."}, status=status.HTTP_404_NOT_FOUND)
 
     def delete(self, request, session_id):
         try:
