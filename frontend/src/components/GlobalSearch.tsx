@@ -1,29 +1,47 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Search, X, FolderKanban, CheckSquare, FileText, Calendar } from 'lucide-react';
-import { taskApi, projectsApi, documentsApi } from '@/services/api';
+import { Search, X, FolderKanban, CheckSquare, FileText, Calendar, Sparkles, AlertCircle } from 'lucide-react';
+import { taskApi, projectsApi, documentsApi, agentApi } from '@/services/api';
+import type { AgentSearchResponse } from '@/types';
+import { getStatusColors } from '@/config/statusColors';
+import { getTypeHex, getTypeBg } from '@/pages/Project/projectConstants';
 
-// ── Types ──────────────────────────────────────────────────────────────────────
+// ── Types 
 type ResultItem = {
   id: number | string;
   title: string;
   sub?: string;
-  type: 'project' | 'task' | 'document';
+  type: 'project' | 'task' | 'document' | 'note' | 'event';
   route: string;
+  taskStatus?: string;
+  taskType?: string;
 };
 
+// Static meta for task/document/note/event
 const TYPE_META = {
-  project:  { icon: <FolderKanban size={15} color="#1663F6" />, color: '#1663F6', bg: '#EEF4FF', label: 'Project' },
-  task:     { icon: <CheckSquare  size={15} color="#F59E0B" />, color: '#F59E0B', bg: '#FFFBEB', label: 'Task' },
-  document: { icon: <FileText     size={15} color="#22C55E" />, color: '#22C55E', bg: '#F0FDF4', label: 'Document' },
-};
+  task:     { icon: <FileText  size={15} color="#F59E0B" />, color: '#F59E0B', bg: '#FFFBEB', label: 'Task'     },
+  document: { icon: <FileText  size={15} color="#22C55E" />, color: '#22C55E', bg: '#F0FDF4', label: 'Document' },
+  note:     { icon: <FileText  size={15} color="#8B5CF6" />, color: '#8B5CF6', bg: '#F5F3FF', label: 'Note'     },
+  event:    { icon: <Calendar  size={15} color="#06B6D4" />, color: '#06B6D4', bg: '#ECFEFF', label: 'Event'    },
+} as const;
 
-// ── Search overlay ─────────────────────────────────────────────────────────────
+// Project meta is dynamic — color comes from project type
+function getProjectMeta(taskType?: string) {
+  const color = getTypeHex(taskType);
+  const bg = getTypeBg(taskType);
+  return { icon: <FolderKanban size={15} color={color} />, color, bg, label: 'Project' };
+}
+
+// ── Search overlay
 export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
-  const navigate  = useNavigate();
-  const inputRef  = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
+  const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState<AgentSearchResponse | null>(null);
+  const [aiError, setAiError] = useState(false);
+  const aiTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Focus on mount
   useEffect(() => { setTimeout(() => inputRef.current?.focus(), 30); }, []);
@@ -35,43 +53,98 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener('keydown', fn);
   }, [onClose]);
 
-  // ── Data ──────────────────────────────────────────────────────────────────────
-  const { data: tasksRes }    = useQuery({ queryKey: ['gs-tasks'],    queryFn: () => taskApi.list({ disable_pagination: true }),    staleTime: 60000 });
-  const { data: projectsRes } = useQuery({ queryKey: ['gs-projects'], queryFn: () => projectsApi.list(),                            staleTime: 60000 });
-  const { data: docsRes }     = useQuery({ queryKey: ['gs-docs'],     queryFn: () => documentsApi.list({ page_size: 200, page: 1 }), staleTime: 60000 });
 
-  const allTasks    = tasksRes?.tasks    || tasksRes?.results    || (Array.isArray(tasksRes)    ? tasksRes    : []);
+  // ── Basic REST data 
+  const { data: tasksRes } = useQuery({ queryKey: ['gs-tasks'], queryFn: () => taskApi.list({ disable_pagination: true }), staleTime: 60000 });
+  const { data: projectsRes } = useQuery({ queryKey: ['gs-projects'], queryFn: () => projectsApi.list(), staleTime: 60000 });
+  const { data: docsRes } = useQuery({ queryKey: ['gs-docs'], queryFn: () => documentsApi.list({ page_size: 200, page: 1 }), staleTime: 60000 });
+
+  const allTasks = tasksRes?.tasks || tasksRes?.results || (Array.isArray(tasksRes) ? tasksRes : []);
   const allProjects = projectsRes?.results || (Array.isArray(projectsRes) ? projectsRes : []);
-    const allDocs     = docsRes?.results   || docsRes?.documents   || (Array.isArray(docsRes)     ? docsRes     : []);
+  const allDocs = docsRes?.results || docsRes?.documents || (Array.isArray(docsRes) ? docsRes : []);
 
-  // ── Filter results ─────────────────────────────────────────────────────────────
+  // ── Parallel AI search: fires for every query alongside basic REST results.
+  // Basic results show instantly (~200ms). AI silently upgrades them when ready (~2s).
+  useEffect(() => {
+    setAiResult(null);
+    setAiError(false);
+    if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
+
+    const trimmed = query.trim();
+    if (trimmed.length < 2) {
+      setAiLoading(false);
+      return;
+    }
+
+    // Debounce: wait for user to pause typing before hitting the AI API
+    setAiLoading(true);
+    aiTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await agentApi.search({ query: trimmed });
+        setAiResult(res);
+      } catch {
+        setAiError(true);
+      } finally {
+        setAiLoading(false);
+      }
+    }, 500);
+
+    return () => { if (aiTimerRef.current) clearTimeout(aiTimerRef.current); };
+  }, [query]);
+
+  // ── Build results: AI results take over when available; otherwise basic REST
   const results: ResultItem[] = (() => {
     if (query.trim().length < 2) return [];
+
+   // AI search returned results — use them
+    if (aiResult?.type === 'search') {
+      const out: ResultItem[] = [];
+      aiResult.results.projects.forEach(p =>
+        out.push({ id: p.id, title: p.name, sub: '', type: 'project', route: `/projects/${p.id}` })
+      );
+      aiResult.results.tasks.forEach(t =>
+        out.push({ id: t.id, title: t.heading, sub: t.project || '', type: 'task', route: '/taskboard', taskStatus: t.status })
+      );
+      aiResult.results.notes.forEach(n =>
+        out.push({ id: n.id, title: n.title, sub: n.preview || n.project || '', type: 'note', route: '/documents' })
+      );
+      (aiResult.results.events || []).forEach(e =>
+        out.push({ id: e.id, title: e.title, sub: e.event_type ? `${e.event_type}${e.organizer ? ' · ' + e.organizer : ''}` : e.organizer || '', type: 'event', route: '/calendar' })
+      );
+      return out.slice(0, 14);
+    }
+    // Basic REST filter (simple keyword, or while AI is still loading)
     const q = query.toLowerCase();
     const out: ResultItem[] = [];
-
     allProjects.forEach((p: any) => {
       if ((p.name || '').toLowerCase().includes(q))
-        out.push({ id: p.id, title: p.name, sub: p.description || '', type: 'project', route: `/projects/${p.id}` });
+        out.push({ id: p.id, title: p.name, sub: p.description || '', type: 'project', route: `/projects/${p.id}`, taskType: p.task_type || p.type || '' });
     });
     allTasks.forEach((t: any) => {
       if ((t.heading || t.title || '').toLowerCase().includes(q) || (t.description || '').toLowerCase().includes(q))
-        out.push({ id: t.id, title: t.heading || t.title, sub: t.project_details?.name || '', type: 'task', route: '/taskboard' });
+        out.push({ id: t.id, title: t.heading || t.title, sub: t.project_details?.name || '', type: 'task', route: '/taskboard', taskStatus: t.status });
     });
     allDocs.forEach((d: any) => {
       if ((d.name || d.title || '').toLowerCase().includes(q))
         out.push({ id: d.id, title: d.name || d.title, sub: d.project_name || d.project || '', type: 'document', route: '/documents' });
     });
-
     return out.slice(0, 10);
   })();
 
+  // ── Action intent: AI classified the query as an action, not a search
+  const isActionIntent = aiResult?.type === 'action';
+  const actionQuery = isActionIntent ? aiResult.query : '';
+  const actionMessage = isActionIntent ? aiResult.message : '';
+
+  // ── AI always runs in parallel — show the indicator whenever query is active
+  const isAiMode = query.trim().length >= 2;
+
   // Quick links shown when no query
   const quickLinks = [
-    { label: 'My Work',    icon: <Calendar size={14} color="#8B5CF6" />,  route: '/my-work',   bg: '#F5F3FF' },
-    { label: 'Tasks',      icon: <CheckSquare size={14} color="#F59E0B" />, route: '/taskboard', bg: '#FFFBEB' },
-    { label: 'Projects',   icon: <FolderKanban size={14} color="#1663F6" />, route: '/projects', bg: '#EEF4FF' },
-    { label: 'Documents',  icon: <FileText size={14} color="#22C55E" />,  route: '/documents', bg: '#F0FDF4' },
+    { label: 'My Work', icon: <Calendar size={14} color="#8B5CF6" />, route: '/my-work', bg: '#F5F3FF' },
+    { label: 'Tasks', icon: <CheckSquare size={14} color="#F59E0B" />, route: '/taskboard', bg: '#FFFBEB' },
+    { label: 'Projects', icon: <FolderKanban size={14} color="#1663F6" />, route: '/projects', bg: '#EEF4FF' },
+    { label: 'Documents', icon: <FileText size={14} color="#22C55E" />, route: '/documents', bg: '#F0FDF4' },
   ];
 
   const go = useCallback((route: string) => { navigate(route); onClose(); }, [navigate, onClose]);
@@ -107,45 +180,114 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
         {/* Results or quick links */}
         <div style={{ maxHeight: 400, overflowY: 'auto' }}>
           {query.trim().length >= 2 ? (
-            results.length === 0 ? (
-              <div style={{ padding: '32px 0', textAlign: 'center', color: '#9CA3AF', fontSize: 14 }}>
-                No results for "<strong>{query}</strong>"
-              </div>
-            ) : (
-              <div>
-                {/* Group by type */}
-                {(['project', 'task', 'document'] as const).map(type => {
-                  const group = results.filter(r => r.type === type);
-                  if (!group.length) return null;
-                  const meta = TYPE_META[type];
-                  return (
-                    <div key={type}>
-                      <div style={{ padding: '10px 18px 4px', fontSize: 10, fontWeight: 800, color: '#9CA3AF', letterSpacing: '.08em', textTransform: 'uppercase' }}>
-                        {meta.label}s
+            <>
+             {/* AI status bar — always visible while query is active, subtly shows AI state */}
+              {isAiMode && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 18px', background: aiLoading ? '#F5F3FF' : aiError ? '#FEF2F2' : '#F0FDF4', borderBottom: '1px solid #EDE9FE', transition: 'background 0.3s' }}>
+                  {aiLoading ? (
+                    <>
+                      <Sparkles size={11} color="#8B5CF6" />
+                      {/* <span style={{ fontSize: 11, color: '#8B5CF6' }}>Upgrading results with AI…</span> */}
+                    </>
+                  ) : aiError ? (
+                    <>
+                      <AlertCircle size={11} color="#EF4444" />
+                      <span style={{ fontSize: 11, color: '#EF4444' }}>AI unavailable — showing local results</span>
+                    </>
+                  ) : aiResult?.type === 'search' ? (
+                    <>
+                      <Sparkles size={11} color="#22C55E" />
+                    </>
+                  ) : null}
+                </div>
+              )}
+
+              {/* Action intent banner */}
+              {isActionIntent ? (
+                <div style={{ padding: '20px 18px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 13, color: '#172033', fontWeight: 600, marginBottom: 6 }}>{actionMessage}</div>
+                  <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 14 }}>
+                    Try the AI assistant to complete this action.
+                  </div>
+                  <button
+                    onClick={() => {
+                      window.dispatchEvent(new CustomEvent('aibot:open', { detail: { query: actionQuery } }));
+                      onClose();
+                    }}
+                    style={{ fontSize: 13, fontWeight: 600, color: '#fff', background: '#8B5CF6', border: 'none', borderRadius: 8, padding: '8px 18px', cursor: 'pointer', fontFamily: 'inherit' }}
+                  >
+                    Open AI Assistant
+                  </button>
+                </div>
+              ) : results.length === 0 && !aiLoading ? (
+                <div style={{ padding: '32px 0', textAlign: 'center', color: '#9CA3AF', fontSize: 14 }}>
+                  No results for "<strong>{query}</strong>"
+                </div>
+              ) : aiLoading && results.length === 0 ? (
+                // Skeleton while AI loads and no basic results yet
+                <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {[1, 2, 3].map(i => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: '#F3F4F6', flexShrink: 0 }} />
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                        <div style={{ height: 12, borderRadius: 4, background: 'linear-gradient(90deg,#f0f2f5 25%,#e4e7ec 50%,#f0f2f5 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite', width: '55%' }} />
+                        <div style={{ height: 10, borderRadius: 4, background: 'linear-gradient(90deg,#f0f2f5 25%,#e4e7ec 50%,#f0f2f5 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite', width: '30%' }} />
                       </div>
-                      {group.map(item => (
-                        <button
-                          key={item.id}
-                          onClick={() => go(item.route)}
-                          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-                          onMouseEnter={e => (e.currentTarget.style.background = '#F7F8FB')}
-                          onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                        >
-                          <div style={{ width: 32, height: 32, borderRadius: 8, background: meta.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            {meta.icon}
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: '#172033', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
-                            {item.sub && <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 1 }}>{item.sub}</div>}
-                          </div>
-                          <span style={{ fontSize: 10, fontWeight: 700, color: meta.color, background: meta.bg, padding: '2px 8px', borderRadius: 10 }}>{meta.label}</span>
-                        </button>
-                      ))}
                     </div>
-                  );
-                })}
-              </div>
-            )
+                  ))}
+                </div>
+              ) : (
+                <div>
+                  {/* Group by type */}
+                  {(['project', 'task', 'note', 'event', 'document'] as const).map(type => {
+                    const group = results.filter(r => r.type === type);
+                    if (!group.length) return null;
+                    // project uses dynamic type color; others use static TYPE_META
+                    const staticMeta = type !== 'project' ? TYPE_META[type] : null;
+                    return (
+                      <div key={type}>
+                        <div style={{ padding: '10px 18px 4px', fontSize: 10, fontWeight: 800, color: '#9CA3AF', letterSpacing: '.08em', textTransform: 'uppercase' }}>
+                          {(staticMeta?.label ?? 'Project')}s
+                        </div>
+                        {group.map(item => {
+                          // Resolve colors per-item using existing app color systems
+                          const meta = item.type === 'project'
+                            ? getProjectMeta(item.taskType)
+                            : staticMeta!;
+                          // For tasks: use existing STATUS_COLORS for the status badge dot
+                          const statusColors = item.taskStatus ? getStatusColors(item.taskStatus) : null;
+                          return (
+                            <button
+                              key={item.id}
+                              onClick={() => go(item.route)}
+                              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                              onMouseEnter={e => (e.currentTarget.style.background = '#F7F8FB')}
+                              onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                            >
+                              <div style={{ width: 32, height: 32, borderRadius: 8, background: meta.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                {meta.icon}
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: '#172033', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
+                                {item.sub && <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 1 }}>{item.sub}</div>}
+                              </div>
+                              {/* Task: show status pill using existing STATUS_COLORS */}
+                              {statusColors ? (
+                                <span style={{ fontSize: 10, fontWeight: 700, color: statusColors.text, background: statusColors.bg, padding: '2px 8px', borderRadius: 10, flexShrink: 0 }}>
+                                  {(item.taskStatus || '').replace('_', ' ')}
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: 10, fontWeight: 700, color: meta.color, background: meta.bg, padding: '2px 8px', borderRadius: 10, flexShrink: 0 }}>{meta.label}</span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
           ) : (
             <div style={{ padding: '16px 18px' }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: '#9CA3AF', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 10 }}>Quick links</div>

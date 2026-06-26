@@ -50,10 +50,26 @@ export function useAIBot() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
-  // ── Focus input when expanded 
+  // ── Focus input when expanded
   useEffect(() => {
     if (isExpanded) inputRef.current?.focus();
   }, [isExpanded]);
+
+  // ── Listen for programmatic open + optional query pre-fill
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const query = (e as CustomEvent<{ query?: string }>).detail?.query;
+      setIsExpanded(true);
+      if (query) {
+        setTimeout(() => {
+          setInput(query);
+          inputRef.current?.focus();
+        }, 80);
+      }
+    };
+    window.addEventListener('aibot:open', handler);
+    return () => window.removeEventListener('aibot:open', handler);
+  }, []);
 
   // ── FAB drag resize handler 
   useEffect(() => {

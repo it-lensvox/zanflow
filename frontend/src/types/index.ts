@@ -1305,6 +1305,66 @@ export interface AgentStreamDone {
 
 export type AgentStreamEvent = AgentStreamChunk | AgentStreamDone;
 
+// ─── AI Search types (/api/v1/agent/search/)
+export interface AgentSearchPayload {
+  query: string;
+}
+
+export interface AgentSearchTask {
+  id: number;
+  heading: string;
+  status: string;
+  priority: string;
+  project: string;
+  assigned_to: string[];
+  end_date: string;
+}
+
+export interface AgentSearchNote {
+  id: number;
+  title: string;
+  preview: string;
+  project: string;
+}
+
+export interface AgentSearchProject {
+  id: number;
+  name: string;
+}
+
+export interface AgentSearchEvent {
+  id:         number;
+  title:      string;
+  event_type: string;
+  start_time: string;
+  end_time:   string;
+  location:   string;
+  is_online:  boolean;
+  organizer:  string;
+}
+
+export interface AgentSearchResults {
+  tasks:    AgentSearchTask[];
+  notes:    AgentSearchNote[];
+  projects: AgentSearchProject[];
+  events:   AgentSearchEvent[];
+}
+export interface AgentSearchResponseSearch {
+  type:     'search';
+  query:    string;
+  results:  AgentSearchResults;
+  total:    number;
+  fallback: boolean;
+}
+
+export interface AgentSearchResponseAction {
+  type:    'action';
+  query:   string;
+  message: string;
+}
+
+export type AgentSearchResponse = AgentSearchResponseSearch | AgentSearchResponseAction;
+
 // ─── Organization / Workspace Types (Superuser only)
 export interface OrgAdmin {
   id: number;

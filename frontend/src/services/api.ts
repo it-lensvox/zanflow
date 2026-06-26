@@ -1597,6 +1597,11 @@ export const agentApi = {
     return response.data;
   },
 
+  search: async (payload: import('@/types').AgentSearchPayload): Promise<import('@/types').AgentSearchResponse> => {
+    const response = await api.post('/agent/search/', payload);
+    return response.data;
+  },
+
   // list all sessions for current user
   listSessions: async (): Promise<import('@/types').AgentSession[]> => {
     const response = await api.get('/agent/sessions/');
