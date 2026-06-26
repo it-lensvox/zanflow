@@ -2103,7 +2103,15 @@ if (localStorage.getItem('access_token')) {
   startProactiveRefresh();
 }
 
-// ── Social Auth API 
+// ── Dashboard API
+export const dashboardApi = {
+  getProjects: () => projectsApi.list(),
+  getDocuments: (params?: { page_size?: number; page?: number }) =>
+    documentsApi.list({ page_size: params?.page_size ?? 200, page: params?.page ?? 1 }),
+  getTasks: () => taskApi.list({ disable_pagination: true }),
+};
+
+// ── Social Auth API
 export const socialAuthApi = {
   authenticate: (payload: SocialAuthPayload): Promise<SocialAuthResponse> =>
     api.post<SocialAuthResponse>('/auth/social-auth/', payload).then((res) => res.data),

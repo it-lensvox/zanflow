@@ -1282,10 +1282,12 @@ export interface AgentSessionDetail {
 
 // Local UI message (what we render in the chat)
 export interface AgentUIMessage {
-  id:        string;
-  role:      'user' | 'assistant';
-  content:   string;
-  timestamp: string;
+  id:          string;
+  role:        'user' | 'assistant';
+  content:     string;
+  timestamp:   string;
+  toolCalled?: string | null;
+  toolResult?: Record<string, unknown> | null;
 }
 
 // ─── Streaming types 

@@ -88,8 +88,6 @@ export function useAIBot() {
     setError(null);
     try {
       const detail = await agentApi.getSession(sessionId);
-      (detail.messages || []).forEach((m: any, i: number) => {
-      });
       const rawMessages = Array.isArray(detail.messages) ? detail.messages : [];
 
       const uiMessages: AgentUIMessage[] = rawMessages
@@ -115,9 +113,7 @@ export function useAIBot() {
           });
           return acc;
         }, []);
-      uiMessages.forEach((m, i) => console.log(`  [${i}] role=${m.role} content=${m.content.slice(0, 60)}`));
-
-      // Backfill title from first user message if not already stored
+      // Backfill title from first user message
       const firstUserMsg = uiMessages.find(m => m.role === 'user');
       if (firstUserMsg) {
         setSessionTitles(prev => {
@@ -172,15 +168,16 @@ export function useAIBot() {
   }, [activeSessionId]);
 
   // ── Send a message with streaming 
+  // ── Send a message with streaming 
   const sendMessage = useCallback(async () => {
     const text = input.trim();
     if (!text || isTyping) return;
 
     // 1 — Add user message immediately
     const userMsg: AgentUIMessage = {
-      id: generateId(),
-      role: 'user',
-      content: text,
+      id:        generateId(),
+      role:      'user',
+      content:   text,
       timestamp: new Date().toISOString(),
     };
     setMessages(prev => [...prev, userMsg]);
@@ -188,25 +185,24 @@ export function useAIBot() {
     setIsTyping(true);
     setError(null);
 
-    // 2 — Create a placeholder bot message that we stream into
+    // 2 — Create empty placeholder bot message to stream chunks into
     const botMsgId = generateId();
-    const botMsg: AgentUIMessage = {
-      id: botMsgId,
-      role: 'assistant',
-      content: '',
+    const botPlaceholder: AgentUIMessage = {
+      id:        botMsgId,
+      role:      'assistant',
+      content:   '',
       timestamp: new Date().toISOString(),
     };
-    setMessages(prev => [...prev, botMsg]);
+    setMessages(prev => [...prev, botPlaceholder]);
 
     try {
       await agentApi.stream(
         { query: text, session_id: activeSessionRef.current },
 
-        // onChunk 
+        // onChunk — typewriter effect
         (() => {
           let chunkQueue: string[] = [];
           let isProcessing = false;
-
           const processQueue = () => {
             if (chunkQueue.length === 0) { isProcessing = false; return; }
             isProcessing = true;
@@ -216,14 +212,19 @@ export function useAIBot() {
             ));
             setTimeout(processQueue, 18);
           };
-
           return (chunk: string) => {
             chunkQueue.push(chunk);
             if (!isProcessing) processQueue();
           };
         })(),
-        // onDone 
+
+        // onDone — attach tool data so EntityCards can render
         (done) => {
+          setMessages(prev => prev.map(m =>
+            m.id === botMsgId
+              ? { ...m, toolCalled: done.tool_called, toolResult: done.tool_result }
+              : m
+          ));
           setSession(done.session_id);
           setSessionTitles(prev => {
             if (prev[done.session_id]) return prev;
@@ -234,7 +235,7 @@ export function useAIBot() {
           loadSessions();
         },
 
-        // onError — show error in the placeholder bubble
+        // onError
         (errText: string) => {
           setMessages(prev => prev.map(m =>
             m.id === botMsgId ? { ...m, content: `⚠️ ${errText}` } : m

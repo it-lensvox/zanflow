@@ -9,8 +9,17 @@ import { GOOGLE_CLIENT_ID, msalConfig } from '@/config/oauthConfig';
 import App from './App';
 import './index.css';
 
-// Instantiated once at module level
-const msalInstance = new PublicClientApplication(msalConfig);
+// MSAL requires crypto.subtle which is only available on secure origins
+// (https or localhost). On HTTP + IP (used by backend team for dev),
+// we skip MSAL initialization to prevent a blank screen crash.
+const isSecureOrigin =
+  window.location.protocol === 'https:' ||
+  window.location.hostname === 'localhost' ||
+  window.location.hostname === '127.0.0.1';
+
+const msalInstance = isSecureOrigin
+  ? new PublicClientApplication(msalConfig)
+  : null;
 
 // Disable automatic refetch on window focus globally
 focusManager.setEventListener(() => {
@@ -35,9 +44,9 @@ const queryClient = new QueryClient({
   },
 });
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+const AppWithProviders = () => (
+  <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+    {msalInstance ? (
       <MsalProvider instance={msalInstance}>
         <QueryClientProvider client={queryClient}>
           <BrowserRouter>
@@ -45,6 +54,18 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           </BrowserRouter>
         </QueryClientProvider>
       </MsalProvider>
-    </GoogleOAuthProvider>
+    ) : (
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </QueryClientProvider>
+    )}
+  </GoogleOAuthProvider>
+);
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <AppWithProviders />
   </React.StrictMode>
 );
