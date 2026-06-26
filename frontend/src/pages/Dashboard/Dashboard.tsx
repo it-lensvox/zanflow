@@ -131,17 +131,17 @@ export function Dashboard() {
           <span style={{ color: TEXT, fontWeight: 700 }}>Dashboard</span>
         </div>
 
-        {/* Right: search + theme + bell + new task */}
+       {/* Right: search + theme + new task + bell + help */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {/* Search */}
+          {/* Search anything (moved from row 3) */}
           <button
             onClick={() => db.setSearchOpen(true)}
             className="hidden sm:flex"
-            style={{ display: 'flex', alignItems: 'center', gap: 8, height: 34, padding: '0 12px', background: '#F7F8FB', border: `1px solid ${LINE}`, borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit', minWidth: 190 }}
+            style={{ ...MONTH_BTN, minWidth: 180, gap: 8, height: 34, padding: '0 12px' }}
           >
             <Search size={13} color={MUTED} />
-            <span style={{ flex: 1, textAlign: 'left', fontSize: 13, color: '#9CA3AF' }}>Search or run a command</span>
-            <kbd style={{ background: '#fff', border: `1px solid #E3E8EF`, borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700, color: '#6B7280' }}>⌘K</kbd>
+            <span style={{ flex: 1, textAlign: 'left', fontSize: 13, color: '#9CA3AF' }}>Search anything…</span>
+            <kbd style={{ marginLeft: 'auto', background: '#F3F4F6', border: '1px solid #E3E8EF', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700, color: '#6B7280' }}>⌘K</kbd>
           </button>
 
           {/* Theme toggle — UI only, not yet active */}
@@ -152,7 +152,10 @@ export function Dashboard() {
             <Moon size={15} color={TEXT} />
           </button>
 
-          {/* Notifications bell */}
+          {/* + New task (moved from row 3) */}
+          <QuickCreateButton />
+
+          {/* Notifications bell (moved from row 3) */}
           <button
             onClick={() => db.setIsActivityOpen(!db.isActivityOpen)}
             style={{ position: 'relative', width: 34, height: 34, border: `1px solid ${LINE}`, borderRadius: 8, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
@@ -205,9 +208,6 @@ export function Dashboard() {
               >
                 {tab.icon}
                 {tab.label}
-                {tab.key === 'today' && (
-                  <Star size={11} style={{ opacity: 0.6 }} />
-                )}
               </button>
             );
           })}
@@ -373,15 +373,6 @@ export function Dashboard() {
               </div>
             </div>
             <div className="flex items-center flex-wrap gap-2" style={{ paddingTop: 4 }}>
-              {/* Search */}
-              <button
-                onClick={() => db.setSearchOpen(true)}
-                className="hidden sm:flex"
-                style={{ ...MONTH_BTN, minWidth: 180, gap: 8, fontSize: 14 }}
-              >
-                <span style={{ fontSize: 13, color: MUTED }}>Search anything…</span>
-                <kbd style={{ marginLeft: 'auto', background: '#F3F4F6', border: '1px solid #E3E8EF', borderRadius: 4, padding: '4px 8px', fontSize: 10, fontWeight: 700, color: '#6B7280' }}>⌘K</kbd>
-              </button>
               {/* Date range picker */}
               <div style={{ position: 'relative' }}>
                 {db.showRangePicker && (
@@ -406,19 +397,6 @@ export function Dashboard() {
                   </div>
                 )}
               </div>
-              {/* Bell (duplicate for overview action bar) */}
-              <button
-                onClick={() => db.setIsActivityOpen(!db.isActivityOpen)}
-                style={{ position: 'relative', width: 36, height: 36, border: `1px solid ${LINE}`, borderRadius: 8, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              >
-                <Bell size={15} color={TEXT} />
-                {db.unreadCount > 0 && (
-                  <span style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, background: '#EF4444', borderRadius: '50%', fontSize: 9, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {db.unreadCount > 9 ? '9+' : db.unreadCount}
-                  </span>
-                )}
-              </button>
-              <QuickCreateButton />
             </div>
           </div>
         </div>

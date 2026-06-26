@@ -236,10 +236,10 @@ export function AnalyticsTab({
       </div>
 
       {/* ── Bottom row: Leaderboard + Throughput */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4">
+      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
 
-        {/* Project leaderboard */}
-        <div style={{ ...CARD, padding: '20px 22px' }}>
+       {/* Project leaderboard */}
+        <div style={{ ...CARD, padding: '20px 22px', flex: '0 0 60%', minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <span style={{ fontSize: 14, fontWeight: 700, color: TEXT }}>Project leaderboard</span>
             <button style={{ fontSize: 13, fontWeight: 600, color: BLUE, background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -298,7 +298,7 @@ export function AnalyticsTab({
         </div>
 
         {/* Team throughput */}
-        <div style={{ ...CARD, padding: '20px 20px' }}>
+        <div style={{ ...CARD, padding: '20px 20px', flex: '1 1 0', minWidth: 280 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
             <span style={{ fontSize: 14, fontWeight: 700, color: TEXT }}>Team throughput</span>
             <span style={{ fontSize: 12, color: MUTED }}>per day</span>
