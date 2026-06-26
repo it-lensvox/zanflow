@@ -43,7 +43,7 @@ export function NotesList({ state, visibleNotes, getNoteTitle, onSelectNote, onN
   };
 
   return (
-    <div style={{ width: 260, flexShrink: 0, borderRight: '1px solid #e6ebf2', display: 'flex', flexDirection: 'column', background: '#fafafa', height: '100%' }}>
+    <div style={{ width: 300, flexShrink: 0, borderRight: '1px solid #e6ebf2', display: 'flex', flexDirection: 'column', background: '#fafafa', height: '100%' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '1px solid #e6ebf2', flexShrink: 0 }}>
         <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.08em', color: '#667085' }}>
@@ -118,9 +118,17 @@ export function NotesList({ state, visibleNotes, getNoteTitle, onSelectNote, onN
                           onBlur={() => commitRename(note.id)} onClick={e => e.stopPropagation()}
                           style={{ width: '100%', fontSize: 13, fontWeight: 500, color: '#172033', background: '#fff', border: '1px solid #1663f6', borderRadius: 4, padding: '1px 4px', outline: 'none' }} />
                       ) : (
-                        <p style={{ fontSize: 13, fontWeight: 500, color: isSelected ? '#172033' : '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</p>
+                        <p style={{ fontSize: 13, fontWeight: 700, color: isSelected ? '#172033' : '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</p>
                       )}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                      {(() => {
+                        const raw = (note.content || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                        return raw ? (
+                          <p style={{ fontSize: 11, color: '#9CA3AF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>
+                            {raw}
+                          </p>
+                        ) : null;
+                      })()}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
                         <p style={{ fontSize: 10, color: '#667085' }}>{formatRelativeTime(note.updated_at)}</p>
                         {note.updated_by && (() => {
                           const u = state.users.find(user => user.id === note.updated_by);
