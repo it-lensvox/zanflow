@@ -9,6 +9,8 @@ Endpoints:
 """
 import logging
 
+import json
+from django.http import StreamingHttpResponse
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -95,6 +97,61 @@ class AgentQueryView(APIView):
                 {"error": "The agent encountered an error. Please try again."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+class AgentQueryStreamView(APIView):
+    """
+    POST /api/v1/agent/query/stream/
+
+    SSE streaming endpoint. Same request body as /query/.
+    Response is text/event-stream — each line is a JSON event:
+
+      data: {"type": "chunk", "text": "Task "}
+      data: {"type": "chunk", "text": "'Fix login bug'"}
+      data: {"type": "done",  "session_id": 42, "tool_called": "create_task", "tool_result": {...}}
+      data: {"type": "error", "message": "..."}
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = AgentQuerySerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        query        = serializer.validated_data["query"]
+        session_id   = serializer.validated_data.get("session_id")
+        workspace_id = get_workspace_id(request)
+
+        if not workspace_id:
+            return Response(
+                {"error": "X-Workspace-Id header is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not query or not query.strip():
+            def empty_stream():
+                yield f"data: {json.dumps({'type': 'chunk', 'text': 'What would you like to do?'})}\n\n"
+                yield f"data: {json.dumps({'type': 'done', 'session_id': None, 'tool_called': None, 'tool_result': None})}\n\n"
+            return StreamingHttpResponse(empty_stream(), content_type="text/event-stream")
+
+        def event_stream():
+            try:
+                orchestrator = AgentOrchestrator(
+                    user=request.user,
+                    workspace_id=workspace_id,
+                    session_id=session_id,
+                )
+                for event in orchestrator.run_stream(query):
+                    yield f"data: {json.dumps(event)}\n\n"
+            except Exception as exc:
+                logger.exception("Streaming failed: %s", exc)
+                yield f"data: {json.dumps({'type': 'error', 'message': 'The agent encountered an error.'})}\n\n"
+
+        response = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+        response["Cache-Control"]               = "no-cache"
+        response["X-Accel-Buffering"]           = "no"  # disable nginx buffering
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
 
 
 class AgentSessionListView(APIView):

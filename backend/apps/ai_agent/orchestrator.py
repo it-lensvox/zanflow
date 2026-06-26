@@ -31,17 +31,26 @@ MAX_TOOL_ROUNDS = 5
 _SELF_REFERENCES = {"me", "myself", "i", "my", "self"}
 
 _STATUS_ALIASES = {
-    "done": "completed", "complete": "completed", "finished": "completed",
-    "start": "in_progress", "started": "in_progress", "working on": "in_progress",
-    "defer": "deferred", "deferred": "deferred", "postpone": "deferred",
-    "deployed": "deployed", "live": "deployed", "shipped": "deployed",
-    "backlog": "backlog", "review": "review", "in review": "review",
+    # Valid DB values: pending, in_progress, completed, review, deployed, deferred, backlog
+    "done": "completed",      "complete": "completed",   "finished": "completed",
+    "close": "completed",     "closed": "completed",
+    "start": "in_progress",   "started": "in_progress",  "working on": "in_progress",
+    "in progress": "in_progress",
+    "defer": "deferred",      "deferred": "deferred",    "postpone": "deferred",
+    "hold": "deferred",       "put on hold": "deferred", "cancel": "deferred",
+    "deployed": "deployed",   "live": "deployed",        "shipped": "deployed",
+    "backlog": "backlog",     "move to backlog": "backlog",
+    "review": "review",       "in review": "review",     "needs review": "review",
+    "ready for review": "review", "ready": "review",
     "pending": "pending",
 }
 
 _PRIORITY_ALIASES = {
-    "urgent": "critical", "asap": "critical", "blocker": "critical",
-    "normal": "medium", "minor": "low",
+    # Valid priorities: low, medium, high, critical
+    "urgent":   "critical", "blocker":  "critical",
+    "asap":     "critical", "highest":  "critical",
+    "normal":   "medium",   "minor":    "low",
+    "lowest":   "low",
 }
 
 def _clean_response(text: str) -> str:
@@ -626,6 +635,111 @@ class AgentOrchestrator:
             log.latency_ms    = int((time.time() - start) * 1000)
             log.save()
             raise
+
+    def run_stream(self, user_query: str):
+        """
+        SSE streaming version of run().
+        1. Executes all tool calls normally (non-streaming).
+        2. Streams only the FINAL text response word-by-word.
+        Yields dicts: {"type": "chunk", "text": "..."} or
+                      {"type": "done", "session_id": id, "tool_called": ..., "tool_result": ...}
+        """
+        import json as _json
+        from apps.ai_agent.llm_client import get_llm_client
+        from apps.ai_agent.tools.registry import ALL_TOOL_SCHEMAS, execute_tool
+
+        try:
+            # self.session = self._get_or_create_session(None)
+            llm          = get_llm_client()
+            tools        = ALL_TOOL_SCHEMAS
+            system       = self._build_system_prompt()
+
+            # Add user message
+            self.session.messages.append({
+                "role": "user",
+                "content": [{"type": "text", "text": user_query}],
+            })
+
+            # ── Run all tool calls non-streaming (same as run()) ──
+            llm_response      = llm.chat(self.session.messages, system, tools)
+            tool_called       = None
+            tool_result       = None
+            first_tool_called = None
+            guard_rail_used   = False
+            rounds            = 0
+
+            while llm_response["stop_reason"] == "tool_use" and rounds < 6:
+                rounds   += 1
+                tool_use  = llm_response["tool_use"]
+                tool_name = tool_use["name"]
+                tool_input = dict(tool_use["input"])
+
+                if first_tool_called is None:
+                    first_tool_called = tool_name
+
+                # Normalise input
+                from apps.ai_agent.orchestrator import _normalise_input
+                tool_input = _normalise_input(tool_input, self.user.email)
+
+                # Execute tool
+                result      = execute_tool(tool_name, tool_input, self.user, self.workspace_id)
+                tool_called = tool_name
+                tool_result = result
+
+                # Update session messages
+                self.session.messages.append({
+                    "role": "assistant",
+                    "content": [{"type": "tool_use", "id": tool_use["id"],
+                                 "name": tool_name, "input": tool_input}],
+                })
+                self.session.messages.append({
+                    "role": "user",
+                    "content": [{"type": "tool_result", "tool_use_id": tool_use["id"],
+                                 "content": _json.dumps(result)}],
+                })
+
+                llm_response = llm.chat(self.session.messages, system, tools)
+
+            # ── Stream the final response ──
+            final_text = ""
+            if hasattr(llm, "stream_final_response"):
+                for chunk in llm.stream_final_response(self.session.messages, system):
+                    final_text += chunk
+                    yield {"type": "chunk", "text": chunk}
+            else:
+                # Fallback for non-OpenAI providers
+                final_text = llm_response.get("content", "")
+                # Simulate streaming word by word
+                for word in final_text.split(" "):
+                    yield {"type": "chunk", "text": word + " "}
+
+            # Save session
+            self.session.messages.append({
+                "role": "assistant",
+                "content": [{"type": "text", "text": final_text}],
+            })
+            self.session.save()
+
+            # Determine reported tool
+            if first_tool_called == "get_workspace_members":
+                reported = "get_workspace_members"
+            elif first_tool_called == "get_user_projects" and tool_called == "create_note":
+                reported = "get_user_projects"
+            elif first_tool_called == "list_tasks" and tool_called == "create_daily_update":
+                reported = "list_tasks"
+            else:
+                reported = tool_called if tool_called else first_tool_called
+
+            yield {
+                "type":        "done",
+                "session_id":  self.session.id,
+                "tool_called": reported,
+                "tool_result": tool_result,
+            }
+
+        except Exception as exc:
+            logger.exception("run_stream failed: %s", exc)
+            yield {"type": "error", "message": "The agent encountered an error. Please try again."}
 
     def _get_or_create_session(self, session_id: int | None) -> AgentSession:
         if session_id:

@@ -182,6 +182,38 @@ class OpenAILLMClient:
 
         return openai_msgs
 
+    def stream_final_response(
+        self,
+        messages: list[dict],
+        system_prompt: str,
+        max_tokens: int = 2048,
+    ):
+        """
+        Stream the final text response word-by-word.
+        Call this AFTER all tool calls are complete — no tools passed.
+        Yields text chunks as they arrive from OpenAI.
+        """
+        try:
+            from openai import OpenAI
+        except ImportError:
+            raise ImportError("Run: pip install openai")
+
+        client = OpenAI(api_key=self.api_key)
+        openai_messages = [{"role": "system", "content": system_prompt}]
+        openai_messages += self._to_openai_messages(messages)
+
+        stream = client.chat.completions.create(
+            model=self.model,
+            messages=openai_messages,
+            max_tokens=max_tokens,
+            temperature=0.2,
+            stream=True,
+        )
+        for chunk in stream:
+            delta = chunk.choices[0].delta
+            if delta and delta.content:
+                yield delta.content
+
     def _parse_openai_response(self, response) -> dict:
         """Parse OpenAI response into our standard format."""
         result = {"stop_reason": "end_turn", "content": "", "tool_use": None}
