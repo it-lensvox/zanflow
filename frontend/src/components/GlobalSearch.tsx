@@ -20,10 +20,10 @@ type ResultItem = {
 
 // Static meta for task/document/note/event
 const TYPE_META = {
-  task:     { icon: <FileText  size={15} color="#F59E0B" />, color: '#F59E0B', bg: '#FFFBEB', label: 'Task'     },
-  document: { icon: <FileText  size={15} color="#22C55E" />, color: '#22C55E', bg: '#F0FDF4', label: 'Document' },
-  note:     { icon: <FileText  size={15} color="#8B5CF6" />, color: '#8B5CF6', bg: '#F5F3FF', label: 'Note'     },
-  event:    { icon: <Calendar  size={15} color="#06B6D4" />, color: '#06B6D4', bg: '#ECFEFF', label: 'Event'    },
+  task: { icon: <FileText size={15} color="#F59E0B" />, color: '#F59E0B', bg: '#FFFBEB', label: 'Task' },
+  document: { icon: <FileText size={15} color="#22C55E" />, color: '#22C55E', bg: '#F0FDF4', label: 'Document' },
+  note: { icon: <FileText size={15} color="#8B5CF6" />, color: '#8B5CF6', bg: '#F5F3FF', label: 'Note' },
+  event: { icon: <Calendar size={15} color="#06B6D4" />, color: '#06B6D4', bg: '#ECFEFF', label: 'Event' },
 } as const;
 
 // Project meta is dynamic — color comes from project type
@@ -33,15 +33,35 @@ function getProjectMeta(taskType?: string) {
   return { icon: <FolderKanban size={15} color={color} />, color, bg, label: 'Project' };
 }
 
+// ── Per-section accumulated items (for Load More per model)
+type SectionItems = Record<'project' | 'task' | 'note' | 'event', ResultItem[]>;
+type SectionPages = Record<'project' | 'task' | 'note' | 'event', number>;
+type SectionHasMore = Record<'project' | 'task' | 'note' | 'event', boolean>;
+type SectionLoading = Record<'project' | 'task' | 'note' | 'event', boolean>;
+
+const EMPTY_ITEMS: SectionItems = { project: [], task: [], note: [], event: [] };
+const EMPTY_PAGES: SectionPages = { project: 1, task: 1, note: 1, event: 1 };
+const EMPTY_HAS_MORE: SectionHasMore = { project: false, task: false, note: false, event: false };
+const EMPTY_LOADING: SectionLoading = { project: false, task: false, note: false, event: false };
+
 // ── Search overlay
 export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
+
+  // AI state
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiResult, setAiResult] = useState<AgentSearchResponse | null>(null);
   const [aiError, setAiError] = useState(false);
+  const [aiResult, setAiResult] = useState<AgentSearchResponse | null>(null);
   const aiTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Per-section accumulated items + pagination state
+  const [sectionItems, setSectionItems] = useState<SectionItems>(EMPTY_ITEMS);
+  const [sectionPages, setSectionPages] = useState<SectionPages>(EMPTY_PAGES);
+  const [sectionHasMore, setSectionHasMore] = useState<SectionHasMore>(EMPTY_HAS_MORE);
+  const [sectionLoading, setSectionLoading] = useState<SectionLoading>(EMPTY_LOADING);
+  const [totals, setTotals] = useState<Record<string, number>>({});
 
   // Focus on mount
   useEffect(() => { setTimeout(() => inputRef.current?.focus(), 30); }, []);
@@ -53,8 +73,7 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener('keydown', fn);
   }, [onClose]);
 
-
-  // ── Basic REST data 
+  // ── Basic REST data (for instant local results while AI loads)
   const { data: tasksRes } = useQuery({ queryKey: ['gs-tasks'], queryFn: () => taskApi.list({ disable_pagination: true }), staleTime: 60000 });
   const { data: projectsRes } = useQuery({ queryKey: ['gs-projects'], queryFn: () => projectsApi.list(), staleTime: 60000 });
   const { data: docsRes } = useQuery({ queryKey: ['gs-docs'], queryFn: () => documentsApi.list({ page_size: 200, page: 1 }), staleTime: 60000 });
@@ -63,25 +82,46 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
   const allProjects = projectsRes?.results || (Array.isArray(projectsRes) ? projectsRes : []);
   const allDocs = docsRes?.results || docsRes?.documents || (Array.isArray(docsRes) ? docsRes : []);
 
-  // ── Parallel AI search: fires for every query alongside basic REST results.
-  // Basic results show instantly (~200ms). AI silently upgrades them when ready (~2s).
+  // ── Helper: map AI response results into SectionItems
+  const mapAiResults = (res: AgentSearchResponse): SectionItems => {
+    if (res.type !== 'search') return EMPTY_ITEMS;
+    return {
+      project: res.results.projects.map(p => ({ id: p.id, title: p.name, sub: '', type: 'project' as const, route: `/projects/${p.id}` })),
+      task:    res.results.tasks.map(t    => ({ id: t.id, title: t.heading, sub: t.project || '', type: 'task' as const, route: `/tasks/${t.id}`, taskStatus: t.status })),
+      note: res.results.notes.map(n => ({ id: n.id, title: n.title, sub: n.preview || n.project || '', type: 'note' as const, route: '/documents' })),
+      event: (res.results.events || []).map(e => ({ id: e.id, title: e.title, sub: e.event_type ? `${e.event_type}${e.organizer ? ' · ' + e.organizer : ''}` : e.organizer || '', type: 'event' as const, route: '/calendar' })),
+    };
+  };
+
+  // ── Parallel AI search: fires on every query, debounced 500ms
+  // Basic REST results show immediately; AI silently upgrades them when ready
   useEffect(() => {
+    // Reset all AI state on new query
     setAiResult(null);
     setAiError(false);
+    setSectionItems(EMPTY_ITEMS);
+    setSectionPages(EMPTY_PAGES);
+    setSectionHasMore(EMPTY_HAS_MORE);
+    setTotals({});
     if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
 
     const trimmed = query.trim();
-    if (trimmed.length < 2) {
-      setAiLoading(false);
-      return;
-    }
+    if (trimmed.length < 2) { setAiLoading(false); return; }
 
-    // Debounce: wait for user to pause typing before hitting the AI API
     setAiLoading(true);
     aiTimerRef.current = setTimeout(async () => {
       try {
-        const res = await agentApi.search({ query: trimmed });
+        const res = await agentApi.search({ query: trimmed, page: 1, page_size: 10 });
         setAiResult(res);
+        if (res.type === 'search') {
+          setSectionItems(mapAiResults(res));
+          setSectionHasMore({
+            project: false, task: false, note: false, event: false, ...Object.fromEntries(
+              (['project', 'task', 'note', 'event'] as const).map(m => [m, res.has_more])
+            )
+          });
+          setTotals(res.totals as unknown as Record<string, number>);
+        }
       } catch {
         setAiError(true);
       } finally {
@@ -92,28 +132,35 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
     return () => { if (aiTimerRef.current) clearTimeout(aiTimerRef.current); };
   }, [query]);
 
-  // ── Build results: AI results take over when available; otherwise basic REST
-  const results: ResultItem[] = (() => {
-    if (query.trim().length < 2) return [];
+  // ── Load more for a specific section
+  const handleLoadMore = async (model: 'project' | 'task' | 'note' | 'event') => {
+    const nextPage = sectionPages[model] + 1;
+    setSectionLoading(prev => ({ ...prev, [model]: true }));
+    try {
+      const res = await agentApi.search({
+        query: query.trim(),
+        page: nextPage,
+        page_size: 10,
+        models: [model],
+      });
+      if (res.type === 'search') {
+        const mapped = mapAiResults(res);
+        setSectionItems(prev => ({ ...prev, [model]: [...prev[model], ...mapped[model]] }));
+        setSectionPages(prev => ({ ...prev, [model]: nextPage }));
+        setSectionHasMore(prev => ({ ...prev, [model]: res.has_more }));
+      }
+    } catch { /* silently fail — existing results stay */ }
+    finally { setSectionLoading(prev => ({ ...prev, [model]: false })); }
+  };
 
-   // AI search returned results — use them
-    if (aiResult?.type === 'search') {
-      const out: ResultItem[] = [];
-      aiResult.results.projects.forEach(p =>
-        out.push({ id: p.id, title: p.name, sub: '', type: 'project', route: `/projects/${p.id}` })
-      );
-      aiResult.results.tasks.forEach(t =>
-        out.push({ id: t.id, title: t.heading, sub: t.project || '', type: 'task', route: '/taskboard', taskStatus: t.status })
-      );
-      aiResult.results.notes.forEach(n =>
-        out.push({ id: n.id, title: n.title, sub: n.preview || n.project || '', type: 'note', route: '/documents' })
-      );
-      (aiResult.results.events || []).forEach(e =>
-        out.push({ id: e.id, title: e.title, sub: e.event_type ? `${e.event_type}${e.organizer ? ' · ' + e.organizer : ''}` : e.organizer || '', type: 'event', route: '/calendar' })
-      );
-      return out.slice(0, 14);
-    }
-    // Basic REST filter (simple keyword, or while AI is still loading)
+  // ── Build displayed results:
+  //    - If AI returned results → use sectionItems (accumulated, paginated)
+  //    - While AI is loading → show basic REST keyword match immediately
+  //    - If AI failed → fall back to basic REST
+  const useAiResults = aiResult?.type === 'search';
+
+  const basicResults: ResultItem[] = (() => {
+    if (query.trim().length < 2) return [];
     const q = query.toLowerCase();
     const out: ResultItem[] = [];
     allProjects.forEach((p: any) => {
@@ -122,7 +169,7 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
     });
     allTasks.forEach((t: any) => {
       if ((t.heading || t.title || '').toLowerCase().includes(q) || (t.description || '').toLowerCase().includes(q))
-        out.push({ id: t.id, title: t.heading || t.title, sub: t.project_details?.name || '', type: 'task', route: '/taskboard', taskStatus: t.status });
+        out.push({ id: t.id, title: t.heading || t.title, sub: t.project_details?.name || '', type: 'task', route: `/tasks/${t.id}`, taskStatus: t.status });
     });
     allDocs.forEach((d: any) => {
       if ((d.name || d.title || '').toLowerCase().includes(q))
@@ -136,9 +183,8 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
   const actionQuery = isActionIntent ? aiResult.query : '';
   const actionMessage = isActionIntent ? aiResult.message : '';
 
-  // ── AI always runs in parallel — show the indicator whenever query is active
+  // ── AI status bar: always visible while query active
   const isAiMode = query.trim().length >= 2;
-
   // Quick links shown when no query
   const quickLinks = [
     { label: 'My Work', icon: <Calendar size={14} color="#8B5CF6" />, route: '/my-work', bg: '#F5F3FF' },
@@ -181,7 +227,7 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
         <div style={{ maxHeight: 400, overflowY: 'auto' }}>
           {query.trim().length >= 2 ? (
             <>
-             {/* AI status bar — always visible while query is active, subtly shows AI state */}
+              {/* AI status bar — always visible while query is active, subtly shows AI state */}
               {isAiMode && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 18px', background: aiLoading ? '#F5F3FF' : aiError ? '#FEF2F2' : '#F0FDF4', borderBottom: '1px solid #EDE9FE', transition: 'background 0.3s' }}>
                   {aiLoading ? (
@@ -219,74 +265,153 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
                     Open AI Assistant
                   </button>
                 </div>
-              ) : results.length === 0 && !aiLoading ? (
-                <div style={{ padding: '32px 0', textAlign: 'center', color: '#9CA3AF', fontSize: 14 }}>
-                  No results for "<strong>{query}</strong>"
-                </div>
-              ) : aiLoading && results.length === 0 ? (
-                // Skeleton while AI loads and no basic results yet
-                <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {[1, 2, 3].map(i => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div style={{ width: 32, height: 32, borderRadius: 8, background: '#F3F4F6', flexShrink: 0 }} />
-                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
-                        <div style={{ height: 12, borderRadius: 4, background: 'linear-gradient(90deg,#f0f2f5 25%,#e4e7ec 50%,#f0f2f5 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite', width: '55%' }} />
-                        <div style={{ height: 10, borderRadius: 4, background: 'linear-gradient(90deg,#f0f2f5 25%,#e4e7ec 50%,#f0f2f5 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite', width: '30%' }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div>
-                  {/* Group by type */}
-                  {(['project', 'task', 'note', 'event', 'document'] as const).map(type => {
-                    const group = results.filter(r => r.type === type);
-                    if (!group.length) return null;
-                    // project uses dynamic type color; others use static TYPE_META
-                    const staticMeta = type !== 'project' ? TYPE_META[type] : null;
-                    return (
-                      <div key={type}>
-                        <div style={{ padding: '10px 18px 4px', fontSize: 10, fontWeight: 800, color: '#9CA3AF', letterSpacing: '.08em', textTransform: 'uppercase' }}>
-                          {(staticMeta?.label ?? 'Project')}s
+            ) : (() => {
+                // Decide which result set to render
+                const displaySections = useAiResults ? sectionItems : null;
+                const displayBasic    = !useAiResults ? basicResults : [];
+
+                // Empty state: AI done + no results, and basic also empty
+                const aiDoneEmpty = !aiLoading && useAiResults && Object.values(sectionItems).every(a => a.length === 0);
+                const basicEmpty  = !aiLoading && !useAiResults && displayBasic.length === 0 && !aiError;
+                const showEmpty   = aiDoneEmpty || basicEmpty;
+
+                if (showEmpty) return (
+                  <div style={{ padding: '32px 0', textAlign: 'center', color: '#9CA3AF', fontSize: 14 }}>
+                    No results for "<strong>{query}</strong>"
+                  </div>
+                );
+
+                // Skeleton: AI loading AND no basic results yet
+                if (aiLoading && displayBasic.length === 0 && !useAiResults) return (
+                  <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {[1, 2, 3].map(i => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{ width: 32, height: 32, borderRadius: 8, background: '#F3F4F6', flexShrink: 0 }} />
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                          <div style={{ height: 12, borderRadius: 4, background: 'linear-gradient(90deg,#f0f2f5 25%,#e4e7ec 50%,#f0f2f5 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite', width: '55%' }} />
+                          <div style={{ height: 10, borderRadius: 4, background: 'linear-gradient(90deg,#f0f2f5 25%,#e4e7ec 50%,#f0f2f5 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite', width: '30%' }} />
                         </div>
-                        {group.map(item => {
-                          // Resolve colors per-item using existing app color systems
-                          const meta = item.type === 'project'
-                            ? getProjectMeta(item.taskType)
-                            : staticMeta!;
-                          // For tasks: use existing STATUS_COLORS for the status badge dot
-                          const statusColors = item.taskStatus ? getStatusColors(item.taskStatus) : null;
-                          return (
-                            <button
-                              key={item.id}
-                              onClick={() => go(item.route)}
-                              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-                              onMouseEnter={e => (e.currentTarget.style.background = '#F7F8FB')}
-                              onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                            >
-                              <div style={{ width: 32, height: 32, borderRadius: 8, background: meta.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                {meta.icon}
-                              </div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: '#172033', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
-                                {item.sub && <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 1 }}>{item.sub}</div>}
-                              </div>
-                              {/* Task: show status pill using existing STATUS_COLORS */}
-                              {statusColors ? (
-                                <span style={{ fontSize: 10, fontWeight: 700, color: statusColors.text, background: statusColors.bg, padding: '2px 8px', borderRadius: 10, flexShrink: 0 }}>
-                                  {(item.taskStatus || '').replace('_', ' ')}
-                                </span>
-                              ) : (
-                                <span style={{ fontSize: 10, fontWeight: 700, color: meta.color, background: meta.bg, padding: '2px 8px', borderRadius: 10, flexShrink: 0 }}>{meta.label}</span>
-                              )}
-                            </button>
-                          );
-                        })}
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                    ))}
+                  </div>
+                );
+
+                // ── AI results: per-section with totals + Load More
+                if (displaySections) return (
+                  <div>
+                    {(['project', 'task', 'note', 'event'] as const).map(model => {
+                      const group = displaySections[model];
+                      if (!group.length && !totals[model + 's'] && !totals[model]) return null;
+                      const staticMeta = model !== 'project' ? TYPE_META[model] : null;
+                      const sectionTotal = totals[model + 's'] ?? totals[model] ?? group.length;
+                      const hasMore = sectionHasMore[model];
+                      const isLoadingMore = sectionLoading[model];
+                      return (
+                        <div key={model}>
+                          {/* Section header with total count */}
+                          <div style={{ padding: '10px 18px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: 10, fontWeight: 800, color: '#9CA3AF', letterSpacing: '.08em', textTransform: 'uppercase' }}>
+                              {staticMeta?.label ?? 'Project'}s
+                            </span>
+                            {sectionTotal > 0 && (
+                              <span style={{ fontSize: 10, fontWeight: 600, color: '#9CA3AF', background: '#F3F4F6', borderRadius: 10, padding: '1px 7px' }}>
+                                {sectionTotal}
+                              </span>
+                            )}
+                          </div>
+                          {/* Result rows */}
+                          {group.map(item => {
+                            const meta = item.type === 'project' ? getProjectMeta(item.taskType) : staticMeta!;
+                            const statusColors = item.taskStatus ? getStatusColors(item.taskStatus) : null;
+                            return (
+                              <button
+                                key={item.id}
+                                onClick={() => go(item.route)}
+                                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                                onMouseEnter={e => (e.currentTarget.style.background = '#F7F8FB')}
+                                onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                              >
+                                <div style={{ width: 32, height: 32, borderRadius: 8, background: meta.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                  {meta.icon}
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: 13, fontWeight: 600, color: '#172033', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
+                                  {item.sub && <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 1 }}>{item.sub}</div>}
+                                </div>
+                                {statusColors ? (
+                                  <span style={{ fontSize: 10, fontWeight: 700, color: statusColors.text, background: statusColors.bg, padding: '2px 8px', borderRadius: 10, flexShrink: 0 }}>
+                                    {(item.taskStatus || '').replace('_', ' ')}
+                                  </span>
+                                ) : (
+                                  <span style={{ fontSize: 10, fontWeight: 700, color: meta.color, background: meta.bg, padding: '2px 8px', borderRadius: 10, flexShrink: 0 }}>{meta.label}</span>
+                                )}
+                              </button>
+                            );
+                          })}
+                          {/* Per-section Load More */}
+                          {hasMore && (
+                            <div style={{ padding: '4px 18px 10px' }}>
+                              <button
+                                onClick={() => handleLoadMore(model)}
+                                disabled={isLoadingMore}
+                                style={{ fontSize: 12, fontWeight: 600, color: '#1663F6', background: 'none', border: 'none', cursor: isLoadingMore ? 'default' : 'pointer', padding: 0, fontFamily: 'inherit', opacity: isLoadingMore ? 0.5 : 1 }}
+                              >
+                                {isLoadingMore ? 'Loading…' : `Show more ${staticMeta?.label.toLowerCase() ?? 'project'}s`}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+
+                // ── Basic REST results (shown while AI is still loading)
+                return (
+                  <div>
+                    {(['project', 'task', 'document'] as const).map(type => {
+                      const group = displayBasic.filter(r => r.type === type);
+                      if (!group.length) return null;
+                      const staticMeta = type !== 'project' ? TYPE_META[type] : null;
+                      return (
+                        <div key={type}>
+                          <div style={{ padding: '10px 18px 4px', fontSize: 10, fontWeight: 800, color: '#9CA3AF', letterSpacing: '.08em', textTransform: 'uppercase' }}>
+                            {staticMeta?.label ?? 'Project'}s
+                          </div>
+                          {group.map(item => {
+                            const meta = item.type === 'project' ? getProjectMeta(item.taskType) : staticMeta!;
+                            const statusColors = item.taskStatus ? getStatusColors(item.taskStatus) : null;
+                            return (
+                              <button
+                                key={item.id}
+                                onClick={() => go(item.route)}
+                                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                                onMouseEnter={e => (e.currentTarget.style.background = '#F7F8FB')}
+                                onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                              >
+                                <div style={{ width: 32, height: 32, borderRadius: 8, background: meta.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                  {meta.icon}
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: 13, fontWeight: 600, color: '#172033', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
+                                  {item.sub && <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 1 }}>{item.sub}</div>}
+                                </div>
+                                {statusColors ? (
+                                  <span style={{ fontSize: 10, fontWeight: 700, color: statusColors.text, background: statusColors.bg, padding: '2px 8px', borderRadius: 10, flexShrink: 0 }}>
+                                    {(item.taskStatus || '').replace('_', ' ')}
+                                  </span>
+                                ) : (
+                                  <span style={{ fontSize: 10, fontWeight: 700, color: meta.color, background: meta.bg, padding: '2px 8px', borderRadius: 10, flexShrink: 0 }}>{meta.label}</span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </>
           ) : (
             <div style={{ padding: '16px 18px' }}>

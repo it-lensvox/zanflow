@@ -1305,9 +1305,12 @@ export interface AgentStreamDone {
 
 export type AgentStreamEvent = AgentStreamChunk | AgentStreamDone;
 
-// ─── AI Search types (/api/v1/agent/search/)
+// ─── AI Search types 
 export interface AgentSearchPayload {
-  query: string;
+  query:      string;
+  page?:      number;
+  page_size?: number;
+  models?:    ('task' | 'note' | 'project' | 'event')[];
 }
 
 export interface AgentSearchTask {
@@ -1349,12 +1352,23 @@ export interface AgentSearchResults {
   projects: AgentSearchProject[];
   events:   AgentSearchEvent[];
 }
+export interface AgentSearchTotals {
+  tasks:    number;
+  notes:    number;
+  projects: number;
+  events:   number;
+}
+
 export interface AgentSearchResponseSearch {
-  type:     'search';
-  query:    string;
-  results:  AgentSearchResults;
-  total:    number;
-  fallback: boolean;
+  type:      'search';
+  query:     string;
+  results:   AgentSearchResults;
+  totals:    AgentSearchTotals;
+  total:     number;
+  page:      number;
+  page_size: number;
+  has_more:  boolean;
+  fallback:  boolean;
 }
 
 export interface AgentSearchResponseAction {
