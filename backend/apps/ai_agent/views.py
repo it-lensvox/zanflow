@@ -232,3 +232,120 @@ class AgentSessionLogsView(APIView):
             return Response(serializer.data)
         except AgentSession.DoesNotExist:
             return Response({"error": "Session not found."}, status=status.HTTP_404_NOT_FOUND)
+
+class AISearchView(APIView):
+    """
+    POST /api/v1/agent/search/
+
+    Classifies query intent then either:
+      - Runs AI-powered filtered search (intent=search)
+      - Returns action hint for frontend to open in chat (intent=action)
+
+    Body:
+        { "query": "critical bugs assigned to Ravi" }
+
+    Response (search):
+        {
+            "type":     "search",
+            "query":    "critical bugs assigned to Ravi",
+            "results":  {"tasks": [...], "notes": [...], "projects": [...]},
+            "total":    5,
+            "fallback": false
+        }
+
+    Response (action):
+        {
+            "type":    "action",
+            "query":   "create a task called Fix login bug",
+            "message": "It looks like you want to perform an action."
+        }
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        query = (request.data.get("query") or "").strip()
+
+        if not query:
+            return Response(
+                {"error": "query is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        workspace_id = get_workspace_id(request)
+        if not workspace_id:
+            return Response(
+                {"error": "X-Workspace-Id header is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            from apps.ai_agent.search.intent import classify_intent, extract_filters
+            from apps.ai_agent.search.query_builder import run_search
+
+            # Step 1 — classify intent
+            intent = classify_intent(query)
+
+            # Step 2a — action intent: return hint, let frontend open chat
+            if intent == "action":
+                return Response({
+                    "type":    "action",
+                    "query":   query,
+                    "message": "It looks like you want to perform an action.",
+                })
+
+            # Step 2b — search intent: extract filters and run ORM search
+            fallback = False
+            filters   = extract_filters(query)
+            page      = int(request.data.get("page", 1))
+            page_size = min(int(request.data.get("page_size", 10)), 50)
+
+            # If filter extraction failed, extract_filters already returned
+            # a safe keyword-only fallback — check if it's a fallback
+            if not any([
+                filters.get("status"), filters.get("priority"),
+                filters.get("assignee_name"), filters.get("project_name"),
+                filters.get("overdue"), filters.get("assigned_to_me"),
+                filters.get("today"), filters.get("date"),
+                filters.get("search_text"),
+            ]):
+                fallback = True
+
+            search_output = run_search(
+                filters, request.user, workspace_id,
+                page=page, page_size=page_size,
+            )
+
+            return Response({
+                "type":      "search",
+                "query":     query,
+                "results":   search_output["results"],
+                "totals":    search_output["totals"],
+                "total":     search_output["total"],
+                "page":      search_output["page"],
+                "page_size": search_output["page_size"],
+                "has_more":  search_output["has_more"],
+                "fallback":  fallback,
+            })
+
+        except Exception as exc:
+            # Full fallback — use existing search_workspace tool unchanged
+            logger.exception("AISearchView failed, falling back to basic search: %s", exc)
+            try:
+                from apps.ai_agent.tools.search_tools import search_workspace
+                result = search_workspace(
+                    {"query": query, "content_types": ["tasks", "notes", "projects"]},
+                    request.user,
+                    workspace_id,
+                )
+                return Response({
+                    "type":     "search",
+                    "query":    query,
+                    "results":  result.get("results", {}),
+                    "total":    result.get("total_results", 0),
+                    "fallback": True,
+                })
+            except Exception:
+                return Response(
+                    {"error": "Search failed. Please try again."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
