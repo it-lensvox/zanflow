@@ -77,11 +77,17 @@ export function Layout() {
   const navigate            = useNavigate();
   const location            = useLocation();
   const faviconImgRef       = useRef<HTMLImageElement | null>(null);
-
   const pageTitle = getPageTitle(location.pathname);
 
   // Hide top bar on Dashboard
   const isDashboard = location.pathname === '/dashboard';
+
+  // Listen for mobile sidebar 
+  useEffect(() => {
+    const handler = () => setIsMobileSidebarOpen(true);
+    window.addEventListener('dashboard:open-sidebar', handler);
+    return () => window.removeEventListener('dashboard:open-sidebar', handler);
+  }, []);
 
   // ── Favicon with notification badge
   useEffect(() => {
@@ -185,18 +191,8 @@ export function Layout() {
           </div>
         )}
 
-        {/* Dashboard gets its own hamburger */}
-        {isDashboard && (
-          <button
-            className="md:hidden fixed top-3 left-3 z-30 flex items-center justify-center w-9 h-9 rounded-md bg-white border border-[#E6EBF2] shadow-sm"
-            onClick={() => setIsMobileSidebarOpen(true)}
-            aria-label="Open menu"
-          >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <path d="M2 4h14M2 9h14M2 14h14" stroke="#344054" strokeWidth="1.75" strokeLinecap="round"/>
-            </svg>
-          </button>
-        )}
+        {/* Dashboard's Row 1 dispatches 'dashboard:open-sidebar' to open mobile sidebar */}
+        {isDashboard && null}
 
         {/* ── Page content ── */}
         <div id="layout-wrapper" className="flex-1 flex flex-col min-w-0">

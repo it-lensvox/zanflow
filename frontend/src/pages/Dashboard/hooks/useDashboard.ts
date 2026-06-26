@@ -199,6 +199,9 @@ export function useDashboard() {
     projectsLoading,
     documentsLoading,
     tasksLoading,
+    // raw data for sub-tabs
+    _allTasks: allTasks,
+    _projects: projects,
     // auth / layout
     user, firstName, unreadCount, navigate,
     isActivityOpen, setIsActivityOpen,
