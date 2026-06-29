@@ -104,16 +104,59 @@ export function useAIBot() {
     setError(null);
     try {
       const detail = await agentApi.getSession(sessionId);
+      console.log('[AIBot] raw session detail:', JSON.stringify(detail, null, 2));
       const rawMessages = Array.isArray(detail.messages) ? detail.messages : [];
+      console.log('[AIBot] rawMessages count:', rawMessages.length);
 
+      // ── Step 1: extract tool_called name and tool_result data from the raw
+      // message array. The backend stores these as separate content-block
+      // messages in Anthropic's native format:
+      //   assistant → [{ type:"tool_use",    name, id }]
+      //   user      → [{ type:"tool_result", tool_use_id, content: "json" }]
+      // We collect them into a lookup keyed by tool_use_id so we can attach
+      // them to the final assistant text message that follows.
+      const toolCallMap: Record<string, { toolCalled: string; toolResult: Record<string, unknown> }> = {};
+
+      rawMessages.forEach((m: any) => {
+        if (!Array.isArray(m.content)) return;
+
+        // assistant message carrying a tool_use block
+        if (m.role === 'assistant') {
+          const toolUseBlock = m.content.find((b: any) => b.type === 'tool_use');
+          if (toolUseBlock?.id && toolUseBlock?.name) {
+            toolCallMap[toolUseBlock.id] = { toolCalled: toolUseBlock.name, toolResult: {} };
+          }
+        }
+
+        // user message carrying the tool_result block
+        if (m.role === 'user') {
+          const toolResultBlock = m.content.find((b: any) => b.type === 'tool_result');
+          if (toolResultBlock?.tool_use_id && toolCallMap[toolResultBlock.tool_use_id]) {
+            try {
+              const parsed = typeof toolResultBlock.content === 'string'
+                ? JSON.parse(toolResultBlock.content)
+                : toolResultBlock.content;
+              toolCallMap[toolResultBlock.tool_use_id].toolResult = parsed ?? {};
+            } catch {
+              toolCallMap[toolResultBlock.tool_use_id].toolResult = {};
+            }
+          }
+        }
+      });
+
+      // The most recent completed tool pair — attached to the next assistant text
+      const toolEntries = Object.values(toolCallMap);
+      const lastTool = toolEntries.length > 0 ? toolEntries[toolEntries.length - 1] : null;
+      console.log('[AIBot] resolved tool pairs:', toolCallMap, 'lastTool:', lastTool);
+
+      // ── Step 2: build UI messages — same as before but now attach tool data
       const uiMessages: AgentUIMessage[] = rawMessages
-        .reduce((acc: AgentUIMessage[], m) => {
+        .reduce((acc: AgentUIMessage[], m: any) => {
           // Extract plain text content regardless of format
           let content = '';
           if (typeof m.content === 'string') {
             content = m.content.trim();
           } else if (Array.isArray(m.content)) {
-
             const textBlock = m.content.find((block: any) => block.type === 'text' && block.text?.trim());
             content = textBlock ? (textBlock.text || '').trim() : '';
           }
@@ -121,12 +164,22 @@ export function useAIBot() {
           // Only keep messages that have actual displayable text
           if (!content) return acc;
 
-          acc.push({
-            id: generateId(),
-            role: m.role === 'assistant' ? 'assistant' : 'user',
+          // For assistant messages: attach the last resolved tool pair
+          const isAssistant = m.role === 'assistant';
+          const uiMsg: AgentUIMessage = {
+            id:         generateId(),
+            role:       isAssistant ? 'assistant' : 'user',
             content,
-            timestamp: detail.created_at ?? new Date().toISOString(),
+            timestamp:  detail.created_at ?? new Date().toISOString(),
+            toolCalled: isAssistant ? (lastTool?.toolCalled ?? null) : undefined,
+            toolResult: isAssistant ? (lastTool?.toolResult ?? null) : undefined,
+          };
+          console.log('[AIBot] built uiMsg:', {
+            role: uiMsg.role,
+            toolCalled: uiMsg.toolCalled,
+            hasToolResult: !!uiMsg.toolResult,
           });
+          acc.push(uiMsg);
           return acc;
         }, []);
       // Backfill title from first user message
@@ -182,8 +235,7 @@ export function useAIBot() {
     if (id === activeSessionId) { setSession(null); setMessages([]); }
     setMessages([]);
   }, [activeSessionId]);
-
-  // ── Send a message with streaming 
+  
   // ── Send a message with streaming 
   const sendMessage = useCallback(async () => {
     const text = input.trim();

@@ -1267,8 +1267,10 @@ export interface AgentSession {
 
 // Message inside a session detail
 export interface AgentMessage {
-  role:    'user' | 'assistant';
-  content: string | Array<{ type: string; text?: string; [key: string]: unknown }>;
+  role:        'user' | 'assistant';
+  content:     string | Array<{ type: string; text?: string; [key: string]: unknown }>;
+  tool_called?: string | null;
+  tool_result?: Record<string, unknown> | null;
 }
 
 // GET /api/v1/agent/sessions/<id>/

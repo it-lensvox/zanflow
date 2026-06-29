@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
-import { CheckSquare, FolderKanban, FileText, ArrowUpRight, Clock, User } from 'lucide-react';
+import { CheckSquare, FileText, ArrowUpRight, Clock, User } from 'lucide-react';
 
-// ─── Priority + status colour maps ───────────────────────────────────────────
+// ─── Priority + status colour maps 
 const PRIORITY_COLOR: Record<string, { bg: string; text: string; border: string }> = {
   critical: { bg: '#fff1f2', text: '#e11d48', border: '#fda4af' },
   high:     { bg: '#fff7ed', text: '#ea580c', border: '#fdba74' },
@@ -24,7 +24,7 @@ const PROJECT_TYPE_COLOR: Record<string, string> = {
   demo:             '#22c36a',
 };
 
-// ─── Task Card ────────────────────────────────────────────────────────────────
+// ─── Task Card 
 interface TaskCardProps {
   id: number; title: string; project?: string;
   status?: string; priority?: string; due?: string; assignee?: string;
@@ -67,7 +67,7 @@ function TaskCard({ id, title, project, status, priority, due, assignee }: TaskC
   );
 }
 
-// ─── Project Card ─────────────────────────────────────────────────────────────
+// ─── Project Card 
 interface ProjectCardProps {
   id: number; name: string; type?: string; tasks?: number; status?: string;
 }
@@ -103,7 +103,7 @@ function ProjectCard({ id, name, type, tasks, status }: ProjectCardProps) {
   );
 }
 
-// ─── Note Card ────────────────────────────────────────────────────────────────
+// ─── Note Card 
 interface NoteCardProps { id: number; title: string; preview?: string; folder?: string; }
 
 function NoteCard({ id, title, preview, folder }: NoteCardProps) {
@@ -127,7 +127,7 @@ function NoteCard({ id, title, preview, folder }: NoteCardProps) {
   );
 }
 
-// ─── Card grid wrapper ────────────────────────────────────────────────────────
+// ─── Card grid wrapper 
 export function EntityCardGrid({ children, label }: { children: React.ReactNode; label?: string }) {
   return (
     <div style={{ marginTop: 10 }}>
@@ -137,14 +137,14 @@ export function EntityCardGrid({ children, label }: { children: React.ReactNode;
   );
 }
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Types
 interface ParsedEntities {
   tasks?:    TaskCardProps[];
   projects?: ProjectCardProps[];
   notes?:    NoteCardProps[];
 }
 
-// ─── Smart extractor — handles many backend shapes ────────────────────────────
+// ─── Smart extractor — handles many backend shapes 
 function extractList(toolResult: Record<string, unknown>, keys: string[]): any[] | null {
   for (const key of keys) {
     const v = (toolResult as any)[key];
@@ -169,12 +169,12 @@ function looksLikeProjects(items: any[]): boolean {
   return !!(first && first.id !== undefined && first.name !== undefined && first.heading === undefined);
 }
 
-// ─── Main parser ──────────────────────────────────────────────────────────────
+// ─── Main parser 
 export function parseToolResult(toolCalled: string | null, toolResult: Record<string, unknown> | null): ParsedEntities | null {
   if (!toolResult) return null;
   const tc = (toolCalled || '').toLowerCase();
 
-  // ── Tasks ──────────────────────────────────────────────────────────────────
+  // ── Tasks 
   const isTaskTool = tc.includes('task') || tc.includes('list_user') || tc.includes('find_task') || tc.includes('search_task');
   const taskCandidates = isTaskTool
     ? extractList(toolResult, ['tasks', 'task'])
@@ -198,7 +198,7 @@ export function parseToolResult(toolCalled: string | null, toolResult: Record<st
     };
   }
 
-  // ── Projects ───────────────────────────────────────────────────────────────
+  // ── Projects 
   // Backend returns: { projects: [...] } or { results: [...] } where items have name + id
   const isProjectTool = tc.includes('project');
   const projectCandidates = isProjectTool
@@ -217,7 +217,7 @@ export function parseToolResult(toolCalled: string | null, toolResult: Record<st
     };
   }
 
-  // ── Notes ──────────────────────────────────────────────────────────────────
+  // ── Notes 
   const isNoteTool = tc.includes('note');
   const noteList = isNoteTool
     ? extractList(toolResult, ['notes', 'note', 'results'])
@@ -237,7 +237,7 @@ export function parseToolResult(toolCalled: string | null, toolResult: Record<st
   return null;
 }
 
-// ─── Renderer ─────────────────────────────────────────────────────────────────
+// ─── Renderer 
 export function EntityCards({ entities }: { entities: ParsedEntities }) {
   return (
     <>

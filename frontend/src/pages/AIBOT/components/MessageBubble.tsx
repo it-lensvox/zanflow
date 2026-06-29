@@ -1,4 +1,4 @@
-import { Bot, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { markdownToHtml, RichTextEditor } from '@/components/common/RichTextEditor';
 import { EntityCards, parseToolResult } from './Entitycard';
 import type { AgentUIMessage } from '@/types';
@@ -23,7 +23,7 @@ export function MessageBubble({ message, isStreaming = false }: MessageBubblePro
     (entities.notes    && entities.notes.length    > 0)
   ));
 
-  // ── User bubble ────────────────────────────────────────────────────────────
+  // ── User bubble 
   if (isUser) {
     return (
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 20, paddingLeft: 40 }}>
@@ -45,7 +45,7 @@ export function MessageBubble({ message, isStreaming = false }: MessageBubblePro
     );
   }
 
-  // ── Bot bubble ─────────────────────────────────────────────────────────────
+  // ── Bot bubble 
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 20, paddingRight: 40 }}>
       {/* Avatar */}
