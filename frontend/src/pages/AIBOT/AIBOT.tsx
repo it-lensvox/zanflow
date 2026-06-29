@@ -41,6 +41,7 @@ export function AIBot() {
             onRenameSession={(id, title) => b.renameSession(title, id)}
             onPinSession={(id, isPinned) => b.pinSession(id, isPinned)}
             onDeleteSession={id => b.deleteSession(id)}
+            onBulkDelete={ids => b.bulkDeleteSessions(ids)}
           />
         )}
       </div>

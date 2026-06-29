@@ -388,6 +388,15 @@ export function useAIBot() {
     renameSession,
     pinSession,
     deleteSession,
+    bulkDeleteSessions: useCallback(async (ids: number[]) => {
+      // Optimistic — remove all immediately
+      setSessions(prev => prev.filter(s => !ids.includes(s.id)));
+      if (ids.includes(activeSessionRef.current!)) { setSession(null); setMessages([]); }
+      // Delete all in parallel
+      await Promise.all(ids.map(id => agentApi.deleteSession(id).catch(() => null)));
+      // Reload to sync any failures
+      loadSessions();
+    }, [loadSessions]),
     loadSessionHistory,
     handleFabMouseDown, handleFabClick,
   };
