@@ -57,6 +57,7 @@ export function useAIBot() {
     const handler = (e: Event) => {
       const query = (e as CustomEvent<{ query?: string }>).detail?.query;
       setIsExpanded(true);
+      setIsFullScreen(true);
       if (query) {
         setTimeout(() => {
           setInput(query);
@@ -79,7 +80,7 @@ export function useAIBot() {
   }, []);
 
   // ── Load sessions when opened 
-  const loadSessions = useCallback(async () => {
+ const loadSessions = useCallback(async () => {
     setSessionsLoading(true);
     try {
       const data = await agentApi.listSessions();
@@ -90,7 +91,7 @@ export function useAIBot() {
     }
   }, []);
 
-  useEffect(() => {
+ useEffect(() => {
     if (isExpanded && !sessionsFetchedRef.current) {
       sessionsFetchedRef.current = true;
       loadSessions();
@@ -181,12 +182,13 @@ export function useAIBot() {
 
   // ── Start a new conversation 
   const startNewConversation = useCallback(() => {
+    loadSessions();
     setSession(null);
     setMessages([]);
     setError(null);
     setSearchQuery('');
     inputRef.current?.focus();
-  }, []);
+  }, [loadSessions]);
 
   const renameSession = useCallback(async (newTitle: string, sessionId?: number) => {
     const id = sessionId ?? activeSessionId;
@@ -354,8 +356,14 @@ export function useAIBot() {
 
   const handleFabClick = useCallback(() => {
     if (didDrag.current) return;
-    setIsExpanded(prev => !prev);
-  }, []);
+    if (!isExpanded) {
+      setIsExpanded(true);
+      setIsFullScreen(true);
+    } else {
+      setIsExpanded(false);
+      setIsFullScreen(false);
+    }
+  }, [isExpanded]);
 
   // ── Derived 
   const filteredSessions = sessions.filter(s =>

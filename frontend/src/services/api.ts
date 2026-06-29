@@ -1604,7 +1604,12 @@ export const agentApi = {
 
   // list all sessions for current user
   listSessions: async (): Promise<import('@/types').AgentSession[]> => {
-    const response = await api.get('/agent/sessions/');
+    const workspaceId = localStorage.getItem('active_workspace_id') || '1';
+    console.log('[AIBot] listSessions — X-Workspace-ID being sent:', workspaceId);
+    const response = await api.get('/agent/sessions/', {
+      headers: { 'X-Workspace-ID': workspaceId },
+    });
+    console.log('[AIBot] listSessions raw response.data:', response.data);
     return response.data;
   },
 

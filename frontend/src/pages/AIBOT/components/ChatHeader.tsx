@@ -1,14 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
-import { Plus, Maximize2, ChevronDown, PanelLeftOpen, PanelLeftClose, MoreHorizontal, Pencil, Trash2, Sparkles } from 'lucide-react';
+import { Plus, X, PanelLeftOpen, PanelLeftClose, MoreHorizontal, Pencil, Trash2, Sparkles } from 'lucide-react';
 
 interface ChatHeaderProps {
-  variant:           'mini' | 'fullscreen';
   isHistoryOpen:     boolean;
   activeSessionId:   number | null;
   sessionTitle:      string;
   onToggleHistory:   () => void;
   onNewConversation: () => void;
-  onMaximize?:       () => void;
   onClose:           () => void;
   onRename:          (newTitle: string) => void;
   onDelete:          () => void;
@@ -25,7 +23,7 @@ function IconBtn({ icon, onClick, title, accent }: { icon: React.ReactNode; onCl
   );
 }
 
-export function ChatHeader({ variant, isHistoryOpen, activeSessionId, sessionTitle, onToggleHistory, onNewConversation, onMaximize, onClose, onRename, onDelete }: ChatHeaderProps) {
+export function ChatHeader({ isHistoryOpen, activeSessionId, sessionTitle, onToggleHistory, onNewConversation, onClose, onRename, onDelete }: ChatHeaderProps) {
   const [menuOpen,   setMenuOpen]   = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameVal,  setRenameVal]  = useState('');
@@ -55,7 +53,7 @@ export function ChatHeader({ variant, isHistoryOpen, activeSessionId, sessionTit
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: variant === 'mini' ? '9px 12px' : '11px 18px',
+      padding: '11px 18px',
       borderBottom: '1px solid #e6ebf2',
       background: '#fff',
       flexShrink: 0, gap: 8,
@@ -91,10 +89,6 @@ export function ChatHeader({ variant, isHistoryOpen, activeSessionId, sessionTit
       <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
         <IconBtn icon={<Plus style={{ width: 14, height: 14 }} />} onClick={onNewConversation} title="New conversation" />
 
-        {variant === 'mini' && onMaximize && (
-          <IconBtn icon={<Maximize2 style={{ width: 14, height: 14 }} />} onClick={onMaximize} title="Full screen" />
-        )}
-
         {activeSessionId && (
           <div style={{ position: 'relative' }} ref={menuRef}>
             <IconBtn icon={<MoreHorizontal style={{ width: 14, height: 14 }} />} onClick={() => setMenuOpen(v => !v)} title="More options" />
@@ -113,7 +107,7 @@ export function ChatHeader({ variant, isHistoryOpen, activeSessionId, sessionTit
           </div>
         )}
 
-        <IconBtn icon={<ChevronDown style={{ width: 14, height: 14 }} />} onClick={onClose} title="Close" />
+         <IconBtn icon={<X style={{ width: 14, height: 14 }} />} onClick={onClose} title="Close" />
       </div>
     </div>
   );

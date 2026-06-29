@@ -2,7 +2,6 @@ import { Outlet, useMatch, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { useState, Suspense, useEffect, useRef } from 'react';
 import { NotificationsPage } from '@/pages/NotificationsPage';
-import { QuickNotes } from '@/components/QuickNotes';
 import { AIBot } from '@/pages/AIBOT/AIBOT';
 import { useNotifications } from '@/hooks/useNotifications';
 import { TaskDraftBar } from '@/pages/MyTask/components/Taskdrafts';
@@ -204,7 +203,6 @@ export function Layout() {
 
       {isActivityOpen && <NotificationsPage onClose={() => setIsActivityOpen(false)} />}
       {!isProjectDetailPage && <AIBot />}
-      <QuickNotes />
       <TaskDraftBar />
     </div>
   );

@@ -40,23 +40,23 @@ function SessionMenu({ sessionId, title, isPinned, onRename, onPin, onDelete, on
   const commitRename = () => { const t = renameVal.trim(); if (t && t !== title) onRename(sessionId, t); onClose(); };
 
   if (renaming) return (
-    <div ref={menuRef} style={{ position: 'absolute', right: 0, top: 32, zIndex: 300, background: '#0f172a', border: '1px solid #1e293b', borderRadius: 10, padding: 8, minWidth: 200, boxShadow: '0 16px 48px rgba(0,0,0,.6)' }}>
+     <div ref={menuRef} style={{ position: 'absolute', right: 0, top: 32, zIndex: 300, background: '#fff', border: '1px solid #dde3f0', borderRadius: 10, padding: 8, minWidth: 200, boxShadow: '0 8px 24px rgba(0,0,0,.1)' }}>
       <input ref={inputRef} value={renameVal} onChange={e => setRenameVal(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') onClose(); }} onBlur={commitRename}
-        style={{ width: '100%', background: '#1e293b', border: '1px solid #334155', borderRadius: 6, padding: '6px 10px', fontSize: 12, color: '#f1f5f9', outline: 'none', fontFamily: 'inherit' }} />
+        style={{ width: '100%', background: '#f0f4ff', border: '1px solid #dde3f0', borderRadius: 6, padding: '6px 10px', fontSize: 12, color: '#172033', outline: 'none', fontFamily: 'inherit' }} />
     </div>
   );
 
   if (confirmDelete) return (
-    <div ref={menuRef} style={{ position: 'absolute', right: 0, top: 32, zIndex: 300, background: '#0f172a', border: '1px solid #1e293b', borderRadius: 10, padding: 12, minWidth: 200, boxShadow: '0 16px 48px rgba(0,0,0,.6)' }}>
-      <p style={{ fontSize: 12, color: '#f1f5f9', marginBottom: 10 }}>Delete this conversation?</p>
+    <div ref={menuRef} style={{ position: 'absolute', right: 0, top: 32, zIndex: 300, background: '#fff', border: '1px solid #dde3f0', borderRadius: 10, padding: 12, minWidth: 200, boxShadow: '0 8px 24px rgba(0,0,0,.1)' }}>
+      <p style={{ fontSize: 12, color: '#374151', marginBottom: 10 }}>Delete this conversation?</p>
       <div style={{ display: 'flex', gap: 6 }}>
         <button onClick={() => { onDelete(sessionId); onClose(); }}
           style={{ flex: 1, padding: '6px 0', borderRadius: 6, border: 'none', background: '#ef4444', color: '#fff', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
           Delete
         </button>
         <button onClick={() => setConfirmDelete(false)}
-          style={{ flex: 1, padding: '6px 0', borderRadius: 6, border: '1px solid #1e293b', background: 'none', color: '#94a3b8', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+          style={{ flex: 1, padding: '6px 0', borderRadius: 6, border: '1px solid #dde3f0', background: 'none', color: '#64748b', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
           Cancel
         </button>
       </div>
@@ -70,11 +70,11 @@ function SessionMenu({ sessionId, title, isPinned, onRename, onPin, onDelete, on
   ];
 
   return (
-    <div ref={menuRef} style={{ position: 'absolute', right: 0, top: 32, zIndex: 300, background: '#0f172a', border: '1px solid #1e293b', borderRadius: 10, boxShadow: '0 16px 48px rgba(0,0,0,.6)', padding: '4px 0', minWidth: 144 }}>
+   <div ref={menuRef} style={{ position: 'absolute', right: 0, top: 32, zIndex: 300, background: '#fff', border: '1px solid #dde3f0', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.1)', padding: '4px 0', minWidth: 144 }}>
       {items.map(item => (
         <button key={item.label} onClick={item.action}
-          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 12, color: item.danger ? '#f87171' : '#94a3b8', textAlign: 'left', fontFamily: 'inherit' }}
-          onMouseEnter={e => e.currentTarget.style.background = item.danger ? '#1f0a0a' : '#1e293b'}
+          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 12, color: item.danger ? '#ef4444' : '#374151', textAlign: 'left', fontFamily: 'inherit' }}
+          onMouseEnter={e => e.currentTarget.style.background = item.danger ? '#fef2f2' : '#f0f4ff'}
           onMouseLeave={e => e.currentTarget.style.background = 'none'}>
           {item.icon}{item.label}
         </button>
@@ -143,15 +143,15 @@ export function HistoryPanel({ sessions, activeSessionId, searchQuery, setSearch
             padding: '9px 30px 9px 10px', borderRadius: 9, border: 'none',
             cursor: 'pointer', textAlign: 'left', transition: 'all .15s',
             background: isSelected
-              ? 'rgba(239,68,68,.12)'
+              ? 'rgba(239,68,68,.08)'
               : isActive
-                ? 'linear-gradient(135deg, rgba(22,99,246,.15), rgba(22,99,246,.08))'
+                ? 'rgba(22,99,246,.1)'
                 : 'transparent',
             borderLeft: isSelected
               ? '2px solid #ef4444'
-              : isActive ? '2px solid #3b82f6' : '2px solid transparent',
+              : isActive ? '2px solid #1663f6' : '2px solid transparent',
           }}
-          onMouseEnter={e => { if (!isActive && !isSelected) e.currentTarget.style.background = '#0f172a'; }}
+          onMouseEnter={e => { if (!isActive && !isSelected) e.currentTarget.style.background = '#eef1fb'; }}
           onMouseLeave={e => { if (!isActive && !isSelected) e.currentTarget.style.background = 'transparent'; }}>
 
           {/* Checkbox in select mode */}
@@ -169,7 +169,7 @@ export function HistoryPanel({ sessions, activeSessionId, searchQuery, setSearch
               {session.is_pinned && !selectMode && (
                 <Pin style={{ width: 9, height: 9, color: '#60a5fa', flexShrink: 0 }} />
               )}
-              <p style={{ fontSize: 12, fontWeight: isActive ? 600 : 400, color: isSelected ? '#fca5a5' : isActive ? '#e2e8f0' : '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              <p style={{ fontSize: 12, fontWeight: isActive ? 600 : 400, color: isSelected ? '#ef4444' : isActive ? '#1663f6' : '#4a5568', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                 title={session.title || `Session ${session.id}`}>
                 {getTitle(session)}
               </p>
@@ -186,7 +186,7 @@ export function HistoryPanel({ sessions, activeSessionId, searchQuery, setSearch
           <button
             onClick={e => { e.stopPropagation(); setOpenMenuId(isMenuOpen ? null : session.id); }}
             style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', width: 20, height: 20, borderRadius: 5, border: 'none', background: isMenuOpen ? '#1e293b' : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569', transition: 'all .15s' }}
-            onMouseEnter={e => e.currentTarget.style.background = '#1e293b'}
+            onMouseEnter={e => e.currentTarget.style.background = '#eef1fb'}
             onMouseLeave={e => { if (!isMenuOpen) e.currentTarget.style.background = 'transparent'; }}>
             <MoreHorizontal style={{ width: 11, height: 11 }} />
           </button>
@@ -206,7 +206,7 @@ export function HistoryPanel({ sessions, activeSessionId, searchQuery, setSearch
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#080f1a' }}>
+     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f0f4ff' }}>
 
       {/* Header */}
       <div style={{ padding: '18px 14px 14px', flexShrink: 0 }}>
@@ -224,15 +224,15 @@ export function HistoryPanel({ sessions, activeSessionId, searchQuery, setSearch
         {/* New conversation + Select toggle */}
         <div style={{ display: 'flex', gap: 6 }}>
           <button onClick={onNewConversation}
-            style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderRadius: 10, border: '1px solid #1e293b', background: 'linear-gradient(135deg, #0f172a, #1e293b)', cursor: 'pointer', color: '#94a3b8', fontSize: 12, fontWeight: 500, transition: 'all .2s' }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = '#334155'; e.currentTarget.style.color = '#e2e8f0'; e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,.3)'; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = '#1e293b'; e.currentTarget.style.color = '#94a3b8'; e.currentTarget.style.boxShadow = 'none'; }}>
+            style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderRadius: 10, border: '1px solid #dde3f0', background: '#fff', cursor: 'pointer', color: '#4a5568', fontSize: 12, fontWeight: 500, transition: 'all .2s' }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = '#1663f6'; e.currentTarget.style.color = '#1663f6'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(22,99,246,.12)'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = '#dde3f0'; e.currentTarget.style.color = '#4a5568'; e.currentTarget.style.boxShadow = 'none'; }}>
             <Plus style={{ width: 13, height: 13 }} />
             New conversation
           </button>
           <button onClick={() => selectMode ? exitSelectMode() : setSelectMode(true)}
             title={selectMode ? 'Cancel selection' : 'Select chats to delete'}
-            style={{ width: 34, height: 34, borderRadius: 10, border: `1px solid ${selectMode ? '#ef4444' : '#1e293b'}`, background: selectMode ? 'rgba(239,68,68,.12)' : 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: selectMode ? '#ef4444' : '#475569', flexShrink: 0, transition: 'all .2s' }}>
+            style={{ width: 34, height: 34, borderRadius: 10, border: `1px solid ${selectMode ? '#ef4444' : '#dde3f0'}`, background: selectMode ? 'rgba(239,68,68,.08)' : '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: selectMode ? '#ef4444' : '#64748b', flexShrink: 0, transition: 'all .2s' }}>
             {selectMode ? <X style={{ width: 13, height: 13 }} /> : <CheckSquare style={{ width: 13, height: 13 }} />}
           </button>
         </div>
@@ -240,18 +240,18 @@ export function HistoryPanel({ sessions, activeSessionId, searchQuery, setSearch
 
       {/* Search */}
       <div style={{ padding: '0 12px 10px', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#0f172a', borderRadius: 8, padding: '0 11px', height: 33, border: '1px solid #1e293b', transition: 'border-color .2s' }}
-          onFocusCapture={e => e.currentTarget.style.borderColor = '#334155'}
-          onBlurCapture={e => e.currentTarget.style.borderColor = '#1e293b'}>
-          <Search style={{ width: 11, height: 11, color: '#475569', flexShrink: 0 }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#fff', borderRadius: 8, padding: '0 11px', height: 33, border: '1px solid #dde3f0', transition: 'border-color .2s' }}
+          onFocusCapture={e => e.currentTarget.style.borderColor = '#1663f6'}
+          onBlurCapture={e => e.currentTarget.style.borderColor = '#dde3f0'}>
+          <Search style={{ width: 11, height: 11, color: '#94a3b8', flexShrink: 0 }} />
           <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search…"
-            style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 12, color: '#cbd5e1', fontFamily: 'inherit' }} />
+            style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 12, color: '#374151', fontFamily: 'inherit' }} />
         </div>
       </div>
 
       {/* Divider */}
-      <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, #1e293b, transparent)', margin: '0 12px 8px' }} />
+      <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, #dde3f0, transparent)', margin: '0 12px 8px' }} />
 
       {/* Bulk action toolbar */}
       {selectMode && (
@@ -266,8 +266,8 @@ export function HistoryPanel({ sessions, activeSessionId, searchQuery, setSearch
                   style={{ flex: 1, padding: '6px 0', borderRadius: 6, border: 'none', background: '#ef4444', color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
                   Delete
                 </button>
-                <button onClick={() => setBulkConfirm(false)}
-                  style={{ flex: 1, padding: '6px 0', borderRadius: 6, border: '1px solid #1e293b', background: 'none', color: '#94a3b8', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>
+               <button onClick={() => setBulkConfirm(false)}
+                  style={{ flex: 1, padding: '6px 0', borderRadius: 6, border: '1px solid #dde3f0', background: 'none', color: '#64748b', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>
                   Cancel
                 </button>
               </div>
@@ -276,7 +276,7 @@ export function HistoryPanel({ sessions, activeSessionId, searchQuery, setSearch
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               {/* Select all checkbox */}
               <button onClick={toggleSelectAll}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, padding: '7px 10px', borderRadius: 8, border: '1px solid #1e293b', background: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 11, fontFamily: 'inherit' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, padding: '7px 10px', borderRadius: 8, border: '1px solid #dde3f0', background: '#fff', cursor: 'pointer', color: '#64748b', fontSize: 11, fontFamily: 'inherit' }}>
                 {allSelected
                   ? <CheckSquare style={{ width: 12, height: 12, color: '#ef4444' }} />
                   : <Square      style={{ width: 12, height: 12 }} />
@@ -287,7 +287,7 @@ export function HistoryPanel({ sessions, activeSessionId, searchQuery, setSearch
               <button
                 onClick={() => setBulkConfirm(true)}
                 disabled={selectedIds.size === 0}
-                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 10px', borderRadius: 8, border: 'none', background: selectedIds.size > 0 ? '#ef4444' : '#1e293b', color: selectedIds.size > 0 ? '#fff' : '#334155', fontSize: 11, fontWeight: 600, cursor: selectedIds.size > 0 ? 'pointer' : 'not-allowed', fontFamily: 'inherit', transition: 'all .15s' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 10px', borderRadius: 8, border: 'none', background: selectedIds.size > 0 ? '#ef4444' : '#e2e8f0', color: selectedIds.size > 0 ? '#fff' : '#94a3b8', fontSize: 11, fontWeight: 600, cursor: selectedIds.size > 0 ? 'pointer' : 'not-allowed', fontFamily: 'inherit', transition: 'all .15s' }}>
                 <Trash2 style={{ width: 11, height: 11 }} />
                 Delete
               </button>
