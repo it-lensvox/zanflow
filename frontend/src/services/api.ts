@@ -8,9 +8,9 @@ import type {
   DailyUpdate, DailyUpdatePayload, DailyUpdateListResponse, TaskFilterParams, Event as CalendarEventType, SocialAuthPayload, SocialAuthResponse,
 } from '@/types';
 
-export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.6:8000/api/v1';
-const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://192.168.1.6:8000/ws/gateway';
-const WS_AI_BOT_URL = (import.meta as any).env.VITE_WS_AI_BOT_URL || 'ws://192.168.1.6:8000/ws/ai-bot/';
+export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.26:8000/api/v1';
+const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://192.168.1.26:8000/ws/gateway';
+const WS_AI_BOT_URL = (import.meta as any).env.VITE_WS_AI_BOT_URL || 'ws://192.168.1.26:8000/ws/ai-bot/';
 
 export const api = axios.create({
   baseURL: API_URL,

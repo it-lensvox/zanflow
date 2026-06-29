@@ -1,4 +1,4 @@
-import { Send, Sparkles, Loader2, Zap, ListTodo, FolderKanban, FileText } from 'lucide-react';
+import { Send, Sparkles, Zap, ListTodo, FolderKanban, FileText } from 'lucide-react';
 import { MessageBubble } from './MessageBubble';
 import type { AgentUIMessage } from '@/types';
 

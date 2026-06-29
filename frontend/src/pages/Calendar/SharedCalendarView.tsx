@@ -30,7 +30,6 @@ export const SharedCalendarView: React.FC = () => {
             setError(null);
             
             try {
-                // IMPORTANT: No auth header for public endpoint
                 const response = await axios.get(
                     `${API_URL}/daily-updates/shared-calendar/${token}/`
                 );

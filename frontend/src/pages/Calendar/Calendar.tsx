@@ -1047,21 +1047,42 @@ const EMPTY_FORM: UpdateFormFields = {
 const serializeContent = (fields: UpdateFormFields, dateLabel: string): string =>
     `Daily Update – ${dateLabel}\n\nToday's Priorities:-\n${fields.todays_priorities}\n\nProgress (Yesterday):-\n${fields.progress_yesterday}\n\nBlockers / Needs:-\n${fields.blockers}\n\nUpcoming:-\n${fields.upcoming}`;
 
-// Parse a content string back into form fields (best-effort)
 const parseContent = (content: string): UpdateFormFields => {
+    if (!content?.trim()) return EMPTY_FORM;
+
     const extract = (label: string, nextLabel?: string): string => {
-        const start = content.indexOf(label);
-        if (start === -1) return ''
-        const valueStart = start + label.length;
-        const end = nextLabel ? content.indexOf(nextLabel) : content.length;
-        return (end === -1 ? content.slice(valueStart) : content.slice(valueStart, end)).trim();
+        const searchLabel = content.includes(label + '\n') ? label + '\n' : label;
+        const start = content.indexOf(searchLabel);
+        if (start === -1) return '';
+        const valueStart = start + searchLabel.length;
+        let end = content.length;
+        if (nextLabel) {
+            const withNewline    = content.indexOf('\n' + nextLabel, valueStart);
+            const withoutNewline = content.indexOf(nextLabel,        valueStart);
+            if (withNewline !== -1 && withoutNewline !== -1) {
+                end = Math.min(withNewline, withoutNewline);
+            } else if (withNewline !== -1) {
+                end = withNewline;
+            } else if (withoutNewline !== -1) {
+                end = withoutNewline;
+            }
+        }
+        return content.slice(valueStart, end).trim();
     };
-    return {
-        todays_priorities: extract("Today's Priorities:-\n", "Progress (Yesterday):-\n"),
-        progress_yesterday: extract("Progress (Yesterday):-\n", "Blockers / Needs:-\n"),
-        blockers: extract("Blockers / Needs:-\n", "Upcoming:-\n"),
-        upcoming: extract("Upcoming:-\n"),
+
+    const structured = {
+        todays_priorities:  extract("Today's Priorities:-",  "Progress (Yesterday):-"),
+        progress_yesterday: extract("Progress (Yesterday):-", "Blockers / Needs:-"),
+        blockers:           extract("Blockers / Needs:-",     "Upcoming:-"),
+        upcoming:           extract("Upcoming:-"),
     };
+
+    const hasAnyContent = Object.values(structured).some(v => v.trim() !== '');
+    if (!hasAnyContent) {
+        return { ...EMPTY_FORM, todays_priorities: content.trim() };
+    }
+
+    return structured;
 };
 
 interface EventModalProps {
@@ -2434,6 +2455,14 @@ const TaskListSidebar: React.FC<TaskListSidebarProps> = ({
     const navigate = useNavigate();
     const [showUpdateForm, setShowUpdateForm] = useState(false);
 
+    React.useEffect(() => {
+      const handler = () => {
+        queryClient.invalidateQueries({ queryKey: ['dailyUpdate'] });
+      };
+      window.addEventListener('aibot:standup-created', handler);
+      return () => window.removeEventListener('aibot:standup-created', handler);
+    }, [queryClient, selectedDate]);
+
     const handleCreateTask = () => {
         const dateStr = selectedDate ? toISODate(selectedDate) : '';
         navigate('/taskboard/create', {
@@ -2865,18 +2894,23 @@ export const Calendar: React.FC = () => {
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [selectedEvent, setSelectedEvent] = useState<CalendarEventType | null>(null);
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+
+    React.useEffect(() => {
+      const handler = () => {
+        queryClient.invalidateQueries({ queryKey: ['dailyUpdate'] });
+      };
+      window.addEventListener('aibot:standup-created', handler);
+      return () => window.removeEventListener('aibot:standup-created', handler);
+    }, [queryClient]);
     const [isEventModalOpen, setIsEventModalOpen] = useState(false);
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [includeSharedEvents, setIncludeSharedEvents] = useState(false);
-    // ═══════════════ SETTINGS DROPDOWN STATE ═══════════════
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
     const settingsDropdownRef = React.useRef<HTMLDivElement>(null);
-    // ═══════════════ INVITATION MODAL STATES ═══════════════
     const [showDeclineModal, setShowDeclineModal] = useState(false);
     const [showRescheduleModal, setShowRescheduleModal] = useState(false);
     const [selectedInvitationEvent, setSelectedInvitationEvent] = useState<CalendarEventType | null>(null);
-    // ═══════════════ DYUKSA AI STATE ═══════════════
     const [dyuksaInput, setDyuksaInput] = useState('');
     const [dyuksaResponse, setDyuksaResponse] = useState<string | null>(null);
     const [isDyuksaLoading, setIsDyuksaLoading] = useState(false);
@@ -2891,7 +2925,7 @@ export const Calendar: React.FC = () => {
         duration: number;
     } | null>(null);
 
-    // ═══════════════ EVENT CONTEXT MENU STATE ═══════════════
+    // EVENT CONTEXT MENU STATE 
     const [contextMenu, setContextMenu] = useState<{
         x: number;
         y: number;
@@ -2901,7 +2935,7 @@ export const Calendar: React.FC = () => {
 
 
 
-    // ═══════════════ INVITATION MUTATIONS ═══════════════
+    // INVITATION MUTATIONS 
     const { mutate: acceptInvitation, isPending: isAccepting } = useMutation({
         mutationFn: (invitationId: number) => eventApi.acceptInvitation(invitationId),
         onSuccess: () => {
@@ -2944,7 +2978,7 @@ export const Calendar: React.FC = () => {
         }
     });
 
-    // ═══════════════ INVITATION HANDLERS ═══════════════
+    // INVITATION HANDLERS
     const handleAcceptInvitation = useCallback((invitationId: number) => {
         acceptInvitation(invitationId);
     }, [acceptInvitation]);
@@ -2970,7 +3004,7 @@ export const Calendar: React.FC = () => {
             rescheduleInvitation({ invitationId: selectedInvitationEvent.my_invitation_id, proposedTime });
         }
     }, [selectedInvitationEvent, rescheduleInvitation]);
-    // ═══════════════ DYUKSA AI HANDLER ═══════════════
+    // DYUKSA AI HANDLER
     const handleDyuksaSubmit = async () => {
         if (!dyuksaInput.trim()) return;
 
@@ -3019,7 +3053,7 @@ export const Calendar: React.FC = () => {
             setIsDyuksaLoading(false);
         }
     };
-    // ═══════════════ EVENT CONTEXT MENU HANDLERS ═══════════════
+    // EVENT CONTEXT MENU HANDLERS 
     const handleEventContextMenu = (e: React.MouseEvent, event: CalendarEventType) => {
         e.preventDefault();
         e.stopPropagation();

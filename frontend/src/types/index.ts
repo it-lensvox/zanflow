@@ -1521,7 +1521,7 @@ export interface UpdateQuickNotePayload {
 
 // Calendar Daily Update Types
 
-// Single daily update entry (matches backend response)
+// Single daily update entry 
 export interface DailyUpdate {
   id: number;
   user: number;
@@ -1546,7 +1546,6 @@ export interface DailyUpdateListResponse {
   results: DailyUpdate[];
 }
 
-// Add this new type (keep this)
 export type InvitationStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'ORGANIZER';
 
 export interface Event {

@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMemo, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { eventApi } from '@/services/api';
 import type { DashboardTask } from './useDashboard';
@@ -7,6 +7,15 @@ import type { Event as CalendarEvent } from '@/types';
 
 export function useTodayTab(allTasks: DashboardTask[]) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const handler = () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks-dashboard'] });
+    };
+    window.addEventListener('aibot:standup-created', handler);
+    return () => window.removeEventListener('aibot:standup-created', handler);
+  }, [queryClient]);
 
   const today = useMemo(() => {
     const d = new Date();

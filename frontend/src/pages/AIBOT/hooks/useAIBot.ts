@@ -104,17 +104,9 @@ export function useAIBot() {
     setError(null);
     try {
       const detail = await agentApi.getSession(sessionId);
-      console.log('[AIBot] raw session detail:', JSON.stringify(detail, null, 2));
       const rawMessages = Array.isArray(detail.messages) ? detail.messages : [];
-      console.log('[AIBot] rawMessages count:', rawMessages.length);
 
       // ── Step 1: extract tool_called name and tool_result data from the raw
-      // message array. The backend stores these as separate content-block
-      // messages in Anthropic's native format:
-      //   assistant → [{ type:"tool_use",    name, id }]
-      //   user      → [{ type:"tool_result", tool_use_id, content: "json" }]
-      // We collect them into a lookup keyed by tool_use_id so we can attach
-      // them to the final assistant text message that follows.
       const toolCallMap: Record<string, { toolCalled: string; toolResult: Record<string, unknown> }> = {};
 
       rawMessages.forEach((m: any) => {
@@ -147,7 +139,6 @@ export function useAIBot() {
       // The most recent completed tool pair — attached to the next assistant text
       const toolEntries = Object.values(toolCallMap);
       const lastTool = toolEntries.length > 0 ? toolEntries[toolEntries.length - 1] : null;
-      console.log('[AIBot] resolved tool pairs:', toolCallMap, 'lastTool:', lastTool);
 
       // ── Step 2: build UI messages — same as before but now attach tool data
       const uiMessages: AgentUIMessage[] = rawMessages
@@ -174,11 +165,6 @@ export function useAIBot() {
             toolCalled: isAssistant ? (lastTool?.toolCalled ?? null) : undefined,
             toolResult: isAssistant ? (lastTool?.toolResult ?? null) : undefined,
           };
-          console.log('[AIBot] built uiMsg:', {
-            role: uiMsg.role,
-            toolCalled: uiMsg.toolCalled,
-            hasToolResult: !!uiMsg.toolResult,
-          });
           acc.push(uiMsg);
           return acc;
         }, []);
@@ -301,6 +287,15 @@ export function useAIBot() {
           ));
           setSession(done.session_id);
           loadSessions();
+          // If the agent created a standup/daily-update, notify other pages to refresh
+          const isStandupTool = (done.tool_called || '').toLowerCase().includes('standup')
+            || (done.tool_called || '').toLowerCase().includes('daily_update')
+            || (done.tool_called || '').toLowerCase().includes('create_daily')
+            || (done.tool_called || '').toLowerCase().includes('daily_updates')
+            || (done.tool_called || '').toLowerCase().includes('get_daily');
+          if (isStandupTool) {
+            window.dispatchEvent(new CustomEvent('aibot:standup-created'));
+          }
         },
 
         // onError

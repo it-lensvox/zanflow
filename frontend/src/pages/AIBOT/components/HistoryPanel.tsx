@@ -319,7 +319,7 @@ export function HistoryPanel({ sessions, activeSessionId, searchQuery, setSearch
             {/* ── Recents section */}
             {filtered.some(s => !s.is_pinned) && (
               <>
-                <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.1em', color: '#334155', padding: '4px 8px 6px' }}>Recents</p>
+                <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.1em', color: '#94a3b8', padding: '4px 8px 6px' }}>Recents</p>
                 {filtered.filter(s => !s.is_pinned).map(session => renderSession(session))}
               </>
             )}

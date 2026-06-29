@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Plus, Maximize2, ChevronDown, PanelLeftOpen, PanelLeftClose, MoreHorizontal, Pencil, Pin, Trash2, Sparkles } from 'lucide-react';
+import { Plus, Maximize2, ChevronDown, PanelLeftOpen, PanelLeftClose, MoreHorizontal, Pencil, Trash2, Sparkles } from 'lucide-react';
 
 interface ChatHeaderProps {
   variant:           'mini' | 'fullscreen';
