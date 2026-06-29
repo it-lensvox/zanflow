@@ -1,21 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
 import { Bell, Calendar, ChevronDown, LayoutDashboard, ListTodo, BarChart2, Star, Moon, Search, HelpCircle, Plus } from 'lucide-react';
-import { NotificationsPage }        from '@/pages/NotificationsPage';
-import { CreateProjectModal }       from '@/pages/Project/CreateProjectModal';
-import { DocumentPreview }          from '@/components/common/DocumentPreview';
-import { QuickCreateButton }        from '@/components/QuickCreateButton';
-import { GlobalSearchOverlay }      from '@/components/GlobalSearch';
-import { useDashboard }             from './hooks/useDashboard';
-import { useTodayTab }              from './hooks/useTodayTab';
-import { useAnalyticsTab }          from './hooks/useAnalyticsTab';
-import { StatCard }                 from './components/StatCard';
-import { TasksDonutCard }           from './components/TasksDonutCard';
-import { TasksLineChartCard }       from './components/TasksLineChartCard';
-import { MyTasksPanel }             from './components/MyTasksPanel';
-import { RecentActivityPanel }      from './components/RecentActivityPanel';
-import { ProjectsOverviewTable }    from './components/ProjectsOverviewTable';
-import { TodayTab }                 from './components/TodayTab';
-import { AnalyticsTab }             from './components/AnalyticsTab';
+import { NotificationsPage } from '@/pages/NotificationsPage';
+import { CreateProjectModal } from '@/pages/Project/CreateProjectModal';
+import { DocumentPreview } from '@/components/common/DocumentPreview';
+import { QuickCreateButton } from '@/components/QuickCreateButton';
+import { GlobalSearchOverlay } from '@/components/GlobalSearch';
+import { useDashboard } from './hooks/useDashboard';
+import { useTodayTab } from './hooks/useTodayTab';
+import { useAnalyticsTab } from './hooks/useAnalyticsTab';
+import { StatCard } from './components/StatCard';
+import { TasksDonutCard } from './components/TasksDonutCard';
+import { TasksLineChartCard } from './components/TasksLineChartCard';
+import { MyTasksPanel } from './components/MyTasksPanel';
+import { RecentActivityPanel } from './components/RecentActivityPanel';
+import { ProjectsOverviewTable } from './components/ProjectsOverviewTable';
+import { TodayTab } from './components/TodayTab';
+import { AnalyticsTab } from './components/AnalyticsTab';
 import {
   BG, TEXT, MUTED, LINE, BLUE, MONTH_BTN,
   STAT_COLORS, DATE_RANGE_LABELS,
@@ -29,15 +29,15 @@ type DashTab = 'overview' | 'today' | 'analytics';
 const DEFAULT_TAB_KEY = 'dyuksa_dashboard_default_tab';
 
 const TABS: { key: DashTab; label: string; icon: React.ReactNode; sub: string }[] = [
-  { key: 'overview',   label: 'Overview',   icon: <LayoutDashboard size={14} />, sub: 'Everything at a glance' },
-  { key: 'today',      label: 'Today',      icon: <ListTodo size={14} />,        sub: 'Your focus for the day' },
-  { key: 'analytics', label: 'Analytics',  icon: <BarChart2 size={14} />,       sub: 'Trends & performance' },
+  { key: 'overview', label: 'Overview', icon: <LayoutDashboard size={14} />, sub: 'Everything at a glance' },
+  { key: 'today', label: 'Today', icon: <ListTodo size={14} />, sub: 'Your focus for the day' },
+  { key: 'analytics', label: 'Analytics', icon: <BarChart2 size={14} />, sub: 'Trends & performance' },
 ];
 
 // Icon map for the switcher dropdown
 const TAB_ICONS_LG: Record<DashTab, React.ReactNode> = {
-  overview:  <LayoutDashboard size={16} />,
-  today:     <ListTodo size={16} />,
+  overview: <LayoutDashboard size={16} />,
+  today: <ListTodo size={16} />,
   analytics: <BarChart2 size={16} />,
 };
 
@@ -49,10 +49,10 @@ export function Dashboard() {
     ? localStorage.getItem(DEFAULT_TAB_KEY)
     : null) as DashTab | null;
 
-  const [activeTab, setActiveTab]           = useState<DashTab>(savedDefault ?? 'overview');
-  const [defaultTab, setDefaultTab]         = useState<DashTab>(savedDefault ?? 'overview');
-  const [switcherOpen, setSwitcherOpen]     = useState(false);
-  const switcherRef                         = useRef<HTMLDivElement>(null);
+  const [activeTab, setActiveTab] = useState<DashTab>(savedDefault ?? 'overview');
+  const [defaultTab, setDefaultTab] = useState<DashTab>(savedDefault ?? 'overview');
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const switcherRef = useRef<HTMLDivElement>(null);
 
   // Close switcher when clicking outside
   useEffect(() => {
@@ -107,7 +107,7 @@ export function Dashboard() {
         style={{
           position: 'sticky', top: 0, zIndex: 27,
           background: '#fff', borderBottom: `1px solid ${LINE}`,
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          display: 'flex', alignItems: 'center',
           height: 52, padding: '0 20px', gap: 12,
         }}
       >
@@ -123,7 +123,7 @@ export function Dashboard() {
             aria-label="Open menu"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <path d="M2 4h14M2 9h14M2 14h14" stroke="#344054" strokeWidth="1.75" strokeLinecap="round"/>
+              <path d="M2 4h14M2 9h14M2 14h14" stroke="#344054" strokeWidth="1.75" strokeLinecap="round" />
             </svg>
           </button>
           <span style={{ color: MUTED, fontWeight: 500 }}>DYUKSA</span>
@@ -131,19 +131,20 @@ export function Dashboard() {
           <span style={{ color: TEXT, fontWeight: 700 }}>Dashboard</span>
         </div>
 
-       {/* Right: search + theme + new task + bell + help */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {/* Search anything (moved from row 3) */}
-          <button
-            onClick={() => db.setSearchOpen(true)}
-            className="hidden sm:flex"
-            style={{ ...MONTH_BTN, minWidth: 180, gap: 8, height: 34, padding: '0 12px' }}
-          >
-            <Search size={13} color={MUTED} />
-            <span style={{ flex: 1, textAlign: 'left', fontSize: 13, color: '#9CA3AF' }}>Search anything…</span>
-            <kbd style={{ marginLeft: 'auto', background: '#F3F4F6', border: '1px solid #E3E8EF', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700, color: '#6B7280' }}>⌘K</kbd>
-          </button>
+        {/* Right: search + theme + new task + bell + help */}
+        {/* Center: search — grows to fill ~40% of the row */}
+        <button
+          onClick={() => db.setSearchOpen(true)}
+          className="hidden sm:flex"
+          style={{ ...MONTH_BTN, flex: '0 1 40%', minWidth: 160, gap: 8, height: 34, padding: '0 12px', marginLeft: 'auto' }}
+        >
+          <Search size={13} color={MUTED} />
+          <span style={{ flex: 1, textAlign: 'left', fontSize: 13, color: '#9CA3AF' }}>Search anything…</span>
+          <kbd style={{ marginLeft: 'auto', background: '#F3F4F6', border: '1px solid #E3E8EF', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700, color: '#6B7280' }}>⌘K</kbd>
+        </button>
 
+        {/* Right: theme + new task + bell + help */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           {/* Theme toggle — UI only, not yet active */}
           <button
             style={{ width: 34, height: 34, border: `1px solid ${LINE}`, borderRadius: 8, background: '#fff', cursor: 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, opacity: 0.5 }}
@@ -167,7 +168,6 @@ export function Dashboard() {
               </span>
             )}
           </button>
-
           {/* Help */}
           <button
             style={{ width: 34, height: 34, border: `1px solid ${LINE}`, borderRadius: 8, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
@@ -177,7 +177,6 @@ export function Dashboard() {
           </button>
         </div>
       </div>
-
       {/* ══ ROW 2 — Sticky tab bar ══ */}
       <div
         style={{
@@ -225,9 +224,9 @@ export function Dashboard() {
             title={defaultTab === activeTab ? `${TABS.find(t => t.key === activeTab)?.label} is your default view` : `Set ${TABS.find(t => t.key === activeTab)?.label} as default`}
             style={{
               display: 'flex', alignItems: 'center', gap: 6, fontSize: 13,
-              color: defaultTab === activeTab ? '#F59E0B' : MUTED,
-              background: defaultTab === activeTab ? '#FFFBEB' : 'none',
-              border: `1px solid ${defaultTab === activeTab ? '#FDE68A' : 'transparent'}`,
+              color: defaultTab === activeTab ? '#1663f6' : MUTED,
+              background: defaultTab === activeTab ? '#EEF3FF' : 'none',
+              border: `1px solid ${defaultTab === activeTab ? '#C7D7FD' : 'transparent'}`,
               cursor: 'pointer', padding: '5px 10px', borderRadius: 7,
               fontFamily: 'inherit', fontWeight: defaultTab === activeTab ? 600 : 500,
               transition: 'all 0.15s',
@@ -241,8 +240,8 @@ export function Dashboard() {
           >
             <Star
               size={13}
-              fill={defaultTab === activeTab ? '#F59E0B' : 'none'}
-              color={defaultTab === activeTab ? '#F59E0B' : MUTED}
+              fill={defaultTab === activeTab ? '#1663f6' : 'none'}
+              color={defaultTab === activeTab ? '#1663f6' : MUTED}
             />
             <span className="hidden sm:inline">
               {defaultTab === activeTab ? 'Default view' : 'Set as default'}
@@ -264,10 +263,10 @@ export function Dashboard() {
             >
               {/* 2×2 grid icon */}
               <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-                <rect x="1" y="1" width="5.5" height="5.5" rx="1.5" fill="currentColor" opacity="0.85"/>
-                <rect x="8.5" y="1" width="5.5" height="5.5" rx="1.5" fill="currentColor" opacity="0.85"/>
-                <rect x="1" y="8.5" width="5.5" height="5.5" rx="1.5" fill="currentColor" opacity="0.85"/>
-                <rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1.5" fill="currentColor" opacity="0.85"/>
+                <rect x="1" y="1" width="5.5" height="5.5" rx="1.5" fill="currentColor" opacity="0.85" />
+                <rect x="8.5" y="1" width="5.5" height="5.5" rx="1.5" fill="currentColor" opacity="0.85" />
+                <rect x="1" y="8.5" width="5.5" height="5.5" rx="1.5" fill="currentColor" opacity="0.85" />
+                <rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1.5" fill="currentColor" opacity="0.85" />
               </svg>
             </button>
 
@@ -286,7 +285,7 @@ export function Dashboard() {
 
                 {/* Tab rows */}
                 {TABS.map(tab => {
-                  const isActive  = activeTab === tab.key;
+                  const isActive = activeTab === tab.key;
                   const isDefault = defaultTab === tab.key;
                   return (
                     <button
@@ -428,7 +427,7 @@ export function Dashboard() {
         )}
 
         {/* ══ TODAY TAB ══ */}
-       {activeTab === 'today' && (
+        {activeTab === 'today' && (
           <TodayTab
             eventsLoading={todayData.eventsLoading}
             tasksLoading={db.tasksLoading}

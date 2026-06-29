@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Search, X, FolderKanban, CheckSquare, FileText, Calendar, Sparkles, AlertCircle } from 'lucide-react';
+import { Search, X, FolderKanban, CheckSquare, FileText, Calendar, } from 'lucide-react';
 import { taskApi, projectsApi, documentsApi, agentApi } from '@/services/api';
 import type { AgentSearchResponse } from '@/types';
 import { getStatusColors } from '@/config/statusColors';
@@ -52,7 +52,6 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
 
   // AI state
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState(false);
   const [aiResult, setAiResult] = useState<AgentSearchResponse | null>(null);
   const aiTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -93,12 +92,9 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
     };
   };
 
-  // ── Parallel AI search: fires on every query, debounced 500ms
-  // Basic REST results show immediately; AI silently upgrades them when ready
+  // ── Parallel AI search
   useEffect(() => {
-    // Reset all AI state on new query
     setAiResult(null);
-    setAiError(false);
     setSectionItems(EMPTY_ITEMS);
     setSectionPages(EMPTY_PAGES);
     setSectionHasMore(EMPTY_HAS_MORE);
@@ -123,7 +119,6 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
           setTotals(res.totals as unknown as Record<string, number>);
         }
       } catch {
-        setAiError(true);
       } finally {
         setAiLoading(false);
       }
@@ -182,9 +177,6 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
   const isActionIntent = aiResult?.type === 'action';
   const actionQuery = isActionIntent ? aiResult.query : '';
   const actionMessage = isActionIntent ? aiResult.message : '';
-
-  // ── AI status bar: always visible while query active
-  const isAiMode = query.trim().length >= 2;
   // Quick links shown when no query
   const quickLinks = [
     { label: 'My Work', icon: <Calendar size={14} color="#8B5CF6" />, route: '/my-work', bg: '#F5F3FF' },
@@ -227,26 +219,6 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
         <div style={{ maxHeight: 400, overflowY: 'auto' }}>
           {query.trim().length >= 2 ? (
             <>
-              {/* AI status bar — always visible while query is active, subtly shows AI state */}
-              {isAiMode && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 18px', background: aiLoading ? '#F5F3FF' : aiError ? '#FEF2F2' : '#F0FDF4', borderBottom: '1px solid #EDE9FE', transition: 'background 0.3s' }}>
-                  {aiLoading ? (
-                    <>
-                      <Sparkles size={11} color="#8B5CF6" />
-                      {/* <span style={{ fontSize: 11, color: '#8B5CF6' }}>Upgrading results with AI…</span> */}
-                    </>
-                  ) : aiError ? (
-                    <>
-                      <AlertCircle size={11} color="#EF4444" />
-                      <span style={{ fontSize: 11, color: '#EF4444' }}>AI unavailable — showing local results</span>
-                    </>
-                  ) : aiResult?.type === 'search' ? (
-                    <>
-                      <Sparkles size={11} color="#22C55E" />
-                    </>
-                  ) : null}
-                </div>
-              )}
 
               {/* Action intent banner */}
               {isActionIntent ? (
@@ -272,7 +244,7 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
 
                 // Empty state: AI done + no results, and basic also empty
                 const aiDoneEmpty = !aiLoading && useAiResults && Object.values(sectionItems).every(a => a.length === 0);
-                const basicEmpty  = !aiLoading && !useAiResults && displayBasic.length === 0 && !aiError;
+                const basicEmpty  = !aiLoading && !useAiResults && displayBasic.length === 0;
                 const showEmpty   = aiDoneEmpty || basicEmpty;
 
                 if (showEmpty) return (
