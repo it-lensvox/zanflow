@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Search, Plus, MessageSquare, MoreHorizontal, Share2, Pencil, Pin, Trash2, Sparkles, Clock } from 'lucide-react';
+import { Search, Plus, MoreHorizontal, Pencil, Pin, Trash2, Sparkles, Clock } from 'lucide-react';
 import type { AgentSession } from '@/types';
 
 interface HistoryPanelProps {
@@ -8,19 +8,21 @@ interface HistoryPanelProps {
   searchQuery:       string;
   setSearchQuery:    (q: string) => void;
   isLoading:         boolean;
-  sessionTitles:     Record<number, string>;
   onSelectSession:   (id: number) => void;
   onNewConversation: () => void;
   onRenameSession:   (id: number, title: string) => void;
+  onPinSession:      (id: number, isPinned: boolean) => void;
   onDeleteSession:   (id: number) => void;
 }
 
-function SessionMenu({ sessionId, title, onRename, onDelete, onClose }: {
-  sessionId: number; title: string;
+function SessionMenu({ sessionId, title, isPinned, onRename, onPin, onDelete, onClose }: {
+  sessionId: number; title: string; isPinned: boolean;
   onRename: (id: number, t: string) => void;
+  onPin:    (id: number, isPinned: boolean) => void;
   onDelete: (id: number) => void;
   onClose: () => void;
 }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const menuRef  = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [renaming,  setRenaming]  = useState(false);
@@ -44,11 +46,26 @@ function SessionMenu({ sessionId, title, onRename, onDelete, onClose }: {
     </div>
   );
 
+  if (confirmDelete) return (
+    <div ref={menuRef} style={{ position: 'absolute', right: 0, top: 32, zIndex: 300, background: '#0f172a', border: '1px solid #1e293b', borderRadius: 10, padding: 12, minWidth: 200, boxShadow: '0 16px 48px rgba(0,0,0,.6)' }}>
+      <p style={{ fontSize: 12, color: '#f1f5f9', marginBottom: 10 }}>Delete this conversation?</p>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button onClick={() => { onDelete(sessionId); onClose(); }}
+          style={{ flex: 1, padding: '6px 0', borderRadius: 6, border: 'none', background: '#ef4444', color: '#fff', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+          Delete
+        </button>
+        <button onClick={() => setConfirmDelete(false)}
+          style={{ flex: 1, padding: '6px 0', borderRadius: 6, border: '1px solid #1e293b', background: 'none', color: '#94a3b8', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+
   const items = [
-    { icon: <Share2 style={{ width: 11, height: 11 }} />, label: 'Share',    action: () => onClose(),                           danger: false },
-    { icon: <Pencil style={{ width: 11, height: 11 }} />, label: 'Rename',   action: () => setRenaming(true),                   danger: false },
-    { icon: <Pin    style={{ width: 11, height: 11 }} />, label: 'Pin',      action: () => onClose(),                           danger: false },
-    { icon: <Trash2 style={{ width: 11, height: 11 }} />, label: 'Delete',   action: () => { onDelete(sessionId); onClose(); }, danger: true  },
+    { icon: <Pencil style={{ width: 11, height: 11 }} />, label: 'Rename',          action: () => setRenaming(true),                              danger: false },
+    { icon: <Pin    style={{ width: 11, height: 11 }} />, label: isPinned ? 'Unpin' : 'Pin', action: () => { onPin(sessionId, !isPinned); onClose(); }, danger: false },
+    { icon: <Trash2 style={{ width: 11, height: 11 }} />, label: 'Delete',           action: () => setConfirmDelete(true),                         danger: true  },
   ];
 
   return (
@@ -65,13 +82,12 @@ function SessionMenu({ sessionId, title, onRename, onDelete, onClose }: {
   );
 }
 
-export function HistoryPanel({ sessions, activeSessionId, searchQuery, setSearchQuery, isLoading, sessionTitles, onSelectSession, onNewConversation, onRenameSession, onDeleteSession }: HistoryPanelProps) {
+export function HistoryPanel({ sessions, activeSessionId, searchQuery, setSearchQuery, isLoading, onSelectSession, onNewConversation, onRenameSession, onPinSession, onDeleteSession }: HistoryPanelProps) {
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
 
   const getTitle = (s: AgentSession) => {
-    const t = sessionTitles[s.id];
-    if (t) return t.length > 32 ? t.slice(0, 32) + '…' : t;
-    return `Session ${s.id}`;
+    const t = s.title || `Session ${s.id}`;
+    return t.length > 32 ? t.slice(0, 32) + '…' : t;
   };
 
   const filtered = sessions.filter(s =>
@@ -85,6 +101,64 @@ export function HistoryPanel({ sessions, activeSessionId, searchQuery, setSearch
     if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
     return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  };
+
+  const renderSession = (session: AgentSession) => {
+    const isActive   = session.id === activeSessionId;
+    const isMenuOpen = openMenuId === session.id;
+
+    return (
+      <div key={session.id} style={{ position: 'relative', marginBottom: 2 }}>
+        <button onClick={() => onSelectSession(session.id)}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'flex-start', gap: 9,
+            padding: '9px 30px 9px 10px', borderRadius: 9, border: 'none',
+            cursor: 'pointer', textAlign: 'left', transition: 'all .15s',
+            background: isActive
+              ? 'linear-gradient(135deg, rgba(22,99,246,.15), rgba(22,99,246,.08))'
+              : 'transparent',
+            borderLeft: isActive ? '2px solid #3b82f6' : '2px solid transparent',
+          }}
+          onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = '#0f172a'; }}
+          onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}>
+
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3 }}>
+              {session.is_pinned && (
+                <Pin style={{ width: 9, height: 9, color: '#60a5fa', flexShrink: 0 }} />
+              )}
+              <p style={{ fontSize: 12, fontWeight: isActive ? 600 : 400, color: isActive ? '#e2e8f0' : '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                title={session.title || `Session ${session.id}`}>
+                {getTitle(session)}
+              </p>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Clock style={{ width: 9, height: 9, color: '#334155' }} />
+              <span style={{ fontSize: 9, color: '#475569' }}>{formatDate(session.updated_at)}</span>
+              <span style={{ fontSize: 9, color: '#334155' }}>· {session.message_count} msg</span>
+            </div>
+          </div>
+        </button>
+
+        <button
+          onClick={e => { e.stopPropagation(); setOpenMenuId(isMenuOpen ? null : session.id); }}
+          style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', width: 20, height: 20, borderRadius: 5, border: 'none', background: isMenuOpen ? '#1e293b' : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569', transition: 'all .15s' }}
+          onMouseEnter={e => e.currentTarget.style.background = '#1e293b'}
+          onMouseLeave={e => { if (!isMenuOpen) e.currentTarget.style.background = 'transparent'; }}>
+          <MoreHorizontal style={{ width: 11, height: 11 }} />
+        </button>
+
+        {isMenuOpen && (
+          <SessionMenu
+            sessionId={session.id} title={getTitle(session)} isPinned={session.is_pinned}
+            onRename={(id, t) => { onRenameSession(id, t); setOpenMenuId(null); }}
+            onPin={(id, p) => { onPinSession(id, p); setOpenMenuId(null); }}
+            onDelete={(id) => { onDeleteSession(id); setOpenMenuId(null); }}
+            onClose={() => setOpenMenuId(null)}
+          />
+        )}
+      </div>
+    );
   };
 
   return (
@@ -130,10 +204,6 @@ export function HistoryPanel({ sessions, activeSessionId, searchQuery, setSearch
 
       {/* Session list */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px 8px' }}>
-        {sessions.length > 0 && (
-          <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.1em', color: '#334155', padding: '4px 8px 8px' }}>Recent</p>
-        )}
-
         {isLoading ? (
           <p style={{ fontSize: 12, color: '#475569', padding: '10px 8px' }}>Loading…</p>
         ) : filtered.length === 0 ? (
@@ -142,61 +212,24 @@ export function HistoryPanel({ sessions, activeSessionId, searchQuery, setSearch
             <p style={{ fontSize: 11, color: '#334155', marginTop: 4 }}>Start a new conversation above</p>
           </div>
         ) : (
-          filtered.map(session => {
-            const isActive   = session.id === activeSessionId;
-            const isMenuOpen = openMenuId === session.id;
+          <>
+            {/* ── Pinned section */}
+            {filtered.some(s => s.is_pinned) && (
+              <>
+                <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.1em', color: '#60a5fa', padding: '4px 8px 6px' }}>Pinned</p>
+                {filtered.filter(s => s.is_pinned).map(session => renderSession(session))}
+                <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, #1e293b, transparent)', margin: '6px 4px 8px' }} />
+              </>
+            )}
 
-            return (
-              <div key={session.id} style={{ position: 'relative', marginBottom: 2 }}>
-                <button onClick={() => onSelectSession(session.id)}
-                  style={{
-                    width: '100%', display: 'flex', alignItems: 'flex-start', gap: 9,
-                    padding: '9px 30px 9px 10px', borderRadius: 9, border: 'none',
-                    cursor: 'pointer', textAlign: 'left', transition: 'all .15s',
-                    background: isActive
-                      ? 'linear-gradient(135deg, rgba(22,99,246,.15), rgba(22,99,246,.08))'
-                      : 'transparent',
-                    borderLeft: isActive ? '2px solid #3b82f6' : '2px solid transparent',
-                  }}
-                  onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = '#0f172a'; }}
-                  onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}>
-
-                  <div style={{ width: 26, height: 26, borderRadius: 7, background: isActive ? 'rgba(59,130,246,.2)' : '#0f172a', border: `1px solid ${isActive ? 'rgba(59,130,246,.3)' : '#1e293b'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
-                    <MessageSquare style={{ width: 11, height: 11, color: isActive ? '#60a5fa' : '#475569' }} />
-                  </div>
-
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: 12, fontWeight: isActive ? 600 : 400, color: isActive ? '#e2e8f0' : '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 3 }}
-                      title={sessionTitles[session.id]}>
-                      {getTitle(session)}
-                    </p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <Clock style={{ width: 9, height: 9, color: '#334155' }} />
-                      <span style={{ fontSize: 9, color: '#475569' }}>{formatDate(session.updated_at)}</span>
-                      <span style={{ fontSize: 9, color: '#334155' }}>· {session.message_count} msg</span>
-                    </div>
-                  </div>
-                </button>
-
-                <button
-                  onClick={e => { e.stopPropagation(); setOpenMenuId(isMenuOpen ? null : session.id); }}
-                  style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', width: 20, height: 20, borderRadius: 5, border: 'none', background: isMenuOpen ? '#1e293b' : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569', transition: 'all .15s' }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#1e293b'}
-                  onMouseLeave={e => { if (!isMenuOpen) e.currentTarget.style.background = 'transparent'; }}>
-                  <MoreHorizontal style={{ width: 11, height: 11 }} />
-                </button>
-
-                {isMenuOpen && (
-                  <SessionMenu
-                    sessionId={session.id} title={getTitle(session)}
-                    onRename={(id, t) => { onRenameSession(id, t); setOpenMenuId(null); }}
-                    onDelete={(id) => { onDeleteSession(id); setOpenMenuId(null); }}
-                    onClose={() => setOpenMenuId(null)}
-                  />
-                )}
-              </div>
-            );
-          })
+            {/* ── Recents section */}
+            {filtered.some(s => !s.is_pinned) && (
+              <>
+                <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.1em', color: '#334155', padding: '4px 8px 6px' }}>Recents</p>
+                {filtered.filter(s => !s.is_pinned).map(session => renderSession(session))}
+              </>
+            )}
+          </>
         )}
       </div>
     </div>

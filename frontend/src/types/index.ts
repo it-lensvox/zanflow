@@ -1259,12 +1259,24 @@ export interface AgentQueryResponse {
 // Item from GET /api/v1/agent/sessions/
 export interface AgentSession {
   id:            number;
-  created_at:    string;
-  updated_at:    string;
+  title:         string;
+  is_pinned:     boolean;
   is_active:     boolean;
   message_count: number;
+  created_at:    string;
+  updated_at:    string;
 }
 
+export interface AgentSessionUpdatePayload {
+  title?:     string;
+  is_pinned?: boolean;
+}
+
+export interface AgentSessionUpdateResponse {
+  id:       number;
+  title:    string;
+  is_pinned: boolean;
+}
 // Message inside a session detail
 export interface AgentMessage {
   role:        'user' | 'assistant';

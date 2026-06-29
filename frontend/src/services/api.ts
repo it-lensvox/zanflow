@@ -1614,6 +1614,17 @@ export const agentApi = {
     return response.data;
   },
 
+  // rename or pin/unpin a session
+  updateSession: async (sessionId: number, payload: import('@/types').AgentSessionUpdatePayload): Promise<import('@/types').AgentSessionUpdateResponse> => {
+    const response = await api.patch(`/agent/sessions/${sessionId}/`, payload);
+    return response.data;
+  },
+
+  // delete a session
+  deleteSession: async (sessionId: number): Promise<void> => {
+    await api.delete(`/agent/sessions/${sessionId}/`);
+  },
+
   stream: async (
     payload:   import('@/types').AgentQueryPayload,
     onChunk:   (text: string) => void,

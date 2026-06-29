@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Plus, Maximize2, ChevronDown, PanelLeftOpen, PanelLeftClose, MoreHorizontal, Share2, Pencil, Pin, Trash2, Sparkles } from 'lucide-react';
+import { Plus, Maximize2, ChevronDown, PanelLeftOpen, PanelLeftClose, MoreHorizontal, Pencil, Pin, Trash2, Sparkles } from 'lucide-react';
 
 interface ChatHeaderProps {
   variant:           'mini' | 'fullscreen';
@@ -48,10 +48,8 @@ export function ChatHeader({ variant, isHistoryOpen, activeSessionId, sessionTit
   };
 
   const menuItems = [
-    { icon: <Share2 style={{ width: 13, height: 13 }} />, label: 'Share',    action: () => setMenuOpen(false),                          color: '#374151' },
-    { icon: <Pencil style={{ width: 13, height: 13 }} />, label: 'Rename',   action: () => { setRenameVal(sessionTitle); setIsRenaming(true); setMenuOpen(false); }, color: '#374151' },
-    { icon: <Pin    style={{ width: 13, height: 13 }} />, label: 'Pin Chat', action: () => setMenuOpen(false),                          color: '#374151' },
-    { icon: <Trash2 style={{ width: 13, height: 13 }} />, label: 'Delete',   action: () => { onDelete(); setMenuOpen(false); },        color: '#ef4444' },
+    { icon: <Pencil style={{ width: 13, height: 13 }} />, label: 'Rename', action: () => { setRenameVal(sessionTitle); setIsRenaming(true); setMenuOpen(false); }, color: '#374151' },
+    { icon: <Trash2 style={{ width: 13, height: 13 }} />, label: 'Delete', action: () => { onDelete(); setMenuOpen(false); },                                      color: '#ef4444' },
   ];
 
   return (

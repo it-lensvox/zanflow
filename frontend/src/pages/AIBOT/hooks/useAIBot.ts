@@ -10,10 +10,6 @@ function generateId(): string {
 // ─── Hook 
 export function useAIBot() {
   const [sessions, setSessions] = useState<AgentSession[]>([]);
-  const [sessionTitles, setSessionTitles] = useState<Record<number, string>>(() => {
-    try { return JSON.parse(localStorage.getItem('aibot_session_titles') || '{}'); }
-    catch { return {}; }
-  });
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
   const setSession = (id: number | null) => {
     activeSessionRef.current = id;
@@ -44,6 +40,7 @@ export function useAIBot() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const activeSessionRef = useRef<number | null>(null);
+  const sessionsFetchedRef = useRef(false);
 
   // ── Scroll to bottom on new messages 
   useEffect(() => {
@@ -94,7 +91,10 @@ export function useAIBot() {
   }, []);
 
   useEffect(() => {
-    if (isExpanded) loadSessions();
+    if (isExpanded && !sessionsFetchedRef.current) {
+      sessionsFetchedRef.current = true;
+      loadSessions();
+    }
   }, [isExpanded, loadSessions]);
 
   // ── Load message history for a session
@@ -182,16 +182,6 @@ export function useAIBot() {
           acc.push(uiMsg);
           return acc;
         }, []);
-      // Backfill title from first user message
-      const firstUserMsg = uiMessages.find(m => m.role === 'user');
-      if (firstUserMsg) {
-        setSessionTitles(prev => {
-          if (prev[sessionId]) return prev;
-          const updated = { ...prev, [sessionId]: firstUserMsg.content };
-          localStorage.setItem('aibot_session_titles', JSON.stringify(updated));
-          return updated;
-        });
-      }
 
       setMessages(uiMessages);
       setSession(sessionId);
@@ -212,29 +202,45 @@ export function useAIBot() {
     inputRef.current?.focus();
   }, []);
 
-  const renameSession = useCallback((newTitle: string, sessionId?: number) => {
+  const renameSession = useCallback(async (newTitle: string, sessionId?: number) => {
     const id = sessionId ?? activeSessionId;
     if (!id) return;
-    setSessionTitles(prev => {
-      const updated = { ...prev, [id]: newTitle };
-      localStorage.setItem('aibot_session_titles', JSON.stringify(updated));
-      return updated;
-    });
-  }, [activeSessionId]);
+    // Optimistic update — update title in sessions list immediately
+    setSessions(prev => prev.map(s => s.id === id ? { ...s, title: newTitle } : s));
+    try {
+      await agentApi.updateSession(id, { title: newTitle });
+    } catch {
+      // Revert on failure by reloading sessions
+      loadSessions();
+    }
+  }, [activeSessionId, loadSessions]);
 
-  const deleteSession = useCallback((sessionId?: number) => {
+  const pinSession = useCallback(async (sessionId: number, isPinned: boolean) => {
+    // Optimistic update
+    setSessions(prev => {
+      const updated = prev.map(s => s.id === sessionId ? { ...s, is_pinned: isPinned } : s);
+      // Pinned sessions first, preserve backend order within each group
+      return [...updated.filter(s => s.is_pinned), ...updated.filter(s => !s.is_pinned)];
+    });
+    try {
+      await agentApi.updateSession(sessionId, { is_pinned: isPinned });
+    } catch {
+      loadSessions();
+    }
+  }, [loadSessions]);
+
+  const deleteSession = useCallback(async (sessionId?: number) => {
     const id = sessionId ?? activeSessionId;
     if (!id) return;
-    setSessionTitles(prev => {
-      const updated = { ...prev };
-      delete updated[id];
-      localStorage.setItem('aibot_session_titles', JSON.stringify(updated));
-      return updated;
-    });
+    // Optimistic update
     setSessions(prev => prev.filter(s => s.id !== id));
     if (id === activeSessionId) { setSession(null); setMessages([]); }
-    setMessages([]);
-  }, [activeSessionId]);
+    try {
+      await agentApi.deleteSession(id);
+    } catch {
+      loadSessions();
+    }
+  }, [activeSessionId, loadSessions]);
   
   // ── Send a message with streaming 
   const sendMessage = useCallback(async () => {
@@ -294,12 +300,6 @@ export function useAIBot() {
               : m
           ));
           setSession(done.session_id);
-          setSessionTitles(prev => {
-            if (prev[done.session_id]) return prev;
-            const updated = { ...prev, [done.session_id]: text };
-            localStorage.setItem('aibot_session_titles', JSON.stringify(updated));
-            return updated;
-          });
           loadSessions();
         },
 
@@ -364,14 +364,13 @@ export function useAIBot() {
 
   // ── Derived 
   const filteredSessions = sessions.filter(s =>
-    String(s.id).includes(searchQuery) ||
-    new Date(s.updated_at).toLocaleDateString().includes(searchQuery)
+    (s.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    String(s.id).includes(searchQuery)
   );
 
   return {
     // state
     sessions, sessionsLoading, filteredSessions,
-    sessionTitles,
     activeSessionId,
     messages, isTyping, historyLoading,
     input, setInput,
@@ -387,6 +386,7 @@ export function useAIBot() {
     sendMessage, handleKeyDown,
     startNewConversation,
     renameSession,
+    pinSession,
     deleteSession,
     loadSessionHistory,
     handleFabMouseDown, handleFabClick,

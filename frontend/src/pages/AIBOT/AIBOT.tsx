@@ -36,10 +36,10 @@ export function AIBot() {
             searchQuery={b.searchQuery}
             setSearchQuery={b.setSearchQuery}
             isLoading={b.sessionsLoading}
-            sessionTitles={b.sessionTitles}
             onSelectSession={id => { b.loadSessionHistory(id); if (variant === 'mini') b.setIsHistoryOpen(false); }}
             onNewConversation={b.startNewConversation}
             onRenameSession={(id, title) => b.renameSession(title, id)}
+            onPinSession={(id, isPinned) => b.pinSession(id, isPinned)}
             onDeleteSession={id => b.deleteSession(id)}
           />
         )}
@@ -51,7 +51,7 @@ export function AIBot() {
           variant={variant}
           isHistoryOpen={b.isHistoryOpen}
           activeSessionId={b.activeSessionId}
-          sessionTitle={b.activeSessionId ? (b.sessionTitles[b.activeSessionId] || `Conversation ${b.activeSessionId}`) : 'Dyuksa AI'}
+          sessionTitle={b.activeSessionId ? (b.sessions.find(s => s.id === b.activeSessionId)?.title || `Conversation ${b.activeSessionId}`) : 'Dyuksa AI'}
           onToggleHistory={() => b.setIsHistoryOpen(v => !v)}
           onNewConversation={b.startNewConversation}
           onMaximize={variant === 'mini' ? () => { b.setIsFullScreen(true); b.setIsHistoryOpen(false); } : undefined}
