@@ -168,18 +168,25 @@ class AgentSessionListView(APIView):
             user=request.user,
             workspace_id=workspace_id,
             is_active=True,
-        )[:20]
-        serializer = AgentSessionSerializer(sessions, many=True)
-        return Response(serializer.data)
+        ).order_by("-is_pinned", "-updated_at")[:50]
+
+        return Response([
+            {
+                "id":         s.id,
+                "title":      s.title or f"Session {s.id}",
+                "is_pinned":  s.is_pinned,
+                "created_at": s.created_at,
+                "updated_at": s.updated_at,
+            }
+            for s in sessions
+        ])
 
 
 class AgentSessionDetailView(APIView):
     """
-    GET    /api/v1/agent/sessions/<session_id>/  — returns session + message history
-    DELETE /api/v1/agent/sessions/<session_id>/  — closes the session
-
-    Closes/clears a session so it won't appear in the list.
-    Does not delete the logs — they're kept for audit.
+    GET    /api/v1/agent/sessions/<session_id>/         — session + message history
+    PATCH  /api/v1/agent/sessions/<session_id>/         — rename or pin/unpin
+    DELETE /api/v1/agent/sessions/<session_id>/         — soft delete session
     """
     permission_classes = [IsAuthenticated]
 
@@ -190,14 +197,66 @@ class AgentSessionDetailView(APIView):
                 user=request.user,
             )
             return Response({
-                "id": session.id,
-                "is_active": session.is_active,
+                "id":         session.id,
+                "title":      session.title or f"Session {session.id}",
+                "is_active":  session.is_active,
+                "is_pinned":  session.is_pinned,
                 "created_at": session.created_at,
                 "updated_at": session.updated_at,
-                "messages": session.messages,  # full conversation history
+                "messages":   session.messages,
             })
         except AgentSession.DoesNotExist:
             return Response({"error": "Session not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    def patch(self, request, session_id):
+        """
+        Rename or pin/unpin a session.
+
+        Body (any combination):
+            { "title": "My renamed chat" }
+            { "is_pinned": true }
+            { "title": "New name", "is_pinned": false }
+        """
+        try:
+            session = AgentSession.objects.get(
+                id=session_id,
+                user=request.user,
+            )
+        except AgentSession.DoesNotExist:
+            return Response({"error": "Session not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        updated_fields = []
+
+        # Rename
+        if "title" in request.data:
+            title = str(request.data["title"]).strip()
+            if not title:
+                return Response(
+                    {"error": "title cannot be empty."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            session.title = title[:255]
+            updated_fields.append("title")
+
+        # Pin / Unpin
+        if "is_pinned" in request.data:
+            session.is_pinned = bool(request.data["is_pinned"])
+            updated_fields.append("is_pinned")
+
+        if not updated_fields:
+            return Response(
+                {"error": "Provide at least one of: title, is_pinned"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        updated_fields.append("updated_at")
+        session.save(update_fields=updated_fields)
+
+        return Response({
+            "id":        session.id,
+            "title":     session.title,
+            "is_pinned": session.is_pinned,
+        })
 
     def delete(self, request, session_id):
         try:
@@ -306,7 +365,7 @@ class AISearchView(APIView):
                 filters.get("assignee_name"), filters.get("project_name"),
                 filters.get("overdue"), filters.get("assigned_to_me"),
                 filters.get("today"), filters.get("date"),
-                filters.get("search_text"),
+                filters.get("search_text"), filters.get("is_favourite"),
             ]):
                 fallback = True
 

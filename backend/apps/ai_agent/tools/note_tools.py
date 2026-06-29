@@ -35,10 +35,8 @@ NOTE_TOOL_SCHEMAS = [
     {
         "name": "list_notes",
         "description": (
-            "List or search notes created by the current user. "
-            "Use for: 'show my notes', 'find notes about X', 'show notes from project N'. "
-            "Notes are user-created text snippets. "
-            "Do NOT use list_documents for notes — that is for project files/documents only."
+            "List or search notes created by the current user only. "
+            "Use when user says 'show my notes', 'find notes about X', etc."
         ),
         "input_schema": {
             "type": "object",
@@ -91,50 +89,41 @@ def _note_fields() -> set:
 
 def create_note(args: dict, user, workspace_id: str) -> dict:
     try:
+        from apps.organizations.models import Workspace
         Note = _get_note_model()
-        fields = _note_fields()
-        payload = {}
+
+        # Note is a TenantModel — must explicitly set organization_id and workspace_id
+        # Cannot rely on request context since agent runs outside normal request cycle
+        workspace = Workspace.objects.filter(id=workspace_id).select_related("organization").first()
+        if not workspace:
+            return {"success": False, "error": f"Workspace {workspace_id} not found."}
+
+        organization_id = workspace.organization_id
 
         # title is optional — auto-generate from content if not provided
-        title = args.get("title") or (args.get("content", "")[:50] + "...") if args.get("content") else "Untitled"
-        if "title" in fields:
-            payload["title"] = title
-        elif "heading" in fields:
-            payload["heading"] = title
+        title = args.get("title", "").strip()
+        if not title:
+            content_preview = args.get("content", "")[:50]
+            title = (content_preview + "...") if len(args.get("content", "")) > 50 else content_preview or "Untitled"
 
-        if "content" in fields:
-            payload["content"] = args["content"]
-        elif "body" in fields:
-            payload["body"] = args["content"]
+        note = Note(
+            title=title,
+            content=args.get("content", ""),
+            user=user,
+            workspace_id=workspace_id,
+            organization_id=organization_id,
+        )
 
-        if "workspace_id" in fields:
-            payload["workspace_id"] = workspace_id
+        if args.get("project_id"):
+            note.project_id = args["project_id"]
 
-        # Always scope to requesting user
-        if "created_by_id" in fields or "created_by" in fields:
-            payload["created_by"] = user
-        elif "author_id" in fields or "author" in fields:
-            payload["author"] = user
-        elif "user_id" in fields or "user" in fields:
-            payload["user"] = user
-
-        try:
-            if "organization_id" in fields:
-                payload["organization_id"] = user.organization_id
-        except AttributeError:
-            pass
-
-        if args.get("project_id") and "project_id" in fields:
-            payload["project_id"] = args["project_id"]
-
-        note = Note.objects.create(**payload)
-        note_title = getattr(note, "title", None) or getattr(note, "heading", "Untitled")
+        note.save()
 
         return {
-            "success": True,
-            "note_id": note.id,
-            "title":   note_title,
-            "message": f"Note '{note_title}' created successfully",
+            "success":  True,
+            "note_id":  note.id,
+            "title":    note.title,
+            "message":  f"Note '{note.title}' created successfully",
         }
 
     except Exception as exc:

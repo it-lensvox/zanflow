@@ -217,6 +217,17 @@ def _build_project_summary_response(tool_result: dict) -> str | None:
         f"{in_prog} in progress, {done} completed."
     )
 
+def _generate_session_title(query: str) -> str:
+    """
+    Generates a short session title from the first user message.
+    Truncates to 60 chars — clean and readable in the sidebar.
+    """
+    title = query.strip()
+    if len(title) > 60:
+        title = title[:57].rsplit(" ", 1)[0] + "..."
+    return title or "New Chat"
+
+
 class AgentOrchestrator:
 
     def __init__(self, user, workspace_id: str, session_id: int | None = None):
@@ -415,20 +426,75 @@ class AgentOrchestrator:
                                     first_tool_called = "get_workspace_members"
                             break
 
-                # ── GUARD RAIL 5: create_daily_update before list_tasks ───────────
-                # Q068: model calls create_daily_update without fetching tasks first
+                # ── GUARD RAIL 5: create_daily_update — build content directly ────
+                # LLM cannot be trusted to format standup content correctly.
+                # We build the content ourselves and call the tool directly,
+                # bypassing the LLM for content generation entirely.
                 if tool_name == "create_daily_update" and first_tool_called is None:
-                    logger.info("Guard rail 5: create_daily_update first, fetching tasks")
-                    tr5 = execute_tool("list_tasks", {"status": "in_progress"}, self.user, self.workspace_id)
-                    if tr5.get("success") and tr5.get("tasks"):
-                        summary = ", ".join(t.get("heading","") for t in tr5["tasks"][:10])
-                        self.session.messages.append({
-                            "role": "user",
-                            "content": [{"type": "text", "text": f"[Context: your in-progress tasks: {summary}]"}],
-                        })
-                    guard_rail_used = True
-                    if first_tool_called is None:
-                        first_tool_called = "list_tasks"
+                    logger.info("Guard rail 5: building standup content directly")
+                    from datetime import date as _date
+
+                    # Step 1 — fetch tasks worked on today
+                    tr5 = execute_tool("list_tasks", {"updated_today": True}, self.user, self.workspace_id)
+                    tasks_today = tr5.get("tasks", []) if tr5.get("success") else []
+
+                    # Step 2 — fallback to in_progress if nothing updated today
+                    if not tasks_today:
+                        tr5_fb = execute_tool("list_tasks", {"status": "in_progress", "limit": 10}, self.user, self.workspace_id)
+                        tasks_today = tr5_fb.get("tasks", []) if tr5_fb.get("success") else []
+
+                    # Step 3 — group by status
+                    in_progress = [t["heading"] for t in tasks_today if t["status"] == "in_progress"]
+                    completed   = [t["heading"] for t in tasks_today if t["status"] == "completed"]
+                    review      = [t["heading"] for t in tasks_today if t["status"] in ("review", "deployed")]
+
+                    # Step 4 — build structured content in exact frontend format
+                    date_header = _date.today().strftime("%-d %B %Y")
+                    _pri = ", ".join(in_progress) if in_progress else "None"
+                    _pro = ", ".join(completed) if completed else "None"
+                    _rev = ", ".join(review) if review else "None"
+                    standup_content = (
+                        "Daily Update – " + date_header + "\n\n"
+                        "Today's Priorities:-\n" + _pri + "\n\n"
+                        "Progress (Yesterday):-\n" + _pro + "\n\n"
+                        "Blockers / Needs:-\nNone\n\n"
+                        "Upcoming:-\n" + _rev
+                    )
+
+                    # Step 5 — call create_daily_update directly with our content
+                    # DO NOT pass to LLM — LLM will rewrite in its own format
+                    du_result = execute_tool(
+                        "create_daily_update",
+                        {"content": standup_content},
+                        self.user,
+                        self.workspace_id,
+                    )
+
+                    # Step 6 — build final response and return immediately
+                    date_str = str(_date.today())
+                    final_response = (
+                        f"Done! Your standup note has been created for {date_str}."
+                    )
+                    self.session.add_message("assistant", final_response)
+                    if not self.session.title:
+                        self.session.title = _generate_session_title(user_query)
+                        self.session.save(update_fields=["title", "updated_at"])
+
+                    log.tool_name      = "create_daily_update"
+                    log.tool_input     = {"content": standup_content}
+                    log.tool_output    = du_result
+                    log.final_response = final_response
+                    log.intent         = "standup"
+                    log.status         = AgentLog.Status.TOOL_CALLED
+                    log.latency_ms     = int((time.time() - start) * 1000)
+                    log.save()
+
+                    return {
+                        "response":    final_response,
+                        "session_id":  self.session.id,
+                        "tool_called": "create_daily_update",
+                        "tool_result": du_result,
+                    }
 
                 # ── GUARD RAIL 6: create_task with string project name ─────────────
                 # Q077/Q089: model calls create_task(project_name="ZanFlow") without ID
@@ -619,6 +685,11 @@ class AgentOrchestrator:
             log.final_response = final_response
             log.status         = AgentLog.Status.TOOL_CALLED if reported_tool else AgentLog.Status.SUCCESS
             log.latency_ms     = int((time.time() - start) * 1000)
+            # Auto-generate session title from first message if not set
+            if not self.session.title:
+                self.session.title = _generate_session_title(user_query)
+                self.session.save(update_fields=["title", "updated_at"])
+
             log.save()
 
             return {
@@ -649,7 +720,7 @@ class AgentOrchestrator:
         from apps.ai_agent.tools.registry import ALL_TOOL_SCHEMAS, execute_tool
 
         try:
-            # self.session = self._get_or_create_session(None)
+            # self.session already set in __init__ with correct session_id
             llm          = get_llm_client()
             tools        = ALL_TOOL_SCHEMAS
             system       = self._build_system_prompt()
@@ -713,11 +784,13 @@ class AgentOrchestrator:
                 for word in final_text.split(" "):
                     yield {"type": "chunk", "text": word + " "}
 
-            # Save session
+            # Save session — auto-generate title from first message if not set
             self.session.messages.append({
                 "role": "assistant",
                 "content": [{"type": "text", "text": final_text}],
             })
+            if not self.session.title:
+                self.session.title = _generate_session_title(user_query)
             self.session.save()
 
             # Determine reported tool

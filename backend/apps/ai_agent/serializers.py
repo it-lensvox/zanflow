@@ -27,7 +27,10 @@ class AgentResponseSerializer(serializers.Serializer):
 class AgentSessionSerializer(serializers.ModelSerializer):
     class Meta:
         model = AgentSession
-        fields = ["id", "workspace_id", "messages", "created_at", "updated_at", "is_active"]
+        fields = [
+            "id", "workspace_id", "title", "is_pinned",
+            "messages", "created_at", "updated_at", "is_active",
+        ]
         read_only_fields = fields
 
 

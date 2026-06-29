@@ -173,6 +173,10 @@ TASK_TOOL_SCHEMAS = [
                     "type": "integer",
                     "description": "Max tasks to return (default: 10, max: 50)",
                 },
+                "updated_today": {
+                    "type": "boolean",
+                    "description": "If true, return tasks where status was changed today by the user. Use for standup creation.",
+                },
             },
             "required": [],
         },
@@ -531,9 +535,21 @@ def list_tasks(args: dict, user, workspace_id: str) -> dict:
             Q(assigned_to=user) | Q(assigned_by=user)
         ).distinct()
 
-        status_filter = args.get("status", "pending")
-        if status_filter and status_filter != "all":
-            qs = qs.filter(status=status_filter)
+        # updated_today filter — used for standup creation
+        # Fetches tasks where status was changed TODAY by current user
+        if args.get("updated_today") is True:
+            from datetime import date
+            today = date.today()
+            qs = qs.filter(
+                updated_at__date=today,
+                status_updated_by=user,
+                status__in=["in_progress", "completed", "review", "deployed"],
+            )
+            # Don't apply default status filter when using updated_today
+        else:
+            status_filter = args.get("status", "pending")
+            if status_filter and status_filter != "all":
+                qs = qs.filter(status=status_filter)
 
         if args.get("priority"):
             qs = qs.filter(priority=args["priority"])
@@ -549,7 +565,7 @@ def list_tasks(args: dict, user, workspace_id: str) -> dict:
             "assigned_by", "project"
         ).prefetch_related(
             "assigned_to"
-        ).order_by("-created_at")[offset: offset + limit]
+        ).order_by("-updated_at")[offset: offset + limit]
 
         tasks_list = [
             {
