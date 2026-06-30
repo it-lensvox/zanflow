@@ -36,7 +36,7 @@ export function useAIBot() {
   // Expand state
   const [isExpanded, setIsExpanded] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const activeSessionRef = useRef<number | null>(null);
@@ -141,10 +141,9 @@ export function useAIBot() {
       const toolEntries = Object.values(toolCallMap);
       const lastTool = toolEntries.length > 0 ? toolEntries[toolEntries.length - 1] : null;
 
-      // ── Step 2: build UI messages — same as before but now attach tool data
+      // ── Step 2: build UI messages 
       const uiMessages: AgentUIMessage[] = rawMessages
         .reduce((acc: AgentUIMessage[], m: any) => {
-          // Extract plain text content regardless of format
           let content = '';
           if (typeof m.content === 'string') {
             content = m.content.trim();
@@ -153,10 +152,9 @@ export function useAIBot() {
             content = textBlock ? (textBlock.text || '').trim() : '';
           }
 
-          // Only keep messages that have actual displayable text
           if (!content) return acc;
 
-          // For assistant messages: attach the last resolved tool pair
+          // For assistant messages: 
           const isAssistant = m.role === 'assistant';
           const uiMsg: AgentUIMessage = {
             id:         generateId(),
@@ -193,21 +191,17 @@ export function useAIBot() {
   const renameSession = useCallback(async (newTitle: string, sessionId?: number) => {
     const id = sessionId ?? activeSessionId;
     if (!id) return;
-    // Optimistic update — update title in sessions list immediately
     setSessions(prev => prev.map(s => s.id === id ? { ...s, title: newTitle } : s));
     try {
       await agentApi.updateSession(id, { title: newTitle });
     } catch {
-      // Revert on failure by reloading sessions
       loadSessions();
     }
   }, [activeSessionId, loadSessions]);
 
   const pinSession = useCallback(async (sessionId: number, isPinned: boolean) => {
-    // Optimistic update
     setSessions(prev => {
       const updated = prev.map(s => s.id === sessionId ? { ...s, is_pinned: isPinned } : s);
-      // Pinned sessions first, preserve backend order within each group
       return [...updated.filter(s => s.is_pinned), ...updated.filter(s => !s.is_pinned)];
     });
     try {
@@ -220,7 +214,6 @@ export function useAIBot() {
   const deleteSession = useCallback(async (sessionId?: number) => {
     const id = sessionId ?? activeSessionId;
     if (!id) return;
-    // Optimistic update
     setSessions(prev => prev.filter(s => s.id !== id));
     if (id === activeSessionId) { setSession(null); setMessages([]); }
     try {

@@ -70,7 +70,6 @@ function PageSkeleton() {
 export function Layout() {
   const [isActivityOpen, setIsActivityOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const isProjectDetailPage = useMatch('/projects/:id');
   const { unreadCount }     = useNotifications();
   const { user }            = useAuth();
   const navigate            = useNavigate();
@@ -202,7 +201,7 @@ export function Layout() {
       </main>
 
       {isActivityOpen && <NotificationsPage onClose={() => setIsActivityOpen(false)} />}
-      {!isProjectDetailPage && <AIBot />}
+      <AIBot />
       <TaskDraftBar />
     </div>
   );

@@ -23,7 +23,7 @@ export function AIBot() {
     );
   }
 
-  // ── Shared inner layout ────────────────────────────────────────────────────
+  // ── Shared inner layout ──
   const innerLayout = (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden', borderRadius: 16 }}>
 
@@ -78,7 +78,7 @@ export function AIBot() {
   if (b.isExpanded) {
     return (
       <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.4)', backdropFilter: 'blur(4px)' }}>
-        <div style={{ width: b.isHistoryOpen ? 'min(1080px, calc(100vw - 48px))' : 'min(860px, calc(100vw - 48px))', height: 'calc(100vh - 80px)', background: '#fff', borderRadius: 16, boxShadow: '0 25px 60px rgba(0,0,0,.25)', overflow: 'hidden', transition: 'width .25s ease' }}>
+        <div style={{ width: b.isHistoryOpen ? 'min(1280px, calc(100vw - 48px))' : 'min(1040px, calc(100vw - 48px))', height: 'calc(100vh - 80px)', background: '#fff', borderRadius: 16, boxShadow: '0 25px 60px rgba(0,0,0,.25)', overflow: 'hidden', transition: 'width .25s ease' }}>
           {innerLayout}
         </div>
       </div>
