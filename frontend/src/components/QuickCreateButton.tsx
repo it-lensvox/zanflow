@@ -117,6 +117,8 @@ export function QuickCreateButton() {
           transform: open ? 'rotate(45deg)' : 'rotate(0deg)',
           flexShrink: 0,
           boxShadow: '0 2px 8px rgba(22,99,246,0.35)',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
         }}
         onClick={() => setOpen(prev => !prev)}
         title="Quick create"
@@ -151,6 +153,8 @@ export function QuickCreateButton() {
               borderRadius: 20,
               boxShadow: '0 24px 80px rgba(0,0,0,0.2)',
               overflow: 'hidden',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
             }}
             onClick={e => e.stopPropagation()}
           >

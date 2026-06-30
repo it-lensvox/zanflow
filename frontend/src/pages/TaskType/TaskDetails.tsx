@@ -10,7 +10,7 @@ import { createDocumentsTableColumns, DocumentGridCard } from '@/components/layo
 import { TaskGridCard, createTasksTableColumns, getStatusConfig, priorityOptions, statusOptions } from '@/components/layout/DualView/taskConfig';
 import { TaskDetailModal } from '../MyTask/components/TaskDetailModal';
 import { SearchFilter, ListFilter, DateFilter, FilterHeaderWrapper } from '@/components/layout/DualView/FilterComponents';
-import { CreateTask } from '@/pages/MyTask/pages/CreateTask';
+import { CreateTask } from '@/pages/MyTask/pages/CreateTask/CreateTask';
 import { InlineCreateRow } from '@/components/layout/CreateTask/InlineCreateRow';
 import { DocumentPreview, useDocumentPreviewKeyboard } from '@/components/common/DocumentPreview';
 import { DocumentShareModal } from '@/pages/Documents/DocumentShareModal';

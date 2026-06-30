@@ -25,11 +25,11 @@
     --ring: 224 71.4% 4.1%;
     --radius: 0.5rem;
     :root {
-     font-size: 16px;
-    }
-    html.font-small  { font-size: 14px; }
-    html.font-medium { font-size: 16px; }
-    html.font-large  { font-size: 18px; }
+    font-size: 15px;
+  }
+  html.font-small  { font-size: 13px; }
+  html.font-medium { font-size: 15px; }
+  html.font-large  { font-size: 17px; }
   }
 
   .dark {
@@ -61,6 +61,9 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 

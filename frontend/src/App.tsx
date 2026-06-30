@@ -18,7 +18,7 @@ const ProjectSettings = lazy(() => import('@/pages/Project/ProjectSettings').the
 const DocumentCreate = lazy(() => import('@/pages/Documents/DocumentCreate').then(m => ({ default: m.DocumentCreate })));
 const Documents = lazy(() => import('@/pages/Documents/Documents').then(m => ({ default: m.Documents })));
 const SharedWithMe = lazy(() => import('@/pages/Documents/SharedWithMe').then(m => ({ default: m.SharedWithMe })));const MyTask = lazy(() => import('@/pages/MyTask/MyTask').then(m => ({ default: m.MyTask })));
-const CreateTask = lazy(() => import('@/pages/MyTask/pages/CreateTask').then(m => ({ default: m.CreateTask })));
+const CreateTask = lazy(() => import('@/pages/MyTask/pages/CreateTask/CreateTask').then(m => ({ default: m.CreateTask })));
 const TaskDetailPage = lazy(() => import('@/pages/MyTask/pages/TaskDetailPage').then(m => ({ default: m.TaskDetailPage })));
 const Teams = lazy(() => import('@/pages/TeamManagement/Teams').then(m => ({ default: m.Teams })));
 const UserManagement = lazy(() => import('@/pages/TeamManagement/UserManagement').then(m => ({ default: m.UserManagement })));
