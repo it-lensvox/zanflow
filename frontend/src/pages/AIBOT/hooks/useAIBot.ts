@@ -277,7 +277,7 @@ export function useAIBot() {
         (done) => {
           setMessages(prev => prev.map(m =>
             m.id === botMsgId
-              ? { ...m, toolCalled: done.tool_called, toolResult: done.tool_result }
+              ? { ...m, toolCalled: done.tool_called, toolResult: done.tool_result, filtersUsed: done.filters_used }
               : m
           ));
           setSession(done.session_id);

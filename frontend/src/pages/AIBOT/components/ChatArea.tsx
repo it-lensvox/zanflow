@@ -16,6 +16,7 @@ interface ChatAreaProps {
   onNewConversation: () => void;
   messagesEndRef:    React.RefObject<HTMLDivElement>;
   inputRef:          React.RefObject<HTMLTextAreaElement>;
+  onCloseChat:       () => void;
 }
 
 const SUGGESTIONS = [
@@ -25,7 +26,7 @@ const SUGGESTIONS = [
   { icon: <FileText style={{ width: 13, height: 13 }} />,     label: 'Standup',  text: 'Summarise my open tasks for today\'s standup',          accent: '#0891b2' },
 ];
 
-export function ChatArea({ messages, isTyping, historyLoading, input, setInput, onSend, onKeyDown, onNewConversation, messagesEndRef, inputRef }: ChatAreaProps) {
+export function ChatArea({ messages, isTyping, historyLoading, input, setInput, onSend, onKeyDown, onNewConversation, messagesEndRef, inputRef, onCloseChat }: ChatAreaProps) {
   const isEmpty = messages.length === 0;
 
   return (
@@ -82,7 +83,7 @@ export function ChatArea({ messages, isTyping, historyLoading, input, setInput, 
             {messages.map((m, i) => {
               const isStreamingMsg = isTyping && i === messages.length - 1 && m.role === 'assistant';
               if (isStreamingMsg && m.content === '') return null;
-              return <MessageBubble key={m.id} message={m} isStreaming={isStreamingMsg} />;
+              return <MessageBubble key={m.id} message={m} isStreaming={isStreamingMsg} onCloseChat={onCloseChat} />;
             })}
 
             {/* Typing indicator */}

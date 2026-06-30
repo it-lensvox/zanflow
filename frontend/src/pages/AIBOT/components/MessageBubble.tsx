@@ -9,9 +9,10 @@ const MUTED = '#667085';
 interface MessageBubbleProps {
   message:     AgentUIMessage;
   isStreaming?: boolean;
+  onCloseChat?: () => void;
 }
 
-export function MessageBubble({ message, isStreaming = false }: MessageBubbleProps) {
+export function MessageBubble({ message, isStreaming = false, onCloseChat }: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const time   = new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const entities = !isStreaming
@@ -87,8 +88,8 @@ export function MessageBubble({ message, isStreaming = false }: MessageBubblePro
             minWidth: 40, minHeight: 20,
           }}>
            {hasEntities ? (
-              /* Cards only — no duplicate text */
-              entities && <EntityCards entities={entities} />
+              /* Cards only  */
+              entities && <EntityCards entities={entities} filtersUsed={message.filtersUsed ?? null} onCloseChat={onCloseChat} />
             ) : (
               /* Plain text response — no entity data detected */
               <RichTextEditor

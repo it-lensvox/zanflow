@@ -69,6 +69,7 @@ export function AIBot() {
           onNewConversation={b.startNewConversation}
           messagesEndRef={b.messagesEndRef}
           inputRef={b.inputRef}
+          onCloseChat={() => { b.setIsExpanded(false); b.setIsFullScreen(false); }}
         />
       </div>
     </div>

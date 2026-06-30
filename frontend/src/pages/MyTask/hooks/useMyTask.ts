@@ -57,9 +57,9 @@ export function useMyTask() {
   const priorityParam  = searchParams.get('priority')   || undefined;
   const projectIdParam = searchParams.get('project_id') || undefined;
   const statusParam = activeFilter !== 'ALL' ? activeFilter.toLowerCase() : undefined;
-  const urlStatusRedirectRef = useRef(false);
+  const urlStatusRedirectRef = useRef<string | null>(null);
   const statusFromUrl = searchParams.get('status');
-  const pendingStatusRedirect = !!statusFromUrl && location.pathname !== `/taskboard/${statusFromUrl.toLowerCase()}` && !urlStatusRedirectRef.current;
+  const pendingStatusRedirect = !!statusFromUrl && location.pathname !== `/taskboard/${statusFromUrl.toLowerCase()}` && urlStatusRedirectRef.current !== statusFromUrl;
 
   // ── Outlet context
   const outletContext = useOutletContext<{
@@ -216,11 +216,11 @@ export function useMyTask() {
   });
 
   useEffect(() => {
-    if (urlStatusRedirectRef.current) return;
     if (!statusFromUrl) return;
+    if (urlStatusRedirectRef.current === statusFromUrl) return;
     const targetPath = `/taskboard/${statusFromUrl.toLowerCase()}`;
     if (location.pathname === targetPath) return;
-    urlStatusRedirectRef.current = true;
+    urlStatusRedirectRef.current = statusFromUrl;
     navigate({ pathname: targetPath, search: location.search }, { replace: true });
   }, [statusFromUrl, location.pathname, location.search, navigate]);
 

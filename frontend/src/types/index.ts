@@ -1297,12 +1297,13 @@ export interface AgentSessionDetail {
 
 // Local UI message (what we render in the chat)
 export interface AgentUIMessage {
-  id:          string;
-  role:        'user' | 'assistant';
-  content:     string;
-  timestamp:   string;
-  toolCalled?: string | null;
-  toolResult?: Record<string, unknown> | null;
+  id:           string;
+  role:         'user' | 'assistant';
+  content:      string;
+  timestamp:    string;
+  toolCalled?:  string | null;
+  toolResult?:  Record<string, unknown> | null;
+  filtersUsed?: AgentFiltersUsed | null;
 }
 
 // ─── Streaming types 
@@ -1312,10 +1313,11 @@ export interface AgentStreamChunk {
 }
 
 export interface AgentStreamDone {
-  type:        'done';
-  session_id:  number;
-  tool_called: string | null;
-  tool_result: Record<string, unknown> | null;
+  type:         'done';
+  session_id:   number;
+  tool_called:  string | null;
+  tool_result:  Record<string, unknown> | null;
+  filters_used: AgentFiltersUsed | null;
 }
 
 export type AgentStreamEvent = AgentStreamChunk | AgentStreamDone;

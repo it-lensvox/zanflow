@@ -1,5 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { CheckSquare, FileText, ArrowUpRight, Clock, User } from 'lucide-react';
+import { buildViewAllUrl } from '@/utils/filtersUsedNavigation';
+import type { AgentFiltersUsed } from '@/types';
 
 // ─── Priority + status colour maps 
 const PRIORITY_COLOR: Record<string, { bg: string; text: string; border: string }> = {
@@ -128,11 +130,33 @@ function NoteCard({ id, title, preview, folder }: NoteCardProps) {
 }
 
 // ─── Card grid wrapper 
-export function EntityCardGrid({ children, label }: { children: React.ReactNode; label?: string }) {
+export function EntityCardGrid({ children, label, viewAllUrl, viewAllLabel, onShowMore, onCloseChat }: { children: React.ReactNode; label?: string; viewAllUrl?: string | null; viewAllLabel?: string; onShowMore?: () => void; onCloseChat?: () => void }) {
+  const navigate = useNavigate();
+  const goViewAll = () => {
+    if (!viewAllUrl) return;
+    onCloseChat?.();
+    navigate(viewAllUrl);
+  };
   return (
     <div style={{ marginTop: 10 }}>
-      {label && <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.08em', color: '#94a3b8', marginBottom: 6 }}>{label}</p>}
+      {label && (
+        <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.08em', color: '#94a3b8', margin: '0 0 6px' }}>{label}</p>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 6 }}>{children}</div>
+      {(onShowMore || viewAllUrl) && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+          {onShowMore ? (
+            <button onClick={onShowMore} style={{ fontSize: 10, fontWeight: 700, color: '#64748b', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
+              Show more
+            </button>
+          ) : <span />}
+          {viewAllUrl && (
+            <button onClick={goViewAll} style={{ fontSize: 10, fontWeight: 700, color: '#1663f6', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
+              {viewAllLabel || 'View all'} →
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -238,21 +262,24 @@ export function parseToolResult(toolCalled: string | null, toolResult: Record<st
 }
 
 // ─── Renderer 
-export function EntityCards({ entities }: { entities: ParsedEntities }) {
+export function EntityCards({ entities, filtersUsed, onCloseChat }: { entities: ParsedEntities; filtersUsed?: AgentFiltersUsed | null; onCloseChat?: () => void }) {
+  const taskViewAllUrl    = buildViewAllUrl('task',    filtersUsed ?? null);
+  const projectViewAllUrl = buildViewAllUrl('project', filtersUsed ?? null);
+  const noteViewAllUrl    = buildViewAllUrl('note',    filtersUsed ?? null);
   return (
     <>
       {entities.tasks    && entities.tasks.length    > 0 && (
-        <EntityCardGrid label={`${entities.tasks.length} task${entities.tasks.length > 1 ? 's' : ''}`}>
+        <EntityCardGrid label={`${entities.tasks.length} task${entities.tasks.length > 1 ? 's' : ''}`} viewAllUrl={taskViewAllUrl} viewAllLabel="View all on Taskboard" onCloseChat={onCloseChat}>
           {entities.tasks.map(t => <TaskCard key={t.id} {...t} />)}
         </EntityCardGrid>
       )}
       {entities.projects && entities.projects.length > 0 && (
-        <EntityCardGrid label={`${entities.projects.length} project${entities.projects.length > 1 ? 's' : ''}`}>
+        <EntityCardGrid label={`${entities.projects.length} project${entities.projects.length > 1 ? 's' : ''}`} viewAllUrl={projectViewAllUrl} viewAllLabel="View all on Projects" onCloseChat={onCloseChat}>
           {entities.projects.map(p => <ProjectCard key={p.id} {...p} />)}
         </EntityCardGrid>
       )}
       {entities.notes    && entities.notes.length    > 0 && (
-        <EntityCardGrid label={`${entities.notes.length} note${entities.notes.length > 1 ? 's' : ''}`}>
+        <EntityCardGrid label={`${entities.notes.length} note${entities.notes.length > 1 ? 's' : ''}`} viewAllUrl={noteViewAllUrl} viewAllLabel="View all on Documents" onCloseChat={onCloseChat}>
           {entities.notes.map(n => <NoteCard key={n.id} {...n} />)}
         </EntityCardGrid>
       )}
