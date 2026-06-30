@@ -697,6 +697,7 @@ class AgentOrchestrator:
                 "session_id":  self.session.id,
                 "tool_called": reported_tool,
                 "tool_result": tool_result,
+                "filters_used": tool_input_last,
             }
 
         except Exception as exc:
@@ -735,6 +736,7 @@ class AgentOrchestrator:
             llm_response      = llm.chat(self.session.messages, system, tools)
             tool_called       = None
             tool_result       = None
+            tool_input_last   = None
             first_tool_called = None
             guard_rail_used   = False
             rounds            = 0
@@ -753,9 +755,10 @@ class AgentOrchestrator:
                 tool_input = _normalise_input(tool_input, self.user.email)
 
                 # Execute tool
-                result      = execute_tool(tool_name, tool_input, self.user, self.workspace_id)
-                tool_called = tool_name
-                tool_result = result
+                result          = execute_tool(tool_name, tool_input, self.user, self.workspace_id)
+                tool_called     = tool_name
+                tool_result     = result
+                tool_input_last = tool_input
 
                 # Update session messages
                 self.session.messages.append({
@@ -804,10 +807,11 @@ class AgentOrchestrator:
                 reported = tool_called if tool_called else first_tool_called
 
             yield {
-                "type":        "done",
-                "session_id":  self.session.id,
-                "tool_called": reported,
-                "tool_result": tool_result,
+                "type":         "done",
+                "session_id":   self.session.id,
+                "tool_called":  reported,
+                "tool_result":  tool_result,
+                "filters_used": tool_input_last,
             }
 
         except Exception as exc:

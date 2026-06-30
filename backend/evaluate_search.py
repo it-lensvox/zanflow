@@ -21,9 +21,9 @@ import argparse
 from datetime import datetime
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-BASE_URL      = "http://192.168.1.6:8000"
+BASE_URL      = "http://192.168.1.26:8000"
 ENDPOINT      = f"{BASE_URL}/api/v1/agent/search/"
-JWT_TOKEN     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzgyNDc0MTc0LCJpYXQiOjE3ODI0NzA1NzQsImp0aSI6ImZhZGE2OGY5M2I2ZTQwMGQ5NGY2N2IxNWRjZTIwMTZiIiwidXNlcl9pZCI6IjEifQ.Vk_RvPFugwJihwbHXBghJPZXgZ_OZZ9N35-OlFV3v3U"
+JWT_TOKEN     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzgyODAzODgyLCJpYXQiOjE3ODI4MDAyODIsImp0aSI6Ijk1YTA5NDQxNDBjZjQ4ZjdhODdkNGE4ZWFkYzYxM2IxIiwidXNlcl9pZCI6IjEifQ.2mFbPvZSIDOd6HWpviVhFwNE-B6a2IlgoqH6i8gwQsU"
 WORKSPACE_ID  = "1"
 QUERIES_FILE  = "search_queries.json"
 RESULTS_DIR   = "results"

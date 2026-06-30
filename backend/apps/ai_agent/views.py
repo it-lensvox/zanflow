@@ -374,16 +374,31 @@ class AISearchView(APIView):
                 page=page, page_size=page_size,
             )
 
+            # Build filters_used — same shape as chat agent's filters_used,
+            # using project_id instead of project_name for consistency
+            # with how the chat agent (list_tasks tool) already works.s
+            filters_for_response = {
+                k: v for k, v in filters.items()
+                if v is not None and k not in ("models", "project_name")
+            }
+            if search_output.get("resolved_project_id"):
+                filters_for_response["project_id"] = search_output["resolved_project_id"]
+            elif filters.get("project_name"):
+                # Could not resolve to an ID — keep the name as fallback
+                # so frontend still has something usable
+                filters_for_response["project_name"] = filters["project_name"]
+
             return Response({
-                "type":      "search",
-                "query":     query,
-                "results":   search_output["results"],
-                "totals":    search_output["totals"],
-                "total":     search_output["total"],
-                "page":      search_output["page"],
-                "page_size": search_output["page_size"],
-                "has_more":  search_output["has_more"],
-                "fallback":  fallback,
+                "type":         "search",
+                "query":        query,
+                "results":      search_output["results"],
+                "totals":       search_output["totals"],
+                "total":        search_output["total"],
+                "page":         search_output["page"],
+                "page_size":    search_output["page_size"],
+                "has_more":     search_output["has_more"],
+                "filters_used": filters_for_response,
+                "fallback":     fallback,
             })
 
         except Exception as exc:

@@ -170,7 +170,6 @@ def _search_events(filters: dict, user, workspace_id: str, limit: int = 10, offs
     try:
         from apps.daily_updates.models import Event
         from datetime import datetime, date
-       
 
         # Events scoped to organizer OR attendee
         qs = Event.objects.filter(
@@ -218,6 +217,28 @@ def _search_events(filters: dict, user, workspace_id: str, limit: int = 10, offs
 
 # ── Public API ──────────────────────────────────────────────────────────────────
 
+def _resolve_project_id(project_name: str, user, workspace_id: str):
+    """
+    Resolves a project name to its ID — used only for filters_used in the
+    API response so frontend gets an unambiguous project_id (like the chat
+    agent already does), instead of a raw name string.
+    Does NOT change how tasks/notes/projects are actually filtered below —
+    those still match by name exactly as before. Read-only lookup, fails
+    silently to None if not found.
+    """
+    try:
+        from apps.projects.models import Project
+        project = Project.objects.filter(
+            workspace_id=workspace_id,
+            members=user,
+            name__icontains=project_name,
+        ).values("id").first()
+        return project["id"] if project else None
+    except Exception as exc:
+        logger.warning("Project ID resolution failed: %s", exc)
+        return None
+
+
 def run_search(filters: dict, user, workspace_id: str,
                page: int = 1, page_size: int = 10) -> dict:
     """
@@ -229,6 +250,11 @@ def run_search(filters: dict, user, workspace_id: str,
     offset  = (page - 1) * page_size
     results = {"tasks": [], "notes": [], "projects": [], "events": []}
     totals  = {"tasks": 0,  "notes": 0,  "projects": 0,  "events": 0}
+
+    # Resolve project_name → project_id for filters_used (read-only, additive)
+    resolved_project_id = None
+    if filters.get("project_name"):
+        resolved_project_id = _resolve_project_id(filters["project_name"], user, workspace_id)
 
     if "task" in models:
         results["tasks"], totals["tasks"] = _search_tasks(
@@ -253,10 +279,11 @@ def run_search(filters: dict, user, workspace_id: str,
     )
 
     return {
-        "results":   results,
-        "totals":    totals,
-        "total":     total,
-        "page":      page,
-        "page_size": page_size,
-        "has_more":  has_more,
+        "results":             results,
+        "totals":              totals,
+        "total":               total,
+        "page":                page,
+        "page_size":           page_size,
+        "has_more":            has_more,
+        "resolved_project_id": resolved_project_id,
     }

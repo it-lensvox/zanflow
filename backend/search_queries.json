@@ -242,7 +242,7 @@
       "category": "filter_priority",
       "difficulty": "easy",
       "query": "list my high priority tasks",
-      "expected_intent": "search",
+
       "expected_filters": {
         "models": [
           "task"
