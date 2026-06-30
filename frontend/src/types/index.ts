@@ -1250,10 +1250,11 @@ export interface AgentQueryPayload {
 
 // Response from POST /api/v1/agent/query/
 export interface AgentQueryResponse {
-  response:    string;          // display this to the user
-  session_id:  number;          // save and pass back next time
-  tool_called: string | null;   // for debugging
-  tool_result: Record<string, unknown> | null;  // for debugging / UI updates
+  response:     string;   
+  session_id:   number;
+  tool_called:  string | null;  
+  tool_result:  Record<string, unknown> | null;  
+  filters_used: AgentFiltersUsed | null;  
 }
 
 // Item from GET /api/v1/agent/sessions/
@@ -1374,15 +1375,30 @@ export interface AgentSearchTotals {
 }
 
 export interface AgentSearchResponseSearch {
-  type:      'search';
-  query:     string;
-  results:   AgentSearchResults;
-  totals:    AgentSearchTotals;
-  total:     number;
-  page:      number;
-  page_size: number;
-  has_more:  boolean;
-  fallback:  boolean;
+  type:         'search';
+  query:        string;
+  results:      AgentSearchResults;
+  totals:       AgentSearchTotals;
+  total:        number;
+  page:         number;
+  page_size:    number;
+  has_more:     boolean;
+  filters_used: AgentFiltersUsed | null;  
+  fallback:     boolean;
+}
+
+// ─── Shared filters_used shape 
+export interface AgentFiltersUsed {
+  status?:         string;  
+  priority?:       string; 
+  project_id?:     number; 
+  assignee_name?:  string;
+  overdue?:        boolean; 
+  assigned_to_me?: boolean;
+  today?:          boolean; 
+  date?:           string; 
+  is_favourite?:   boolean; 
+  search_text?:    string; 
 }
 
 export interface AgentSearchResponseAction {

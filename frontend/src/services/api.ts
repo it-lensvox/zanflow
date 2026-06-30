@@ -631,9 +631,12 @@ export const taskApi = {
     return data;
   },
 
-  // Paginated fetch — used by the Task Board infinite scroll
-  listPaginated: async (page: number = 1): Promise<import('@/types').TaskPaginatedResponse> => {
-    const response = await api.get('/tasksite/', { params: { page } });
+  // Paginated fetch 
+  listPaginated: async (
+    page: number = 1,
+    filters?: { status?: string; priority?: string; project_id?: number | string },
+  ): Promise<import('@/types').TaskPaginatedResponse> => {
+    const response = await api.get('/tasksite/', { params: { page, ...filters } });
     const data = response.data;
     const rawResults: any[] = data.results ?? data.tasks ?? [];
     const results = rawResults.map((task: any) => ({
@@ -1605,11 +1608,9 @@ export const agentApi = {
   // list all sessions for current user
   listSessions: async (): Promise<import('@/types').AgentSession[]> => {
     const workspaceId = localStorage.getItem('active_workspace_id') || '1';
-    console.log('[AIBot] listSessions — X-Workspace-ID being sent:', workspaceId);
     const response = await api.get('/agent/sessions/', {
       headers: { 'X-Workspace-ID': workspaceId },
     });
-    console.log('[AIBot] listSessions raw response.data:', response.data);
     return response.data;
   },
 

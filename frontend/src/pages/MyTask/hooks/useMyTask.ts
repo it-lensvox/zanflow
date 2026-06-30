@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { useNavigate, useLocation, useOutletContext } from 'react-router-dom';
+import { useNavigate, useLocation, useOutletContext, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { taskApi, usersApi, projectsApi } from '@/services/api';
@@ -21,13 +21,14 @@ function sanitiseTaskCache(queryClient: ReturnType<typeof useQueryClient>) {
       (p: any) => p && typeof p === 'object' && Array.isArray(p.results)
     );
   if (!isValid) {
-    queryClient.removeQueries({ queryKey: ['tasks'], exact: true });
+    queryClient.removeQueries({ queryKey: ['tasks'] });
   }
 }
 
 export function useMyTask() {
   const navigate  = useNavigate();
   const location  = useLocation();
+  const [searchParams] = useSearchParams();
   const { user }  = useAuth();
   const queryClient = useQueryClient();
   const { unreadCount } = useNotifications();
@@ -49,8 +50,16 @@ export function useMyTask() {
   const dateTriggerRef   = useRef<HTMLButtonElement>(null);
   const personTriggerRef = useRef<HTMLButtonElement>(null);
 
-  // Active status filter from URL path
+ // Active status filter from URL path
   const activeFilter = location.pathname.split('/').filter(Boolean)[1]?.toUpperCase() || 'ALL';
+
+  // ── Server-side filters from URL query params (e.g. /taskboard/pending?priority=critical&project_id=1)
+  const priorityParam  = searchParams.get('priority')   || undefined;
+  const projectIdParam = searchParams.get('project_id') || undefined;
+  const statusParam = activeFilter !== 'ALL' ? activeFilter.toLowerCase() : undefined;
+  const urlStatusRedirectRef = useRef(false);
+  const statusFromUrl = searchParams.get('status');
+  const pendingStatusRedirect = !!statusFromUrl && location.pathname !== `/taskboard/${statusFromUrl.toLowerCase()}` && !urlStatusRedirectRef.current;
 
   // ── Outlet context
   const outletContext = useOutletContext<{
@@ -113,8 +122,15 @@ export function useMyTask() {
     fetchNextPage,
     hasNextPage,
   } = useInfiniteQuery({
-    queryKey: ['tasks'],
-    queryFn:  async ({ pageParam = 1 }) => taskApi.listPaginated(pageParam as number),
+    queryKey: ['tasks', statusParam, priorityParam, projectIdParam],
+    queryFn:  async ({ pageParam = 1 }) => {
+      const res = await taskApi.listPaginated(pageParam as number, {
+        status: statusParam,
+        priority: priorityParam,
+        project_id: projectIdParam,
+      });
+      return res;
+    },
     getNextPageParam: (lastPage) => {
       if (!lastPage || typeof lastPage !== 'object' || Array.isArray(lastPage)) return undefined;
       if (!('next' in lastPage) || !lastPage.next) return undefined;
@@ -126,7 +142,7 @@ export function useMyTask() {
       } catch { return undefined; }
     },
     initialPageParam: 1,
-    enabled: !!user,
+    enabled: !!user && !pendingStatusRedirect,
     staleTime: 1000 * 60 * 2,
     placeholderData: (prev: any) => prev,
   });
@@ -142,15 +158,14 @@ export function useMyTask() {
     } else if (user?.role !== 'admin') {
       filtered = all.filter(t => t.assigned_to.includes(user?.id ?? -1));
     }
-    return filtered.map(t => ({ ...t, status_label: (t.status || '').toLowerCase().replace(/_/g, ' ') }));
+    const mapped = filtered.map(t => ({ ...t, status_label: (t.status || '').toLowerCase().replace(/_/g, ' ') }));
+    return mapped;
   }, [infiniteData, user]);
 
   // ── Infinite scroll sentinel
  const sentinelRef         = useRef<HTMLDivElement>(null);
   const isFetchingRef       = useRef(false);
 
-  // Keep ref in sync so the observer callback always reads the latest value
-  // without being re-created on every isFetchingNextPage change
   useEffect(() => { isFetchingRef.current = isFetchingNextPage; }, [isFetchingNextPage]);
 
   useEffect(() => {
@@ -167,6 +182,13 @@ export function useMyTask() {
     observer.observe(el);
     return () => observer.disconnect();
   }, [hasNextPage, fetchNextPage]);
+
+  const hasUrlFilter = !!(statusParam || priorityParam || projectIdParam);
+  useEffect(() => {
+    if (hasUrlFilter && hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [hasUrlFilter, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   // ── Column filter config 
   const filterConfig: ColumnFilterConfig[] = [
@@ -193,6 +215,39 @@ export function useMyTask() {
     globalSearchFields: ['heading', 'description', 'status', 'priority', 'project_name', 'status_label'],
   });
 
+  useEffect(() => {
+    if (urlStatusRedirectRef.current) return;
+    if (!statusFromUrl) return;
+    const targetPath = `/taskboard/${statusFromUrl.toLowerCase()}`;
+    if (location.pathname === targetPath) return;
+    urlStatusRedirectRef.current = true;
+    navigate({ pathname: targetPath, search: location.search }, { replace: true });
+  }, [statusFromUrl, location.pathname, location.search, navigate]);
+
+  const urlFiltersAppliedRef = useRef(false);
+  useEffect(() => {
+    if (urlFiltersAppliedRef.current) return;
+    if (!searchParams.toString()) return;
+    if (!projectsData) return;
+    urlFiltersAppliedRef.current = true;
+
+    const projectIdParam = searchParams.get('project_id');
+    const priorityParam = searchParams.get('priority');
+
+    setColumnFilters(prev => {
+      const next = { ...prev };
+      if (projectIdParam) {
+        const projectsArr = (projectsData as any)?.results || (Array.isArray(projectsData) ? projectsData : []);
+        const matchedProject = projectsArr.find((p: any) => String(p.id) === projectIdParam);
+        if (matchedProject) next.project = matchedProject.name;
+      }
+      if (priorityParam) {
+        next.priority = priorityParam;
+      }
+      return next;
+    });
+  }, [searchParams, projectsData, location.pathname, location.search, navigate, setColumnFilters]);
+
   // ── Final filtered list
  const filteredTasks = useMemo(() => {
     if (!hookFilteredTasks) return [];
@@ -214,7 +269,6 @@ export function useMyTask() {
         const matchesCreatedBy = !createdByVal || String(task.assigned_by) === String(createdByVal);
         return matchesFilter && matchesSearch && matchesAssignee && matchesCreatedBy;
       })
-      // Enrich each task with project_task_type for colour inheritance
       .map(task => ({
         ...task,
         project_task_type: projectTypeLookup[(task.project as any)] || projectTypeLookup[task.project_details?.id as any] || '',

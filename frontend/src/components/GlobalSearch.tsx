@@ -5,6 +5,7 @@ import { Search, X, FolderKanban, CheckSquare, FileText, Calendar, } from 'lucid
 import { taskApi, projectsApi, documentsApi, agentApi } from '@/services/api';
 import type { AgentSearchResponse } from '@/types';
 import { getStatusColors } from '@/config/statusColors';
+import { buildViewAllUrl } from '@/utils/filtersUsedNavigation';
 import { getTypeHex, getTypeBg } from '@/pages/Project/projectConstants';
 
 // ── Types 
@@ -108,6 +109,8 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
     aiTimerRef.current = setTimeout(async () => {
       try {
         const res = await agentApi.search({ query: trimmed, page: 1, page_size: 10 });
+        if (res.type === 'search') {
+        }
         setAiResult(res);
         if (res.type === 'search') {
           setSectionItems(mapAiResults(res));
@@ -144,14 +147,11 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
         setSectionPages(prev => ({ ...prev, [model]: nextPage }));
         setSectionHasMore(prev => ({ ...prev, [model]: res.has_more }));
       }
-    } catch { /* silently fail — existing results stay */ }
+    } catch { }
     finally { setSectionLoading(prev => ({ ...prev, [model]: false })); }
   };
 
   // ── Build displayed results:
-  //    - If AI returned results → use sectionItems (accumulated, paginated)
-  //    - While AI is loading → show basic REST keyword match immediately
-  //    - If AI failed → fall back to basic REST
   const useAiResults = aiResult?.type === 'search';
 
   const basicResults: ResultItem[] = (() => {
@@ -278,18 +278,31 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
                       const sectionTotal = totals[model + 's'] ?? totals[model] ?? group.length;
                       const hasMore = sectionHasMore[model];
                       const isLoadingMore = sectionLoading[model];
+                      const viewAllUrl = useAiResults && aiResult?.type === 'search'
+                        ? buildViewAllUrl(model, aiResult.filters_used)
+                        : null;
                       return (
                         <div key={model}>
-                          {/* Section header with total count */}
+                          {/* Section header with total count + View all link */}
                           <div style={{ padding: '10px 18px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                             <span style={{ fontSize: 10, fontWeight: 800, color: '#9CA3AF', letterSpacing: '.08em', textTransform: 'uppercase' }}>
                               {staticMeta?.label ?? 'Project'}s
                             </span>
-                            {sectionTotal > 0 && (
-                              <span style={{ fontSize: 10, fontWeight: 600, color: '#9CA3AF', background: '#F3F4F6', borderRadius: 10, padding: '1px 7px' }}>
-                                {sectionTotal}
-                              </span>
-                            )}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              {sectionTotal > 0 && (
+                                <span style={{ fontSize: 10, fontWeight: 600, color: '#9CA3AF', background: '#F3F4F6', borderRadius: 10, padding: '1px 7px' }}>
+                                  {sectionTotal}
+                                </span>
+                              )}
+                             {viewAllUrl && sectionTotal > group.length && (
+                                <button
+                                  onClick={() => { console.log('[DEBUG] View all clicked — built URL:', viewAllUrl, 'from filters_used:', aiResult?.type === 'search' ? aiResult.filters_used : null); go(viewAllUrl); }}
+                                  style={{ fontSize: 10, fontWeight: 700, color: '#1663F6', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
+                                >
+                                  View all {sectionTotal} →
+                                </button>
+                              )}
+                            </div>
                           </div>
                           {/* Result rows */}
                           {group.map(item => {
@@ -338,7 +351,7 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
                   </div>
                 );
 
-                // ── Basic REST results (shown while AI is still loading)
+                // ── Basic REST results 
                 return (
                   <div>
                     {(['project', 'task', 'document'] as const).map(type => {
@@ -420,7 +433,7 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ── Trigger button — placed in the top bar ─────────────────────────────────────
+// ── Trigger button 
 export function GlobalSearchTrigger() {
   const [open, setOpen] = useState(false);
 
