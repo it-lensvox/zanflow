@@ -166,18 +166,17 @@ export function Layout() {
                 </svg>
               </button>
               <span style={{ color: '#667085', fontWeight: 500 }}>DYUKSA</span>
-              <span style={{ color: '#CBD5E1' }}>/</span>
               <span style={{ color: '#172033', fontWeight: 700 }}>{pageTitle}</span>
             </div>
 
-            {/* Center: search — grows to fill ~40% of the row */}
+            {/* search — grows to fill ~40% of the row */}
             <div className="hidden sm:flex" style={{ flex: '0 1 40%', minWidth: 160, marginLeft: 'auto' }}>
               <GlobalSearchTrigger />
             </div>
 
             {/* Right: Moon + QuickCreate + Bell + Help */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-              {/* Theme toggle — UI only, not yet active */}
+              {/* Theme toggle  */}
               <button
                 style={{ width: 34, height: 34, border: '1px solid #E6EBF2', borderRadius: 8, background: '#fff', cursor: 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, opacity: 0.5 }}
                 title="Dark mode coming soon"

@@ -36,6 +36,7 @@ export function useAIBot() {
   // Expand state
   const [isExpanded, setIsExpanded] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -47,10 +48,21 @@ export function useAIBot() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
-  // ── Focus input when expanded
+  // ── Focus input when expanded and not minimized
   useEffect(() => {
-    if (isExpanded) inputRef.current?.focus();
-  }, [isExpanded]);
+    if (isExpanded && !isMinimized) inputRef.current?.focus();
+  }, [isExpanded, isMinimized]);
+
+  // ── ESC key minimizes instead of closing
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isExpanded && !isMinimized) {
+        setIsMinimized(true);
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [isExpanded, isMinimized]);
 
   // ── Listen for programmatic open + optional query pre-fill
   useEffect(() => {
@@ -347,14 +359,20 @@ export function useAIBot() {
     window.addEventListener('mouseup', onMouseUp);
   }, [fabPos, onMouseMove, onMouseUp]);
 
+  const handleMinimize = useCallback(() => {
+    setIsMinimized(true);
+  }, []);
+
   const handleFabClick = useCallback(() => {
     if (didDrag.current) return;
     if (!isExpanded) {
       setIsExpanded(true);
       setIsFullScreen(true);
+      setIsMinimized(false);
     } else {
       setIsExpanded(false);
       setIsFullScreen(false);
+      setIsMinimized(false);
     }
   }, [isExpanded]);
 
@@ -374,7 +392,9 @@ export function useAIBot() {
     searchQuery, setSearchQuery,
     isExpanded, setIsExpanded,
     isFullScreen, setIsFullScreen,
+    isMinimized, setIsMinimized,
     isHistoryOpen, setIsHistoryOpen,
+    handleMinimize,
     fabPos,
     // refs
     messagesEndRef, inputRef,

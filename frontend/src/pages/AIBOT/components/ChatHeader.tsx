@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Plus, X, PanelLeftOpen, PanelLeftClose, MoreHorizontal, Pencil, Trash2, Sparkles } from 'lucide-react';
+import { Plus, X, Minus, PanelLeftOpen, PanelLeftClose, MoreHorizontal, Pencil, Trash2, Sparkles } from 'lucide-react';
 
 interface ChatHeaderProps {
   isHistoryOpen:     boolean;
@@ -7,6 +7,7 @@ interface ChatHeaderProps {
   sessionTitle:      string;
   onToggleHistory:   () => void;
   onNewConversation: () => void;
+  onMinimize:        () => void;
   onClose:           () => void;
   onRename:          (newTitle: string) => void;
   onDelete:          () => void;
@@ -23,7 +24,7 @@ function IconBtn({ icon, onClick, title, accent }: { icon: React.ReactNode; onCl
   );
 }
 
-export function ChatHeader({ isHistoryOpen, activeSessionId, sessionTitle, onToggleHistory, onNewConversation, onClose, onRename, onDelete }: ChatHeaderProps) {
+export function ChatHeader({ isHistoryOpen, activeSessionId, sessionTitle, onToggleHistory, onNewConversation, onMinimize, onClose, onRename, onDelete }: ChatHeaderProps) {
   const [menuOpen,   setMenuOpen]   = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameVal,  setRenameVal]  = useState('');
@@ -107,6 +108,7 @@ export function ChatHeader({ isHistoryOpen, activeSessionId, sessionTitle, onTog
           </div>
         )}
 
+         <IconBtn icon={<Minus style={{ width: 14, height: 14 }} />} onClick={onMinimize} title="Minimize" />
          <IconBtn icon={<X style={{ width: 14, height: 14 }} />} onClick={onClose} title="Close" />
       </div>
     </div>
