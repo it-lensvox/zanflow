@@ -226,6 +226,40 @@ def _search_documents(filters: dict, user, workspace_id: str, limit: int = 10, o
         return [], 0
 
 
+# ── Member ────────────────────────────────────────────────────────────────────
+
+def _search_members(filters: dict, user, workspace_id: str, limit: int = 10, offset: int = 0) -> tuple:
+    """Returns (results_list, total_count)"""
+    try:
+        from apps.ai_agent.access.members import get_workspace_member_queryset
+        from django.db.models import Q
+
+        qs = get_workspace_member_queryset(user, workspace_id)
+
+        if filters.get("search_text"):
+            t = filters["search_text"]
+            qs = qs.filter(
+                Q(first_name__icontains=t) |
+                Q(last_name__icontains=t)  |
+                Q(email__icontains=t)
+            )
+
+        total    = qs.count()
+        page_qs  = qs.order_by("first_name")[offset: offset + limit]
+        return [
+            {
+                "id":    m.id,
+                "name":  m.get_full_name() or m.email,
+                "email": m.email,
+            }
+            for m in page_qs
+        ], total
+
+    except Exception as exc:
+        logger.warning("Member search failed: %s", exc)
+        return [], 0
+
+
 # ── Public API ──────────────────────────────────────────────────────────────────
 
 def _resolve_project_id(project_name: str, user, workspace_id: str):
@@ -258,9 +292,13 @@ def run_search(filters: dict, user, workspace_id: str,
     Each model query is independent — one failure never blocks others.
     """
     models  = filters.get("models") or ["task", "note", "project", "event", "document"]
+    # NOTE: "member" is NOT in the default list intentionally.
+    # Members are only searched when explicitly requested (e.g. "who is in my workspace")
+    # so the AI extracts models=["member"]. Adding it to defaults causes irrelevant
+    # member results on every fallback search.
     offset  = (page - 1) * page_size
-    results = {"tasks": [], "notes": [], "projects": [], "events": [], "documents": []}
-    totals  = {"tasks": 0,  "notes": 0,  "projects": 0,  "events": 0,  "documents": 0}
+    results = {"tasks": [], "notes": [], "projects": [], "events": [], "documents": [], "members": []}
+    totals  = {"tasks": 0,  "notes": 0,  "projects": 0,  "events": 0,  "documents": 0,  "members": 0}
 
     # Resolve project_name → project_id for filters_used (read-only, additive)
     resolved_project_id = None
@@ -287,10 +325,14 @@ def run_search(filters: dict, user, workspace_id: str,
         results["documents"], totals["documents"] = _search_documents(
             filters, user, workspace_id, limit=page_size, offset=offset)
 
+    if "member" in models:
+        results["members"], totals["members"] = _search_members(
+            filters, user, workspace_id, limit=page_size, offset=offset)
+
     total    = sum(totals.values())
     has_more = any(
         totals[m] > offset + page_size
-        for m in ["tasks", "notes", "projects", "events", "documents"]
+        for m in ["tasks", "notes", "projects", "events", "documents", "members"]
     )
 
     return {

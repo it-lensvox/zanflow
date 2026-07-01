@@ -189,6 +189,22 @@ def _build_note_response(tool_input: dict, tool_result: dict) -> str | None:
         msg = f"Done! Note '{title}' created and saved, linked to project {project_id}."
     return msg
 
+def _build_chat_response(tool_result: dict) -> str | None:
+    """
+    Programmatic open_chat response.
+    room_id is returned in tool_result and filters_used — no need to embed in text.
+    Handles both private chat (member_name) and project chat (project_name).
+    """
+    if not tool_result.get("success"):
+        return None
+    room_type = tool_result.get("room_type", "private")
+    if room_type == "project":
+        project_name = tool_result.get("project_name", "the project")
+        return f"I've opened the {project_name} project chat. You can find it in your Messages."
+    member_name = tool_result.get("member_name", "the user")
+    return f"I've opened a chat with {member_name}. You can find it in your Messages."
+
+
 def _build_standup_response(tool_result: dict) -> str | None:
     """
     Programmatic create_daily_update response.
@@ -496,6 +512,35 @@ class AgentOrchestrator:
                         "tool_result": du_result,
                     }
 
+                # ── GUARD RAIL 7: open_chat — inject project context ──────────────
+                # GPT cannot know which names are projects vs people without context.
+                # Fetch user's projects first so GPT can decide:
+                #   project name → open_chat(project_name="X")
+                #   person name  → open_chat(member_name="X")
+                if tool_name == "open_chat" and first_tool_called is None:
+                    gr7 = execute_tool("get_user_projects", {}, self.user, self.workspace_id)
+                    if gr7.get("success") and gr7.get("projects"):
+                        project_list = ", ".join(
+                            f"{p['name']}(id={p['id']})"
+                            for p in gr7["projects"]
+                        )
+                        self.session.messages.append({
+                            "role": "user",
+                            "content": [{
+                                "type": "text",
+                                "text": (
+                                    f"[Context: user projects available for chat: {project_list}. "
+                                    f"If the chat target matches a project name above, use "
+                                    f"open_chat(project_name=...). "
+                                    f"Otherwise use open_chat(member_name=...).]"
+                                ),
+                            }],
+                        })
+                    guard_rail_used = True
+                    if first_tool_called is None:
+                        first_tool_called = "get_user_projects"
+                    logger.info("Guard rail 7: open_chat — injected project context")
+
                 # ── GUARD RAIL 6: create_task with string project name ─────────────
                 # Q077/Q089: model calls create_task(project_name="ZanFlow") without ID
                 if tool_name == "create_task" and first_tool_called is None:
@@ -635,6 +680,11 @@ class AgentOrchestrator:
                     if prog:
                         final_response = prog
 
+            elif tool_called == "open_chat" and tool_result:
+                prog = _build_chat_response(tool_result)
+                if prog:
+                    final_response = prog
+
             elif tool_called == "get_project_summary" and tool_result:
                 # Only override if response is bare "Done." or missing key words
                 # Q039, Q092 return "Done." — fix those without breaking Q032/Q033/Q035
@@ -692,12 +742,33 @@ class AgentOrchestrator:
 
             log.save()
 
+            # For open_chat — expose navigation data in filters_used
+            # so frontend has room_id without parsing tool_result
+            if reported_tool == "open_chat" and tool_result and tool_result.get("success"):
+                room_type = tool_result.get("room_type", "private")
+                if room_type == "project":
+                    computed_filters = {
+                        "room_id":      tool_result.get("room_id"),
+                        "room_type":    "project",
+                        "project_id":   tool_result.get("project_id"),
+                        "project_name": tool_result.get("project_name"),
+                    }
+                else:
+                    computed_filters = {
+                        "room_id":     tool_result.get("room_id"),
+                        "room_type":   "private",
+                        "member_id":   tool_result.get("member_id"),
+                        "member_name": tool_result.get("member_name"),
+                    }
+            else:
+                computed_filters = tool_input_last
+
             return {
                 "response":    final_response,
                 "session_id":  self.session.id,
                 "tool_called": reported_tool,
                 "tool_result": tool_result,
-                "filters_used": tool_input_last,
+                "filters_used": computed_filters,
             }
 
         except Exception as exc:

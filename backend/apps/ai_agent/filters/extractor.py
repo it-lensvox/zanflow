@@ -27,10 +27,20 @@ logger = logging.getLogger(__name__)
 _INTENT_SYSTEM_PROMPT = """You are an intent classifier for Dyuksa, a project management app.
 
 Classify the user query as exactly one of:
-  "search" → user wants to FIND or VIEW something
-             (show, list, find, search, who, what, how many, display, get)
-  "action" → user wants to DO something
+  "search" → user wants to FIND or VIEW data that exists in the system
+             (show, list, find, search, who, what, display, get)
+             Valid search targets: tasks, notes, projects, events, documents, members
+  "action" → user wants to DO something OR asks about system-level things not searchable
              (create, update, delete, assign, mark, move, add, change, remove, defer)
+             Also classify as "action": questions about workspaces, account settings,
+             "how many workspaces", conversations about non-searchable topics
+
+Examples:
+  "find Ravi in workspace"     → search  (member search)
+  "show my tasks"              → search  (task search)
+  "how many workspace I have"  → action  (workspace info, not searchable)
+  "create a task"              → action
+  "who is in my workspace"     → search  (member search)
 
 Return ONLY valid JSON with a single key. No explanation. No markdown.
 {"intent": "search"}  OR  {"intent": "action"}"""
@@ -43,12 +53,14 @@ No explanation. No markdown. No extra keys.
 Valid status values  : pending, in_progress, completed, review, deployed, deferred, backlog
 Valid priority values: low, medium, high, critical
 Aliases to map       : urgent→critical, done→completed, started→in_progress, overdue→check overdue field
-Valid models         : task, note, project, event
+Valid models         : task, note, project, event, document, member
+Document aliases     : document, documents, file, files → models includes "document"
+Member aliases       : member, members, teammate, teammates, people, workspace members, who → models includes "member"
 Favourite aliases    : favourite, favorite, starred, bookmarked, saved → set is_favourite=true
 
 JSON schema (use null for any field not mentioned in the query):
 {
-  "models":         ["task"|"note"|"project"|"event"],  // which models to search
+  "models":         ["task"|"note"|"project"|"event"|"document"|"member"],  // which models to search
   "search_text":    "string | null",            // keyword in heading/title/description
   "status":         "string | null",            // task status
   "priority":       "string | null",            // task priority
@@ -72,7 +84,12 @@ Examples:
   "find meeting about API"            → models=["event"], search_text="API"
   "show critical tasks"               → models=["task"], priority="critical"
   "find notes about budget"           → models=["note"], search_text="budget"
-  "show everything about ZanFlow"     → models=["task","note","project","event"], project_name="ZanFlow"
+  "find all documents under ZanFlow project" → models=["document"], project_name="ZanFlow"
+  "show files in Mockflow"            → models=["document"], project_name="Mockflow"
+  "who is in my workspace"            → models=["member"]
+  "find Ravi in my workspace"         → models=["member"], search_text="Ravi"
+  "list all teammates"                → models=["member"]
+  "show everything about ZanFlow"     → models=["task","note","project","event","document","member"], project_name="ZanFlow"
   "find my favourite projects"        → models=["project"], is_favourite=true
   "show my starred projects"          → models=["project"], is_favourite=true
   "show my bookmarked projects"       → models=["project"], is_favourite=true
@@ -129,7 +146,7 @@ def extract_filters(query: str) -> dict:
     try:
         result = _call_gpt(_FILTER_SYSTEM_PROMPT, query)
         return {
-            "models":         result.get("models", ["task", "note", "project", "event"]),
+            "models":         result.get("models", ["task", "note", "project", "event", "document"]),
             "search_text":    result.get("search_text"),
             "status":         result.get("status"),
             "priority":       result.get("priority"),
@@ -145,7 +162,7 @@ def extract_filters(query: str) -> dict:
     except Exception as exc:
         logger.warning("extract_filters failed, using keyword fallback: %s", exc)
         return {
-            "models":         ["task", "note", "project", "event"],
+            "models":         ["task", "note", "project", "event", "document"],
             "search_text":    query,
             "status":         None,
             "priority":       None,

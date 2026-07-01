@@ -29,6 +29,19 @@ def _get_user_by_email(email: str):
 
 TASK_TOOL_SCHEMAS = [
     {
+        "name": "list_workspaces",
+        "description": (
+            "List all workspaces the current user belongs to with their names and IDs. "
+            "Use when user asks 'how many workspaces do I have', 'which workspaces am I in', "
+            "'list my workspaces', 'show all my workspaces'."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    {
         "name": "get_user_projects",
         "description": (
             "Fetch projects the current user is a member of. "
@@ -47,9 +60,24 @@ TASK_TOOL_SCHEMAS = [
         },
     },
     {
+        "name": "list_workspaces",
+        "description": (
+            "List all workspaces the current user belongs to. "
+            "Use when user asks 'how many workspaces do I have', "
+            "'which workspaces am I in', 'show my workspaces', 'list workspaces'."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    {
         "name": "get_workspace_members",
         "description": (
-            "Search workspace members by name or email to get their email address. "
+            "Search workspace members by name or email. "
+            "Pass an empty search string to list ALL members in the workspace. "
+            "Use when user asks: 'who is in my workspace', 'list all members', 'how many members'. "
             "YOU MUST call this as the FIRST tool call whenever the user mentions "
             "any person's name (not email) in the context of assigning a task. "
             "Call this BEFORE get_user_projects and BEFORE create_task. "
@@ -272,6 +300,38 @@ TASK_TOOL_SCHEMAS = [
 
 # ── Executors ─────────────────────────────────────────────────────────────────
 
+def list_workspaces(args: dict, user, workspace_id: str) -> dict:
+    """
+    Returns all workspaces the current user belongs to.
+    """
+    try:
+        from apps.organizations.models import WorkspaceMembership, Workspace
+
+        memberships = WorkspaceMembership.objects.filter(
+            user=user,
+        ).select_related("workspace").order_by("workspace__name")
+
+        workspaces = []
+        for m in memberships:
+            w = m.workspace
+            workspaces.append({
+                "id":         w.id,
+                "name":       w.name,
+                "is_current": str(w.id) == str(workspace_id),
+                "role":       m.role,
+            })
+
+        return {
+            "success":    True,
+            "count":      len(workspaces),
+            "workspaces": workspaces,
+        }
+
+    except Exception as exc:
+        logger.exception("list_workspaces failed: %s", exc)
+        return {"success": False, "error": str(exc)}
+
+
 def get_workspace_members(args: dict, user, workspace_id: str) -> dict:
     """
     Search members of the CURRENT WORKSPACE only by name or email.
@@ -286,13 +346,26 @@ def get_workspace_members(args: dict, user, workspace_id: str) -> dict:
         from apps.organizations.models import WorkspaceMembership
 
         search = args.get("search", "").strip()
-        if not search:
-            return {"success": False, "error": "search term is required"}
 
         # Step 1 — get IDs of users who belong to this workspace only
         workspace_member_ids = WorkspaceMembership.objects.filter(
             workspace_id=workspace_id,
         ).values_list("user_id", flat=True)
+
+        # Empty search → return ALL workspace members
+        if not search:
+            all_members = User.objects.filter(
+                id__in=workspace_member_ids,
+            ).exclude(id=user.id).order_by("first_name")
+            members_list = [
+                {"name": m.get_full_name() or m.email, "email": m.email, "id": m.id}
+                for m in all_members
+            ]
+            return {
+                "success": True,
+                "count":   len(members_list),
+                "members": members_list,
+            }
 
         # Step 2 — split "Shifali Gupta" → ["Shifali", "Gupta"]
         # and match each word against first_name OR last_name OR email
@@ -345,6 +418,38 @@ def get_workspace_members(args: dict, user, workspace_id: str) -> dict:
 
     except Exception as exc:
         logger.exception("get_workspace_members failed: %s", exc)
+        return {"success": False, "error": str(exc)}
+
+
+def list_workspaces(args: dict, user, workspace_id: str) -> dict:
+    """
+    Returns all workspaces the current user belongs to.
+    Queries WorkspaceMembership directly — not scoped to current workspace.
+    """
+    try:
+        from apps.organizations.models import WorkspaceMembership, Workspace
+
+        memberships = WorkspaceMembership.objects.filter(
+            user=user,
+        ).select_related("workspace").order_by("workspace__name")
+
+        workspaces = [
+            {
+                "id":   m.workspace.id,
+                "name": m.workspace.name,
+                "role": m.role,
+            }
+            for m in memberships
+        ]
+
+        return {
+            "success":    True,
+            "count":      len(workspaces),
+            "workspaces": workspaces,
+        }
+
+    except Exception as exc:
+        logger.exception("list_workspaces failed: %s", exc)
         return {"success": False, "error": str(exc)}
 
 

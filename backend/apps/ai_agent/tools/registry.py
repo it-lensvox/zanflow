@@ -1,7 +1,7 @@
 """
 Tool Registry — single source of truth for all agent tools.
 
-7 tool files · 21 tools total:
+8 tool files · 23 tools total:
   task_tools.py         — 8 tools  (get_user_projects, get_workspace_members,
                                      create_task, list_tasks, update_task,
                                      delete_task, add_task_comment, get_task_comments)
@@ -12,6 +12,7 @@ Tool Registry — single source of truth for all agent tools.
                                      list_events, create_event)
   team_tools.py         — 2 tools  (list_team_members, get_team_summary)
   document_tools.py     — 2 tools  (list_documents, get_document_summary)
+  chat_tools.py         — 1 tool   (open_chat)
 
 Adding a new tool:
   1. Add schema to the relevant *_TOOL_SCHEMAS list
@@ -21,6 +22,7 @@ Adding a new tool:
 """
 from apps.ai_agent.tools.task_tools import (
     TASK_TOOL_SCHEMAS,
+    list_workspaces,
     get_user_projects,
     get_workspace_members,
     create_task,
@@ -62,6 +64,10 @@ from apps.ai_agent.tools.document_tools import (
     list_documents,
     get_document_summary,
 )
+from apps.ai_agent.tools.chat_tools import (
+    CHAT_TOOL_SCHEMAS,
+    open_chat,
+)
 
 # All schemas sent to the LLM before every query
 ALL_TOOL_SCHEMAS = (
@@ -72,12 +78,14 @@ ALL_TOOL_SCHEMAS = (
     + DAILY_UPDATE_TOOL_SCHEMAS # 4 tools
     + TEAM_TOOL_SCHEMAS         # 2 tools
     + DOCUMENT_TOOL_SCHEMAS     # 2 tools
+    + CHAT_TOOL_SCHEMAS         # 1 tool
 )
-# Total: 22 tools
+# Total: 23 tools
 
 # Map tool name → executor function
 TOOL_EXECUTORS = {
     # Task tools
+    "list_workspaces":       list_workspaces,
     "get_user_projects":     get_user_projects,
     "get_workspace_members": get_workspace_members,
     "create_task":           create_task,
@@ -106,6 +114,8 @@ TOOL_EXECUTORS = {
     # Document tools
     "list_documents":        list_documents,
     "get_document_summary":  get_document_summary,
+    # Chat tools
+    "open_chat":             open_chat,
 }
 
 
