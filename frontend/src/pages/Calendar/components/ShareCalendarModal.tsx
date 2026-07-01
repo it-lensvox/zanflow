@@ -1,41 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { X, Search, Copy, Check, Link2, Users, ChevronDown, Trash2, Globe, Lock, Loader2, AlertCircle, Download } from 'lucide-react';
-import { usersApi, api, eventApi } from '@/services/api';
-
-// ═══════════════ API FUNCTIONS ═══════════════
-// ═══════════════ API FUNCTIONS ═══════════════
-const calendarShareApi = {
-    list: async () => {
-        const response = await api.get('/daily-updates/calendar-shares/');
-        return Array.isArray(response.data) ? response.data : (response.data.results || []);
-    },
-    create: async (data: { shared_with: number; permission: 'view' | 'edit' | 'full' }) => {
-        const response = await api.post('/daily-updates/calendar-shares/', data);
-        return response.data;
-    },
-    update: async (shareId: number, data: { permission: 'view' | 'edit' | 'full' }) => {
-        const response = await api.patch(`/daily-updates/calendar-shares/${shareId}/`, data);
-        return response.data;
-    },
-    delete: async (shareId: number) => {
-        await api.delete(`/daily-updates/calendar-shares/${shareId}/`);
-    },
-};
-// ═══════════════ CALENDAR LINK API ═══════════════
-const calendarLinkApi = {
-    list: async () => {
-        const response = await api.get('/daily-updates/calendar-links/');
-        return Array.isArray(response.data) ? response.data : (response.data.results || []);
-    },
-    create: async () => {
-        const response = await api.post('/daily-updates/calendar-links/', {});
-        return response.data;
-    },
-    delete: async (linkId: number) => {
-        await api.delete(`/daily-updates/calendar-links/${linkId}/`);
-    },
-};
+import { usersApi, eventApi, calendarShareApi, calendarLinkApi } from '@/services/api';
 
 interface SharedUser {
     id: number;
