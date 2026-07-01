@@ -13,7 +13,7 @@ import { ProjectGridCard }  from './components/ProjectGridCard';
 import { MoveProjectModal } from './components/MoveProjectModal';
 import { StatusPill, TypePill, MemberAvatars } from './components/ProjectPills';
 
-const th: React.CSSProperties = { textAlign: 'left', color: '#344054', fontSize: 14, fontWeight: 700, padding: '14px 16px', borderBottom: `1px solid ${LINE}`, borderRight: `1px solid ${LINE}`, background: '#f9fafb', whiteSpace: 'nowrap' as const };
+const th: React.CSSProperties = { textAlign: 'left', color: '#172033', fontSize: 14, fontWeight: 800, padding: '14px 16px', borderBottom: `1px solid ${LINE}`, borderRight: `1px solid ${LINE}`, background: '#f9fafb', whiteSpace: 'nowrap' as const, position: 'sticky', top: 0, zIndex: 1 };
 const td: React.CSSProperties = { padding: '14px 16px', borderBottom: `1px solid ${LINE}`, borderRight: `1px solid ${LINE}`, verticalAlign: 'middle', fontSize: 14, color: TEXT };
 
 const STATUS_OPTIONS = [
@@ -43,7 +43,7 @@ export function Projects() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#fff', overflow: 'hidden' }}>
 
-      {/* TOP BAR */}
+     {/* TOP BAR */}
       <div className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40" style={{ flexShrink: 0, background: '#fff', borderBottom: `1px solid ${LINE}`, paddingTop: 16, paddingBottom: 16 }}>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
@@ -236,7 +236,7 @@ export function Projects() {
               </div>
 
             ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 8 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#f9fafb' }}>
                     <th style={{ ...th, width: 40 }}><input type="checkbox" checked={p.selectedIds.size === p.paginated.length && p.paginated.length > 0} onChange={p.toggleAll} style={{ accentColor: BLUE, width: 15, height: 15, cursor: 'pointer' }} /></th>

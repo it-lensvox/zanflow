@@ -3553,7 +3553,7 @@ export const Calendar: React.FC = () => {
         <div className="w-full px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 pt-6 pb-8 space-y-6">
 
             {/* Controls Bar */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-2 bg-white p-3 rounded-xl border border-gray-200 shadow-sm sticky top-0 z-30">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-2 bg-white p-3 rounded-xl border border-gray-200 shadow-sm sticky top-[52px] z-[26]">
                 <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
                     <h5 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
                         <CalendarIcon className="w-6 h-6 text-blue-600" />

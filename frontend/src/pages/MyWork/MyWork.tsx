@@ -23,26 +23,30 @@ export function MyWork() {
     rescheduleMutation,
   } = useMyWork();
 
-  return (
-    <div className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 pt-6 pb-8" style={{ background: '#F8FAFC', minHeight: '100vh' }}>
+ return (
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: '#fff' }}>
 
       {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3" style={{ marginBottom: 24 }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, color: INK, letterSpacing: '-.03em' }}>My Work</h1>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: MUTED }}>
-            {today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-          </p>
+     <div className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40" style={{ position: 'sticky', top: 0, zIndex: 26, flexShrink: 0, background: '#F8FAFC', borderBottom: '1px solid #E6EBF2', paddingTop: 16, paddingBottom: 16 }}>
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div>
+            <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, color: INK, letterSpacing: '-.03em' }}>My Work</h1>
+            <p style={{ margin: '4px 0 0', fontSize: 13, color: MUTED }}>
+              {today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+            </p>
+          </div>
+          {!activeTask && (
+            <button
+              onClick={() => navigate('/taskboard')}
+              style={{ height: 40, background: BLUE, color: '#fff', border: 'none', borderRadius: 8, padding: '0 18px', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+            >
+              <Plus size={15} /> Add focus block
+            </button>
+          )}
         </div>
-        {!activeTask && (
-          <button
-            onClick={() => navigate('/taskboard')}
-            style={{ height: 40, background: BLUE, color: '#fff', border: 'none', borderRadius: 8, padding: '0 18px', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
-          >
-            <Plus size={15} /> Add focus block
-          </button>
-        )}
       </div>
+
+      <div className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 pt-6 pb-8">
 
       {/* ── Focus Block ── */}
       {activeTask && <FocusBlock activeTask={activeTask} focusProgress={focusProgress} />}
@@ -68,6 +72,7 @@ export function MyWork() {
           onSave={(id, start_time, end_time) => rescheduleMutation.mutate({ id, start_time, end_time })}
         />
       )}
+      </div>
     </div>
   );
 }

@@ -22,11 +22,10 @@ export function TaskBoardHeader({
     <div
       className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40"
       style={{
-        position: 'sticky', top: 0, zIndex: 25,
+        flexShrink: 0,
         background: '#fff',
         borderBottom: `1px solid ${LINE}`,
         paddingTop: 16, paddingBottom: 16,
-        flexShrink: 0,
       }}
     >
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3" style={{ marginBottom: 16 }}>

@@ -4,7 +4,7 @@ import { useLocation } from 'react-router-dom';
 import { useQuickNotes }       from './hooks/useQuickNotes';
 import { QuickNotesContent }   from './components/QuickNotesContent';
 
-// ─── Design tokens — same as Projects page ────────────────────────────────────
+// ─── Design tokens 
 const TEXT  = '#172033';
 const MUTED = '#667085';
 const LINE  = '#e6ebf2';
@@ -32,19 +32,19 @@ export function QuickNotesPage() {
     attachNoteToProject,
   } = useQuickNotes();
 
-  // Navigate from mini view — select the right note
+  // Navigate from mini view
   useEffect(() => {
     const incoming = (location.state as { selectedNoteId?: number } | null)?.selectedNoteId;
     if (incoming && !state.isLoading) selectNote(incoming);
   }, [location.state, state.isLoading]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#F7F8FB', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#fff', overflow: 'hidden' }}>
 
-      {/* ── Header — matches Projects page exactly ── */}
+      {/* ── Header ── */}
       <div
         className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40"
-        style={{ flexShrink: 0, background: '#fff', borderBottom: `1px solid ${LINE}`, paddingTop: 16, paddingBottom: 16 }}
+       style={{ flexShrink: 0, background: '#fff', borderBottom: `1px solid ${LINE}`, paddingTop: 16, paddingBottom: 16 }}
       >
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div>

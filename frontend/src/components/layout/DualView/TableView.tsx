@@ -70,7 +70,7 @@ export function TableView<T>({
             {columns.map((column) => (
               <th
                 key={column.key}
-                className={`group/header text-left py-[12px] px-3 font-semibold text-[13px] text-[#5e6c84] bg-[#fafbfc] border-b border-r border-[#dfe1e6] last:border-r-0 whitespace-nowrap relative ${activeFilterKey === column.key ? 'z-[100]' : ''} ${column.headerClassName || ''}`}
+                className={`group/header text-left py-[12px] px-3 font-extrabold text-[13px] text-[#172033] bg-[#fafbfc] border-b border-r border-[#dfe1e6] last:border-r-0 whitespace-nowrap relative ${activeFilterKey === column.key ? 'z-[100]' : ''} ${column.headerClassName || ''}`}
                 style={column.width ? { width: column.width } : undefined}
               >
                 <div className="flex items-center justify-between gap-2">

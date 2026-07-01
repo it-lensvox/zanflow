@@ -61,7 +61,7 @@ export const MyTask: React.FC = () => {
   if (!isBoard) return <Outlet />;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#F7F8FB', overflow: 'hidden' }}>
+   <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#fff', overflow: 'hidden' }}>
 
       {/* ── Sticky header ── */}
       <TaskBoardHeader

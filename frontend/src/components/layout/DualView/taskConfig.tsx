@@ -754,7 +754,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
   return [
     {
       key: 'project',
-      label: <span className="text-[14px] font-bold tracking-wide text-gray-700">Project</span>,
+      label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">Project</span>,
       width: '10%',
       render: (task: Task) => (
         <span
@@ -771,19 +771,19 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     },
     {
       key: 'heading',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Task Title</span>,
+      label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">Task Title</span>,
       width: '10%',
       render: (task: Task) => <TaskTitleCell task={task} queryClient={queryClient} />,
     },
     {
       key: 'status',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Status</span>,
+      label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">Status</span>,
       width: '8%',
       render: (task: Task) => <StatusDropdown task={task} />,
     },
     {
       key: personField,
-      label: <span className="text-[14px] font-bold tracking-wide text-gray-700">{personField === 'assigned_to' ? 'Assignee' : personField === 'created_by' ? 'Created By' : 'Updated By'}</span>, width: '8%',
+      label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">{personField === 'assigned_to' ? 'Assignee' : personField === 'created_by' ? 'Created By' : 'Updated By'}</span>, width: '8%',
       render: (task: Task) => {
         if (personField === 'created_by') {
           // Show Created By
@@ -901,13 +901,13 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     },
     {
       key: 'priority',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Priority</span>,
+     label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">Priority</span>,
       width: '8%',
       render: (task: Task) => <PriorityDropdown task={task} />,
     },
     {
       key: 'labels',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Labels</span>,
+      label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">Labels</span>,
       width: '8%',
       render: (task: Task) => (
         <div className="flex flex-wrap gap-1.5 items-center h-full min-h-[24px]" onClick={(e) => e.stopPropagation()}>
@@ -929,7 +929,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     },
     {
       key: dateField,
-      label: <span className="text-[14px] font-bold tracking-wide text-gray-700">{dateField === 'end_date' ? 'Due Date' : dateField === 'start_date' ? 'Start Date' : 'Created At'}</span>,
+      label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">{dateField === 'end_date' ? 'Due Date' : dateField === 'start_date' ? 'Start Date' : 'Created At'}</span>,
       width: '8%',
       render: (task: Task) =>
         dateField === 'created_at'
@@ -938,7 +938,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     },
     {
       key: 'updated_at',
-      label: <span className="text-[14px] font-bold tracking-wide text-gray-700">Updated</span>,
+      label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">Updated</span>,
       width: '8%',
       render: (task: Task) => {
         if (!task) return <span className="text-[13px] text-gray-600 pl-1">—</span>;
@@ -951,7 +951,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     },
     {
       key: 'duration',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Duration</span>,
+      label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">Duration</span>,
       width: '8%',
       render: (task: Task) => (
         <input

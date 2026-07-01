@@ -127,13 +127,13 @@ function SharedColumnHeader() {
         style={{
           display: 'flex', alignItems: 'center', gap: 5,
           background: 'none', border: 'none', cursor: 'pointer',
-          padding: 0, fontSize: 12, fontWeight: 600, color: '#6b7280',
+          padding: 0, fontSize: 12, fontWeight: 800, color: '#172033',
         }}
       >
         {mode === 'shared_with' ? 'Shared With' : 'Shared By'}
         {/* Chevron icon */}
         <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M3 5L6 8L9 5" stroke="#6b7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M3 5L6 8L9 5" stroke="#172033" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
 
@@ -320,7 +320,7 @@ export const createDocumentsTableColumns = (
   return [
     {
       key: 'name',
-      label: <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Document</span>,
+      label: <span style={{ fontSize: 12, fontWeight: 800, color: '#172033' }}>Document</span>,
       width: '350px',
       render: (doc: Document) => {
         const iconColor = getDocIconColor(doc.name);
@@ -354,8 +354,7 @@ export const createDocumentsTableColumns = (
     },
     {
       key: 'project',
-      label: <span style={{ fontSize: 13, fontWeight: 600, color: '#6b7280' }}>Project</span>,
-      width: '140px',
+      label: <span style={{ fontSize: 13, fontWeight: 800, color: '#172033' }}>Project</span>,
       render: (doc: Document) => {
         const name = doc.project_name || 'General';
         const display = name.length > 13 ? name.slice(0, 13) + '...' : name;
@@ -384,7 +383,7 @@ export const createDocumentsTableColumns = (
     },
     {
       key: 'labels',
-      label: <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Tags</span>,
+      label: <span style={{ fontSize: 12, fontWeight: 800, color: '#172033' }}>Tags</span>,
       width: '180px',
       render: (doc: Document) => {
         const labels = doc.labels || [];
@@ -442,13 +441,13 @@ export const createDocumentsTableColumns = (
     },
     {
       key: 'status',
-      label: <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Status</span>,
+      label: <span style={{ fontSize: 12, fontWeight: 800, color: '#172033' }}>Status</span>,
       width: '120px',
       render: (doc: Document) => <StatusDropdown doc={doc} />,
     },
     {
       key: 'updated_at',
-      label: <span style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>Updated</span>,
+      label: <span style={{ fontSize: 12, fontWeight: 800, color: '#172033' }}>Updated</span>,
       width: '120px',
       render: (doc: Document) => <span style={{ fontSize: 14, color: '#1a1a1a' }}>{formatRelativeTime(doc.updated_at)}</span>,
     },

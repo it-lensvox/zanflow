@@ -1,4 +1,4 @@
-import { Outlet, useMatch, useLocation } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { useState, Suspense, useEffect, useRef } from 'react';
 import { NotificationsPage } from '@/pages/NotificationsPage';
@@ -6,7 +6,7 @@ import { AIBot } from '@/pages/AIBOT/AIBOT';
 import { useNotifications } from '@/hooks/useNotifications';
 import { TaskDraftBar } from '@/pages/MyTask/components/Taskdrafts';
 import { GlobalSearchTrigger } from '@/components/GlobalSearch';
-import { Bell } from 'lucide-react';
+import { Bell, Moon, HelpCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import logoImage from '../../public/assets/logo.png';
@@ -15,18 +15,18 @@ import { cn } from '@/lib/utils';
 
 // Page titles per route
 const PAGE_TITLES: Record<string, string> = {
-  '/dashboard':  'Dashboard',
-  '/my-work':    'My Work',
-  '/taskboard':  'Tasks',
-  '/projects':   'Projects',
-  '/documents':  'Documents',
-  '/calendar':   'Calendar',
-  '/team-chat':  'Team Chat',
-  '/quick-notes':'Quick Notes',
-  '/reports':    'Reports',
-  '/team':       'Team',
-  '/profile':    'Profile',
-  '/settings':   'Settings',
+  '/dashboard': 'Dashboard',
+  '/my-work': 'My Work',
+  '/taskboard': 'Tasks',
+  '/projects': 'Projects',
+  '/documents': 'Documents',
+  '/calendar': 'Calendar',
+  '/team-chat': 'Team Chat',
+  '/quick-notes': 'Quick Notes',
+  '/reports': 'Reports',
+  '/team': 'Team',
+  '/profile': 'Profile',
+  '/settings': 'Settings',
 };
 
 function getPageTitle(pathname: string) {
@@ -70,11 +70,11 @@ function PageSkeleton() {
 export function Layout() {
   const [isActivityOpen, setIsActivityOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const { unreadCount }     = useNotifications();
-  const { user }            = useAuth();
-  const navigate            = useNavigate();
-  const location            = useLocation();
-  const faviconImgRef       = useRef<HTMLImageElement | null>(null);
+  const { unreadCount } = useNotifications();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const faviconImgRef = useRef<HTMLImageElement | null>(null);
   const pageTitle = getPageTitle(location.pathname);
 
   // Hide top bar on Dashboard
@@ -121,7 +121,7 @@ export function Layout() {
     }
   }, [unreadCount]);
 
-   return (
+  return (
     <div className="flex h-screen bg-background overflow-hidden">
 
       {/* Mobile sidebar backdrop */}
@@ -141,51 +141,74 @@ export function Layout() {
       </div>
 
       {/* Main area */}
-      <main className="flex-1 min-w-0 overflow-auto flex flex-col">
+      <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
 
-        {/* ── Global Top Bar ── */}
+       {/* ── Global Top Bar ── */}
         {!isDashboard && (
           <div style={{
-            height: 56, flexShrink: 0,
+            height: 52, flexShrink: 0,
             display: 'flex', alignItems: 'center',
-            padding: '0 16px', gap: 12,
+            padding: '0 20px', gap: 12,
             background: '#fff',
             borderBottom: '1px solid #E6EBF2',
-            position: 'sticky', top: 0, zIndex: 100,
+            zIndex: 27,
           }}>
-            {/* Hamburger — mobile only */}
-            <button
-              className="md:hidden flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors flex-shrink-0"
-              onClick={() => setIsMobileSidebarOpen(true)}
-              aria-label="Open menu"
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <path d="M2 4h14M2 9h14M2 14h14" stroke="#344054" strokeWidth="1.75" strokeLinecap="round"/>
-              </svg>
-            </button>
+            {/* Left: hamburger (mobile) + breadcrumb */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: '#667085' }}>
+              {/* Hamburger — mobile only */}
+              <button
+                className="md:hidden flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors flex-shrink-0 mr-1"
+                onClick={() => setIsMobileSidebarOpen(true)}
+                aria-label="Open menu"
+              >
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                  <path d="M2 4h14M2 9h14M2 14h14" stroke="#344054" strokeWidth="1.75" strokeLinecap="round" />
+                </svg>
+              </button>
+              <span style={{ color: '#667085', fontWeight: 500 }}>DYUKSA</span>
+              <span style={{ color: '#CBD5E1' }}>/</span>
+              <span style={{ color: '#172033', fontWeight: 700 }}>{pageTitle}</span>
+            </div>
 
-            {/* Page title */}
-            <span className="text-sm font-bold text-[#172033] flex-1 truncate">
-              {pageTitle}
-            </span>
+            {/* Center: search — grows to fill ~40% of the row */}
+            <div className="hidden sm:flex" style={{ flex: '0 1 40%', minWidth: 160, marginLeft: 'auto' }}>
+              <GlobalSearchTrigger />
+            </div>
 
-            {/* Global search */}
-            <GlobalSearchTrigger />
+            {/* Right: Moon + QuickCreate + Bell + Help */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+              {/* Theme toggle — UI only, not yet active */}
+              <button
+                style={{ width: 34, height: 34, border: '1px solid #E6EBF2', borderRadius: 8, background: '#fff', cursor: 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, opacity: 0.5 }}
+                title="Dark mode coming soon"
+              >
+                <Moon size={15} color="#172033" />
+              </button>
 
-            {/* Notification bell */}
-            <button
-              onClick={() => setIsActivityOpen(!isActivityOpen)}
-              style={{ position: 'relative', width: 36, height: 36, border: '1px solid #E6EBF2', borderRadius: 8, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-            >
-              <Bell size={15} color="#344054" />
-              {unreadCount > 0 && (
-                <span style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, background: '#EF4444', borderRadius: '50%', fontSize: 9, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
-              )}
-            </button>
+              {/* Quick create */}
+              <QuickCreateButton />
 
-            <QuickCreateButton />
+              {/* Notification bell */}
+              <button
+                onClick={() => setIsActivityOpen(!isActivityOpen)}
+                style={{ position: 'relative', width: 34, height: 34, border: '1px solid #E6EBF2', borderRadius: 8, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+              >
+                <Bell size={15} color="#172033" />
+                {unreadCount > 0 && (
+                  <span style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, background: '#EF4444', borderRadius: '50%', fontSize: 9, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Help */}
+              <button
+                style={{ width: 34, height: 34, border: '1px solid #E6EBF2', borderRadius: 8, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                className="hidden sm:flex"
+              >
+                <HelpCircle size={15} color="#667085" />
+              </button>
+            </div>
           </div>
         )}
 
@@ -193,7 +216,7 @@ export function Layout() {
         {isDashboard && null}
 
         {/* ── Page content ── */}
-        <div id="layout-wrapper" className="flex-1 flex flex-col min-w-0">
+        <div id="layout-wrapper" className="flex-1 flex flex-col min-w-0 overflow-auto">
           <Suspense fallback={<PageSkeleton />}>
             <Outlet context={{ isActivityOpen, setIsActivityOpen }} />
           </Suspense>

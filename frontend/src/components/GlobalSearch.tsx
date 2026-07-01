@@ -455,7 +455,7 @@ export function GlobalSearchTrigger() {
           height: 36, padding: '0 14px',
           background: '#F7F8FB', border: '1px solid #E6EBF2',
           borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit',
-          minWidth: 200,
+          minWidth: 200, width: '100%',
         }}
       >
         <Search size={13} color="#667085" />

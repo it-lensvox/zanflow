@@ -252,7 +252,7 @@ export function Documents() {
     <div className="flex w-full h-full min-h-0">
       <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden" style={{ background: '#fff' }}>
 
-        {/* ── TOPBAR (matches Project page design exactly) ── */}
+       {/* ── TOPBAR ── */}
         <div className="flex-shrink-0 px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40" style={{ background: '#fff', borderBottom: `1px solid ${LINE}`, paddingTop: 16, paddingBottom: 16 }}>
 
           {/* Title row */}
