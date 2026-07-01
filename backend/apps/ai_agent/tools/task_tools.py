@@ -523,19 +523,17 @@ def list_tasks(args: dict, user, workspace_id: str) -> dict:
     Supports offset-based pagination.
     """
     try:
-        from apps.ai_agent.access.tasks import get_user_task_queryset
+        from apps.ai_agent.access.tasks import get_user_task_queryset, apply_task_filters
 
         qs = get_user_task_queryset(user, workspace_id)
-
-        status_filter = args.get("status", "pending")
-        if status_filter and status_filter != "all":
-            qs = qs.filter(status=status_filter)
-
-        if args.get("priority"):
-            qs = qs.filter(priority=args["priority"])
-
-        if args.get("project_id"):
-            qs = qs.filter(project_id=args["project_id"])
+        qs = apply_task_filters(
+            qs,
+            user=user,
+            status=args.get("status", "pending"),   # chat default: pending
+            priority=args.get("priority"),
+            project_id=args.get("project_id"),
+            updated_today=args.get("updated_today"),
+        )
 
         total_count = qs.count()
         limit  = min(args.get("limit", 10), 50)

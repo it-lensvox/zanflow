@@ -21,40 +21,20 @@ logger = logging.getLogger(__name__)
 def _search_tasks(filters: dict, user, workspace_id: str, limit: int = 10, offset: int = 0) -> tuple:
     """Returns (results_list, total_count)"""
     try:
-        from apps.ai_agent.access.tasks import get_user_task_queryset
+        from apps.ai_agent.access.tasks import get_user_task_queryset, apply_task_filters
 
         qs = get_user_task_queryset(user, workspace_id)
-
-        if filters.get("search_text"):
-            t = filters["search_text"]
-            qs = qs.filter(
-                Q(heading__icontains=t) | Q(description__icontains=t)
-            )
-
-        if filters.get("status"):
-            qs = qs.filter(status=filters["status"])
-
-        if filters.get("priority"):
-            qs = qs.filter(priority=filters["priority"])
-
-        if filters.get("overdue") is True:
-            qs = qs.filter(
-                end_date__lt=date.today(),
-                status__in=["pending", "in_progress", "review", "backlog"],
-            )
-
-        if filters.get("assigned_to_me") is True:
-            qs = qs.filter(assigned_to=user)
-
-        if filters.get("assignee_name"):
-            name = filters["assignee_name"]
-            qs = qs.filter(
-                Q(assigned_to__first_name__icontains=name) |
-                Q(assigned_to__last_name__icontains=name)
-            ).distinct()
-
-        if filters.get("project_name"):
-            qs = qs.filter(project__name__icontains=filters["project_name"])
+        qs = apply_task_filters(
+            qs,
+            user=user,
+            status=filters.get("status"),           # search default: none (show all)
+            priority=filters.get("priority"),
+            project_name=filters.get("project_name"),
+            search_text=filters.get("search_text"),
+            overdue=filters.get("overdue"),
+            assigned_to_me=filters.get("assigned_to_me"),
+            assignee_name=filters.get("assignee_name"),
+        )
 
         total = qs.count()
         page_qs = qs.order_by("-updated_at")[offset: offset + limit]
