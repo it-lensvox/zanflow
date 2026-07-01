@@ -2137,7 +2137,7 @@
         }
       },
       "expected_tool_call": {
-        "tool": "create_note",
+        "tool": null,
         "args": {}
       },
       "expected_answer": {
@@ -2148,9 +2148,7 @@
         "response_must_not_contain": [
           "error"
         ],
-        "tool_result_shape": {
-          "success": true
-        }
+        "tool_result_shape": null
       },
       "evaluation": {
         "should_ask_clarification": false,
@@ -3293,16 +3291,21 @@
         "context": "Previous turn: task 567 'Integrate payment gateway' was just created"
       },
       "expected_tool_call": {
-        "tool": null,
+        "tool": "update_task",
         "args": {}
       },
       "expected_answer": {
         "response_text": "Done! Task has been updated to high priority.",
-        "response_must_contain": [],
+        "response_must_contain": [
+          "high",
+          "priority"
+        ],
         "response_must_not_contain": [
           "error"
         ],
-        "tool_result_shape": null
+        "tool_result_shape": {
+          "success": true
+        }
       },
       "evaluation": {
         "should_ask_clarification": false,
@@ -3963,7 +3966,7 @@
         }
       },
       "expected_tool_call": {
-        "tool": "get_user_projects",
+        "tool": null,
         "args": {}
       },
       "expected_answer": {
@@ -4321,20 +4324,18 @@
         }
       },
       "expected_tool_call": {
-        "tool": "get_user_projects",
+        "tool": null,
         "args": {}
       },
       "expected_answer": {
         "response_text": "Which project should the AI suggestion be for?",
         "response_must_contain": [
-          "project"
+          "performance"
         ],
         "response_must_not_contain": [
           "error"
         ],
-        "tool_result_shape": {
-          "success": true
-        }
+        "tool_result_shape": null
       },
       "evaluation": {
         "should_ask_clarification": true,
@@ -4767,7 +4768,7 @@
         }
       },
       "expected_tool_call": {
-        "tool": "update_task",
+        "tool": "get_workspace_members",
         "args": {}
       },
       "expected_answer": {

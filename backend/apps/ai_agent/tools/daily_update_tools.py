@@ -224,18 +224,16 @@ def list_events(args: dict, user, workspace_id: str) -> dict:
     """
     try:
         from datetime import date as date_cls
-        from django.db.models import Q
-        from apps.daily_updates.models import Event, EventInvitation
+        from apps.ai_agent.access.events import get_user_event_queryset
+        from apps.daily_updates.models import EventInvitation
 
         start = args.get("start_date") or str(date_cls.today())
         limit = min(args.get("limit", 10), 50)
 
         # Events user organised OR was invited to
-        qs = Event.objects.filter(
-            Q(organizer=user) | Q(attendees=user)
-        ).filter(
+        qs = get_user_event_queryset(user, workspace_id).filter(
             start_time__date__gte=start
-        ).distinct()
+        )
 
         if args.get("end_date"):
             qs = qs.filter(start_time__date__lte=args["end_date"])

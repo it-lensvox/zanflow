@@ -15,9 +15,8 @@ DOCUMENT_TOOL_SCHEMAS = [
     {
         "name": "list_documents",
         "description": (
-            "List project files and documents (PDFs, uploaded files, ground truth docs). "
-            "Use ONLY for actual file documents, NOT for user notes. "
-            "For user notes, use list_notes instead. "
+            "List documents in a project that the current user has access to. "
+            "Includes documents shared with the user via DocumentShare. "
             "Use when user asks 'show documents', 'list files in project X', "
             "'what documents are in review'."
         ),
@@ -79,20 +78,13 @@ def _user_accessible_documents(user, workspace_id, project_id=None):
     Returns a queryset of documents accessible to the user:
       - Documents in projects they are a member of
       - Documents explicitly shared with them via DocumentShare
+
+    Thin wrapper kept here for backward compatibility — actual logic
+    now lives in apps.ai_agent.access.documents, shared with AI Search.
     """
-    from django.db.models import Q
-    from apps.groundtruth.models import Document
+    from apps.ai_agent.access.documents import get_user_document_queryset
 
-    qs = Document.objects.filter(
-        workspace_id=workspace_id,
-    ).filter(
-        Q(project__members=user) | Q(shares__shared_with=user)
-    ).distinct()
-
-    if project_id:
-        qs = qs.filter(project_id=project_id)
-
-    return qs
+    return get_user_document_queryset(user, workspace_id, project_id)
 
 
 # ── Executors ─────────────────────────────────────────────────────────────────

@@ -21,9 +21,9 @@ import argparse
 from datetime import datetime
 
 # ── Config ────────────────────────────────────────────────────────────────────
-BASE_URL     = "http://192.168.1.6:8000"
+BASE_URL     = "http://192.168.1.26:8000"
 ENDPOINT     = f"{BASE_URL}/api/v1/agent/query/"
-JWT_TOKEN    = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzgyMzcxOTMzLCJpYXQiOjE3ODIzNjgzMzMsImp0aSI6IjgyNGJhM2Y2YTU2NzQ1Yjg5MWQxNzU3MzE5Y2JiYzQ0IiwidXNlcl9pZCI6IjEifQ.KTk6x_or1Vtk5lDQTfO9R_gFqPAktDYKTAW2ne2reQY"
+JWT_TOKEN    = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzgyODg0MDMxLCJpYXQiOjE3ODI4ODA0MzEsImp0aSI6IjYwYjE0M2MyMTQzZjQzNDViZmY1ZmE5M2JhNjYwZWY2IiwidXNlcl9pZCI6IjEifQ.xkzfoCNcXRHqrFk_E50SxTVg6v0dJWLyQHFL4-hf6kk"
 WORKSPACE_ID = "1"
 QUERIES_FILE = "/Users/Harshitshukla/Desktop/ZanFlow/ZanFlow/backend/dyuksa_queries.json"
 RESULTS_DIR  = "results"

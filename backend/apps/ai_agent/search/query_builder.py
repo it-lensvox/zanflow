@@ -21,13 +21,9 @@ logger = logging.getLogger(__name__)
 def _search_tasks(filters: dict, user, workspace_id: str, limit: int = 10, offset: int = 0) -> tuple:
     """Returns (results_list, total_count)"""
     try:
-        from apps.tasksite.models import Task
+        from apps.ai_agent.access.tasks import get_user_task_queryset
 
-        qs = Task.objects.filter(
-            workspace_id=workspace_id,
-        ).filter(
-            Q(assigned_to=user) | Q(assigned_by=user)
-        ).distinct()
+        qs = get_user_task_queryset(user, workspace_id)
 
         if filters.get("search_text"):
             t = filters["search_text"]
@@ -128,13 +124,9 @@ def _search_notes(filters: dict, user, workspace_id: str, limit: int = 10, offse
 def _search_projects(filters: dict, user, workspace_id: str, limit: int = 10, offset: int = 0) -> tuple:
     """Returns (results_list, total_count)"""
     try:
-        from apps.projects.models import Project
+        from apps.ai_agent.access.projects import get_user_project_queryset
 
-        qs = Project.objects.filter(
-            workspace_id=workspace_id,
-            is_active=True,
-            members=user,
-        ).distinct()
+        qs = get_user_project_queryset(user, workspace_id)
 
         # Favourites filter
         if filters.get("is_favourite") is True:
@@ -168,13 +160,12 @@ def _search_projects(filters: dict, user, workspace_id: str, limit: int = 10, of
 def _search_events(filters: dict, user, workspace_id: str, limit: int = 10, offset: int = 0) -> tuple:
     """Returns (results_list, total_count)"""
     try:
-        from apps.daily_updates.models import Event
+        from apps.ai_agent.access.events import get_user_event_queryset
         from datetime import datetime, date
+        import pytz
 
         # Events scoped to organizer OR attendee
-        qs = Event.objects.filter(
-            Q(organizer=user) | Q(attendees=user)
-        ).distinct()
+        qs = get_user_event_queryset(user, workspace_id)
 
         # Keyword search
         if filters.get("search_text"):
@@ -215,6 +206,46 @@ def _search_events(filters: dict, user, workspace_id: str, limit: int = 10, offs
         return [], 0
 
 
+# ── Document ───────────────────────────────────────────────────────────────────
+
+def _search_documents(filters: dict, user, workspace_id: str, limit: int = 10, offset: int = 0) -> tuple:
+    """
+    Returns (results_list, total_count)
+    Uses the SAME shared access function as chat's list_documents tool —
+    apps.ai_agent.access.documents — guaranteeing identical visibility
+    rules between chat and search for documents.
+    """
+    try:
+        from apps.ai_agent.access.documents import get_user_document_queryset
+
+        qs = get_user_document_queryset(user, workspace_id)
+
+        # Project filter — same project_name → ID matching style used elsewhere
+        if filters.get("project_name"):
+            qs = qs.filter(project__name__icontains=filters["project_name"])
+
+        # Keyword search
+        if filters.get("search_text"):
+            qs = qs.filter(name__icontains=filters["search_text"])
+
+        total = qs.count()
+        page_qs = qs.select_related("project").order_by("-created_at")[offset: offset + limit]
+        return [
+            {
+                "id":         str(d.id),
+                "name":       d.name,
+                "project":    d.project.name if d.project else None,
+                "status":     d.status,
+                "file_type":  d.file_type,
+            }
+            for d in page_qs
+        ], total
+
+    except Exception as exc:
+        logger.warning("Document search failed: %s", exc)
+        return [], 0
+
+
 # ── Public API ──────────────────────────────────────────────────────────────────
 
 def _resolve_project_id(project_name: str, user, workspace_id: str):
@@ -246,10 +277,10 @@ def run_search(filters: dict, user, workspace_id: str,
     Returns a dict ready for the API response.
     Each model query is independent — one failure never blocks others.
     """
-    models  = filters.get("models") or ["task", "note", "project", "event"]
+    models  = filters.get("models") or ["task", "note", "project", "event", "document"]
     offset  = (page - 1) * page_size
-    results = {"tasks": [], "notes": [], "projects": [], "events": []}
-    totals  = {"tasks": 0,  "notes": 0,  "projects": 0,  "events": 0}
+    results = {"tasks": [], "notes": [], "projects": [], "events": [], "documents": []}
+    totals  = {"tasks": 0,  "notes": 0,  "projects": 0,  "events": 0,  "documents": 0}
 
     # Resolve project_name → project_id for filters_used (read-only, additive)
     resolved_project_id = None
@@ -272,10 +303,14 @@ def run_search(filters: dict, user, workspace_id: str,
         results["events"], totals["events"] = _search_events(
             filters, user, workspace_id, limit=page_size, offset=offset)
 
+    if "document" in models:
+        results["documents"], totals["documents"] = _search_documents(
+            filters, user, workspace_id, limit=page_size, offset=offset)
+
     total    = sum(totals.values())
     has_more = any(
         totals[m] > offset + page_size
-        for m in ["tasks", "notes", "projects", "events"]
+        for m in ["tasks", "notes", "projects", "events", "documents"]
     )
 
     return {

@@ -23,7 +23,7 @@ from datetime import datetime
 # ── Config ─────────────────────────────────────────────────────────────────────
 BASE_URL      = "http://192.168.1.26:8000"
 ENDPOINT      = f"{BASE_URL}/api/v1/agent/search/"
-JWT_TOKEN     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzgyODAzODgyLCJpYXQiOjE3ODI4MDAyODIsImp0aSI6Ijk1YTA5NDQxNDBjZjQ4ZjdhODdkNGE4ZWFkYzYxM2IxIiwidXNlcl9pZCI6IjEifQ.2mFbPvZSIDOd6HWpviVhFwNE-B6a2IlgoqH6i8gwQsU"
+JWT_TOKEN     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzgyODgyODE3LCJpYXQiOjE3ODI4NzkyMTcsImp0aSI6ImM5M2I4Yjc1MjYzMDRiNDBhNjhkNmI5MGFjOGQyOWRiIiwidXNlcl9pZCI6IjEifQ.kp6cUTAxVOsV_d1tWqTaNbf2dm-3H1m1EXvN6IUI030"
 WORKSPACE_ID  = "1"
 QUERIES_FILE  = "search_queries.json"
 RESULTS_DIR   = "results"

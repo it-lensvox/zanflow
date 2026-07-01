@@ -46,14 +46,10 @@ PROJECT_TOOL_SCHEMAS = [
 
 def list_projects(args: dict, user, workspace_id: str) -> dict:
     try:
-        from apps.projects.models import Project
+        from apps.ai_agent.access.projects import get_user_project_queryset
 
         # User-scoped — only projects user is a member of
-        qs = Project.objects.filter(
-            workspace_id=workspace_id,
-            is_active=True,
-            members=user,           # ← user-scoped
-        ).distinct()
+        qs = get_user_project_queryset(user, workspace_id)
 
         limit = min(args.get("limit", 10), 50)
         projects = qs.order_by("name")[:limit]
@@ -76,15 +72,12 @@ def list_projects(args: dict, user, workspace_id: str) -> dict:
 
 def get_project_summary(args: dict, user, workspace_id: str) -> dict:
     try:
-        from apps.projects.models import Project
+        from apps.ai_agent.access.projects import get_user_project_queryset
 
         # User-scoped — can only view projects they are a member of
-        project = Project.objects.filter(
+        project = get_user_project_queryset(user, workspace_id).filter(
             id=args["project_id"],
-            workspace_id=workspace_id,
-            is_active=True,
-            members=user,           # ← user-scoped
-        ).distinct().first()
+        ).first()
 
         if not project:
             return {
