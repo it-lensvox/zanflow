@@ -7,14 +7,14 @@ import type { CustomDashboard, WidgetConfig, WidgetType, WidgetSize } from '@/ty
 
 // Size → CSS column span (12-col grid)
 const SIZE_COLS: Record<WidgetSize, string> = {
-  sm: 'col-span-12 sm:col-span-6 lg:col-span-3',   // ~3 cols
-  md: 'col-span-12 sm:col-span-6 lg:col-span-6',   // ~6 cols
-  lg: 'col-span-12',                                // 12 cols
+  sm: 'col-span-12 sm:col-span-6 lg:col-span-3',
+  md: 'col-span-12 sm:col-span-6 lg:col-span-6',
+  lg: 'col-span-12',   
 };
 
 interface Props {
   dashboard: CustomDashboard;
-  db: any; // Full useDashboard return — passed through, no new fetches
+  db: any;
   onAddWidget: (type: WidgetType, size: WidgetSize) => void;
   onRemoveWidget: (widgetId: string) => void;
   onReorderWidgets: (widgets: WidgetConfig[]) => void;
@@ -38,7 +38,7 @@ export function CustomDashboardView({
   const existingTypes = dashboard.widgets.map(w => w.type);
   const widgets = [...dashboard.widgets].sort((a, b) => a.order - b.order);
 
-  // ── Drag handlers (native HTML5 drag — no library needed)
+  // ── Drag handlers 
   const handleDragStart = (index: number) => setDragIndex(index);
   const handleDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
@@ -74,7 +74,7 @@ export function CustomDashboardView({
   };
 
   return (
-    <div style={{ width: '100%' }}>
+    <div style={{ width: '100%', fontFamily: '-apple-system,BlinkMacSystemFont,"Inter",system-ui,sans-serif' }}>
       {/* ── Edit mode toolbar */}
       {isEditMode && (
         <div style={{
@@ -82,7 +82,7 @@ export function CustomDashboardView({
           padding: '8px 20px', display: 'flex', alignItems: 'center',
           gap: 10, flexWrap: 'wrap',
         }}>
-          {/* Dashboard name — inline rename */}
+          {/* Dashboard name  */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
             {isRenaming ? (
               <>
@@ -161,7 +161,7 @@ export function CustomDashboardView({
               {widgets.length} widget{widgets.length !== 1 ? 's' : ''} · Custom dashboard
             </div>
           </div>
-          {/* Customise button — only shown when NOT in edit mode */}
+          {/* Customise button  */}
           {!isEditMode && (
             <button
               onClick={handleEnterEditMode}
@@ -182,7 +182,7 @@ export function CustomDashboardView({
       {/* ── Widget grid */}
       <div
         className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 pt-6"
-        style={{ paddingBottom: 40 }}
+        style={{ paddingBottom: 24 }}
       >
         {widgets.length === 0 ? (
           /* Empty state */
@@ -248,6 +248,10 @@ export function CustomDashboardView({
         <WidgetPicker
           existingTypes={existingTypes}
           onAdd={(type, size) => { onAddWidget(type, size); }}
+          onRemove={(type) => {
+            const widget = dashboard.widgets.find(w => w.type === type);
+            if (widget) onRemoveWidget(widget.id);
+          }}
           onClose={() => setShowPicker(false)}
         />
       )}

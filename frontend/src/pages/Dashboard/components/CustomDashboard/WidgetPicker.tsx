@@ -28,10 +28,11 @@ const STAT_WIDGETS: WidgetType[] = ['stat_projects','stat_documents','stat_tasks
 interface Props {
   onClose: () => void;
   onAdd: (type: WidgetType, size: WidgetSize) => void;
+  onRemove: (type: WidgetType) => void;
   existingTypes: WidgetType[];
 }
 
-export function WidgetPicker({ onClose, onAdd, existingTypes }: Props) {
+export function WidgetPicker({ onClose, onAdd, onRemove, existingTypes }: Props) {
   const stats = WIDGET_META.filter(w => STAT_WIDGETS.includes(w.type));
   const charts = WIDGET_META.filter(w => !STAT_WIDGETS.includes(w.type));
 
@@ -46,26 +47,28 @@ export function WidgetPicker({ onClose, onAdd, existingTypes }: Props) {
           return (
             <button
               key={w.type}
-              onClick={() => !added && onAdd(w.type, w.defaultSize)}
-              disabled={added}
+              onClick={() => added ? onRemove(w.type) : onAdd(w.type, w.defaultSize)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 10,
                 padding: '9px 12px', borderRadius: 8,
-                border: `1px solid ${added ? '#EEF3FF' : LINE}`,
-                background: added ? '#F7F9FF' : '#fff',
-                cursor: added ? 'default' : 'pointer',
+                border: `1px solid ${added ? '#FECACA' : LINE}`,
+                background: added ? '#FFF5F5' : '#fff',
+                cursor: 'pointer',
                 fontFamily: 'inherit', textAlign: 'left',
-                opacity: added ? 0.6 : 1,
                 transition: 'background 0.12s',
               }}
-              onMouseEnter={e => { if (!added) e.currentTarget.style.background = BG; }}
-              onMouseLeave={e => { if (!added) e.currentTarget.style.background = '#fff'; }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = added ? '#FEE2E2' : BG;
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = added ? '#FFF5F5' : '#fff';
+              }}
             >
               <div style={{
                 width: 30, height: 30, borderRadius: 7, flexShrink: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: added ? '#EEF4FF' : BG,
-                color: added ? BLUE : MUTED,
+                background: added ? '#FEE2E2' : BG,
+                color: added ? '#EF4444' : MUTED,
               }}>
                 {w.icon}
               </div>
@@ -74,7 +77,7 @@ export function WidgetPicker({ onClose, onAdd, existingTypes }: Props) {
                 <div style={{ fontSize: 11, color: MUTED, marginTop: 1 }}>{w.sub}</div>
               </div>
               {added ? (
-                <span style={{ fontSize: 11, color: BLUE, fontWeight: 600, flexShrink: 0 }}>Added</span>
+                <span style={{ fontSize: 11, color: '#EF4444', fontWeight: 600, flexShrink: 0 }}>Remove</span>
               ) : (
                 <span style={{ fontSize: 18, color: MUTED, lineHeight: 1, flexShrink: 0 }}>+</span>
               )}

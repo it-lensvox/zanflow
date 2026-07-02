@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Bell, Calendar, ChevronDown, LayoutDashboard, ListTodo, BarChart2, Star, Moon, Search, HelpCircle, Plus, Pencil, Trash2, MoreHorizontal } from 'lucide-react';
 import { NotificationsPage } from '@/pages/NotificationsPage';
 import { CreateProjectModal } from '@/pages/Project/CreateProjectModal';
@@ -18,13 +18,8 @@ import { ProjectsOverviewTable } from './components/ProjectsOverviewTable';
 import { TodayTab } from './components/TodayTab';
 import { AnalyticsTab } from './components/AnalyticsTab';
 import { CustomDashboardView, NewDashboardModal } from './components/CustomDashboard';
-import {
-  BG, TEXT, MUTED, LINE, BLUE, MONTH_BTN,
-  STAT_COLORS, DATE_RANGE_LABELS,
-} from './index';
-import {
-  FolderKanban, FileText, CheckCircle, AlertTriangle,
-} from 'lucide-react';
+import { BG, TEXT, MUTED, LINE, BLUE, MONTH_BTN, STAT_COLORS, DATE_RANGE_LABELS } from './index';
+import { FolderKanban, FileText, CheckCircle, AlertTriangle } from 'lucide-react';
 
 type DashTab = 'overview' | 'today' | 'analytics' | `custom_${number}`;
 
@@ -46,17 +41,30 @@ export function Dashboard() {
   const db = useDashboard();
 
   // Read saved default tab from localStorage
-  const savedDefault = (typeof localStorage !== 'undefined'
-    ? localStorage.getItem(DEFAULT_TAB_KEY)
-    : null) as DashTab | null;
-
-  const [activeTab, setActiveTab] = useState<DashTab>(savedDefault ?? 'overview');
-  const [defaultTab, setDefaultTab] = useState<DashTab>(savedDefault ?? 'overview');
+  const [activeTab, setActiveTab] = useState<DashTab>(() =>
+    (typeof localStorage !== 'undefined'
+      ? (localStorage.getItem(DEFAULT_TAB_KEY) as DashTab | null)
+      : null) ?? 'overview'
+  );
+  const [defaultTab, setDefaultTab] = useState<DashTab>(() =>
+    (typeof localStorage !== 'undefined'
+      ? (localStorage.getItem(DEFAULT_TAB_KEY) as DashTab | null)
+      : null) ?? 'overview'
+  );
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const switcherRef = useRef<HTMLDivElement>(null);
   const [showNewDashboardModal, setShowNewDashboardModal] = useState(false);
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
+  const [renameState, setRenameState] = useState<{ id: number; value: string } | null>(null);
+
+  const openMenu = useCallback((e: React.MouseEvent, id: number) => {
+    e.stopPropagation();
+    if (menuOpenId === id) { setMenuOpenId(null); setMenuPos(null); return; }
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setMenuPos({ top: rect.bottom + 6, right: window.innerWidth - rect.right });
+    setMenuOpenId(id);
+  }, [menuOpenId]);
 
   const {
     dashboards,
@@ -88,6 +96,10 @@ export function Dashboard() {
 
   // Handler: save current tab as default
   const handleSetDefault = () => {
+    if (defaultTab === activeTab) {
+      setActiveTab('overview');
+      return;
+    }
     if (activeTab.startsWith('custom_')) {
       const id = Number(activeTab.replace('custom_', ''));
       setDefaultDashboard(id);
@@ -250,7 +262,9 @@ export function Dashboard() {
           {/* Set as default button */}
           <button
             onClick={handleSetDefault}
-            title={defaultTab === activeTab ? `${TABS.find(t => t.key === activeTab)?.label} is your default view` : `Set ${TABS.find(t => t.key === activeTab)?.label} as default`}
+            title={defaultTab === activeTab
+              ? 'Click to go back to Overview'
+              : `Set ${TABS.find(t => t.key === activeTab)?.label ?? activeCustomDashboard?.name ?? 'this dashboard'} as default`}
             style={{
               display: 'flex', alignItems: 'center', gap: 6, fontSize: 13,
               color: defaultTab === activeTab ? '#1663f6' : MUTED,
@@ -312,7 +326,7 @@ export function Dashboard() {
                   YOUR DASHBOARDS
                 </div>
 
-                {/* Built-in tab rows — unchanged */}
+                {/* Built-in tab rows */}
                 {TABS.map(tab => {
                   const isActive = activeTab === tab.key;
                   const isDefault = defaultTab === tab.key;
@@ -394,10 +408,10 @@ export function Dashboard() {
                               style={{ flexShrink: 0 }}
                             />
                           </button>
-                          {/* ··· menu */}
-                          <div ref={menuRef} style={{ position: 'relative', paddingRight: 8 }}>
+                          {/* ··· menu trigger */}
+                          <div style={{ paddingRight: 8, flexShrink: 0 }}>
                             <button
-                              onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === cd.id ? null : cd.id); }}
+                              onClick={(e) => openMenu(e, cd.id)}
                               style={{
                                 width: 24, height: 24, borderRadius: 5, border: 'none',
                                 background: 'transparent', cursor: 'pointer',
@@ -407,46 +421,6 @@ export function Dashboard() {
                             >
                               <MoreHorizontal size={14} />
                             </button>
-                            {menuOpenId === cd.id && (
-                              <>
-                                <div style={{ position: 'fixed', inset: 0, zIndex: 1 }} onClick={() => setMenuOpenId(null)} />
-                                <div style={{
-                                  position: 'absolute', right: 0, top: '100%', zIndex: 2,
-                                  background: '#fff', border: `1px solid ${LINE}`, borderRadius: 10,
-                                  boxShadow: '0 8px 24px rgba(16,24,40,.10)', overflow: 'hidden', minWidth: 160,
-                                }}>
-                                  <button
-                                    onClick={() => { setDefaultDashboard(cd.id); localStorage.setItem(DEFAULT_TAB_KEY, tabKey); setDefaultTab(tabKey); setMenuOpenId(null); }}
-                                    style={{ width: '100%', padding: '9px 14px', border: 'none', background: '#fff', fontSize: 13, color: TEXT, cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'inherit' }}
-                                  >
-                                    <Star size={13} color={MUTED} /> Set as default
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      const newName = prompt('Rename dashboard', cd.name);
-                                      if (newName?.trim()) renameDashboard(cd.id, newName.trim());
-                                      setMenuOpenId(null);
-                                    }}
-                                    style={{ width: '100%', padding: '9px 14px', border: 'none', background: '#fff', fontSize: 13, color: TEXT, cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'inherit' }}
-                                  >
-                                    <Pencil size={13} color={MUTED} /> Rename
-                                  </button>
-                                  <div style={{ height: 1, background: LINE }} />
-                                  <button
-                                    onClick={() => {
-                                      if (!confirm(`Delete "${cd.name}"?`)) return;
-                                      deleteDashboard(cd.id);
-                                      if (activeTab === tabKey) setActiveTab('overview');
-                                      if (defaultTab === tabKey) { localStorage.setItem(DEFAULT_TAB_KEY, 'overview'); setDefaultTab('overview'); }
-                                      setMenuOpenId(null);
-                                    }}
-                                    style={{ width: '100%', padding: '9px 14px', border: 'none', background: '#fff', fontSize: 13, color: '#EF4444', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'inherit' }}
-                                  >
-                                    <Trash2 size={13} color="#EF4444" /> Delete
-                                  </button>
-                                </div>
-                              </>
-                            )}
                           </div>
                         </div>
                       );
@@ -476,7 +450,7 @@ export function Dashboard() {
                     <Plus size={16} color={MUTED} />
                   </div>
                   <div style={{ textAlign: 'left' }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: TEXT }}>New dashboard</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: TEXT }}>Custom dashboard</div>
                   </div>
                 </button>
               </div>
@@ -583,6 +557,11 @@ export function Dashboard() {
         )}
 
         {/* ══ CUSTOM DASHBOARD TAB ══ */}
+        {activeTab.startsWith('custom_') && !activeCustomDashboard && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2" style={{ borderColor: BLUE }} />
+          </div>
+        )}
         {activeTab.startsWith('custom_') && activeCustomDashboard && (
           <CustomDashboardView
             dashboard={activeCustomDashboard}
@@ -640,7 +619,7 @@ export function Dashboard() {
         />
       )}
 
-      {showNewDashboardModal && (
+     {showNewDashboardModal && (
         <NewDashboardModal
           onClose={() => setShowNewDashboardModal(false)}
           onCreate={async (name, template) => {
@@ -649,6 +628,189 @@ export function Dashboard() {
             setSwitcherOpen(false);
           }}
         />
+      )}
+
+      {/* ── Fixed-position context menu — renders outside any overflow/clip context */}
+      {menuOpenId !== null && menuPos && (
+        <>
+          {/* Backdrop */}
+          <div
+            style={{ position: 'fixed', inset: 0, zIndex: 498 }}
+            onClick={() => { setMenuOpenId(null); setMenuPos(null); }}
+          />
+          {/* Menu */}
+          <div style={{
+            position: 'fixed',
+            top: menuPos.top,
+            right: menuPos.right,
+            zIndex: 499,
+            background: '#fff',
+            border: `1px solid ${LINE}`,
+            borderRadius: 10,
+            boxShadow: '0 8px 24px rgba(16,24,40,.12)',
+            overflow: 'hidden',
+            minWidth: 172,
+          }}>
+            {/* Set as default */}
+            {(() => {
+              const cd = dashboards.find(d => d.id === menuOpenId);
+              if (!cd) return null;
+              const tabKey: DashTab = `custom_${cd.id}`;
+              const isAlreadyDefault = defaultTab === tabKey;
+              return (
+                <button
+                  onClick={() => {
+                    if (!cd || isAlreadyDefault) { setMenuOpenId(null); setMenuPos(null); return; }
+                    setDefaultDashboard(cd.id);
+                    localStorage.setItem(DEFAULT_TAB_KEY, tabKey);
+                    setDefaultTab(tabKey);
+                    setMenuOpenId(null); setMenuPos(null);
+                  }}
+                  style={{
+                    width: '100%', padding: '9px 14px', border: 'none',
+                    background: isAlreadyDefault ? '#EEF3FF' : '#fff',
+                    fontSize: 13, fontWeight: isAlreadyDefault ? 600 : 500,
+                    color: isAlreadyDefault ? '#1663f6' : TEXT,
+                    cursor: isAlreadyDefault ? 'default' : 'pointer',
+                    textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8,
+                    fontFamily: 'inherit',
+                  }}
+                  onMouseEnter={e => { if (!isAlreadyDefault) e.currentTarget.style.background = '#F7F8FB'; }}
+                  onMouseLeave={e => { if (!isAlreadyDefault) e.currentTarget.style.background = '#fff'; }}
+                >
+                  <Star
+                    size={13}
+                    fill={isAlreadyDefault ? '#1663f6' : 'none'}
+                    color={isAlreadyDefault ? '#1663f6' : MUTED}
+                  />
+                  {isAlreadyDefault ? 'Default view' : 'Set as default'}
+                </button>
+              );
+            })()}
+
+            {/* Rename — opens inline input */}
+            <button
+              onClick={() => {
+                const cd = dashboards.find(d => d.id === menuOpenId);
+                if (!cd) return;
+                setRenameState({ id: cd.id, value: cd.name });
+                setMenuOpenId(null); setMenuPos(null);
+              }}
+              style={{
+                width: '100%', padding: '9px 14px', border: 'none',
+                background: '#fff', fontSize: 13, fontWeight: 500,
+                color: TEXT, cursor: 'pointer', textAlign: 'left',
+                display: 'flex', alignItems: 'center', gap: 8,
+                fontFamily: 'inherit',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#F7F8FB')}
+              onMouseLeave={e => (e.currentTarget.style.background = '#fff')}
+            >
+              <Pencil size={13} color={MUTED} /> Rename
+            </button>
+
+            <div style={{ height: 1, background: LINE }} />
+
+            {/* Delete */}
+            <button
+              onClick={() => {
+                const cd = dashboards.find(d => d.id === menuOpenId);
+                if (!cd) return;
+                const tabKey: DashTab = `custom_${cd.id}`;
+                deleteDashboard(cd.id);
+                if (activeTab === tabKey) setActiveTab('overview');
+                if (defaultTab === tabKey) { localStorage.setItem(DEFAULT_TAB_KEY, 'overview'); setDefaultTab('overview'); }
+                setMenuOpenId(null); setMenuPos(null);
+              }}
+              style={{
+                width: '100%', padding: '9px 14px', border: 'none',
+                background: '#fff', fontSize: 13, fontWeight: 500,
+                color: '#EF4444', cursor: 'pointer', textAlign: 'left',
+                display: 'flex', alignItems: 'center', gap: 8,
+                fontFamily: 'inherit',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#FEF2F2')}
+              onMouseLeave={e => (e.currentTarget.style.background = '#fff')}
+            >
+              <Trash2 size={13} color="#EF4444" /> Delete
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* ── Inline rename modal — replaces browser prompt() */}
+      {renameState !== null && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 500,
+            background: 'rgba(16,24,40,0.35)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 16,
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setRenameState(null); }}
+        >
+          <div style={{
+            background: '#fff', borderRadius: 14, width: '100%', maxWidth: 380,
+            boxShadow: '0 20px 60px rgba(16,24,40,0.18)',
+            padding: '20px',
+          }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: TEXT, marginBottom: 12 }}>
+              Rename dashboard
+            </div>
+            <input
+              autoFocus
+              value={renameState.value}
+              onChange={e => setRenameState(s => s ? { ...s, value: e.target.value } : null)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  if (renameState.value.trim()) renameDashboard(renameState.id, renameState.value.trim());
+                  setRenameState(null);
+                }
+                if (e.key === 'Escape') setRenameState(null);
+              }}
+              maxLength={60}
+              style={{
+                width: '100%', height: 38, borderRadius: 8,
+                border: `1px solid ${LINE}`, padding: '0 12px',
+                fontSize: 14, color: TEXT, outline: 'none',
+                fontFamily: 'inherit', boxSizing: 'border-box',
+                marginBottom: 16,
+              }}
+              onFocus={e => (e.currentTarget.style.borderColor = BLUE)}
+              onBlur={e => (e.currentTarget.style.borderColor = LINE)}
+            />
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setRenameState(null)}
+                style={{
+                  height: 34, padding: '0 14px', borderRadius: 8,
+                  border: `1px solid ${LINE}`, background: '#fff',
+                  fontSize: 13, fontWeight: 600, color: TEXT,
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (renameState.value.trim()) renameDashboard(renameState.id, renameState.value.trim());
+                  setRenameState(null);
+                }}
+                disabled={!renameState.value.trim()}
+                style={{
+                  height: 34, padding: '0 16px', borderRadius: 8,
+                  border: 'none',
+                  background: renameState.value.trim() ? BLUE : '#C7D7FD',
+                  fontSize: 13, fontWeight: 600, color: '#fff',
+                  cursor: renameState.value.trim() ? 'pointer' : 'not-allowed',
+                  fontFamily: 'inherit',
+                }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
