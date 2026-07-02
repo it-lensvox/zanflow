@@ -1399,15 +1399,14 @@ export interface AgentSearchResponseSearch {
 
 // ─── Shared filters_used shape 
 export interface AgentFiltersUsed {
-  status?:         string;  
-  priority?:       string; 
-  project_id?:     number; 
+  status?:         string;
+  priority?:       string;
   assignee_name?:  string;
-  overdue?:        boolean; 
+  overdue?:        boolean;
   assigned_to_me?: boolean;
-  today?:          boolean; 
-  date?:           string; 
-  is_favourite?:   boolean; 
+  today?:          boolean;
+  date?:           string;
+  is_favourite?:   boolean;
   search_text?:    string;
   // open_chat filters
   room_id?:        string;
@@ -1415,6 +1414,11 @@ export interface AgentFiltersUsed {
   member_id?:      number;
   member_name?:    string;
   project_name?:   string;
+  project_id?:     number;
+  // label filters
+  label_name?:     string;
+  label_names?:    string[];
+  heading?:        string;
 }
 
 export interface AgentSearchResponseAction {

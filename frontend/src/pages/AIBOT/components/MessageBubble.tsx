@@ -19,11 +19,13 @@ export function MessageBubble({ message, isStreaming = false, onCloseChat }: Mes
     ? parseToolResult(message.toolCalled || null, message.toolResult || null)
     : null;
   const hasEntities = !!(entities && (
-    (entities.tasks         && entities.tasks.length    > 0) ||
-    (entities.projects      && entities.projects.length > 0) ||
-    (entities.notes         && entities.notes.length    > 0) ||
-    entities.openChat                                        ||
-    entities.createdProject                                  ||
+    (entities.tasks         && entities.tasks.length      > 0) ||
+    (entities.projects      && entities.projects.length   > 0) ||
+    (entities.notes         && entities.notes.length      > 0) ||
+    entities.openChat                                          ||
+    entities.createdProject                                    ||
+    entities.createdTask                                       ||
+    entities.missingLabels                                     ||
     (entities.members       && entities.members.length    > 0) ||
     (entities.workspaces    && entities.workspaces.length > 0)
   ));
@@ -91,11 +93,8 @@ export function MessageBubble({ message, isStreaming = false, onCloseChat }: Mes
             boxShadow: '0 2px 12px rgba(16,24,40,.06)',
             minWidth: 40, minHeight: 20,
           }}>
-           {hasEntities ? (
-              /* Cards only  */
-              entities && <EntityCards entities={entities} filtersUsed={message.filtersUsed ?? null} onCloseChat={onCloseChat} />
-            ) : (
-              /* Plain text response — no entity data detected */
+           {/* Always show AI text response */}
+            {message.content && (
               <RichTextEditor
                 value={markdownToHtml(typeof message.content === 'string' ? message.content : '')}
                 onChange={() => {}}
@@ -104,6 +103,13 @@ export function MessageBubble({ message, isStreaming = false, onCloseChat }: Mes
                 minHeight="0px"
                 className="!border-0 !ring-0 !bg-transparent !rounded-none [&_.ProseMirror]:!p-0 [&_.ProseMirror]:!min-h-0"
               />
+            )}
+
+            {/* Entity cards below the text when available */}
+            {hasEntities && entities && (
+              <div style={{ marginTop: message.content ? 12 : 0 }}>
+                <EntityCards entities={entities} filtersUsed={message.filtersUsed ?? null} onCloseChat={onCloseChat} />
+              </div>
             )}
           </div>
         )}

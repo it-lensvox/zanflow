@@ -1678,7 +1678,7 @@ export const agentApi = {
         try {
           const event = JSON.parse(jsonStr) as import('@/types').AgentStreamEvent;
           if (event.type === 'chunk') onChunk(event.text);
-          if (event.type === 'done')  { console.log('[DEBUG] raw SSE done event from backend:', event); onDone(event); }
+          if (event.type === 'done')  onDone(event);
         } catch { }
       }
     }

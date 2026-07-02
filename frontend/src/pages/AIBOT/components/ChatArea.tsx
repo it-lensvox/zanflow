@@ -106,12 +106,12 @@ export function ChatArea({ messages, isTyping, historyLoading, input, setInput, 
 
       {/* Input */}
       <div style={{ padding: '10px 20px 14px', background: '#fff', borderTop: '1px solid #e2e8f0', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, background: '#f8faff', borderRadius: 14, padding: '9px 12px', border: '1.5px solid #e2e8f0', transition: 'all .2s' }}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#f8faff', borderRadius: 14, padding: '13px 14px', border: '1.5px solid #e2e8f0', transition: 'all .2s' }}
           onFocusCapture={e => { e.currentTarget.style.borderColor = '#1663f6'; e.currentTarget.style.background = '#fff'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(22,99,246,.08)'; }}
           onBlurCapture={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#f8faff'; e.currentTarget.style.boxShadow = 'none'; }}>
           <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={onKeyDown}
             placeholder="Ask Dyuksa AI anything…" rows={1}
-            style={{ flex: 1, resize: 'none', border: 'none', outline: 'none', background: 'transparent', fontSize: 14, color: TEXT, fontFamily: 'inherit', lineHeight: 1.5, maxHeight: 120, overflowY: 'auto' }}
+            style={{ flex: 1, resize: 'none', border: 'none', outline: 'none', background: 'transparent', fontSize: 14, color: TEXT, fontFamily: 'inherit', lineHeight: 1.5, maxHeight: 120, overflowY: 'auto', display: 'block', paddingTop: 2 }}
             onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = `${Math.min(el.scrollHeight, 120)}px`; }} />
           <button onClick={onSend} disabled={!input.trim() || isTyping}
             style={{ width: 34, height: 34, borderRadius: 10, border: 'none', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s', cursor: !input.trim() || isTyping ? 'not-allowed' : 'pointer', background: !input.trim() || isTyping ? '#e2e8f0' : 'linear-gradient(135deg, #1663f6, #0f4bd4)', boxShadow: !input.trim() || isTyping ? 'none' : '0 4px 12px rgba(22,99,246,.35)' }}>

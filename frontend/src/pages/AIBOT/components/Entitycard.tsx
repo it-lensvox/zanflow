@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { CheckSquare, FileText, ArrowUpRight, Clock, User, MessageSquare, FolderKanban as FolderIcon, ExternalLink, Building2 } from 'lucide-react';
+import { CheckSquare, FileText, ArrowUpRight, Clock, User, MessageSquare, FolderKanban as FolderIcon, ExternalLink, Building2, AlertTriangle } from 'lucide-react';
 import { buildViewAllUrl } from '@/utils/filtersUsedNavigation';
 import { chatApi } from '@/services/api';
 import type { AgentFiltersUsed } from '@/types';
@@ -165,13 +165,15 @@ export function EntityCardGrid({ children, label, viewAllUrl, viewAllLabel, onSh
 
 // ─── Types
 interface ParsedEntities {
-  tasks?:      TaskCardProps[];
-  projects?:   ProjectCardProps[];
-  notes?:      NoteCardProps[];
-  openChat?:   OpenChatResult;
-  members?:    WorkspaceMember[];
-  workspaces?: WorkspaceItem[];
+  tasks?:          TaskCardProps[];
+  projects?:       ProjectCardProps[];
+  notes?:          NoteCardProps[];
+  openChat?:       OpenChatResult;
+  members?:        WorkspaceMember[];
+  workspaces?:     WorkspaceItem[];
   createdProject?: CreatedProject;
+  createdTask?:    CreatedTask;
+  missingLabels?:  MissingLabels;
 }
 
 interface OpenChatResult {
@@ -199,6 +201,16 @@ interface WorkspaceItem {
 interface CreatedProject {
   project_id: number;
   name:       string;
+}
+
+interface CreatedTask {
+  task_id:          number;
+  labels_attached?: string[];
+}
+
+interface MissingLabels {
+  missing_labels:   string[];
+  available_labels: string[];
 }
 
 // ─── Smart extractor — handles many backend shapes 
@@ -262,12 +274,52 @@ export function parseToolResult(toolCalled: string | null, toolResult: Record<st
     };
   }
 
+  // ── create_task — success
+  if (tc === 'create_task' && (toolResult as any).success && (toolResult as any).task_id) {
+    return {
+      createdTask: {
+        task_id:          Number((toolResult as any).task_id),
+        labels_attached:  (toolResult as any).labels_attached ?? [],
+      },
+    };
+  }
+
+  // ── create_task — missing labels (task NOT created)
+  if (tc === 'create_task' && !(toolResult as any).success && Array.isArray((toolResult as any).missing_labels)) {
+    return {
+      missingLabels: {
+        missing_labels:   (toolResult as any).missing_labels,
+        available_labels: (toolResult as any).available_labels ?? [],
+      },
+    };
+  }
+
   // ── create_project
   if (tc === 'create_project' && (toolResult as any).success && (toolResult as any).project_id) {
     return {
       createdProject: {
         project_id: Number((toolResult as any).project_id),
         name:       String((toolResult as any).name || 'New Project'),
+      },
+    };
+  }
+
+  // ── create_task — success
+  if (tc === 'create_task' && (toolResult as any).success && (toolResult as any).task_id) {
+    return {
+      createdTask: {
+        task_id:         Number((toolResult as any).task_id),
+        labels_attached: (toolResult as any).labels_attached ?? [],
+      },
+    };
+  }
+
+  // ── create_task — missing labels (task NOT created)
+  if (tc === 'create_task' && !(toolResult as any).success && Array.isArray((toolResult as any).missing_labels)) {
+    return {
+      missingLabels: {
+        missing_labels:   (toolResult as any).missing_labels,
+        available_labels: (toolResult as any).available_labels ?? [],
       },
     };
   }
@@ -451,6 +503,63 @@ function CreatedProjectCard({ project, onCloseChat }: { project: CreatedProject;
     </div>
   );
 }
+// ─── Created Task Card
+function CreatedTaskCard({ task, onCloseChat }: { task: CreatedTask; onCloseChat?: () => void }) {
+  const navigate = useNavigate();
+  return (
+    <div style={{ background: '#F0FDF4', border: '1px solid #86efac', borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ width: 36, height: 36, borderRadius: 9, background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <CheckSquare style={{ width: 16, height: 16, color: '#16a34a' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#172033' }}>Task created successfully</div>
+        {task.labels_attached && task.labels_attached.length > 0 && (
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' as const, marginTop: 4 }}>
+            {task.labels_attached.map(l => (
+              <span key={l} style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 99, background: '#dbeafe', color: '#1d4ed8' }}>{l}</span>
+            ))}
+          </div>
+        )}
+      </div>
+      <button
+        onClick={() => { onCloseChat?.(); navigate(`/tasks/${task.task_id}`); }}
+        style={{ height: 30, padding: '0 14px', borderRadius: 7, border: 'none', background: '#16a34a', fontSize: 12, fontWeight: 600, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, fontFamily: 'inherit' }}
+      >
+        <ExternalLink style={{ width: 11, height: 11 }} /> View task
+      </button>
+    </div>
+  );
+}
+
+// ─── Missing Labels Card
+function MissingLabelsCard({ data }: { data: MissingLabels }) {
+  return (
+    <div style={{ background: '#FFF7ED', border: '1px solid #fdba74', borderRadius: 10, padding: '12px 14px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <div style={{ width: 28, height: 28, borderRadius: 7, background: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <AlertTriangle style={{ width: 13, height: 13, color: '#d97706' }} />
+        </div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#172033' }}>Task not created — label not found</div>
+      </div>
+      {data.missing_labels.length > 0 && (
+        <div style={{ marginBottom: 6 }}>
+          <span style={{ fontSize: 11, color: '#92400e', fontWeight: 500 }}>Missing: </span>
+          {data.missing_labels.map(l => (
+            <span key={l} style={{ fontSize: 11, fontWeight: 600, padding: '1px 7px', borderRadius: 99, background: '#FEE2E2', color: '#dc2626', marginRight: 4 }}>{l}</span>
+          ))}
+        </div>
+      )}
+      {data.available_labels.length > 0 && (
+        <div>
+          <span style={{ fontSize: 11, color: '#667085', fontWeight: 500 }}>Available labels: </span>
+          {data.available_labels.map(l => (
+            <span key={l} style={{ fontSize: 11, fontWeight: 600, padding: '1px 7px', borderRadius: 99, background: '#EEF4FF', color: '#1663f6', marginRight: 4 }}>{l}</span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ─── Renderer 
 export function EntityCards({ entities, filtersUsed, onCloseChat }: { entities: ParsedEntities; filtersUsed?: AgentFiltersUsed | null; onCloseChat?: () => void }) {
@@ -467,6 +576,16 @@ export function EntityCards({ entities, filtersUsed, onCloseChat }: { entities: 
       {/* create_project */}
       {entities.createdProject && (
         <CreatedProjectCard project={entities.createdProject} onCloseChat={onCloseChat} />
+      )}
+
+      {/* create_task — success */}
+      {entities.createdTask && (
+        <CreatedTaskCard task={entities.createdTask} onCloseChat={onCloseChat} />
+      )}
+
+      {/* create_task — missing labels */}
+      {entities.missingLabels && (
+        <MissingLabelsCard data={entities.missingLabels} />
       )}
 
       {/* get_workspace_members */}

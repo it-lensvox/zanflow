@@ -56,6 +56,7 @@ export function useMyTask() {
   // ── Server-side filters from URL query params (e.g. /taskboard/pending?priority=critical&project_id=1)
   const priorityParam  = searchParams.get('priority')   || undefined;
   const projectIdParam = searchParams.get('project_id') || undefined;
+  const labelNameParam = searchParams.get('label_name') || undefined;
   const statusParam = activeFilter !== 'ALL' ? activeFilter.toLowerCase() : undefined;
   const urlStatusRedirectRef = useRef<string | null>(null);
   const statusFromUrl = searchParams.get('status');
@@ -231,8 +232,9 @@ export function useMyTask() {
     if (!projectsData) return;
     urlFiltersAppliedRef.current = true;
 
-    const projectIdParam = searchParams.get('project_id');
-    const priorityParam = searchParams.get('priority');
+   const projectIdParam = searchParams.get('project_id');
+    const priorityParam  = searchParams.get('priority');
+    const labelNameParam = searchParams.get('label_name');
 
     setColumnFilters(prev => {
       const next = { ...prev };
@@ -246,6 +248,11 @@ export function useMyTask() {
       }
       return next;
     });
+
+    // Label filter 
+    if (labelNameParam) {
+      setSearchQuery(labelNameParam);
+    }
   }, [searchParams, projectsData, location.pathname, location.search, navigate, setColumnFilters]);
 
   // ── Final filtered list
@@ -267,7 +274,11 @@ export function useMyTask() {
         const matchesAssignee = !assigneeVal || (task.assigned_to || []).map(String).includes(String(assigneeVal));
         const createdByVal    = columnFilters['created_by'];
         const matchesCreatedBy = !createdByVal || String(task.assigned_by) === String(createdByVal);
-        return matchesFilter && matchesSearch && matchesAssignee && matchesCreatedBy;
+        const labelsVal       = columnFilters['labels'];
+        const matchesLabel    = !labelsVal || (task.labels || []).some(
+          (l: any) => (l.name || l.label || '').toLowerCase().includes(String(labelsVal).toLowerCase())
+        );
+        return matchesFilter && matchesSearch && matchesAssignee && matchesCreatedBy && matchesLabel;
       })
       .map(task => ({
         ...task,

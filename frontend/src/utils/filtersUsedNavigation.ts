@@ -1,7 +1,7 @@
 import type { AgentFiltersUsed } from '@/types';
 
 const DESTINATION_BY_TYPE: Record<string, { path: string; paramKeys: (keyof AgentFiltersUsed)[] }> = {
-  task:    { path: '/taskboard', paramKeys: ['status', 'project_id', 'priority', 'overdue', 'assigned_to_me', 'today'] },
+  task:    { path: '/taskboard', paramKeys: ['status', 'project_id', 'priority', 'overdue', 'assigned_to_me', 'today', 'label_name'] },
   project: { path: '/projects',  paramKeys: ['project_id', 'is_favourite'] },
   event:   { path: '/calendar',  paramKeys: ['today', 'date'] },
   note:    { path: '/documents', paramKeys: ['search_text'] },
