@@ -1612,10 +1612,41 @@ export interface DyuksaAIResponse {
 }
 
 
-// ── Social Auth Types 
+// ── Custom Dashboard Types
+
+export type WidgetType =
+  | 'stat_projects'
+  | 'stat_documents'
+  | 'stat_tasks'
+  | 'stat_completed'
+  | 'stat_overdue'
+  | 'donut_chart'
+  | 'line_chart'
+  | 'my_tasks'
+  | 'recent_activity'
+  | 'projects_table';
+
+export type WidgetSize = 'sm' | 'md' | 'lg';
+
+export interface WidgetConfig {
+  id: string;
+  type: WidgetType;
+  size: WidgetSize;
+  order: number;
+}
+
+export interface CustomDashboard {
+  id: number;
+  name: string;
+  is_default: boolean;
+  widgets: WidgetConfig[];
+  created_at: string;
+  updated_at: string;
+}
+
+// ── Social Auth Types
 
 export type SocialProvider = 'google' | 'microsoft';
-
 // company_name is optional — present for Signup, absent for Login.
 export interface SocialAuthPayload {
   provider: SocialProvider;

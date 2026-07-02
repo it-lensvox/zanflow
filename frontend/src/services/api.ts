@@ -8,9 +8,9 @@ import type {
   DailyUpdate, DailyUpdatePayload, DailyUpdateListResponse, TaskFilterParams, Event as CalendarEventType, SocialAuthPayload, SocialAuthResponse,
 } from '@/types';
 
-export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.26:8000/api/v1';
-const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://192.168.1.26:8000/ws/gateway';
-const WS_AI_BOT_URL = (import.meta as any).env.VITE_WS_AI_BOT_URL || 'ws://192.168.1.26:8000/ws/ai-bot/';
+export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.17:8000/api/v1';
+const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://192.168.1.17:8000/ws/gateway';
+const WS_AI_BOT_URL = (import.meta as any).env.VITE_WS_AI_BOT_URL || 'ws://192.168.1.17:8000/ws/ai-bot/';
 
 export const api = axios.create({
   baseURL: API_URL,
@@ -2125,7 +2125,6 @@ if (localStorage.getItem('access_token')) {
   startProactiveRefresh();
 }
 
-// ── Dashboard API
 export const dashboardApi = {
   getProjects: () => projectsApi.list(),
   getDocuments: (params?: { page_size?: number; page?: number }) =>
@@ -2137,6 +2136,38 @@ export const dashboardApi = {
 export const socialAuthApi = {
   authenticate: (payload: SocialAuthPayload): Promise<SocialAuthResponse> =>
     api.post<SocialAuthResponse>('/auth/social-auth/', payload).then((res) => res.data),
+};
+
+// ── Custom Dashboards API
+export const customDashboardsApi = {
+  getAll: async (): Promise<import('@/types').CustomDashboard[]> => {
+    const response = await api.get('/dashboard/custom/');
+    const data = response.data;
+    // Normalize: handle array, { results: [] }, or { data: [] } response shapes
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.results)) return data.results;
+    if (Array.isArray(data?.data)) return data.data;
+    return [];
+  },
+
+  create: async (
+    payload: Pick<import('@/types').CustomDashboard, 'name' | 'is_default' | 'widgets'>
+  ): Promise<import('@/types').CustomDashboard> => {
+    const response = await api.post('/dashboard/custom/', payload);
+    return response.data;
+  },
+
+  update: async (
+    id: number,
+    payload: Partial<Pick<import('@/types').CustomDashboard, 'name' | 'is_default' | 'widgets'>>
+  ): Promise<import('@/types').CustomDashboard> => {
+    const response = await api.patch(`/dashboard/custom/${id}/`, payload);
+    return response.data;
+  },
+
+  remove: async (id: number): Promise<void> => {
+    await api.delete(`/dashboard/custom/${id}/`);
+  },
 };
 
 export default api;
