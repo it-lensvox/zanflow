@@ -16,7 +16,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config("SECRET_KEY", default="django-insecure-dev-key-change-in-production")
 DEBUG = config("DEBUG", default=True, cast=bool)
 # ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1,192.168.1.12").split(",")
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", "192.168.1.26"," 192.168.1.229", "*"]
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", "192.168.1.17"," 192.168.1.229", "*"]
 
 
 # Application definition
@@ -159,7 +159,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # CORS
 _cors_origins = config(
     "CORS_ALLOWED_ORIGINS",
-    default="http://localhost:3001,http://localhost:3000,http://127.0.0.1:5173,http://192.168.1.121:5173,http://192.168.1.14:3001,http://192.168.1.160:3001,http://192.168.1.164:3001, http://192.168.1.188:8000"
+    default="http://localhost:3001,http://localhost:3000,http://127.0.0.1:5173,http://192.168.1.121:5173,http://192.168.1.15:3001,http://192.168.1.160:3001,http://192.168.1.164:3001, http://192.168.1.188:8000"
 )
 CORS_ALLOWED_ORIGINS = [origin.strip() for origin in _cors_origins.split(",") if origin.strip()]
 CORS_ALLOW_CREDENTIALS = True

@@ -35,6 +35,7 @@ from apps.ai_agent.tools.task_tools import (
 )
 from apps.ai_agent.tools.project_tools import (
     PROJECT_TOOL_SCHEMAS,
+    create_project,
     list_projects,
     get_project_summary,
 )
@@ -86,6 +87,7 @@ ALL_TOOL_SCHEMAS = (
 TOOL_EXECUTORS = {
     # Task tools
     "list_workspaces":       list_workspaces,
+    "create_project":        create_project,
     "get_user_projects":     get_user_projects,
     "get_workspace_members": get_workspace_members,
     "create_task":           create_task,
