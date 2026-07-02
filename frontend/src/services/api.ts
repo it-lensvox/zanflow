@@ -2143,7 +2143,7 @@ export const customDashboardsApi = {
   getAll: async (): Promise<import('@/types').CustomDashboard[]> => {
     const response = await api.get('/dashboard/custom/');
     const data = response.data;
-    // Normalize: handle array, { results: [] }, or { data: [] } response shapes
+    // Normalize: handle array,
     if (Array.isArray(data)) return data;
     if (Array.isArray(data?.results)) return data.results;
     if (Array.isArray(data?.data)) return data.data;

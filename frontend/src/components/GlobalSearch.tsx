@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Search, X, FolderKanban, CheckSquare, FileText, Calendar, } from 'lucide-react';
+import { Search, X, FolderKanban, CheckSquare, FileText, Calendar, MessageSquare, Users } from 'lucide-react';
 import { taskApi, projectsApi, documentsApi, agentApi } from '@/services/api';
-import type { AgentSearchResponse } from '@/types';
+import type { AgentSearchResponse, AgentSearchMember } from '@/types';
 import { getStatusColors } from '@/config/statusColors';
 import { buildViewAllUrl } from '@/utils/filtersUsedNavigation';
 import { getTypeHex, getTypeBg } from '@/pages/Project/projectConstants';
@@ -83,8 +83,13 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
   const allDocs = docsRes?.results || docsRes?.documents || (Array.isArray(docsRes) ? docsRes : []);
 
   // ── Helper: map AI response results into SectionItems
+  // Members from AI search stored separately (not in SectionItems — different render)
+  const [memberResults, setMemberResults] = useState<AgentSearchMember[]>([]);
+
   const mapAiResults = (res: AgentSearchResponse): SectionItems => {
     if (res.type !== 'search') return EMPTY_ITEMS;
+    // Store members separately
+    setMemberResults(res.results.members || []);
     return {
       project: res.results.projects.map(p => ({ id: p.id, title: p.name, sub: '', type: 'project' as const, route: `/projects/${p.id}` })),
       task:    res.results.tasks.map(t    => ({ id: t.id, title: t.heading, sub: t.project || '', type: 'task' as const, route: `/tasks/${t.id}`, taskStatus: t.status })),
@@ -100,6 +105,7 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
     setSectionPages(EMPTY_PAGES);
     setSectionHasMore(EMPTY_HAS_MORE);
     setTotals({});
+    setMemberResults([]);
     if (aiTimerRef.current) clearTimeout(aiTimerRef.current);
 
     const trimmed = query.trim();
@@ -268,9 +274,42 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
                   </div>
                 );
 
-                // ── AI results: per-section with totals + Load More
+               // ── AI results: per-section with totals + Load More
                 if (displaySections) return (
                   <div>
+                    {/* Members section — only from AI search */}
+                    {memberResults.length > 0 && (
+                      <div>
+                        <div style={{ padding: '10px 18px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: 10, fontWeight: 800, color: '#9CA3AF', letterSpacing: '.08em', textTransform: 'uppercase' }}>
+                            Members
+                          </span>
+                          <span style={{ fontSize: 10, fontWeight: 600, color: '#9CA3AF', background: '#F3F4F6', borderRadius: 10, padding: '1px 7px' }}>
+                            {memberResults.length}
+                          </span>
+                        </div>
+                        {memberResults.map(member => {
+                          const initials = member.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
+                          return (
+                            <div key={member.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px' }}>
+                              <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#EEF4FF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                <span style={{ fontSize: 11, fontWeight: 700, color: '#1663F6' }}>{initials}</span>
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: '#172033', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.name}</div>
+                                <div style={{ fontSize: 11, color: '#9CA3AF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.email}</div>
+                              </div>
+                              <button
+                                onClick={() => { navigate(`/team-chat/chat?member_id=${member.id}`); onClose(); }}
+                                style={{ height: 26, padding: '0 10px', borderRadius: 6, border: '1px solid #C7D7FD', background: '#EEF4FF', fontSize: 11, fontWeight: 600, color: '#1663F6', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, fontFamily: 'inherit' }}
+                              >
+                                <MessageSquare size={10} /> Chat
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                     {(['project', 'task', 'note', 'event'] as const).map(model => {
                       const group = displaySections[model];
                       if (!group.length && !totals[model + 's'] && !totals[model]) return null;

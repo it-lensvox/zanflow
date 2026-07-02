@@ -1363,17 +1363,25 @@ export interface AgentSearchEvent {
   organizer:  string;
 }
 
+export interface AgentSearchMember {
+  id:    number;
+  name:  string;
+  email: string;
+}
+
 export interface AgentSearchResults {
   tasks:    AgentSearchTask[];
   notes:    AgentSearchNote[];
   projects: AgentSearchProject[];
   events:   AgentSearchEvent[];
+  members?: AgentSearchMember[];
 }
 export interface AgentSearchTotals {
   tasks:    number;
   notes:    number;
   projects: number;
   events:   number;
+  members?: number;
 }
 
 export interface AgentSearchResponseSearch {
@@ -1400,7 +1408,13 @@ export interface AgentFiltersUsed {
   today?:          boolean; 
   date?:           string; 
   is_favourite?:   boolean; 
-  search_text?:    string; 
+  search_text?:    string;
+  // open_chat filters
+  room_id?:        string;
+  room_type?:      'private' | 'project';
+  member_id?:      number;
+  member_name?:    string;
+  project_name?:   string;
 }
 
 export interface AgentSearchResponseAction {

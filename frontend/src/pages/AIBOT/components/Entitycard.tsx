@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { CheckSquare, FileText, ArrowUpRight, Clock, User } from 'lucide-react';
+import { CheckSquare, FileText, ArrowUpRight, Clock, User, MessageSquare, FolderKanban as FolderIcon, ExternalLink, Users, Building2 } from 'lucide-react';
 import { buildViewAllUrl } from '@/utils/filtersUsedNavigation';
 import type { AgentFiltersUsed } from '@/types';
 
@@ -163,9 +163,38 @@ export function EntityCardGrid({ children, label, viewAllUrl, viewAllLabel, onSh
 
 // ─── Types
 interface ParsedEntities {
-  tasks?:    TaskCardProps[];
-  projects?: ProjectCardProps[];
-  notes?:    NoteCardProps[];
+  tasks?:      TaskCardProps[];
+  projects?:   ProjectCardProps[];
+  notes?:      NoteCardProps[];
+  openChat?:   OpenChatResult;
+  members?:    WorkspaceMember[];
+  workspaces?: WorkspaceItem[];
+  createdProject?: CreatedProject;
+}
+
+interface OpenChatResult {
+  room_id:      string;
+  room_type:    'private' | 'project';
+  member_name?: string;
+  project_name?: string;
+}
+
+interface WorkspaceMember {
+  id:    number;
+  name:  string;
+  email: string;
+}
+
+interface WorkspaceItem {
+  id:         number;
+  name:       string;
+  is_current: boolean;
+  role:       string;
+}
+
+interface CreatedProject {
+  project_id: number;
+  name:       string;
 }
 
 // ─── Smart extractor — handles many backend shapes 
@@ -197,6 +226,46 @@ function looksLikeProjects(items: any[]): boolean {
 export function parseToolResult(toolCalled: string | null, toolResult: Record<string, unknown> | null): ParsedEntities | null {
   if (!toolResult) return null;
   const tc = (toolCalled || '').toLowerCase();
+
+  // ── open_chat
+  if (tc === 'open_chat' && (toolResult as any).success && (toolResult as any).room_id) {
+    return {
+      openChat: {
+        room_id:      String((toolResult as any).room_id),
+        room_type:    (toolResult as any).room_type === 'project' ? 'project' : 'private',
+        member_name:  (toolResult as any).member_name,
+        project_name: (toolResult as any).project_name,
+      },
+    };
+  }
+
+  // ── get_workspace_members
+  if (tc === 'get_workspace_members' && Array.isArray((toolResult as any).members)) {
+    return {
+      members: (toolResult as any).members.map((m: any) => ({
+        id: m.id, name: m.name, email: m.email,
+      })),
+    };
+  }
+
+  // ── list_workspaces
+  if (tc === 'list_workspaces' && Array.isArray((toolResult as any).workspaces)) {
+    return {
+      workspaces: (toolResult as any).workspaces.map((w: any) => ({
+        id: w.id, name: w.name, is_current: !!w.is_current, role: w.role || '',
+      })),
+    };
+  }
+
+  // ── create_project
+  if (tc === 'create_project' && (toolResult as any).success && (toolResult as any).project_id) {
+    return {
+      createdProject: {
+        project_id: Number((toolResult as any).project_id),
+        name:       String((toolResult as any).name || 'New Project'),
+      },
+    };
+  }
 
   // ── Tasks 
   const isTaskTool = tc.includes('task') || tc.includes('list_user') || tc.includes('find_task') || tc.includes('search_task');
@@ -261,6 +330,100 @@ export function parseToolResult(toolCalled: string | null, toolResult: Record<st
   return null;
 }
 
+// ─── Open Chat Card
+function OpenChatCard({ result, onCloseChat }: { result: OpenChatResult; onCloseChat?: () => void }) {
+  const navigate = useNavigate();
+  const label = result.room_type === 'project'
+    ? `${result.project_name || 'Project'} chat`
+    : `Chat with ${result.member_name || 'member'}`;
+  const route = result.room_type === 'project'
+    ? `/team-chat/chat/${result.room_id}`
+    : `/team-chat/chat/${result.room_id}`;
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid #e6ebf2', borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ width: 36, height: 36, borderRadius: 9, background: '#EEF4FF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <MessageSquare style={{ width: 16, height: 16, color: '#1663f6' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#172033' }}>{label}</div>
+        <div style={{ fontSize: 11, color: '#667085', marginTop: 2 }}>
+          {result.room_type === 'private' ? 'Private message' : 'Project channel'}
+        </div>
+      </div>
+      <button
+        onClick={() => { onCloseChat?.(); navigate(route); }}
+        style={{ height: 30, padding: '0 14px', borderRadius: 7, border: 'none', background: '#1663f6', fontSize: 12, fontWeight: 600, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, fontFamily: 'inherit' }}
+      >
+        <MessageSquare style={{ width: 11, height: 11 }} /> Open chat
+      </button>
+    </div>
+  );
+}
+
+// ─── Workspace Member Card
+function MemberCard({ member, onCloseChat }: { member: WorkspaceMember; onCloseChat?: () => void }) {
+  const navigate = useNavigate();
+  const initials = member.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+  return (
+    <div style={{ background: '#fff', border: '1px solid #e6ebf2', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#EEF4FF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: '#1663f6' }}>{initials}</span>
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#172033', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.name}</div>
+        <div style={{ fontSize: 11, color: '#667085', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.email}</div>
+      </div>
+      <button
+        onClick={() => { onCloseChat?.(); navigate(`/team-chat/chat?member_id=${member.id}`); }}
+        style={{ height: 26, padding: '0 10px', borderRadius: 6, border: '1px solid #e6ebf2', background: '#fff', fontSize: 11, fontWeight: 600, color: '#1663f6', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, fontFamily: 'inherit' }}
+      >
+        <MessageSquare style={{ width: 10, height: 10 }} /> Chat
+      </button>
+    </div>
+  );
+}
+
+// ─── Workspace Card
+function WorkspaceCard({ workspace }: { workspace: WorkspaceItem }) {
+  return (
+    <div style={{ background: workspace.is_current ? '#F7F9FF' : '#fff', border: `1px solid ${workspace.is_current ? '#C7D7FD' : '#e6ebf2'}`, borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ width: 32, height: 32, borderRadius: 8, background: workspace.is_current ? '#EEF4FF' : '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <Building2 style={{ width: 14, height: 14, color: workspace.is_current ? '#1663f6' : '#667085' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#172033', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{workspace.name}</div>
+        <div style={{ fontSize: 11, color: '#667085', marginTop: 1, textTransform: 'capitalize' as const }}>{workspace.role}{workspace.is_current ? ' · Current' : ''}</div>
+      </div>
+      {workspace.is_current && (
+        <span style={{ fontSize: 10, fontWeight: 700, color: '#1663f6', background: '#EEF4FF', padding: '2px 8px', borderRadius: 99 }}>Active</span>
+      )}
+    </div>
+  );
+}
+
+// ─── Created Project Card
+function CreatedProjectCard({ project, onCloseChat }: { project: CreatedProject; onCloseChat?: () => void }) {
+  const navigate = useNavigate();
+  return (
+    <div style={{ background: '#F0FDF4', border: '1px solid #86efac', borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ width: 36, height: 36, borderRadius: 9, background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <FolderIcon style={{ width: 16, height: 16, color: '#16a34a' }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#172033' }}>{project.name}</div>
+        <div style={{ fontSize: 11, color: '#16a34a', marginTop: 2 }}>Project created successfully</div>
+      </div>
+      <button
+        onClick={() => { onCloseChat?.(); navigate(`/projects/${project.project_id}`); }}
+        style={{ height: 30, padding: '0 14px', borderRadius: 7, border: 'none', background: '#16a34a', fontSize: 12, fontWeight: 600, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, fontFamily: 'inherit' }}
+      >
+        <ExternalLink style={{ width: 11, height: 11 }} /> Go to project
+      </button>
+    </div>
+  );
+}
+
 // ─── Renderer 
 export function EntityCards({ entities, filtersUsed, onCloseChat }: { entities: ParsedEntities; filtersUsed?: AgentFiltersUsed | null; onCloseChat?: () => void }) {
   const taskViewAllUrl    = buildViewAllUrl('task',    filtersUsed ?? null);
@@ -268,6 +431,30 @@ export function EntityCards({ entities, filtersUsed, onCloseChat }: { entities: 
   const noteViewAllUrl    = buildViewAllUrl('note',    filtersUsed ?? null);
   return (
     <>
+      {/* open_chat */}
+      {entities.openChat && (
+        <OpenChatCard result={entities.openChat} onCloseChat={onCloseChat} />
+      )}
+
+      {/* create_project */}
+      {entities.createdProject && (
+        <CreatedProjectCard project={entities.createdProject} onCloseChat={onCloseChat} />
+      )}
+
+      {/* get_workspace_members */}
+      {entities.members && entities.members.length > 0 && (
+        <EntityCardGrid label={`${entities.members.length} member${entities.members.length > 1 ? 's' : ''}`}>
+          {entities.members.map(m => <MemberCard key={m.id} member={m} onCloseChat={onCloseChat} />)}
+        </EntityCardGrid>
+      )}
+
+      {/* list_workspaces */}
+      {entities.workspaces && entities.workspaces.length > 0 && (
+        <EntityCardGrid label={`${entities.workspaces.length} workspace${entities.workspaces.length > 1 ? 's' : ''}`}>
+          {entities.workspaces.map(w => <WorkspaceCard key={w.id} workspace={w} />)}
+        </EntityCardGrid>
+      )}
+
       {entities.tasks    && entities.tasks.length    > 0 && (
         <EntityCardGrid label={`${entities.tasks.length} task${entities.tasks.length > 1 ? 's' : ''}`} viewAllUrl={taskViewAllUrl} viewAllLabel="View all on Taskboard" onCloseChat={onCloseChat}>
           {entities.tasks.map(t => <TaskCard key={t.id} {...t} />)}
