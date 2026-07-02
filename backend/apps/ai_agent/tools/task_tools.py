@@ -29,6 +29,25 @@ def _get_user_by_email(email: str):
 
 TASK_TOOL_SCHEMAS = [
     {
+        "name": "get_project_labels",
+        "description": (
+            "Get all labels available in a specific project. "
+            "Use when user wants to attach a label to a task and you need to confirm "
+            "the label exists in that project. "
+            "Also use when user asks 'what labels are in project X'."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "project_id": {
+                    "type": "integer",
+                    "description": "The project ID to fetch labels for",
+                },
+            },
+            "required": ["project_id"],
+        },
+    },
+    {
         "name": "list_workspaces",
         "description": (
             "List all workspaces the current user belongs to with their names and IDs. "
@@ -140,6 +159,11 @@ TASK_TOOL_SCHEMAS = [
                     "enum": ["pending", "backlog", "in_progress", "review", "completed", "deployed", "deferred"],
                     "description": "Initial status (default: pending)",
                 },
+                "label_names": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of label names to attach to the task (e.g. ['deployment', 'bug']). Labels must exist in the project.",
+                },
             },
             "required": ["heading", "project_id"],
         },
@@ -200,6 +224,10 @@ TASK_TOOL_SCHEMAS = [
                 "limit": {
                     "type": "integer",
                     "description": "Max tasks to return (default: 10, max: 50)",
+                },
+                "label_name": {
+                    "type": "string",
+                    "description": "Filter tasks by label name (e.g. 'Frontend', 'deployment', 'bug'). Partial match.",
                 },
             },
             "required": [],
@@ -300,6 +328,44 @@ TASK_TOOL_SCHEMAS = [
 
 # ── Executors ─────────────────────────────────────────────────────────────────
 
+def get_project_labels(args: dict, user, workspace_id: str) -> dict:
+    """
+    Returns all labels defined in a specific project.
+    Used before create_task to confirm label names exist.
+    """
+    try:
+        from apps.projects.models import Label, Project
+
+        project_id = args.get("project_id")
+        if not project_id:
+            return {"success": False, "error": "project_id is required."}
+
+        project = Project.objects.filter(
+            id=project_id,
+            workspace_id=workspace_id,
+            members=user,
+            is_active=True,
+        ).first()
+
+        if not project:
+            return {"success": False, "error": f"Project {project_id} not found."}
+
+        labels = Label.objects.filter(project_id=project_id).order_by("name")
+        return {
+            "success":      True,
+            "project_name": project.name,
+            "count":        labels.count(),
+            "labels": [
+                {"id": l.id, "name": l.name, "color": l.color, "is_default": l.is_default}
+                for l in labels
+            ],
+        }
+
+    except Exception as exc:
+        logger.exception("get_project_labels failed: %s", exc)
+        return {"success": False, "error": str(exc)}
+
+
 def list_workspaces(args: dict, user, workspace_id: str) -> dict:
     """
     Returns all workspaces the current user belongs to.
@@ -357,8 +423,35 @@ def get_workspace_members(args: dict, user, workspace_id: str) -> dict:
             all_members = User.objects.filter(
                 id__in=workspace_member_ids,
             ).exclude(id=user.id).order_by("first_name")
+
+            # Pre-fetch all existing private rooms between current user and workspace members
+            # so we can include room_id in each member without N+1 queries.
+            # IMPORTANT: use email-based lookup not ID-based, because duplicate user accounts
+            # (same email, different IDs) mean the room participant ID may differ from the
+            # workspace membership ID for the same person.
+            from apps.chat.models import ChatRoom
+            private_rooms = ChatRoom.objects.filter(
+                room_type="private",
+                workspace_id=workspace_id,
+                participants=user,
+            ).prefetch_related("participants")
+
+            # Build lookup: email → room_id (handles duplicate user accounts)
+            room_lookup = {}
+            _current_email = user.email
+            for room in private_rooms:
+                for participant in room.participants.all():
+                    # Use email comparison — handles duplicate user accounts
+                    if participant.email != _current_email:
+                        room_lookup[participant.email] = str(room.id)
+
             members_list = [
-                {"name": m.get_full_name() or m.email, "email": m.email, "id": m.id}
+                {
+                    "name":    m.get_full_name() or m.email,
+                    "email":   m.email,
+                    "id":      m.id,
+                    "room_id": room_lookup.get(m.email, None),
+                }
                 for m in all_members
             ]
             return {
@@ -405,8 +498,30 @@ def get_workspace_members(args: dict, user, workspace_id: str) -> dict:
 
         members_raw.sort(key=sort_key)
 
+        # Pre-fetch private rooms for room_id lookup
+        # Use email-based lookup to handle duplicate user accounts safely
+        from apps.chat.models import ChatRoom as _ChatRoom
+        _private_rooms = _ChatRoom.objects.filter(
+            room_type="private",
+            workspace_id=workspace_id,
+            participants=user,
+        ).prefetch_related("participants")
+        _room_lookup = {}
+        _user_email = user.email
+        for _room in _private_rooms:
+            for _p in _room.participants.all():
+                # Use email comparison — handles duplicate user accounts
+                # where same person may have different IDs across records
+                if _p.email != _user_email:
+                    _room_lookup[_p.email] = str(_room.id)
+
         members = [
-            {"email": u.email, "name": u.get_full_name() or u.email}
+            {
+                "email":   u.email,
+                "name":    u.get_full_name() or u.email,
+                "id":      u.id,
+                "room_id": _room_lookup.get(u.email, None),
+            }
             for u in members_raw
         ]
 
@@ -548,14 +663,66 @@ def create_task(args: dict, user, workspace_id: str) -> dict:
             if assignee:
                 task.assigned_to.add(assignee)
 
+        # Attach labels — resolve label names to Label objects within this project
+        # Uses multi-stage matching to handle typos like "deployment" → "Deployement"
+        labels_attached = []
+        labels_not_found = []
+        if args.get("label_names"):
+            from apps.projects.models import Label
+
+            def _find_label(project_id, name):
+                name = name.strip()
+                name_lower = name.lower()
+
+                # Get all labels in this project once
+                all_labels = list(Label.objects.filter(project_id=project_id))
+
+                # Stage 1: exact match (case-insensitive)
+                for l in all_labels:
+                    if l.name.lower() == name_lower:
+                        return l
+
+                # Stage 2: user input is substring of label name
+                # "deploy" matches "Deployement"
+                for l in all_labels:
+                    if name_lower in l.name.lower():
+                        return l
+
+                # Stage 3: label name is substring of user input
+                # "frontend" matches "frontends"
+                for l in all_labels:
+                    if l.name.lower() in name_lower:
+                        return l
+
+                # Stage 4: root word match — first 5+ chars match
+                # "deployment" matches "Deployement" via root "deplo"
+                if len(name_lower) >= 5:
+                    root = name_lower[:5]
+                    for l in all_labels:
+                        if l.name.lower().startswith(root) or l.name.lower()[:5] == root:
+                            return l
+
+                return None
+
+            for label_name in args["label_names"]:
+                label = _find_label(args["project_id"], label_name)
+                if label:
+                    task.labels.add(label)
+                    labels_attached.append(label.name)
+                else:
+                    labels_not_found.append(label_name.strip())
+                    logger.warning("Label '%s' not found in project %s", label_name, args["project_id"])
+
         return {
-            "success":      True,
-            "task_id":      task.id,
-            "heading":      task.heading,
-            "status":       task.status,
-            "priority":     task.priority,
-            "project_name": project.name,
-            "assigned_to":  list(task.assigned_to.values_list("email", flat=True)),
+            "success":         True,
+            "task_id":         task.id,
+            "heading":         task.heading,
+            "status":          task.status,
+            "priority":        task.priority,
+            "project_name":    project.name,
+            "labels_attached":  labels_attached,
+            "labels_not_found": labels_not_found,
+            "assigned_to":      list(task.assigned_to.values_list("email", flat=True)),
         }
 
     except Exception as exc:
@@ -631,13 +798,18 @@ def list_tasks(args: dict, user, workspace_id: str) -> dict:
         from apps.ai_agent.access.tasks import get_user_task_queryset, apply_task_filters
 
         qs = get_user_task_queryset(user, workspace_id)
+        # When filtering by label, don't default status to "pending"
+        # because label-filtered tasks may be in any status
+        _default_status = None if args.get("label_name") else "pending"
+
         qs = apply_task_filters(
             qs,
             user=user,
-            status=args.get("status", "pending"),   # chat default: pending
+            status=args.get("status", _default_status),
             priority=args.get("priority"),
             project_id=args.get("project_id"),
             updated_today=args.get("updated_today"),
+            label_name=args.get("label_name"),
         )
 
         total_count = qs.count()

@@ -21,11 +21,11 @@ import argparse
 from datetime import datetime
 
 # ── Config ────────────────────────────────────────────────────────────────────
-BASE_URL     = "http://192.168.1.26:8000"
+BASE_URL     = "http://192.168.1.17:8000"
 ENDPOINT     = f"{BASE_URL}/api/v1/agent/query/"
-JWT_TOKEN    = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzgyODg0MDMxLCJpYXQiOjE3ODI4ODA0MzEsImp0aSI6IjYwYjE0M2MyMTQzZjQzNDViZmY1ZmE5M2JhNjYwZWY2IiwidXNlcl9pZCI6IjEifQ.xkzfoCNcXRHqrFk_E50SxTVg6v0dJWLyQHFL4-hf6kk"
+JWT_TOKEN    = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzgyOTkxNzc5LCJpYXQiOjE3ODI5ODgxNzksImp0aSI6IjdjNWRkM2M0MmE0YjRiNDJiNGI1M2FmZjVjN2I2OWE1IiwidXNlcl9pZCI6IjEifQ.Ft3AAQdlYOvMaE2Df0qCVUDYGHkqTye7a-VVDZQswGc"
 WORKSPACE_ID = "1"
-QUERIES_FILE = "/Users/Harshitshukla/Desktop/ZanFlow/ZanFlow/backend/dyuksa_queries.json"
+QUERIES_FILE = "/Users/Harshitshukla/Desktop/ZanFlow/ZanFlow/backend/dyuksa_queries_v2.json"
 RESULTS_DIR  = "results"
 DELAY        = 1.0   # seconds between queries — set to 0.3 for faster runs
 

@@ -39,7 +39,7 @@ def apply_task_filters(qs, user=None,
                        project_id=None, project_name=None,
                        search_text=None, overdue=None,
                        assigned_to_me=None, assignee_name=None,
-                       updated_today=None):
+                       updated_today=None, label_name=None):
     """
     Applies optional filter conditions to a Task queryset.
     Single source of truth for ALL task filtering logic.
@@ -98,5 +98,10 @@ def apply_task_filters(qs, user=None,
             status_updated_by=user,
             status__in=["in_progress", "completed", "review", "deployed"],
         )
+
+    if label_name:
+        qs = qs.filter(
+            labels__name__icontains=label_name
+        ).distinct()
 
     return qs

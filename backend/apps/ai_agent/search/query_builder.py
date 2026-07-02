@@ -36,6 +36,12 @@ def _search_tasks(filters: dict, user, workspace_id: str, limit: int = 10, offse
             assignee_name=filters.get("assignee_name"),
         )
 
+        # Label filter — applied after apply_task_filters since label is M2M
+        if filters.get("label_name"):
+            qs = qs.filter(
+                labels__name__icontains=filters["label_name"]
+            ).distinct()
+
         total = qs.count()
         page_qs = qs.order_by("-updated_at")[offset: offset + limit]
         return [
@@ -200,13 +206,21 @@ def _search_documents(filters: dict, user, workspace_id: str, limit: int = 10, o
 
         qs = get_user_document_queryset(user, workspace_id)
 
-        # Project filter — same project_name → ID matching style used elsewhere
+        # Project filter
         if filters.get("project_name"):
             qs = qs.filter(project__name__icontains=filters["project_name"])
 
-        # Keyword search
+        # Keyword search by document name
         if filters.get("search_text"):
             qs = qs.filter(name__icontains=filters["search_text"])
+
+        # Status filter — draft, in_review, approved, archived
+        if filters.get("doc_status"):
+            qs = qs.filter(status=filters["doc_status"])
+
+        # File type filter — pdf, image, json, text, video, mp4, other
+        if filters.get("file_type"):
+            qs = qs.filter(file_type=filters["file_type"])
 
         total = qs.count()
         page_qs = qs.select_related("project").order_by("-created_at")[offset: offset + limit]

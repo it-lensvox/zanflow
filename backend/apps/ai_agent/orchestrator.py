@@ -652,6 +652,90 @@ class AgentOrchestrator:
                         first_tool_called = "get_user_projects"
                     logger.info("Guard rail 7: open_chat — injected project context")
 
+                # ── GUARD RAIL 8: create_task with label_names — validate before creating ──
+                # If user requests labels, verify they exist in the project FIRST.
+                # If any label is not found → STOP, do NOT create the task,
+                # show the user what labels are available instead.
+                if tool_name == "create_task" and tool_input.get("label_names"):
+                    from apps.projects.models import Label, Project as Proj
+
+                    # Resolve project_id — GPT may pass project_name before GR6 resolves it
+                    _pid = tool_input.get("project_id")
+                    if not _pid and tool_input.get("project_name"):
+                        _proj = Proj.objects.filter(
+                            workspace_id=self.workspace_id,
+                            members=self.user,
+                            name__icontains=tool_input["project_name"],
+                            is_active=True,
+                        ).first()
+                        if _proj:
+                            _pid = _proj.id
+
+                    if _pid:
+                        _label_names = tool_input["label_names"]
+                        _missing     = []
+                        _found       = []
+
+                        for _lname in _label_names:
+                            _lname = _lname.strip()
+                            # Exact match first, then partial
+                            _label = Label.objects.filter(
+                                project_id=_pid, name__iexact=_lname,
+                            ).first()
+                            if not _label:
+                                _label = Label.objects.filter(
+                                    project_id=_pid, name__icontains=_lname,
+                                ).first()
+                            if _label:
+                                _found.append(_label.name)
+                            else:
+                                _missing.append(_lname)
+
+                        if _missing:
+                            _available = list(
+                                Label.objects.filter(project_id=_pid)
+                                .order_by("name")
+                                .values_list("name", flat=True)
+                            )
+                            _avail_str   = ", ".join(_available) if _available else "No labels defined"
+                            _missing_str = ", ".join(_missing)
+
+                            final_response = (
+                                f"I couldn't create the task because the label(s) '{_missing_str}' "
+                                f"do not exist in this project. "
+                                f"Available labels are: {_avail_str}. "
+                                f"Please use one of the available labels or ask me to create the task without a label."
+                            )
+                            self.session.add_message("assistant", final_response)
+                            if not self.session.title:
+                                self.session.title = _generate_session_title(user_query)
+                                self.session.save(update_fields=["title", "updated_at"])
+
+                            log.tool_name      = "create_task"
+                            log.tool_input     = tool_input
+                            log.tool_output    = {"success": False, "missing_labels": _missing, "available_labels": _available}
+                            log.final_response = final_response
+                            log.intent         = "label_validation_failed"
+                            log.status         = AgentLog.Status.SUCCESS
+                            log.latency_ms     = int((time.time() - start) * 1000)
+                            log.save()
+
+                            return {
+                                "response":    final_response,
+                                "session_id":  self.session.id,
+                                "tool_called": None,
+                                "tool_result": {
+                                    "success":          False,
+                                    "missing_labels":   _missing,
+                                    "available_labels": _available,
+                                },
+                                "filters_used": None,
+                            }
+                        else:
+                            # All labels validated — replace with exact DB names
+                            tool_input["label_names"] = _found
+                            logger.info("Guard rail 8: all labels validated — %s", _found)
+
                 # ── GUARD RAIL 6: create_task with string project name ─────────────
                 # Q077/Q089: model calls create_task(project_name="ZanFlow") without ID
                 if tool_name == "create_task" and first_tool_called is None:

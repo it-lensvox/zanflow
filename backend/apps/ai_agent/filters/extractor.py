@@ -28,19 +28,25 @@ _INTENT_SYSTEM_PROMPT = """You are an intent classifier for Dyuksa, a project ma
 
 Classify the user query as exactly one of:
   "search" → user wants to FIND or VIEW data that exists in the system
-             (show, list, find, search, who, what, display, get)
+             Triggers: show, list, find, search, who, what, display, get, how many
              Valid search targets: tasks, notes, projects, events, documents, members
-  "action" → user wants to DO something OR asks about system-level things not searchable
-             (create, update, delete, assign, mark, move, add, change, remove, defer)
-             Also classify as "action": questions about workspaces, account settings,
-             "how many workspaces", conversations about non-searchable topics
+             "how many X" about tasks/notes/projects/events/documents → ALWAYS search
+  "action" → user wants to DO something
+             Triggers: create, update, delete, assign, mark, move, add, change, remove, defer
+             ONLY classify as "action" for workspace/account questions (not searchable):
+             "how many workspaces do I have", "which workspace am I in"
 
-Examples:
-  "find Ravi in workspace"     → search  (member search)
-  "show my tasks"              → search  (task search)
-  "how many workspace I have"  → action  (workspace info, not searchable)
-  "create a task"              → action
-  "who is in my workspace"     → search  (member search)
+CRITICAL RULE: "how many tasks/notes/projects/events" → ALWAYS "search", never "action"
+
+Examples:s
+  "find Ravi in workspace"              → search
+  "show my tasks"                       → search
+  "how many pending tasks in ZanFlow"   → search  ← tasks are searchable
+  "how many tasks do I have"            → search  ← tasks are searchable
+  "who is in my workspace"              → search
+  "how many workspace I have"           → action  ← workspaces are NOT searchable
+  "create a task"                       → action
+  "mark task 119 as done"               → action
 
 Return ONLY valid JSON with a single key. No explanation. No markdown.
 {"intent": "search"}  OR  {"intent": "action"}"""
@@ -76,6 +82,9 @@ JSON schema (use null for any field not mentioned in the query):
 {
   "models":         ["task"|"note"|"project"|"event"|"document"|"member"],  // which models to search
   "search_text":    "string | null",            // keyword in heading/title/description
+  "label_name":     "string | null",            // label/tag name to filter tasks by (e.g. "deployment", "bug")
+  "doc_status":     "string | null",            // document status: draft, in_review, approved, archived
+  "file_type":      "string | null",            // document file type: pdf, image, json, text, video, mp4, other
   "status":         "string | null",            // task status
   "priority":       "string | null",            // task priority
   "assignee_name":  "string | null",            // person first or full name
@@ -99,6 +108,12 @@ Examples:
   "show critical tasks"               → models=["task"], priority="critical"
   "find notes about budget"           → models=["note"], search_text="budget"
   "find all documents under ZanFlow project" → models=["document"], project_name="ZanFlow"
+  "find tasks with label deployment"          → models=["task"], label_name="deployment"
+  "show tasks tagged as frontend"             → models=["task"], label_name="frontend"
+  "find bug label tasks in ZanFlow"           → models=["task"], label_name="bug", project_name="ZanFlow"
+  "find approved documents in ZanFlow"        → models=["document"], doc_status="approved", project_name="ZanFlow"
+  "show PDF documents"                        → models=["document"], file_type="pdf"
+  "find draft documents"                      → models=["document"], doc_status="draft"
   "show files in Mockflow"            → models=["document"], project_name="Mockflow"
   "who is in my workspace"            → models=["member"]
   "find Ravi in my workspace"         → models=["member"], search_text="Ravi"
@@ -162,6 +177,9 @@ def extract_filters(query: str) -> dict:
         return {
             "models":         result.get("models", ["task", "note", "project", "event", "document"]),
             "search_text":    result.get("search_text"),
+            "label_name":     result.get("label_name"),
+            "doc_status":     result.get("doc_status"),
+            "file_type":      result.get("file_type"),
             "status":         result.get("status"),
             "priority":       result.get("priority"),
             "assignee_name":  result.get("assignee_name"),
@@ -178,6 +196,9 @@ def extract_filters(query: str) -> dict:
         return {
             "models":         ["task", "note", "project", "event", "document"],
             "search_text":    query,
+            "label_name":     None,
+            "doc_status":     None,
+            "file_type":      None,
             "status":         None,
             "priority":       None,
             "assignee_name":  None,

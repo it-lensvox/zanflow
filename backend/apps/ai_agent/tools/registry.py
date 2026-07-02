@@ -22,6 +22,7 @@ Adding a new tool:
 """
 from apps.ai_agent.tools.task_tools import (
     TASK_TOOL_SCHEMAS,
+    get_project_labels,
     list_workspaces,
     get_user_projects,
     get_workspace_members,
@@ -86,6 +87,7 @@ ALL_TOOL_SCHEMAS = (
 # Map tool name → executor function
 TOOL_EXECUTORS = {
     # Task tools
+    "get_project_labels":    get_project_labels,
     "list_workspaces":       list_workspaces,
     "create_project":        create_project,
     "get_user_projects":     get_user_projects,

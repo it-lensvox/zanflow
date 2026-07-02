@@ -15,10 +15,10 @@ DOCUMENT_TOOL_SCHEMAS = [
     {
         "name": "list_documents",
         "description": (
-            "List documents in a project that the current user has access to. "
+            "List documents the current user has access to. "
             "Includes documents shared with the user via DocumentShare. "
             "Use when user asks 'show documents', 'list files in project X', "
-            "'what documents are in review'."
+            "'find documents under task X', 'what documents are in review'."
         ),
         "input_schema": {
             "type": "object",
@@ -27,10 +27,18 @@ DOCUMENT_TOOL_SCHEMAS = [
                     "type": "integer",
                     "description": "Filter by project ID (optional — shows all accessible if omitted)",
                 },
+                "task_id": {
+                    "type": "integer",
+                    "description": "Filter documents linked to a specific task ID (optional)",
+                },
                 "status": {
                     "type": "string",
                     "enum": ["draft", "in_review", "approved", "archived"],
                     "description": "Filter by document status (optional)",
+                },
+                "search_text": {
+                    "type": "string",
+                    "description": "Search documents by name or keyword (optional)",
                 },
                 "file_type": {
                     "type": "string",
@@ -92,16 +100,25 @@ def _user_accessible_documents(user, workspace_id, project_id=None):
 def list_documents(args: dict, user, workspace_id: str) -> dict:
     """
     Lists documents accessible to the user with optional filters.
+    Supports filtering by project_id, task_id, status, file_type, search_text.
     """
     try:
         project_id = args.get("project_id")
-        limit  = min(args.get("limit", 10), 50)
-        offset = args.get("offset", 0)
+        task_id    = args.get("task_id")
+        limit      = min(args.get("limit", 10), 50)
+        offset     = args.get("offset", 0)
 
         qs = _user_accessible_documents(user, workspace_id, project_id)
 
+        # Filter by task — documents linked to a specific task
+        if task_id:
+            qs = qs.filter(task_id=task_id)
+
         if args.get("status"):
             qs = qs.filter(status=args["status"])
+
+        if args.get("search_text"):
+            qs = qs.filter(name__icontains=args["search_text"])
 
         if args.get("file_type"):
             qs = qs.filter(file_type=args["file_type"])
