@@ -3,17 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { usersApi, chatApi, gatewaySocket } from '@/services/api';
-import type {
-  ChatRoom,
-  ChatMessage,
-  ChatRoomMessagesResponse,
-  ToastNotification,
-  GatewayIncomingMessage,
-  ProjectChatRoom,
-  TeamChatRoom,
-  User,
-  OptimisticChatMessage,
-} from '@/types';
+import type { ChatRoom, ChatMessage, ChatRoomMessagesResponse, ToastNotification, GatewayIncomingMessage, ProjectChatRoom, TeamChatRoom, User, OptimisticChatMessage } from '@/types';
 import type { GatewayWebSocketService } from '@/services/api';
 
 // Extended user type with last message info
@@ -30,7 +20,7 @@ export function useTeamChat() {
   const { projectId: urlProjectId, roomId: urlRoomId, tab: urlTab } = useParams<{ projectId: string; roomId: string; tab: string }>();
   const queryClient = useQueryClient();
 
-  // ─── UI State ─────────────────────────────────────────────────────────────
+  // ─── UI State ───
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [activeRoom, setActiveRoom] = useState<ChatRoom | null>(null);
   const [selectedProjectRoom, setSelectedProjectRoom] = useState<ProjectChatRoom | null>(null);
@@ -54,7 +44,7 @@ export function useTeamChat() {
   const [previewDoc, setPreviewDoc] = useState<{ url: string; fileName: string; fileType?: string } | null>(null);
   const [userPresence, setUserPresence] = useState<Map<number, 'online' | 'offline'>>(new Map());
 
-  // ─── Unread Tracking & Notifications ──────────────────────────────────────
+  // ─── Unread Tracking & Notifications ───
   const [unreadCounts, setUnreadCounts] = useState<Map<string, number>>(new Map());
   const [toastNotifications, setToastNotifications] = useState<ToastNotification[]>([]);
   const [roomUserMap, setRoomUserMap] = useState<Map<string, number>>(new Map());
@@ -222,53 +212,63 @@ const justLeftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Auto-select private room from URL params (/team-chat/chat/:roomId)
   useEffect(() => {
-    if (urlRoomId && !urlProjectId && privateRoomsData && privateRoomsData.length > 0) {
+    if (!urlRoomId || urlProjectId) return;
+
+    const activate = (matchedRoom: any) => {
+      if (activeRoomRef.current?.id === matchedRoom.id) return;
+
+      setSelectedTeamRoom(null);
+      setSelectedProjectRoom(null);
+
+      const otherUserId: number | undefined = matchedRoom.participants?.find(
+        (id: number) => id !== currentUser?.id
+      );
+
+      setActiveRoom(matchedRoom as ChatRoom);
+      activeRoomRef.current = matchedRoom as ChatRoom;
+      (window as any).__activeTeamChatRoomId = matchedRoom.id;
+
+      if (otherUserId) {
+        setSelectedUserId(otherUserId);
+        setRoomUserMap(prev => {
+          const m = new Map(prev);
+          m.set(matchedRoom.id, otherUserId);
+          return m;
+        });
+        setUserRoomMap(prev => {
+          const m = new Map(prev);
+          m.set(otherUserId, matchedRoom.id);
+          return m;
+        });
+        roomUserMapRef.current.set(matchedRoom.id, otherUserId);
+      }
+
+      queryClient.prefetchQuery({
+        queryKey: ['chat-messages', matchedRoom.id],
+        queryFn: () => chatApi.getRoomMessages(matchedRoom.id),
+      });
+
+      queryClient.prefetchQuery({
+        queryKey: ['chat-room-details', matchedRoom.id],
+        queryFn: () => chatApi.getRoomDetails(matchedRoom.id),
+      });
+    };
+
+    // Try cache first
+    if (privateRoomsData && privateRoomsData.length > 0) {
       const matchedRoom = (privateRoomsData as any[]).find((room: any) => room.id === urlRoomId);
       if (matchedRoom) {
-        // Prevent unnecessary re-selection
-        if (activeRoom?.id === matchedRoom.id) return;
-
-        setSelectedTeamRoom(null);
-        setSelectedProjectRoom(null);
-
-        // Map the room→user so the sidebar highlight works
-        const otherUserId: number | undefined = matchedRoom.participants?.find(
-          (id: number) => id !== currentUser?.id
-        );
-
-        setActiveRoom(matchedRoom as ChatRoom);
-        activeRoomRef.current = matchedRoom as ChatRoom;
-        (window as any).__activeTeamChatRoomId = matchedRoom.id;
-
-        if (otherUserId) {
-          setSelectedUserId(otherUserId);
-          setRoomUserMap(prev => {
-            const m = new Map(prev);
-            m.set(matchedRoom.id, otherUserId);
-            return m;
-          });
-          setUserRoomMap(prev => {
-            const m = new Map(prev);
-            m.set(otherUserId, matchedRoom.id);
-            return m;
-          });
-          roomUserMapRef.current.set(matchedRoom.id, otherUserId);
-        }
-
-        // ✅ FIX: Prefetch messages immediately after setting activeRoom
-        queryClient.prefetchQuery({
-          queryKey: ['chat-messages', matchedRoom.id],
-          queryFn: () => chatApi.getRoomMessages(matchedRoom.id),
-        });
-
-        queryClient.prefetchQuery({
-          queryKey: ['chat-room-details', matchedRoom.id],
-          queryFn: () => chatApi.getRoomDetails(matchedRoom.id),
-        });
+        activate(matchedRoom);
+        return;
       }
     }
-  }, [urlRoomId, urlProjectId, privateRoomsData, currentUser?.id]);
 
+    // Cache miss — fetch directly so switching between members always works
+    chatApi.getRoomDetails(urlRoomId).then(room => {
+      if (room) activate(room);
+    }).catch(() => {});
+
+  }, [urlRoomId, urlProjectId, privateRoomsData, currentUser?.id]);
   // Sort Teams by Last Message Time
   const teamRooms = useMemo(() => {
     if (!teamRoomsData) return [];

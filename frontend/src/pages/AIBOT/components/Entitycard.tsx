@@ -1,6 +1,8 @@
 import { useNavigate } from 'react-router-dom';
-import { CheckSquare, FileText, ArrowUpRight, Clock, User, MessageSquare, FolderKanban as FolderIcon, ExternalLink, Users, Building2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { CheckSquare, FileText, ArrowUpRight, Clock, User, MessageSquare, FolderKanban as FolderIcon, ExternalLink, Building2 } from 'lucide-react';
 import { buildViewAllUrl } from '@/utils/filtersUsedNavigation';
+import { chatApi } from '@/services/api';
 import type { AgentFiltersUsed } from '@/types';
 
 // ─── Priority + status colour maps 
@@ -173,16 +175,18 @@ interface ParsedEntities {
 }
 
 interface OpenChatResult {
-  room_id:      string;
-  room_type:    'private' | 'project';
-  member_name?: string;
+  room_id:       string;
+  room_type:     'private' | 'project';
+  member_name?:  string;
   project_name?: string;
+  project_id?:   number;
 }
 
 interface WorkspaceMember {
-  id:    number;
-  name:  string;
-  email: string;
+  id:       number;
+  name:     string;
+  email:    string;
+  room_id?: string | null;
 }
 
 interface WorkspaceItem {
@@ -235,6 +239,7 @@ export function parseToolResult(toolCalled: string | null, toolResult: Record<st
         room_type:    (toolResult as any).room_type === 'project' ? 'project' : 'private',
         member_name:  (toolResult as any).member_name,
         project_name: (toolResult as any).project_name,
+        project_id:   (toolResult as any).project_id ? Number((toolResult as any).project_id) : undefined,
       },
     };
   }
@@ -243,7 +248,7 @@ export function parseToolResult(toolCalled: string | null, toolResult: Record<st
   if (tc === 'get_workspace_members' && Array.isArray((toolResult as any).members)) {
     return {
       members: (toolResult as any).members.map((m: any) => ({
-        id: m.id, name: m.name, email: m.email,
+        id: m.id, name: m.name, email: m.email, room_id: m.room_id ?? null,
       })),
     };
   }
@@ -336,8 +341,8 @@ function OpenChatCard({ result, onCloseChat }: { result: OpenChatResult; onClose
   const label = result.room_type === 'project'
     ? `${result.project_name || 'Project'} chat`
     : `Chat with ${result.member_name || 'member'}`;
-  const route = result.room_type === 'project'
-    ? `/team-chat/chat/${result.room_id}`
+  const route = result.room_type === 'project' && result.project_id
+    ? `/team-chat/${result.project_id}/${result.room_id}`
     : `/team-chat/chat/${result.room_id}`;
 
   return (
@@ -364,7 +369,30 @@ function OpenChatCard({ result, onCloseChat }: { result: OpenChatResult; onClose
 // ─── Workspace Member Card
 function MemberCard({ member, onCloseChat }: { member: WorkspaceMember; onCloseChat?: () => void }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const initials = member.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+
+  const handleChat = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['private-chat-rooms'] });
+
+    if (member.room_id) {
+      onCloseChat?.();
+      navigate(`/team-chat/chat/${member.room_id}`);
+      return;
+    }
+
+    // Fallback: room_id null — create private room on demand
+    try {
+      const room = await chatApi.createPrivateRoom(member.id);
+      await queryClient.invalidateQueries({ queryKey: ['private-chat-rooms'] });
+      onCloseChat?.();
+      navigate(`/team-chat/chat/${room.id}`);
+    } catch {
+      onCloseChat?.();
+      navigate('/team-chat/chat');
+    }
+  };
+
   return (
     <div style={{ background: '#fff', border: '1px solid #e6ebf2', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
       <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#EEF4FF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -375,7 +403,7 @@ function MemberCard({ member, onCloseChat }: { member: WorkspaceMember; onCloseC
         <div style={{ fontSize: 11, color: '#667085', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.email}</div>
       </div>
       <button
-        onClick={() => { onCloseChat?.(); navigate(`/team-chat/chat?member_id=${member.id}`); }}
+        onClick={handleChat}
         style={{ height: 26, padding: '0 10px', borderRadius: 6, border: '1px solid #e6ebf2', background: '#fff', fontSize: 11, fontWeight: 600, color: '#1663f6', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, fontFamily: 'inherit' }}
       >
         <MessageSquare style={{ width: 10, height: 10 }} /> Chat

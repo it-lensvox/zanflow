@@ -48,9 +48,14 @@ export function useAIBot() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
-  // ── Focus input when expanded and not minimized
+  // ── Scroll to bottom + focus when restored from minimized
   useEffect(() => {
-    if (isExpanded && !isMinimized) inputRef.current?.focus();
+    if (isExpanded && !isMinimized) {
+      inputRef.current?.focus();
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+      }, 50);
+    }
   }, [isExpanded, isMinimized]);
 
   // ── ESC key minimizes instead of closing
