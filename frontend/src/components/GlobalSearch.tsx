@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Search, X, FolderKanban, CheckSquare, FileText, Calendar, MessageSquare, Users } from 'lucide-react';
 import { taskApi, projectsApi, documentsApi, agentApi } from '@/services/api';
+import { DocumentPreview } from '@/components/common/DocumentPreview';
 import type { AgentSearchResponse, AgentSearchMember } from '@/types';
 import { getStatusColors } from '@/config/statusColors';
 import { buildViewAllUrl } from '@/utils/filtersUsedNavigation';
@@ -17,6 +18,7 @@ type ResultItem = {
   route: string;
   taskStatus?: string;
   taskType?: string;
+  fileType?: string;
 };
 
 // Static meta for task/document/note/event
@@ -35,16 +37,15 @@ function getProjectMeta(taskType?: string) {
 }
 
 // ── Per-section accumulated items (for Load More per model)
-type SectionItems = Record<'project' | 'task' | 'note' | 'event', ResultItem[]>;
-type SectionPages = Record<'project' | 'task' | 'note' | 'event', number>;
-type SectionHasMore = Record<'project' | 'task' | 'note' | 'event', boolean>;
-type SectionLoading = Record<'project' | 'task' | 'note' | 'event', boolean>;
+type SectionItems = Record<'project' | 'task' | 'note' | 'event' | 'document', ResultItem[]>;
+type SectionPages = Record<'project' | 'task' | 'note' | 'event' | 'document', number>;
+type SectionHasMore = Record<'project' | 'task' | 'note' | 'event' | 'document', boolean>;
+type SectionLoading = Record<'project' | 'task' | 'note' | 'event' | 'document', boolean>;
 
-const EMPTY_ITEMS: SectionItems = { project: [], task: [], note: [], event: [] };
-const EMPTY_PAGES: SectionPages = { project: 1, task: 1, note: 1, event: 1 };
-const EMPTY_HAS_MORE: SectionHasMore = { project: false, task: false, note: false, event: false };
-const EMPTY_LOADING: SectionLoading = { project: false, task: false, note: false, event: false };
-
+const EMPTY_ITEMS: SectionItems = { project: [], task: [], note: [], event: [], document: [] };
+const EMPTY_PAGES: SectionPages = { project: 1, task: 1, note: 1, event: 1, document: 1 };
+const EMPTY_HAS_MORE: SectionHasMore = { project: false, task: false, note: false, event: false, document: false };
+const EMPTY_LOADING: SectionLoading = { project: false, task: false, note: false, event: false, document: false };
 // ── Search overlay
 export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
@@ -83,18 +84,34 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
   const allDocs = docsRes?.results || docsRes?.documents || (Array.isArray(docsRes) ? docsRes : []);
 
   // ── Helper: map AI response results into SectionItems
-  // Members from AI search stored separately (not in SectionItems — different render)
   const [memberResults, setMemberResults] = useState<AgentSearchMember[]>([]);
+  const [previewDoc, setPreviewDoc] = useState<{ url: string; fileName: string; fileType: string } | null>(null);
+  const [previewLoading, setPreviewLoading] = useState<string | null>(null); // stores doc id being loaded
+  const handleDocClick = async (docId: string, fileName: string, fileType: string) => {
+    setPreviewLoading(docId);
+    try {
+      const doc = await documentsApi.get(docId);
+      const projectId = doc.project ?? doc.project_id;
+      if (!projectId) { navigate('/documents'); onClose(); return; }
+      const { url } = await documentsApi.getDownloadUrl(Number(projectId), { document_id: docId });
+      setPreviewDoc({ url, fileName, fileType });
+    } catch {
+      navigate('/documents');
+      onClose();
+    } finally {
+      setPreviewLoading(null);
+    }
+  };
 
   const mapAiResults = (res: AgentSearchResponse): SectionItems => {
     if (res.type !== 'search') return EMPTY_ITEMS;
-    // Store members separately
     setMemberResults(res.results.members || []);
     return {
-      project: res.results.projects.map(p => ({ id: p.id, title: p.name, sub: '', type: 'project' as const, route: `/projects/${p.id}` })),
-      task:    res.results.tasks.map(t    => ({ id: t.id, title: t.heading, sub: t.project || '', type: 'task' as const, route: `/tasks/${t.id}`, taskStatus: t.status })),
-      note: res.results.notes.map(n => ({ id: n.id, title: n.title, sub: n.preview || n.project || '', type: 'note' as const, route: '/documents' })),
-      event: (res.results.events || []).map(e => ({ id: e.id, title: e.title, sub: e.event_type ? `${e.event_type}${e.organizer ? ' · ' + e.organizer : ''}` : e.organizer || '', type: 'event' as const, route: '/calendar' })),
+      project:  res.results.projects.map(p  => ({ id: p.id,   title: p.name,    sub: '',                                                     type: 'project'  as const, route: `/projects/${p.id}` })),
+      task:     res.results.tasks.map(t     => ({ id: t.id,   title: t.heading, sub: t.project || '',                                        type: 'task'     as const, route: `/tasks/${t.id}`, taskStatus: t.status })),
+      note:     res.results.notes.map(n     => ({ id: n.id,   title: n.title,   sub: n.preview || n.project || '',                           type: 'note'     as const, route: '/documents' })),
+      event:    (res.results.events || []).map(e => ({ id: e.id, title: e.title, sub: e.event_type ? `${e.event_type}${e.organizer ? ' · ' + e.organizer : ''}` : e.organizer || '', type: 'event' as const, route: '/calendar' })),
+      document: (res.results.documents || []).map(d => ({ id: d.id, title: d.name, sub: d.project || '', type: 'document' as const, route: '/documents', fileType: d.file_type })),
     };
   };
 
@@ -121,8 +138,8 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
         if (res.type === 'search') {
           setSectionItems(mapAiResults(res));
           setSectionHasMore({
-            project: false, task: false, note: false, event: false, ...Object.fromEntries(
-              (['project', 'task', 'note', 'event'] as const).map(m => [m, res.has_more])
+            project: false, task: false, note: false, event: false, document: false, ...Object.fromEntries(
+              (['project', 'task', 'note', 'event', 'document'] as const).map(m => [m, res.has_more])
             )
           });
           setTotals(res.totals as unknown as Record<string, number>);
@@ -137,7 +154,7 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
   }, [query]);
 
   // ── Load more for a specific section
-  const handleLoadMore = async (model: 'project' | 'task' | 'note' | 'event') => {
+  const handleLoadMore = async (model: 'project' | 'task' | 'note' | 'event' | 'document') => {
     const nextPage = sectionPages[model] + 1;
     setSectionLoading(prev => ({ ...prev, [model]: true }));
     try {
@@ -145,7 +162,7 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
         query: query.trim(),
         page: nextPage,
         page_size: 10,
-        models: [model],
+        models: model !== 'document' ? [model] : undefined,
       });
       if (res.type === 'search') {
         const mapped = mapAiResults(res);
@@ -249,7 +266,9 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
                 const displayBasic    = !useAiResults ? basicResults : [];
 
                 // Empty state: AI done + no results, and basic also empty
-                const aiDoneEmpty = !aiLoading && useAiResults && Object.values(sectionItems).every(a => a.length === 0);
+                const aiDoneEmpty = !aiLoading && useAiResults
+                  && Object.values(sectionItems).every(a => a.length === 0)
+                  && memberResults.length === 0;
                 const basicEmpty  = !aiLoading && !useAiResults && displayBasic.length === 0;
                 const showEmpty   = aiDoneEmpty || basicEmpty;
 
@@ -300,7 +319,13 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
                                 <div style={{ fontSize: 11, color: '#9CA3AF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.email}</div>
                               </div>
                               <button
-                                onClick={() => { navigate(`/team-chat/chat?member_id=${member.id}`); onClose(); }}
+                                onClick={() => {
+                                  const route = member.room_id
+                                    ? `/team-chat/chat/${member.room_id}`
+                                    : `/team-chat/chat`;
+                                  navigate(route);
+                                  onClose();
+                                }}
                                 style={{ height: 26, padding: '0 10px', borderRadius: 6, border: '1px solid #C7D7FD', background: '#EEF4FF', fontSize: 11, fontWeight: 600, color: '#1663F6', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, fontFamily: 'inherit' }}
                               >
                                 <MessageSquare size={10} /> Chat
@@ -310,13 +335,14 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
                         })}
                       </div>
                     )}
-                    {(['project', 'task', 'note', 'event'] as const).map(model => {
+                    {(['project', 'task', 'note', 'event', 'document'] as const).map(model => {
                       const group = displaySections[model];
                       if (!group.length && !totals[model + 's'] && !totals[model]) return null;
-                      const staticMeta = model !== 'project' ? TYPE_META[model] : null;
+                      const staticMeta = (model !== 'project' && model in TYPE_META) ? TYPE_META[model as keyof typeof TYPE_META] : null;
                       const sectionTotal = totals[model + 's'] ?? totals[model] ?? group.length;
                       const hasMore = sectionHasMore[model];
                       const isLoadingMore = sectionLoading[model];
+                      // filters_used already has project_id and file_type for documents
                       const viewAllUrl = useAiResults && aiResult?.type === 'search'
                         ? buildViewAllUrl(model, aiResult.filters_used)
                         : null;
@@ -333,12 +359,18 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
                                   {sectionTotal}
                                 </span>
                               )}
-                             {viewAllUrl && sectionTotal > group.length && (
+                             {viewAllUrl && (
                                 <button
-                                  onClick={() => { console.log('[DEBUG] View all clicked — built URL:', viewAllUrl, 'from filters_used:', aiResult?.type === 'search' ? aiResult.filters_used : null); go(viewAllUrl); }}
+                                  onClick={() => go(viewAllUrl)}
                                   style={{ fontSize: 10, fontWeight: 700, color: '#1663F6', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
                                 >
-                                  View all {sectionTotal} →
+                                  {sectionTotal > group.length
+                                    ? `View all ${sectionTotal} →`
+                                    : model === 'document' ? 'View all on Documents →'
+                                    : model === 'task'     ? 'View all on Taskboard →'
+                                    : model === 'project'  ? 'View all on Projects →'
+                                    : model === 'event'    ? 'View all on Calendar →'
+                                    : 'View all →'}
                                 </button>
                               )}
                             </div>
@@ -347,11 +379,19 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
                           {group.map(item => {
                             const meta = item.type === 'project' ? getProjectMeta(item.taskType) : staticMeta!;
                             const statusColors = item.taskStatus ? getStatusColors(item.taskStatus) : null;
+                            const isDocLoading = previewLoading === String(item.id);
                             return (
                               <button
                                 key={item.id}
-                                onClick={() => go(item.route)}
-                                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                                onClick={() => {
+                                  if (item.type === 'document') {
+                                    handleDocClick(String(item.id), item.title, item.fileType || 'pdf');
+                                  } else {
+                                    go(item.route);
+                                  }
+                                }}
+                                disabled={isDocLoading}
+                                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', background: 'none', border: 'none', cursor: isDocLoading ? 'wait' : 'pointer', textAlign: 'left', opacity: isDocLoading ? 0.6 : 1 }}
                                 onMouseEnter={e => (e.currentTarget.style.background = '#F7F8FB')}
                                 onMouseLeave={e => (e.currentTarget.style.background = 'none')}
                               >
@@ -372,8 +412,8 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
                               </button>
                             );
                           })}
-                          {/* Per-section Load More */}
-                          {hasMore && (
+                          {/* Per-section Load More — not shown for documents */}
+                          {hasMore && model !== 'document' && (
                             <div style={{ padding: '4px 18px 10px' }}>
                               <button
                                 onClick={() => handleLoadMore(model)}
@@ -468,11 +508,20 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
           ))}
         </div>
       </div>
+
+      {/* Document preview modal */}
+      {previewDoc && (
+        <DocumentPreview
+          url={previewDoc.url}
+          fileName={previewDoc.fileName}
+          fileType={previewDoc.fileType}
+          onClose={() => setPreviewDoc(null)}
+        />
+      )}
     </div>
   );
 }
 
-// ── Trigger button 
 export function GlobalSearchTrigger() {
   const [open, setOpen] = useState(false);
 

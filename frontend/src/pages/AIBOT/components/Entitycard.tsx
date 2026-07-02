@@ -1,8 +1,10 @@
 import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { CheckSquare, FileText, ArrowUpRight, Clock, User, MessageSquare, FolderKanban as FolderIcon, ExternalLink, Building2, AlertTriangle } from 'lucide-react';
 import { buildViewAllUrl } from '@/utils/filtersUsedNavigation';
-import { chatApi } from '@/services/api';
+import { chatApi, documentsApi } from '@/services/api';
+import { DocumentPreview } from '@/components/common/DocumentPreview';
 import type { AgentFiltersUsed } from '@/types';
 
 // ─── Priority + status colour maps 
@@ -165,15 +167,16 @@ export function EntityCardGrid({ children, label, viewAllUrl, viewAllLabel, onSh
 
 // ─── Types
 interface ParsedEntities {
-  tasks?:          TaskCardProps[];
-  projects?:       ProjectCardProps[];
-  notes?:          NoteCardProps[];
-  openChat?:       OpenChatResult;
-  members?:        WorkspaceMember[];
-  workspaces?:     WorkspaceItem[];
-  createdProject?: CreatedProject;
-  createdTask?:    CreatedTask;
-  missingLabels?:  MissingLabels;
+  tasks?:           TaskCardProps[];
+  projects?:        ProjectCardProps[];
+  notes?:           NoteCardProps[];
+  openChat?:        OpenChatResult;
+  members?:         WorkspaceMember[];
+  workspaces?:      WorkspaceItem[];
+  createdProject?:  CreatedProject;
+  createdTask?:     CreatedTask;
+  missingLabels?:   MissingLabels;
+  agentDocuments?:  AgentDocCard[];
 }
 
 interface OpenChatResult {
@@ -384,6 +387,23 @@ export function parseToolResult(toolCalled: string | null, toolResult: Record<st
     };
   }
 
+  // ── Documents (from AI search results passed as tool_result)
+  const isDocTool = tc.includes('document') || tc.includes('search_doc') || tc.includes('find_doc');
+  const docList = isDocTool
+    ? extractList(toolResult, ['documents', 'document', 'results'])
+    : extractList(toolResult, ['documents']);
+
+  if (docList && docList.length > 0 && docList[0]?.file_type !== undefined) {
+    return {
+      agentDocuments: docList.slice(0, 10).map((d: any) => ({
+        id:        String(d.id),
+        title:     d.name || d.title || 'Untitled',
+        project:   d.project || '',
+        file_type: d.file_type || 'other',
+      })),
+    };
+  }
+
   return null;
 }
 
@@ -503,6 +523,72 @@ function CreatedProjectCard({ project, onCloseChat }: { project: CreatedProject;
     </div>
   );
 }
+// ─── Agent Search Document Card
+interface AgentDocCard {
+  id:        string;
+  title:     string;
+  project:   string;
+  file_type: string;
+}
+
+function DocumentCard({ doc, onCloseChat }: { doc: AgentDocCard; onCloseChat?: () => void }) {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<{ url: string; fileName: string; fileType: string } | null>(null);
+
+  const FILE_ICON_COLOR: Record<string, string> = {
+    pdf: '#EF4444', image: '#8B5CF6', video: '#F59E0B',
+    json: '#10B981', text: '#3B82F6', other: '#6B7280',
+  };
+  const iconColor = FILE_ICON_COLOR[doc.file_type] || FILE_ICON_COLOR.other;
+
+  const handleOpen = async () => {
+    setLoading(true);
+    try {
+      const detail = await documentsApi.get(doc.id);
+      const projectId = detail.project ?? detail.project_id;
+      if (!projectId) { navigate('/documents'); onCloseChat?.(); return; }
+      const { url } = await documentsApi.getDownloadUrl(Number(projectId), { document_id: doc.id });
+      setPreviewDoc({ url, fileName: doc.title, fileType: doc.file_type });
+    } catch {
+      navigate('/documents');
+      onCloseChat?.();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <>
+      <div style={{ background: '#fff', border: '1px solid #e6ebf2', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ width: 34, height: 34, borderRadius: 8, background: `${iconColor}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <FileText style={{ width: 15, height: 15, color: iconColor }} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#172033', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.title}</div>
+          <div style={{ fontSize: 11, color: '#667085', marginTop: 1 }}>{doc.project} · {doc.file_type.toUpperCase()}</div>
+        </div>
+        <button
+          onClick={handleOpen}
+          disabled={loading}
+          style={{ height: 28, padding: '0 12px', borderRadius: 7, border: 'none', background: loading ? '#e2e8f0' : '#1663f6', fontSize: 11, fontWeight: 600, color: loading ? '#94a3b8' : '#fff', cursor: loading ? 'wait' : 'pointer', flexShrink: 0, fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4 }}
+        >
+          <ExternalLink style={{ width: 10, height: 10 }} />
+          {loading ? 'Opening…' : 'Open'}
+        </button>
+      </div>
+      {previewDoc && (
+        <DocumentPreview
+          url={previewDoc.url}
+          fileName={previewDoc.fileName}
+          fileType={previewDoc.fileType}
+          onClose={() => setPreviewDoc(null)}
+        />
+      )}
+    </>
+  );
+}
+
 // ─── Created Task Card
 function CreatedTaskCard({ task, onCloseChat }: { task: CreatedTask; onCloseChat?: () => void }) {
   const navigate = useNavigate();
@@ -587,6 +673,29 @@ export function EntityCards({ entities, filtersUsed, onCloseChat }: { entities: 
       {entities.missingLabels && (
         <MissingLabelsCard data={entities.missingLabels} />
       )}
+
+      {/* agent documents */}
+      {entities.agentDocuments && entities.agentDocuments.length > 0 && (() => {
+        // Build filtered documents URL — Documents page reads ?project={id} and ?file_type={type}
+        const projectId = (filtersUsed as any)?.project_id || '';
+        const fileType  = (filtersUsed as any)?.file_type  || '';
+        const params = new URLSearchParams();
+        if (projectId) params.set('project', String(projectId));
+        if (fileType)  params.set('file_type', fileType);
+        const docViewAllUrl = params.toString() ? `/documents?${params.toString()}` : '/documents';
+        return (
+          <EntityCardGrid
+            label={`${entities.agentDocuments.length} document${entities.agentDocuments.length > 1 ? 's' : ''}`}
+            viewAllUrl={docViewAllUrl}
+            viewAllLabel="View all on Documents"
+            onCloseChat={onCloseChat}
+          >
+            {entities.agentDocuments.map(d => (
+              <DocumentCard key={d.id} doc={d} onCloseChat={onCloseChat} />
+            ))}
+          </EntityCardGrid>
+        );
+      })()}
 
       {/* get_workspace_members */}
       {entities.members && entities.members.length > 0 && (

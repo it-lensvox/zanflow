@@ -1327,7 +1327,7 @@ export interface AgentSearchPayload {
   query:      string;
   page?:      number;
   page_size?: number;
-  models?:    ('task' | 'note' | 'project' | 'event')[];
+  models?:    ('task' | 'note' | 'project' | 'event' | 'document')[];
 }
 
 export interface AgentSearchTask {
@@ -1338,6 +1338,14 @@ export interface AgentSearchTask {
   project: string;
   assigned_to: string[];
   end_date: string;
+}
+
+export interface AgentSearchDocument {
+  id:         string;
+  name:       string;
+  project:    string;
+  status:     string;
+  file_type:  string;
 }
 
 export interface AgentSearchNote {
@@ -1364,26 +1372,36 @@ export interface AgentSearchEvent {
 }
 
 export interface AgentSearchMember {
-  id:    number;
-  name:  string;
-  email: string;
+  id:       number;
+  name:     string;
+  email:    string;
+  room_id?: string | null;
+}
+
+export interface AgentSearchDocument {
+  id:        string;
+  name:      string;
+  project:   string;
+  status:    string;
+  file_type: string;
 }
 
 export interface AgentSearchResults {
-  tasks:    AgentSearchTask[];
-  notes:    AgentSearchNote[];
-  projects: AgentSearchProject[];
-  events:   AgentSearchEvent[];
-  members?: AgentSearchMember[];
+  tasks:      AgentSearchTask[];
+  notes:      AgentSearchNote[];
+  projects:   AgentSearchProject[];
+  events:     AgentSearchEvent[];
+  documents?: AgentSearchDocument[];
+  members?:   AgentSearchMember[];
 }
 export interface AgentSearchTotals {
-  tasks:    number;
-  notes:    number;
-  projects: number;
-  events:   number;
-  members?: number;
+  tasks:      number;
+  notes:      number;
+  projects:   number;
+  events:     number;
+  documents?: number;
+  members?:   number;
 }
-
 export interface AgentSearchResponseSearch {
   type:         'search';
   query:        string;
@@ -1413,12 +1431,14 @@ export interface AgentFiltersUsed {
   room_type?:      'private' | 'project';
   member_id?:      number;
   member_name?:    string;
-  project_name?:   string;
   project_id?:     number;
   // label filters
   label_name?:     string;
   label_names?:    string[];
   heading?:        string;
+  // document filters
+  file_type?:      string;
+  project_name?:   string;
 }
 
 export interface AgentSearchResponseAction {

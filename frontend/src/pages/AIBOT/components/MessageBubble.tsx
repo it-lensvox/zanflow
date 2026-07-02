@@ -19,15 +19,16 @@ export function MessageBubble({ message, isStreaming = false, onCloseChat }: Mes
     ? parseToolResult(message.toolCalled || null, message.toolResult || null)
     : null;
   const hasEntities = !!(entities && (
-    (entities.tasks         && entities.tasks.length      > 0) ||
-    (entities.projects      && entities.projects.length   > 0) ||
-    (entities.notes         && entities.notes.length      > 0) ||
-    entities.openChat                                          ||
-    entities.createdProject                                    ||
-    entities.createdTask                                       ||
-    entities.missingLabels                                     ||
-    (entities.members       && entities.members.length    > 0) ||
-    (entities.workspaces    && entities.workspaces.length > 0)
+    (entities.tasks           && entities.tasks.length          > 0) ||
+    (entities.projects        && entities.projects.length       > 0) ||
+    (entities.notes           && entities.notes.length          > 0) ||
+    (entities.agentDocuments  && entities.agentDocuments.length > 0) ||
+    entities.openChat                                                ||
+    entities.createdProject                                          ||
+    entities.createdTask                                             ||
+    entities.missingLabels                                           ||
+    (entities.members         && entities.members.length        > 0) ||
+    (entities.workspaces      && entities.workspaces.length     > 0)
   ));
 
   // ── User bubble 
