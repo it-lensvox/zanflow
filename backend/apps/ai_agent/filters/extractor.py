@@ -52,7 +52,21 @@ No explanation. No markdown. No extra keys.
 
 Valid status values  : pending, in_progress, completed, review, deployed, deferred, backlog
 Valid priority values: low, medium, high, critical
-Aliases to map       : urgent→critical, done→completed, started→in_progress, overdue→check overdue field
+
+Status aliases (always map to DB value):
+  remaining/open/not started/todo              → pending
+  in progress/wip/ongoing/active/working on    → in_progress
+  review/needs review/ready for review/pr      → review
+  done/complete/finished/closed/resolved       → completed
+  production/in production/live/shipped/launched/released → deployed
+  hold/on hold/cancelled/paused/blocked        → deferred
+  backlog/parked/future                        → backlog
+
+Priority aliases (always map to DB value):
+  urgent/blocker/asap/emergency/top priority   → critical
+  important/high priority                      → high
+  normal/moderate/standard                     → medium
+  minor/lowest/nice to have/not urgent         → low
 Valid models         : task, note, project, event, document, member
 Document aliases     : document, documents, file, files → models includes "document"
 Member aliases       : member, members, teammate, teammates, people, workspace members, who → models includes "member"

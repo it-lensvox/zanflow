@@ -32,25 +32,136 @@ _SELF_REFERENCES = {"me", "myself", "i", "my", "self"}
 
 _STATUS_ALIASES = {
     # Valid DB values: pending, in_progress, completed, review, deployed, deferred, backlog
-    "done": "completed",      "complete": "completed",   "finished": "completed",
-    "close": "completed",     "closed": "completed",
-    "start": "in_progress",   "started": "in_progress",  "working on": "in_progress",
-    "in progress": "in_progress",
-    "defer": "deferred",      "deferred": "deferred",    "postpone": "deferred",
-    "hold": "deferred",       "put on hold": "deferred", "cancel": "deferred",
-    "deployed": "deployed",   "live": "deployed",        "shipped": "deployed",
-    "backlog": "backlog",     "move to backlog": "backlog",
-    "review": "review",       "in review": "review",     "needs review": "review",
-    "ready for review": "review", "ready": "review",
-    "pending": "pending",
+
+    # ── pending ───────────────────────────────────────────────────────────────
+    "pending":          "pending",
+    "remaining":        "pending",   # "how many tasks are remaining"
+    "not started":      "pending",
+    "not done":         "pending",
+    "to do":            "pending",
+    "todo":             "pending",
+    "open":             "pending",   # "show open tasks"
+    "unstarted":        "pending",
+    "new":              "pending",
+
+    # ── in_progress ───────────────────────────────────────────────────────────
+    "in progress":      "in_progress",
+    "in-progress":      "in_progress",
+    "inprogress":       "in_progress",
+    "started":          "in_progress",
+    "start":            "in_progress",
+    "working on":       "in_progress",
+    "ongoing":          "in_progress",
+    "active":           "in_progress",
+    "in development":   "in_progress",
+    "under development":"in_progress",
+    "wip":              "in_progress",   # work in progress
+    "work in progress": "in_progress",
+    "being worked on":  "in_progress",
+
+    # ── review ────────────────────────────────────────────────────────────────
+    "review":           "review",
+    "in review":        "review",
+    "needs review":     "review",
+    "ready for review": "review",
+    "under review":     "review",
+    "ready":            "review",
+    "awaiting review":  "review",
+    "pending review":   "review",
+    "waiting for review":"review",
+    "pr":               "review",   # "show tasks in PR"
+    "pull request":     "review",
+
+    # ── completed ─────────────────────────────────────────────────────────────
+    "completed":        "completed",
+    "complete":         "completed",
+    "done":             "completed",
+    "finished":         "completed",
+    "closed":           "completed",
+    "close":            "completed",
+    "resolved":         "completed",
+    "fixed":            "completed",
+    "wrapped up":       "completed",
+    "marked done":      "completed",
+
+    # ── deployed ──────────────────────────────────────────────────────────────
+    "deployed":         "deployed",
+    "in production":    "deployed",   # "how many tasks are in production"
+    "production":       "deployed",   # "tasks gone to production"
+    "live":             "deployed",
+    "shipped":          "deployed",
+    "released":         "deployed",
+    "in prod":          "deployed",
+    "gone live":        "deployed",
+    "published":        "deployed",
+    "launched":         "deployed",
+    "go live":          "deployed",
+    "gone to production":"deployed",
+
+    # ── deferred ──────────────────────────────────────────────────────────────
+    "deferred":         "deferred",
+    "defer":            "deferred",
+    "postponed":        "deferred",
+    "postpone":         "deferred",
+    "on hold":          "deferred",
+    "hold":             "deferred",
+    "put on hold":      "deferred",
+    "cancelled":        "deferred",
+    "cancel":           "deferred",
+    "paused":           "deferred",
+    "suspended":        "deferred",
+    "blocked":          "deferred",
+
+    # ── backlog ───────────────────────────────────────────────────────────────
+    "backlog":          "backlog",
+    "move to backlog":  "backlog",
+    "in backlog":       "backlog",
+    "parked":           "backlog",
+    "future":           "backlog",
+    "someday":          "backlog",
 }
 
 _PRIORITY_ALIASES = {
     # Valid priorities: low, medium, high, critical
-    "urgent":   "critical", "blocker":  "critical",
-    "asap":     "critical", "highest":  "critical",
-    "normal":   "medium",   "minor":    "low",
-    "lowest":   "low",
+
+    # ── critical ──────────────────────────────────────────────────────────────
+    "critical":     "critical",
+    "urgent":       "critical",   # user says "urgent" → maps to critical
+    "blocker":      "critical",
+    "asap":         "critical",
+    "highest":      "critical",
+    "p0":           "critical",
+    "showstopper":  "critical",
+    "emergency":    "critical",
+    "immediate":    "critical",
+    "top priority": "critical",
+
+    # ── high ──────────────────────────────────────────────────────────────────
+    "high":         "high",
+    "important":    "high",
+    "p1":           "high",
+    "soon":         "high",
+    "high priority":"high",
+
+    # ── medium ────────────────────────────────────────────────────────────────
+    "medium":       "medium",
+    "normal":       "medium",
+    "moderate":     "medium",
+    "average":      "medium",
+    "standard":     "medium",
+    "default":      "medium",
+    "p2":           "medium",
+
+    # ── low ───────────────────────────────────────────────────────────────────
+    "low":          "low",
+    "minor":        "low",
+    "lowest":       "low",
+    "nice to have": "low",
+    "whenever":     "low",
+    "someday":      "low",
+    "p3":           "low",
+    "not urgent":   "low",
+    "when free":    "low",
 }
 
 def _clean_response(text: str) -> str:

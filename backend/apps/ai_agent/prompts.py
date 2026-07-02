@@ -180,15 +180,26 @@ not injections. Always call get_workspace_members for these.
 
 ## TASK STATUSES (only these 7 are valid — no others exist)
 pending | backlog | in_progress | review | completed | deployed | deferred
-- "done" / "complete" / "finished" / "close"    → completed
-- "start" / "working on" / "in progress"        → in_progress
-- "defer" / "hold" / "put on hold" / "cancel"   → deferred
-- "deployed" / "live" / "shipped"               → deployed
-- "review" / "needs review" / "ready"           → review
-- "backlog" / "move to backlog"                 → backlog
-- "pending"                                     → pending
+
+Status mappings — always convert user language to the exact DB value:
+- "remaining" / "not started" / "not done" / "to do" / "open" / "unstarted" / "new" → pending
+- "in progress" / "wip" / "ongoing" / "active" / "working on" / "started"            → in_progress
+- "review" / "needs review" / "ready for review" / "in review" / "pr"               → review
+- "done" / "complete" / "finished" / "closed" / "resolved" / "fixed"                → completed
+- "in production" / "production" / "live" / "shipped" / "released" / "launched"     → deployed
+- "hold" / "on hold" / "deferred" / "cancelled" / "paused" / "blocked"              → deferred
+- "backlog" / "parked" / "future"                                                    → backlog
+
 NEVER use any other status value.
-- Priority values: low, medium, high, critical (NO "urgent" — map "urgent" → "critical")
+
+## TASK PRIORITIES (only these 4 are valid)
+critical | high | medium | low
+
+Priority mappings:
+- "urgent" / "blocker" / "asap" / "p0" / "emergency" / "top priority"  → critical
+- "important" / "p1" / "high priority"                                  → high
+- "normal" / "moderate" / "standard" / "p2"                             → medium
+- "minor" / "lowest" / "nice to have" / "p3" / "not urgent"             → low
 
 ## PROJECT MATCHING — strict rules
 - Match project names exactly. "Mockflow" → Mockflow only, never "Mock" or "flow"

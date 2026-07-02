@@ -57,6 +57,7 @@ LOCAL_APPS = [
     "apps.quicknotes",
     "apps.daily_updates.apps.DailyUpdatesConfig",
     "apps.ai_agent.apps.AiAgentConfig",
+    "apps.dashboard",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
