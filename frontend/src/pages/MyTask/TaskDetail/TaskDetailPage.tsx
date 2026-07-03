@@ -1,10 +1,12 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Trash2, Save, Edit3, Loader2 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { taskApi } from '@/services/api';
 import { useAuth } from '@/hooks/useAuth';
 import { useTaskDetail } from './hooks/useTaskDetail';
 import { TaskDetailContent, TaskDetailConfirms, T } from './Components/TaskDetailContent';
+import { TaskDetailModal } from './Components/TaskDetailModal';
 import type { Task } from '@/types';
 
 export function TaskDetailPage() {
@@ -49,6 +51,7 @@ export function TaskDetailPage() {
 
 function TaskDetailPageInner({ task, onDelete }: { task: Task; onDelete: (id: number) => Promise<void> }) {
     const { user } = useAuth();
+    const [childTask, setChildTask] = useState<Task | null>(null);
     const detail = useTaskDetail({ task, onDelete, onClose: undefined, onTaskUpdated: undefined });
     const { isSaving, hasUnsavedChanges, isEditingTitle, setIsEditingTitle, editableTitle, setEditableTitle, handleSave, setShowDeleteConfirm, setShowNotAdminPopup } = detail;
 
@@ -97,10 +100,19 @@ function TaskDetailPageInner({ task, onDelete }: { task: Task; onDelete: (id: nu
 
             {/* Content */}
             <div className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 py-8">
-                <TaskDetailContent detail={detail} task={task} />
+                <TaskDetailContent detail={detail} task={task} onChildTaskClick={(ct) => setChildTask(ct)} />
             </div>
 
             <TaskDetailConfirms detail={detail} task={task} />
+
+            {childTask && (
+                <TaskDetailModal
+                    task={childTask}
+                    onClose={() => setChildTask(null)}
+                    onDelete={async (_id: number) => { setChildTask(null); }}
+                    onTaskUpdated={(updated) => setChildTask(updated)}
+                />
+            )}
         </div>
     );
 }

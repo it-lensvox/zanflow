@@ -1,9 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { ExternalLink, Trash2, X, Save, Edit3, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTaskDetail } from '../hooks/useTaskDetail';
-import { TaskDetailContent, TaskDetailConfirms, T } from './TaskDetailContent';
+import { TaskDetailContent, TaskDetailConfirms, T, type TaskDetailContentProps } from './TaskDetailContent';
 import type { Task } from '@/types';
+import { taskApi } from '@/services/api';
 
 interface TaskDetailModalProps {
     task: Task;
@@ -14,6 +15,21 @@ interface TaskDetailModalProps {
 
 export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose, onDelete, onTaskUpdated }) => {
     const navigate = useNavigate();
+    const [childTask, setChildTask] = useState<Task | null>(null);
+    const [childTaskLoading, setChildTaskLoading] = useState(false);
+
+    const handleChildTaskClick = useCallback(async (ct: Task) => {
+        setChildTaskLoading(true);
+        try {
+            const res = await taskApi.get(ct.id);
+            setChildTask(res.task || res);
+        } catch {
+            // fallback to partial data if fetch fails
+            setChildTask(ct);
+        } finally {
+            setChildTaskLoading(false);
+        }
+    }, []);
     const detail = useTaskDetail({ task, onClose, onDelete, onTaskUpdated });
     const { user, isSaving, hasUnsavedChanges, isEditingTitle, setIsEditingTitle, editableTitle, setEditableTitle, handleSave, showDeleteConfirm, setShowDeleteConfirm, setShowNotAdminPopup } = detail;
 
@@ -81,11 +97,28 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
                 {/* Body */}
                 <div className="flex-1 overflow-y-auto" style={{ background: T.bg }}>
                     <div style={{ padding: '20px 20px 32px' }}>
-                        <TaskDetailContent detail={detail} task={task} />
+                        <TaskDetailContent detail={detail} task={task} onChildTaskClick={handleChildTaskClick} />
+                        {childTaskLoading && (
+                            <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.3)' }}>
+                                <div style={{ background: '#fff', borderRadius: 12, padding: '20px 28px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: '#172033' }}>
+                                    <Loader2 size={18} className="animate-spin" style={{ color: '#1663f6' }} /> Loading task…
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
-            <TaskDetailConfirms detail={detail} task={task} />
+          <TaskDetailConfirms detail={detail} task={task} />
+
+            {/* ── Child task modal — opens on top when child task row is clicked ── */}
+            {childTask && (
+                <TaskDetailModal
+                    task={childTask}
+                    onClose={() => setChildTask(null)}
+                    onDelete={async (_id: number) => { setChildTask(null); }}
+                    onTaskUpdated={(updated) => setChildTask(updated)}
+                />
+            )}
         </div>
     );
 };

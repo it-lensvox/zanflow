@@ -339,6 +339,7 @@ function usePinTask(task: Task, queryClient: ReturnType<typeof useQueryClient>) 
       return old;
     };
 
+    // Update ALL active task cache entries — board uses ['tasks', status, priority, projectId]
     queryClient.getQueryCache().findAll({ queryKey: ['tasks'] }).forEach(query => {
       queryClient.setQueryData(query.queryKey, applyPin);
     });

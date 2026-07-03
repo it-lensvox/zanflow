@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
-    X, Loader2, ChevronDown, Send, Clock, CheckCircle, Plus, Link, Sparkles, ChevronRight, Calendar, Edit3, Trash2,
+    X, Loader2, ChevronDown, Send,
+    Clock, CheckCircle, Plus,
+    Link, Sparkles, ChevronRight, Calendar, Edit3, Trash2,
 } from 'lucide-react';
 import { getStatusConfig } from '@/components/layout/DualView/taskConfig';
 import { TASK_STATUS_OPTIONS } from '@/config/statusColors';
@@ -9,8 +11,9 @@ import { RichTextEditor } from '@/components/common/RichTextEditor';
 import { DocumentThumbnail, DocumentPreview } from '@/components/common/DocumentPreview';
 import { AISuggestionPanel } from './AISuggestionPanel';
 import { useTaskDetail } from '../hooks/useTaskDetail';
+import { TaskDetailModal } from './TaskDetailModal';
 
-// ── Design tokens ────
+// ── Design tokens 
 export const T = {
     text:   '#172033',
     muted:  '#667085',
@@ -56,14 +59,15 @@ export const DescriptionContent = ({ html }: { html: string }) => (
     />
 );
 
-// ── Props ───
+// ── Props
 export interface TaskDetailContentProps {
     detail: ReturnType<typeof useTaskDetail>;
     task: Task;
+    onChildTaskClick?: (ct: Task) => void;
 }
 
-// ── Shared body sections ─────
-export function TaskDetailContent({ detail, task }: TaskDetailContentProps) {
+// ── Shared body sections
+export function TaskDetailContent({ detail, task, onChildTaskClick }: TaskDetailContentProps) {
     const {
         user, canEditDates, resolvedTaskId,
         selectedStatus, setSelectedStatus,
@@ -105,7 +109,7 @@ export function TaskDetailContent({ detail, task }: TaskDetailContentProps) {
         const pmIds = projectMembers.map(m => m.user.id);
         pool = pool.filter(u => pmIds.includes(u.id));
     }
-    pool = pool.filter(u => !task.assigned_to_user_details.some(a => a.id === u.id) && !newUsers.includes(u.id));
+   pool = pool.filter(u => !(task.assigned_to_user_details ?? []).some(a => a.id === u.id) && !newUsers.includes(u.id));
 
     return (
         <div className="space-y-3">
@@ -212,7 +216,7 @@ export function TaskDetailContent({ detail, task }: TaskDetailContentProps) {
                     </button>
                     {assignedMembersOpen && (
                         <div style={{ padding: '0 16px 14px', display: 'flex', flexDirection: 'column', gap: 5 }}>
-                            {task.assigned_to_user_details.map(u => (
+                            {(task.assigned_to_user_details ?? []).map(u => (
                                 <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 7, background: '#f7f8fb' }}>
                                     <div style={{ width: 26, height: 26, borderRadius: '50%', background: '#ede9fe', border: '1px solid #c4b5fd', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#6d28d9', flexShrink: 0 }}>
                                         {u.first_name[0]}{u.last_name[0]}
@@ -346,6 +350,7 @@ export function TaskDetailContent({ detail, task }: TaskDetailContentProps) {
                                     const csc = getStatusConfig(ct.status || 'pending');
                                     return (
                                         <div key={ct.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: `1px solid ${T.line}`, background: '#fafafa', cursor: 'pointer' }}
+                                            onClick={() => onChildTaskClick?.(ct as Task)}
                                             onMouseEnter={e => (e.currentTarget.style.background = '#f7f8fb')}
                                             onMouseLeave={e => (e.currentTarget.style.background = '#fafafa')}>
                                             <span style={{ width: 7, height: 7, borderRadius: '50%', background: csc.color, flexShrink: 0 }} />
@@ -482,10 +487,10 @@ export function TaskDetailContent({ detail, task }: TaskDetailContentProps) {
     );
 }
 
-// ── Shared confirm dialogs ────────────────────────────────────────────────────
+// ── Shared confirm dialogs 
 export function TaskDetailConfirms({ detail, task }: TaskDetailContentProps) {
+    const [selectedChildTask, setSelectedChildTask] = useState<Task | null>(null);
     const { showDeleteConfirm, setShowDeleteConfirm, showNotAdminPopup, setShowNotAdminPopup, deleteAttachmentConfirm, setDeleteAttachmentConfirm, previewDocument, setPreviewDocument, deleteMutation, handleDeleteAttachment } = detail;
-
     return (
         <>
             {showDeleteConfirm && (
@@ -526,6 +531,16 @@ export function TaskDetailConfirms({ detail, task }: TaskDetailContentProps) {
             )}
             {previewDocument && (
                 <DocumentPreview url={previewDocument.url} fileName={previewDocument.fileName} fileType={previewDocument.fileType} onClose={() => setPreviewDocument(null)} />
+            )}
+
+            {/* ── Child task detail modal ── */}
+            {selectedChildTask && (
+                <TaskDetailModal
+                    task={selectedChildTask}
+                    onClose={() => setSelectedChildTask(null)}
+                    onDelete={async (_id: number) => { setSelectedChildTask(null); }}
+                    onTaskUpdated={(updated) => setSelectedChildTask(updated)}
+                />
             )}
         </>
     );

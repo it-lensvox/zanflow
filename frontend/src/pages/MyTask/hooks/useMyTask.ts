@@ -309,9 +309,11 @@ export function useMyTask() {
   }, [queryClient]);
 
   const handleDeleteTask = useCallback(async (id: number) => {
-    queryClient.setQueryData(['tasks'], (old: any) => {
-      if (!old?.pages) return old;
-      return { ...old, pages: old.pages.map((page: any) => ({ ...page, results: page.results.filter((t: Task) => t.id !== id) })) };
+    queryClient.getQueryCache().findAll({ queryKey: ['tasks'] }).forEach(query => {
+      queryClient.setQueryData(query.queryKey, (old: any) => {
+        if (!old?.pages) return old;
+        return { ...old, pages: old.pages.map((page: any) => ({ ...page, results: page.results.filter((t: Task) => t.id !== id) })) };
+      });
     });
     setSelectedTask(null);
     try { await taskApi.delete(id); } catch { queryClient.invalidateQueries({ queryKey: ['tasks'] }); }
