@@ -82,6 +82,7 @@ export function TaskDetailContent({ detail, task, onChildTaskClick }: TaskDetail
         links, linkInput, setLinkInput,
         selectedLabelIds, setSelectedLabelIds, availableLabels,
         startDate, setStartDate, endDate, setEndDate,
+        durationTime, setDurationTime,
         uploadingDocs,
         deleteAttachmentConfirm, setDeleteAttachmentConfirm,
         newComment, setNewComment,
@@ -132,11 +133,28 @@ export function TaskDetailContent({ detail, task, onChildTaskClick }: TaskDetail
                                 style={{ ...T.input, cursor: canEditDates ? 'pointer' : 'not-allowed' }}
                                 onFocus={canEditDates ? focusInput : undefined} onBlur={canEditDates ? blurInput : undefined} />
                         </div>
-                        <div>
+                       <div>
                             <FieldLabel><Clock size={13} /> Duration</FieldLabel>
-                            <div style={{ ...T.input, display: 'flex', alignItems: 'center', color: T.muted, cursor: 'default', background: '#fafafa' }}>
-                                {(task as any).duration_time || 'N/A'}
-                            </div>
+                            <input
+                                type="text"
+                                value={durationTime}
+                                onChange={e => {
+                                    let val = e.target.value;
+                                    const isDeleting = (e.nativeEvent as any).inputType === 'deleteContentBackward';
+                                    if (!isDeleting) {
+                                        val = val.replace(/[^0-9:]/g, '');
+                                        if (/^\d{2}$/.test(val)) val = val + ':';
+                                        else if (/^\d{2}:\d$/.test(val)) val = val + '0';
+                                    }
+                                    setDurationTime(val);
+                                    setHasUnsavedChanges(true);
+                                }}
+                                placeholder="HH:MM"
+                                maxLength={5}
+                                style={{ ...T.input }}
+                                onFocus={focusInput}
+                                onBlur={blurInput}
+                            />
                         </div>
                         <div ref={statusDropdownRef} style={{ position: 'relative' }}>
                             <FieldLabel>Status</FieldLabel>

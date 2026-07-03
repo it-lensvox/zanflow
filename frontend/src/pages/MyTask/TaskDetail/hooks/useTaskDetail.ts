@@ -60,6 +60,7 @@ export function useTaskDetail({ task, onClose, onDelete, onTaskUpdated }: UseTas
     const [availableLabels,       setAvailableLabels]       = useState<Label[]>([]);
     const [startDate,             setStartDate]             = useState(task.start_date?.split('T')[0] || '');
     const [endDate,               setEndDate]               = useState(task.end_date?.split('T')[0] || '');
+    const [durationTime,          setDurationTime]          = useState((task as any).duration_time || '');
     const [uploadingDocs,         setUploadingDocs]         = useState(false);
     const [previewDocument,       setPreviewDocument]       = useState<{ url: string; fileName: string; fileType?: string } | null>(null);
     const [deleteAttachmentConfirm, setDeleteAttachmentConfirm] = useState<{ id: string; name: string } | null>(null);
@@ -184,8 +185,9 @@ export function useTaskDetail({ task, onClose, onDelete, onTaskUpdated }: UseTas
             selectedStatus !== task.status ||
             newUsers.length > 0 ||
             editableDescription !== task.description ||
-            startDate !== (task.start_date?.split('T')[0] || '') ||
-            endDate   !== (task.end_date?.split('T')[0]   || '') ||
+            startDate    !== (task.start_date?.split('T')[0] || '') ||
+            endDate      !== (task.end_date?.split('T')[0]   || '') ||
+            durationTime !== ((task as any).duration_time     || '') ||
             JSON.stringify(links) !== JSON.stringify(baseline) ||
             editableTitle !== (task.heading || '') ||
             JSON.stringify([...selectedLabelIds].sort()) !== JSON.stringify(origLabelIds)
@@ -299,8 +301,9 @@ export function useTaskDetail({ task, onClose, onDelete, onTaskUpdated }: UseTas
         if (editableDescription !== task.description)         updates.description = editableDescription;
         const origStart = task.start_date?.split('T')[0] || '';
         const origEnd   = task.end_date?.split('T')[0]   || '';
-        if (startDate !== origStart) updates.start_date = startDate ? `${startDate}T09:00:00Z` : null;
-        if (endDate   !== origEnd)   updates.end_date   = endDate   ? `${endDate}T18:00:00Z`   : null;
+        if (startDate !== origStart)                                    updates.start_date   = startDate    ? `${startDate}T09:00:00Z` : null;
+        if (endDate   !== origEnd)                                      updates.end_date     = endDate      ? `${endDate}T18:00:00Z`   : null;
+        if (durationTime !== ((task as any).duration_time || ''))      updates.duration_time = durationTime || null;
         if (JSON.stringify(links) !== JSON.stringify(baseline))   updates.links  = links;
         if (JSON.stringify([...selectedLabelIds].sort()) !== JSON.stringify(origLabelIds)) updates.labels = selectedLabelIds;
         if (Object.keys(updates).length === 0) return;
@@ -380,6 +383,7 @@ export function useTaskDetail({ task, onClose, onDelete, onTaskUpdated }: UseTas
         availableLabels,
         startDate, setStartDate,
         endDate, setEndDate,
+        durationTime, setDurationTime,
         uploadingDocs,
         previewDocument, setPreviewDocument,
         deleteAttachmentConfirm, setDeleteAttachmentConfirm,
