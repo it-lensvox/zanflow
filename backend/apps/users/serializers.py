@@ -184,4 +184,4 @@ class AcceptInvitationSerializer(serializers.Serializer):
 class ContactMessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ContactMessage
-        fields = ['name', 'email', 'company', 'problem']
+        fields = ['name', 'email', 'company', 'problem','source']

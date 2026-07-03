@@ -526,12 +526,10 @@ class ContactUsView(APIView):
 
         # 3. Send email via AWS SES if superusers exist
         if superuser_emails:
-            subject = f"New Contact Submission on Dyuksa from {contact_message.name}"
+            subject = f"New Contact Submission on {contact_message.source or 'Unknown Platform'} from {contact_message.name}"
             
             # You can also use render_to_string here if you want a beautiful HTML email like your invitations
             text_content = f"""
-New contact form submission on the Dyuksa platform:
-
 Name: {contact_message.name}
 Email: {contact_message.email}
 Company: {contact_message.company or 'Not provided'}

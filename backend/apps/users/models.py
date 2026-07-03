@@ -165,6 +165,7 @@ class ContactMessage(models.Model):
     email = models.EmailField()
     company = models.CharField(max_length=255, blank=True, null=True)
     problem = models.TextField()
+    source = models.CharField(max_length=100, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
