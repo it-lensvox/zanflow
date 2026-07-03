@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { ChevronRight, ChevronDown, FolderOpen, ArrowLeft, Folder } from 'lucide-react';
 import type { Project } from '@/types';
-import { BLUE, LINE, TEXT, MUTED, TREE_GROUPS, getTypeHex } from '../projectConstants';
+import { BLUE, LINE, TEXT, MUTED } from '@/config/tokens';
+import { TREE_GROUPS, getTypeHex } from '@/config/projectTypeConfig';
 
 interface TreePanelProps {
   projects: Project[];

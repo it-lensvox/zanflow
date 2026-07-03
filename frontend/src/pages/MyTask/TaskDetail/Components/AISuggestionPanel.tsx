@@ -4,7 +4,8 @@ import {
   AlertCircle, CheckCircle2, ChevronDown, User,
 } from 'lucide-react';
 import type { TaskSuggestion, SuggestionPriority, SuggestionStatus } from '../hooks/useAISuggestions';
-import { getStatusConfig, priorityOptions } from '@/components/layout/DualView/taskConfig';
+import { getStatusConfig, priorityOptions, statusOptions } from '@/components/layout/DualView/taskConfig';
+import { PRIORITY_OPTIONS } from '@/config/priorityConfig';
 
 // ── Design tokens 
 const T = {
@@ -13,19 +14,6 @@ const T = {
   line:  '#e6ebf2',
   blue:  '#1663f6',
 } as const;
-
-// ── Priority 
-const PRIORITY_HEX: Record<SuggestionPriority, { dot: string; bg: string; color: string; border: string }> = {
-  high:   { dot: '#ef4444', bg: '#fef2f2', color: '#b91c1c', border: '#fecaca' },
-  medium: { dot: '#f59e0b', bg: '#fffbeb', color: '#92400e', border: '#fde68a' },
-  low:    { dot: '#22c55e', bg: '#f0fdf4', color: '#166534', border: '#bbf7d0' },
-};
-
-const PRIORITY_CONFIG: Record<SuggestionPriority, { label: string; dot: string; bg: string; color: string; border: string }> = {
-  high:   { label: priorityOptions.find(o => o.value === 'high')?.label   ?? 'High',   ...PRIORITY_HEX.high   },
-  medium: { label: priorityOptions.find(o => o.value === 'medium')?.label ?? 'Medium', ...PRIORITY_HEX.medium },
-  low:    { label: priorityOptions.find(o => o.value === 'low')?.label    ?? 'Low',    ...PRIORITY_HEX.low    },
-};
 
 // ── Status — dot colors pulled from getStatusConfig (single source of truth) ─
 const STATUS_OPTS: { value: SuggestionStatus; label: string; dot: string }[] = (
@@ -36,7 +24,7 @@ const STATUS_OPTS: { value: SuggestionStatus; label: string; dot: string }[] = (
   dot:   getStatusConfig(v).color,
 }));
 
-const PRIORITY_OPTS: SuggestionPriority[] = ['high', 'medium', 'low'];
+const PRIORITY_OPTS = PRIORITY_OPTIONS.map(p => p.value) as SuggestionPriority[];
 
 // ── Shared mini-dropdown ────
 function MiniDropdown<T extends string>({
@@ -289,9 +277,7 @@ function SuggestionRow({
   onRemoveAssignee: (id: number)             => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const pc       = PRIORITY_CONFIG[suggestion.priority];
-  const sc       = STATUS_OPTS.find(o => o.value === suggestion.status) ?? STATUS_OPTS[0];
-
+  const sc = STATUS_OPTS.find(o => o.value === suggestion.status) ?? STATUS_OPTS[0];
   useEffect(() => {
     if (suggestion.isEditing) inputRef.current?.focus();
   }, [suggestion.isEditing]);
@@ -378,20 +364,20 @@ function SuggestionRow({
           value={suggestion.priority}
           options={PRIORITY_OPTS}
           renderTrigger={p => {
-            const c = PRIORITY_CONFIG[p];
+            const c = priorityOptions.find(o => o.value === p) ?? priorityOptions[2];
             return (
               <>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: c.dot, flexShrink: 0 }} />
-                <span style={{ color: c.color, fontSize: 11 }}>{c.label}</span>
+                <div className={`h-1 w-3 rounded-full ${c.dotColor}`} style={{ flexShrink: 0 }} />
+                <span className={`text-[11px] font-medium ${c.color}`}>{c.label}</span>
               </>
             );
           }}
           renderOption={p => {
-            const c = PRIORITY_CONFIG[p];
+            const c = priorityOptions.find(o => o.value === p) ?? priorityOptions[2];
             return (
               <>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: c.dot, flexShrink: 0 }} />
-                <span style={{ fontSize: 12, color: c.color, fontWeight: 500 }}>{c.label}</span>
+                <span>{c.icon}</span>
+                <span className={`text-[12px] font-medium ${c.color}`}>{c.label}</span>
               </>
             );
           }}
@@ -403,20 +389,21 @@ function SuggestionRow({
           value={suggestion.status}
           options={STATUS_OPTS.map(o => o.value)}
           renderTrigger={s => {
-            const opt = STATUS_OPTS.find(o => o.value === s) ?? STATUS_OPTS[0];
+            const cfg = getStatusConfig(s);
             return (
-              <>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: opt.dot, flexShrink: 0 }} />
-                <span style={{ color: T.text, fontSize: 11 }}>{opt.label}</span>
-              </>
+              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${cfg.badge}`}>
+                {cfg.label}
+              </span>
             );
           }}
           renderOption={s => {
-            const opt = STATUS_OPTS.find(o => o.value === s) ?? STATUS_OPTS[0];
+            const cfg = getStatusConfig(s);
+            const opt = statusOptions.find(o => o.value === s);
+            const textColor = cfg.badge.split(' ').find((cls: string) => cls.startsWith('text-')) || cfg.text;
             return (
               <>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: opt.dot, flexShrink: 0 }} />
-                <span style={{ fontSize: 12 }}>{opt.label}</span>
+                {opt && React.createElement(opt.icon, { className: `w-3.5 h-3.5 ${textColor}` })}
+                <span className={`text-[12px] font-medium ${textColor}`}>{cfg.label}</span>
               </>
             );
           }}

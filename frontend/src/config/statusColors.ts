@@ -18,7 +18,7 @@ export const STATUS_COLORS: Record<string, StatusColorConfig> = {
   review:      { bg: '#EFF6FF', text: '#1D4ED8', dot: '#3B82F6' },
 };
 
-// Dot-only color lookup (used by charts and sparklines)
+// Dot-only color lookup 
 export const STATUS_DOT_COLORS: Record<string, string> = {
   in_progress: '#6366F1',
   pending:     '#F59E0B',
@@ -29,7 +29,7 @@ export const STATUS_DOT_COLORS: Record<string, string> = {
   review:      '#3B82F6',
 };
 
-// Project avatar palette — consistent across dashboard and project pages
+// Project avatar palette 
 export const PROJECT_COLORS = [
   '#1663F6', '#22C55E', '#8B5CF6', '#F59E0B',
   '#EF4444', '#06B6D4', '#EC4899',
@@ -64,3 +64,16 @@ export function getStatusColors(status: string): StatusColorConfig {
   const key = status.toLowerCase().replace(/[\s-]/g, '_');
   return STATUS_COLORS[key] || STATUS_COLORS.deferred;
 }
+
+// ─── Task Status Options
+export const TASK_STATUS_OPTIONS = [
+  { value: 'pending',     label: 'Pending',     dot: STATUS_DOT_COLORS.pending     },
+  { value: 'backlog',     label: 'Backlog',     dot: STATUS_DOT_COLORS.backlog     },
+  { value: 'in_progress', label: 'In Progress', dot: STATUS_DOT_COLORS.in_progress },
+  { value: 'review',      label: 'Review',      dot: STATUS_DOT_COLORS.review      },
+  { value: 'completed',   label: 'Completed',   dot: STATUS_DOT_COLORS.completed   },
+  { value: 'deployed',    label: 'Deployed',    dot: STATUS_DOT_COLORS.deployed    },
+  { value: 'deferred',    label: 'Deferred',    dot: STATUS_DOT_COLORS.deferred    },
+] as const;
+
+export type TaskStatusValue = typeof TASK_STATUS_OPTIONS[number]['value'];

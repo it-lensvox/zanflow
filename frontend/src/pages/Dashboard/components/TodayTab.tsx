@@ -8,14 +8,10 @@ import type { DashboardTask } from '../hooks/useDashboard';
 import type { Event as CalendarEvent } from '@/types';
 import { formatRelativeTime } from '@/lib/utils';
 import type { Document } from '@/types';
-import { getFileBadge } from '@/config/statusColors';
+import { getFileBadge, STATUS_DOT_COLORS, TASK_STATUS_OPTIONS } from '@/config/statusColors';
+import { getPriorityConfig } from '@/config/priorityConfig';
 
-// ── Priority config
-const PRIORITY_CONFIG: Record<string, { color: string; dot: string; label: string }> = {
-  high:   { color: '#EF4444', dot: '#EF4444', label: 'High' },
-  medium: { color: '#F59E0B', dot: '#F59E0B', label: 'Medium' },
-  low:    { color: '#9CA3AF', dot: '#9CA3AF', label: 'Low' },
-};
+
 
 // ── Group-by options
 type GroupBy = 'priority' | 'status' | 'project' | 'none';
@@ -106,7 +102,7 @@ function Dropdown({
 // ── Task row in focus list
 function FocusTaskRow({ task, navigate }: { task: DashboardTask; navigate: (p: string) => void }) {
   const priority = (task.priority || 'low').toLowerCase();
-  const cfg = PRIORITY_CONFIG[priority] || PRIORITY_CONFIG.low;
+  const cfg = getPriorityConfig(priority);
   const timeStr = task.end_date
     ? new Date(task.end_date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
     : '';
@@ -240,10 +236,9 @@ function groupTasks(tasks: DashboardTask[], groupBy: GroupBy): { key: string; la
       in_progress: 'In Progress', review: 'Review', pending: 'Pending',
       backlog: 'Backlog', completed: 'Completed', deployed: 'Deployed', deferred: 'Deferred',
     };
-    const statusColors: Record<string, string> = {
-      in_progress: '#6366F1', review: '#8B5CF6', pending: '#F59E0B',
-      backlog: '#9CA3AF', completed: '#22C55E', deployed: '#22C55E', deferred: '#9CA3AF',
-    };
+    const statusColors: Record<string, string> = Object.fromEntries(
+      TASK_STATUS_OPTIONS.map(o => [o.value, STATUS_DOT_COLORS[o.value] ?? '#9CA3AF'])
+    );
     const seen = new Set<string>();
     const groups: { key: string; label: string; color?: string; tasks: DashboardTask[] }[] = [];
     tasks.forEach(t => {

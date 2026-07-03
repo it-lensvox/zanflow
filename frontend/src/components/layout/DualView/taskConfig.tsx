@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -11,7 +11,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { formatRelativeTime } from '@/lib/utils';
 import { TablePopover } from '@/components/common';
-import { getTypeHex, getTypeBg } from '@/pages/Project/projectConstants';
+import { getTypeHex, getTypeBg } from '@/config/projectTypeConfig';
+import { PRIORITY_OPTIONS as _PRIORITY_OPTIONS } from '@/config/priorityConfig';
 
 // Utility function to format dates
 const formatDate = (dateString: string) => {
@@ -116,12 +117,13 @@ export const getStatusConfig = (status: Task['status']) => {
 };
 
 // Priority options
-export const priorityOptions = [
-  { value: 'critical', label: 'Critical', color: 'text-red-700', dotColor: 'bg-red-700', icon: '🚨' },
-  { value: 'high', label: 'High', color: 'text-red-600', dotColor: 'bg-red-500', icon: '🔴' },
-  { value: 'medium', label: 'Medium', color: 'text-orange-600', dotColor: 'bg-orange-200', icon: '🟡' },
-  { value: 'low', label: 'Low', color: 'text-green-600', dotColor: 'bg-green-500', icon: '🟢' },
-];
+export const priorityOptions = _PRIORITY_OPTIONS.map(p => ({
+  value:    p.value,
+  label:    p.label,
+  color:    p.twText,
+  dotColor: p.twDot,
+  icon:     p.icon,
+}));
 
 // Status options
 export const statusOptions = [
@@ -309,19 +311,18 @@ function usePinTask(task: Task, queryClient: ReturnType<typeof useQueryClient>) 
   const [isPending, setIsPending] = useState(false);
 
   const applyReorder = useCallback((next: boolean) => {
-    queryClient.setQueryData(['tasks'], (old: any) => {
+    const reorder = (tasks: Task[]): Task[] => {
+      const updated = tasks.map((t) =>
+        t.id === task.id ? { ...t, is_pinned: next } : t
+      );
+      return [
+        ...updated.filter((t) => t.is_pinned),
+        ...updated.filter((t) => !t.is_pinned),
+      ];
+    };
+
+    const applyPin = (old: any) => {
       if (!old) return old;
-
-      const reorder = (tasks: Task[]): Task[] => {
-        const updated = tasks.map((t) =>
-          t.id === task.id ? { ...t, is_pinned: next } : t
-        );
-        return [
-          ...updated.filter((t) => t.is_pinned),
-          ...updated.filter((t) => !t.is_pinned),
-        ];
-      };
-
       if (old.pages) {
         const pageSizes = old.pages.map((p: any) => p.results.length);
         const allTasks = reorder(old.pages.flatMap((p: any) => p.results));
@@ -333,10 +334,13 @@ function usePinTask(task: Task, queryClient: ReturnType<typeof useQueryClient>) 
         });
         return { ...old, pages: newPages };
       }
-
       if (Array.isArray(old)) return reorder(old);
       if (old.results) return { ...old, results: reorder(old.results) };
       return old;
+    };
+
+    queryClient.getQueryCache().findAll({ queryKey: ['tasks'] }).forEach(query => {
+      queryClient.setQueryData(query.queryKey, applyPin);
     });
   }, [task.id, queryClient]);
 
@@ -460,16 +464,10 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     const [activeDropdown, setActiveDropdown] = useState(false);
     const statusConfig = getStatusConfig(task.status);
     const handleStatusChange = (newStatus: string) => {
+      const updatedTask = { ...task, status: newStatus, updated_at: new Date().toISOString() };
 
-      const taskListKeys = queryClient.getQueryCache().findAll({ queryKey: ['tasks-list'] });
-      queryClient.setQueryData(['tasks'], (old: any) => {
-        if (!old) {
-          console.warn('[StatusChange] Cache is empty — cannot reorder.');
-          return old;
-        }
-        const updatedTask = { ...task, status: newStatus, updated_at: new Date().toISOString() };
-
-        // useInfiniteQuery shape
+      const applyUpdate = (old: any) => {
+        if (!old) return old;
         if (old.pages) {
           const pagesWithoutTask = old.pages.map((page: any) => ({
             ...page,
@@ -483,53 +481,41 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
             ],
           };
         }
-        if (Array.isArray(old)) {
-          const newList = [updatedTask, ...old.filter((t: Task) => t.id !== task.id)];
-          return newList;
-        }
-        if (old.tasks) {
-          const newTasks = [updatedTask, ...old.tasks.filter((t: Task) => t.id !== task.id)];
-          return { ...old, tasks: newTasks };
-        }
-        if (old.results) {
-          const newResults = [updatedTask, ...old.results.filter((t: Task) => t.id !== task.id)];
-          return { ...old, results: newResults };
-        }
-        console.warn('[StatusChange] ⚠️ Unknown cache shape — task not reordered:', old);
+        if (Array.isArray(old)) return [updatedTask, ...old.filter((t: Task) => t.id !== task.id)];
+        if (old.tasks)   return { ...old, tasks:   [updatedTask, ...old.tasks.filter((t: Task) => t.id !== task.id)] };
+        if (old.results) return { ...old, results: [updatedTask, ...old.results.filter((t: Task) => t.id !== task.id)] };
         return old;
+      };
+
+      // Update ALL active task cache entries (board uses ['tasks', status, priority, projectId])
+      queryClient.getQueryCache().findAll({ queryKey: ['tasks'] }).forEach(query => {
+        queryClient.setQueryData(query.queryKey, applyUpdate);
       });
 
-      // Also update all project-specific caches
-      const updatedTaskForProjects = { ...task, status: newStatus, updated_at: new Date().toISOString() };
-      updateAllTaskListCaches(updatedTaskForProjects);
+      updateAllTaskListCaches(updatedTask);
 
       setActiveDropdown(false);
       taskApi.update(task.id, { status: newStatus } as any)
         .then((response) => {
           const updatedTaskFromServer = response.task || response;
-          queryClient.setQueryData(['tasks'], (old: any) => {
+          const applyServerUpdate = (old: any) => {
             if (!old) return old;
             if (old.pages) {
               return {
                 ...old,
                 pages: old.pages.map((page: any) => ({
                   ...page,
-                  results: page.results.map((t: Task) =>
-                    t.id === task.id ? updatedTaskFromServer : t
-                  ),
+                  results: page.results.map((t: Task) => t.id === task.id ? updatedTaskFromServer : t),
                 })),
               };
             }
-            if (Array.isArray(old)) {
-              return old.map((t: Task) => (t.id === task.id ? updatedTaskFromServer : t));
-            }
-            if (old.tasks) {
-              return { ...old, tasks: old.tasks.map((t: Task) => (t.id === task.id ? updatedTaskFromServer : t)) };
-            }
-            if (old.results) {
-              return { ...old, results: old.results.map((t: Task) => (t.id === task.id ? updatedTaskFromServer : t)) };
-            }
+            if (Array.isArray(old)) return old.map((t: Task) => t.id === task.id ? updatedTaskFromServer : t);
+            if (old.tasks)   return { ...old, tasks:   old.tasks.map((t: Task) => t.id === task.id ? updatedTaskFromServer : t) };
+            if (old.results) return { ...old, results: old.results.map((t: Task) => t.id === task.id ? updatedTaskFromServer : t) };
             return old;
+          };
+          queryClient.getQueryCache().findAll({ queryKey: ['tasks'] }).forEach(query => {
+            queryClient.setQueryData(query.queryKey, applyServerUpdate);
           });
           updateAllTaskListCaches(updatedTaskFromServer);
         })
@@ -589,15 +575,10 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     const priorityOption = priorityOptions.find(opt => opt.value === task.priority);
 
     const handlePriorityChange = (newPriority: string) => {
-      const taskListKeys = queryClient.getQueryCache().findAll({ queryKey: ['tasks-list'] });
-      queryClient.setQueryData(['tasks'], (old: any) => {
-        if (!old) {
-          console.warn('[PriorityChange] Cache is empty — cannot reorder.');
-          return old;
-        }
-        const updatedTask = { ...task, priority: newPriority, updated_at: new Date().toISOString() };
+      const updatedTask = { ...task, priority: newPriority, updated_at: new Date().toISOString() };
 
-        // useInfiniteQuery shape
+      const applyUpdate = (old: any) => {
+        if (!old) return old;
         if (old.pages) {
           const pagesWithoutTask = old.pages.map((page: any) => ({
             ...page,
@@ -611,25 +592,18 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
             ],
           };
         }
-        if (Array.isArray(old)) {
-          const newList = [updatedTask, ...old.filter((t: Task) => t.id !== task.id)];
-          return newList;
-        }
-        if (old.tasks) {
-          const newTasks = [updatedTask, ...old.tasks.filter((t: Task) => t.id !== task.id)];
-          return { ...old, tasks: newTasks };
-        }
-        if (old.results) {
-          const newResults = [updatedTask, ...old.results.filter((t: Task) => t.id !== task.id)];
-          return { ...old, results: newResults };
-        }
-        console.warn('[PriorityChange] ⚠️ Unknown cache shape — task not reordered:', old);
+        if (Array.isArray(old)) return [updatedTask, ...old.filter((t: Task) => t.id !== task.id)];
+        if (old.tasks)   return { ...old, tasks:   [updatedTask, ...old.tasks.filter((t: Task) => t.id !== task.id)] };
+        if (old.results) return { ...old, results: [updatedTask, ...old.results.filter((t: Task) => t.id !== task.id)] };
         return old;
+      };
+
+      // Update ALL active task cache entries (board uses ['tasks', status, priority, projectId])
+      queryClient.getQueryCache().findAll({ queryKey: ['tasks'] }).forEach(query => {
+        queryClient.setQueryData(query.queryKey, applyUpdate);
       });
 
-      // Also update all project-specific caches
-      const updatedTaskForProjects = { ...task, priority: newPriority, updated_at: new Date().toISOString() };
-      updateAllTaskListCaches(updatedTaskForProjects);
+      updateAllTaskListCaches(updatedTask);
 
       setActiveDropdown(false);
 
@@ -683,14 +657,10 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
 
       const isoValue = `${value}T12:00:00Z`;
 
-      queryClient.setQueryData(['tasks'], (old: any) => {
-        if (!old) {
-          console.warn('[DateChange] Cache is empty — cannot reorder.');
-          return old;
-        }
-        const updatedTask = { ...task, [field]: isoValue, updated_at: new Date().toISOString() };
+      const updatedTask = { ...task, [field]: isoValue, updated_at: new Date().toISOString() };
 
-        // useInfiniteQuery shape
+      const applyDateUpdate = (old: any) => {
+        if (!old) return old;
         if (old.pages) {
           const pagesWithoutTask = old.pages.map((page: any) => ({
             ...page,
@@ -704,25 +674,17 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
             ],
           };
         }
-        if (Array.isArray(old)) {
-          const newList = [updatedTask, ...old.filter((t: Task) => t.id !== task.id)];
-          return newList;
-        }
-        if (old.tasks) {
-          const newTasks = [updatedTask, ...old.tasks.filter((t: Task) => t.id !== task.id)];
-          return { ...old, tasks: newTasks };
-        }
-        if (old.results) {
-          const newResults = [updatedTask, ...old.results.filter((t: Task) => t.id !== task.id)];
-          return { ...old, results: newResults };
-        }
-        console.warn('[DateChange] ⚠️ Unknown cache shape — task not reordered:', old);
+        if (Array.isArray(old)) return [updatedTask, ...old.filter((t: Task) => t.id !== task.id)];
+        if (old.tasks)   return { ...old, tasks:   [updatedTask, ...old.tasks.filter((t: Task) => t.id !== task.id)] };
+        if (old.results) return { ...old, results: [updatedTask, ...old.results.filter((t: Task) => t.id !== task.id)] };
         return old;
+      };
+
+      queryClient.getQueryCache().findAll({ queryKey: ['tasks'] }).forEach(query => {
+        queryClient.setQueryData(query.queryKey, applyDateUpdate);
       });
 
-      // Also update all project-specific caches
-      const updatedTaskForProjects = { ...task, [field]: isoValue, updated_at: new Date().toISOString() };
-      updateAllTaskListCaches(updatedTaskForProjects);
+      updateAllTaskListCaches(updatedTask);
 
       taskApi.update(task.id, { [field]: isoValue }).catch((error) => {
         console.error('Failed to update date:', error);

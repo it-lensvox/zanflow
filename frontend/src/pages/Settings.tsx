@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { workspaceApi } from '@/services/api';
@@ -9,6 +9,7 @@ import {
   Globe, Type, PanelLeft, BellRing, Mail, MessageSquare,
   ClipboardList, Volume2, Clock, Smartphone, Trash2, AlertTriangle,
 } from 'lucide-react';
+import { getRoleConfig } from '@/config/roleConfig';
 
 // Design tokens
 const PAGE_BG = '#F7F8FB';
@@ -202,14 +203,6 @@ interface Workspace {
   role: 'admin' | 'manager' | 'viewer' | 'annotator' | 'developer';
   created_by?: number; created_at: string; updated_at: string;
 }
-
-const ROLE_BADGE: Record<string, { bg: string; color: string }> = {
-  admin:     { bg: '#dcfce7', color: '#16a34a' },
-  manager:   { bg: '#dbeafe', color: '#2563eb' },
-  developer: { bg: '#f3e8ff', color: '#7c3aed' },
-  viewer:    { bg: '#f3f4f6', color: '#6b7280' },
-  annotator: { bg: '#fef9c3', color: '#ca8a04' },
-};
 
 function WorkspaceCard({ activeWorkspace, userRole }: { activeWorkspace: any; userRole: string }) {
   const queryClient = useQueryClient();
@@ -454,7 +447,7 @@ function WorkspaceCard({ activeWorkspace, userRole }: { activeWorkspace: any; us
             {filteredMembers.map((member: any) => {
               const name = `${member.first_name || ''} ${member.last_name || ''}`.trim() || member.username;
               const initials = name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
-              const roleStyle = ROLE_BADGE[member.role] ?? ROLE_BADGE.viewer;
+              const roleStyle = getRoleConfig(member.role);
               const isRemoving = removingUserId === member.user_id;
               const isUpdatingRole = updatingRoleId === member.user_id;
               return (
@@ -667,7 +660,7 @@ function WorkspaceCard({ activeWorkspace, userRole }: { activeWorkspace: any; us
             overflow: 'hidden',
           }}>
             {(['viewer', 'annotator', 'developer', 'manager', 'admin'] as const).map((role) => {
-              const rs = ROLE_BADGE[role] ?? ROLE_BADGE.viewer;
+              const rs = getRoleConfig(role);
               const activeMember = filteredMembers.find((m: any) => m.user_id === openRoleDropdownId);
               const isActive = activeMember?.role === role;
               return (

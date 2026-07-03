@@ -7,8 +7,9 @@ import {
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/common';
 import { DocumentPreview, useDocumentPreviewKeyboard } from '@/components/common/DocumentPreview';
 import { projectsApi, documentsApi } from '@/services/api';
-import { formatDate, getStatusColor } from '@/lib/utils';
-import type { Project, Document } from '@/types';
+import { formatDate } from '@/lib/utils';
+import { getDocStatusConfig } from '@/config/documentConfig';
+import type { Document } from '@/types';
 import { AITask } from '@/pages/MyTask/components/AITask';
 
 
@@ -285,8 +286,8 @@ export function ProjectDetail() {
                         <Badge variant="outline">{doc.file_type}</Badge>
                       </td>
                       <td className="py-3 px-4">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(doc.status)}`}>
-                          {doc.status.replace('_', ' ')}
+                        <span style={{ padding: '2px 8px', borderRadius: 99, fontSize: 12, fontWeight: 500, background: getDocStatusConfig(doc.status).bg, color: getDocStatusConfig(doc.status).text }}>
+                          {getDocStatusConfig(doc.status).label}
                         </span>
                       </td>
                       <td className="py-3 px-4">

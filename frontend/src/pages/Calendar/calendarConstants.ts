@@ -1,8 +1,6 @@
-// ─── Calendar Design Tokens 
-export const BLUE  = '#1663f6';
-export const LINE  = '#e6ebf2';
-export const TEXT  = '#172033';
-export const MUTED = '#667085';
+export { BLUE, LINE, TEXT, MUTED } from '@/config/tokens';
+import { TEXT } from '@/config/tokens';
+export { getPriorityColor } from '@/config/priorityConfig';
 
 // ─── View Modes
 export type ViewMode = 'day' | 'work_week' | 'week' | 'month';
@@ -109,15 +107,6 @@ export const toLocalDateStr = (iso: string | undefined): string => {
 export const formatDateForUpdate = (date: Date): string =>
     date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 
-// ─── Priority Color (uses STATUS_COLORS single source of truth values)
-export const getPriorityColor = (priority: string): string => {
-    switch (priority?.toLowerCase()) {
-        case 'high':   return '#ef4444';
-        case 'medium': return '#f59e0b';
-        case 'low':    return '#22c55e';
-        default:       return '#6b7280';
-    }
-};
 
 // ─── Invitation Status Helpers
 export const getEventStatusColors = (status?: InvitationStatus) => {

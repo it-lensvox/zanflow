@@ -1,41 +1,24 @@
 import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import type { Document, Project } from '@/types';
-import { getTypeHex, getTypeBg } from '@/pages/Project/projectConstants';
+import { getTypeHex, getTypeBg } from '@/config/projectTypeConfig';
+import { getDocStatusConfig, getFileExtColor, getFileExtLabel } from '@/config/documentConfig';
 
 interface TreeDocumentViewProps {
   documents: Document[];
   projects: Project[];
   onDocumentClick: (doc: Document) => void;
 }
-// ─── Ext badge
-const EXT_COLOR: Record<string, string> = {
-  pdf: '#EF4444', doc: '#2563EB', docx: '#2563EB',
-  xls: '#16A34A', xlsx: '#16A34A', csv: '#16A34A',
-  ppt: '#EA580C', pptx: '#EA580C',
-  png: '#7C3AED', jpg: '#7C3AED', jpeg: '#7C3AED', gif: '#7C3AED', svg: '#7C3AED',
-  mp4: '#EC4899', mov: '#EC4899', avi: '#EC4899',
-  js: '#F59E0B', ts: '#2563EB', jsx: '#0891B2', tsx: '#0891B2',
-  py: '#3B82F6', json: '#F59E0B', zip: '#F59E0B',
-};
 
 function ExtBadge({ fileName }: { fileName: string }) {
-  const ext = fileName.split('.').pop()?.toLowerCase() || '';
-  const color = EXT_COLOR[ext] || '#6B7280';
-  const label = ext.toUpperCase().slice(0, 4) || 'FILE';
+  const color = getFileExtColor(fileName);
+  const label = getFileExtLabel(fileName);
   return (
     <div style={{ width: 36, height: 36, borderRadius: 8, flexShrink: 0, background: `${color}18`, border: `1px solid ${color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <span style={{ fontSize: 9, fontWeight: 700, color, letterSpacing: '.04em', lineHeight: 1 }}>{label}</span>
     </div>
   );
 }
-
-const STATUS_CONFIG: Record<string, { bg: string; color: string; label: string }> = {
-  approved: { bg: '#E8F5E9', color: '#16A34A', label: 'Approved' },
-  in_review: { bg: '#FFF4E6', color: '#D97706', label: 'In Review' },
-  draft: { bg: '#F3F4F6', color: '#6B7280', label: 'Draft' },
-  archived: { bg: '#F3F4F6', color: '#6B7280', label: 'Archived' },
-};
 
 export function TreeDocumentView({ documents, projects, onDocumentClick }: TreeDocumentViewProps) {
   const [expandedProjects, setExpandedProjects] = useState<Set<number>>(new Set());
@@ -82,7 +65,7 @@ export function TreeDocumentView({ documents, projects, onDocumentClick }: TreeD
                 <div style={{ borderTop: '1px solid #E6EBF2' }}>
                   {docs.map((doc, i) => {
                     const fileName = doc.original_file_name || doc.name || '';
-                    const status = STATUS_CONFIG[doc.status] || STATUS_CONFIG.draft;
+                    const status = getDocStatusConfig(doc.status);
                     const isLast = i === docs.length - 1;
 
                     return (
@@ -107,7 +90,7 @@ export function TreeDocumentView({ documents, projects, onDocumentClick }: TreeD
                         </div>
 
                         {/* Status badge */}
-                        <span style={{ fontSize: 10, fontWeight: 600, padding: '3px 9px', borderRadius: 99, background: status.bg, color: status.color, flexShrink: 0 }}>
+                        <span style={{ fontSize: 10, fontWeight: 600, padding: '3px 9px', borderRadius: 99, background: status.bg, color: status.text, flexShrink: 0 }}>
                           {status.label}
                         </span>
                       </div>

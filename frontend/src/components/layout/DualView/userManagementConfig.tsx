@@ -1,8 +1,8 @@
-import React from 'react';
 import { Trash2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import type { User as AppUser } from '@/types';
 import type { TableColumn } from '../DualView';
+import { getRoleConfig } from '@/config/roleConfig';
 
 interface UserTableColumnsProps {
   onRoleClick: (user: AppUser) => void;
@@ -10,20 +10,9 @@ interface UserTableColumnsProps {
 }
 
 const getRoleColorConfig = (role: AppUser['role']) => {
-  const normalizedRole = role.toLowerCase();
-  switch (normalizedRole) {
-    case 'admin':
-      return { bg: 'bg-green-50', text: 'text-green-800', label: 'ADMIN' };
-    case 'manager':
-      return { bg: 'bg-blue-50', text: 'text-blue-800', label: 'MANAGER' };
-      case 'annotator':
-        return { bg: 'bg-yellow-50', text: 'text-yellow-800', label: 'ANNOTATOR' };
-      case 'developer':
-        return { bg: 'bg-purple-50', text: 'text-purple-800', label: 'DEVELOPER' };
-      default:
-        return { bg: 'bg-gray-50', text: 'text-gray-800', label: 'VIEWER' };
-  }
-};
+  const cfg = getRoleConfig(role);
+  return { bg: cfg.twBg, text: cfg.twText, label: cfg.badgeLabel };
+}
 
 export const createUserTableColumns = ({ onRoleClick, onDeleteClick }: UserTableColumnsProps): TableColumn<AppUser>[] => {
   return [

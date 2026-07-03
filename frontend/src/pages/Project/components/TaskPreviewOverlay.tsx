@@ -1,22 +1,13 @@
 import React, { useState } from 'react';
 import { X, Upload, Loader2, Users, ArrowLeft, CheckCircle2 } from 'lucide-react';
-import { priorityOptions, getStatusConfig } from '@/components/layout/DualView/taskConfig';
+import { getStatusConfig } from '@/components/layout/DualView/taskConfig';
+import { getPriorityConfig } from '@/config/priorityConfig';
 import type { PreviewTask } from '@/hooks/useJsonPreview';
 
-// Priority badge 
-const PRIORITY_STYLES: Record<string, { bg: string; text: string; dot: string; label: string }> = {
-  critical: { bg: '#FEF2F2', text: '#DC2626', dot: '#EF4444', label: 'Critical' },
-  high:     { bg: '#FFF7ED', text: '#C2410C', dot: '#F97316', label: 'High' },
-  medium:   { bg: '#FFFBEB', text: '#B45309', dot: '#F59E0B', label: 'Medium' },
-  low:      { bg: '#F0FDF4', text: '#15803D', dot: '#22C55E', label: 'Low' },
-};
-
 function PriorityBadge({ priority }: { priority?: string }) {
-  const key = (priority || '').toLowerCase();
-  const cfg = PRIORITY_STYLES[key];
-  if (!cfg) return null;
+  const cfg = getPriorityConfig(priority);
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: cfg.bg, color: cfg.text, whiteSpace: 'nowrap' }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: cfg.bg, color: cfg.color, whiteSpace: 'nowrap' }}>
       <span style={{ width: 6, height: 6, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />
       {cfg.label}
     </span>

@@ -1,31 +1,19 @@
 import React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { BLUE, LINE, MUTED, TEXT } from '@/config/tokens';
 
-// ─── Design tokens — matches Dashboard + Projects exactly ─────────────────────
-const BLUE   = '#1663f6';
-const LINE   = '#e6ebf2';
-const MUTED  = '#667085';
-const TEXT   = '#172033';
-
-// ─── Props ────────────────────────────────────────────────────────────────────
+// ─── Props ──
 interface PaginationProps {
-  /** Current active page (1-based) */
   currentPage:   number;
-  /** Total number of pages */
   totalPages:    number;
-  /** Total item count — used for the "Showing X–Y of Z" label */
   totalItems:    number;
-  /** Items shown per page */
   pageSize:      number;
-  /** Called when user clicks a page button */
   onPageChange:  (page: number) => void;
-  /** Label for the item type e.g. "projects", "documents" */
   itemLabel?:    string;
-  /** Extra class on the wrapper */
   className?:    string;
 }
 
-// ─── Smart page number list with ellipsis ─────────────────────────────────────
+// ─── Smart page number list with ellipsis ────
 function getPageNumbers(current: number, total: number): (number | '...')[] {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
 
@@ -41,7 +29,7 @@ function getPageNumbers(current: number, total: number): (number | '...')[] {
   return pages;
 }
 
-// ─── Button base style helper ─────────────────────────────────────────────────
+// ─── Button base style helper 
 function btnStyle(active: boolean, disabled: boolean): React.CSSProperties {
   return {
     height:      32,
@@ -64,7 +52,7 @@ function btnStyle(active: boolean, disabled: boolean): React.CSSProperties {
   };
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// ─── Component 
 export function Pagination({
   currentPage,
   totalPages,

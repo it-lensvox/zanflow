@@ -1,2 +1,2 @@
 export { DiffViewer } from './DiffViewer';
-export { LabelSelector } from './LabelSelector';
+export { DocumentLabelSelector } from './DocumentLabelSelector';

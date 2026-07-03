@@ -1,19 +1,12 @@
 import React from 'react';
+import { BLUE, LINE, MUTED } from '@/config/tokens';
 
-// ─── Design tokens ────────────────────────────────────────────────────────────
-const BLUE = '#1663f6';
-const LINE = '#e6ebf2';
-const MUTED = '#667085';
 const BG_SELECTED = '#EEF4FF';
 
 interface BulkToolbarProps {
-  /** Number of currently selected items */
   count: number;
-  /** Called when the user clicks the count badge to deselect all */
   onClear: () => void;
-  /** Text shown when nothing is selected */
   emptyHint?: string;
-  /** Page-specific action buttons — rendered right of the count badge */
   children?: React.ReactNode;
 }
 

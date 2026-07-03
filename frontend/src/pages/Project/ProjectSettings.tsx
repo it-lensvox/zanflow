@@ -1,22 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Save, Trash2, Plus, X, Users, Tags, Settings, AlertTriangle, } from 'lucide-react';
+import { ArrowLeft, Save, Trash2, Plus, X, Tags, Settings, AlertTriangle, } from 'lucide-react';
 import {
-  Button, Input, Card, CardHeader, CardTitle, CardContent, Badge,
+  Button, Input, Card, CardHeader, CardTitle, CardContent,
 } from '@/components/common';
 import { projectsApi, usersApi } from '@/services/api';
 import DeleteModal from '@/components/common/Deletemodal';
 import { useAuth } from '@/hooks/useAuth';
-import { cn, getProjectTypeColor } from '@/lib/utils';
+import { getProjectTypeColor } from '@/config/projectTypeConfig';
 import type { Project, Label, TaskType, User as AppUser } from '@/types';
-
-const TASK_TYPES = [
-  { value: 'client', label: 'Client' },
-  { value: 'internal', label: 'Internal' },
-  { value: 'content_creation', label: 'Content Creation' },
-  { value: 'ideas', label: 'Ideas' },
-];
+import { PROJECT_TYPE_OPTIONS as TASK_TYPES } from '@/config/projectTypeConfig';
 
 const PRESET_COLORS = [
   '#ef4444', '#f97316', '#f59e0b', '#eab308',
@@ -573,7 +567,7 @@ export function ProjectSettings() {
                     >
                       <div className="flex items-center gap-2">
                         {/* Color Circle */}
-                        <div className={cn("h-3 w-3 rounded-full", getProjectTypeColor(type.value))} />
+                        <div className={`h-3 w-3 rounded-full ${getProjectTypeColor(type.value)}`} />
                         <span>{type.label}</span>
                       </div>
                       {formData.task_type === type.value && <span className="text-primary font-bold">✓</span>}

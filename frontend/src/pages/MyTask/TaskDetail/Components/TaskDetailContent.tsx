@@ -1,17 +1,16 @@
 import React from 'react';
 import {
-    X, Loader2, ChevronDown, Send,
-    Clock, ListTodo, PlayCircle, CheckCircle, CheckSquare, Pause, Plus,
-    Link, Sparkles, ChevronRight, Calendar, Edit3, Trash2,
+    X, Loader2, ChevronDown, Send, Clock, CheckCircle, Plus, Link, Sparkles, ChevronRight, Calendar, Edit3, Trash2,
 } from 'lucide-react';
 import { getStatusConfig } from '@/components/layout/DualView/taskConfig';
-import { Task, TaskAttachment, Label } from '@/types';
+import { TASK_STATUS_OPTIONS } from '@/config/statusColors';
+import { Task, TaskAttachment } from '@/types';
 import { RichTextEditor } from '@/components/common/RichTextEditor';
 import { DocumentThumbnail, DocumentPreview } from '@/components/common/DocumentPreview';
 import { AISuggestionPanel } from './AISuggestionPanel';
 import { useTaskDetail } from '../hooks/useTaskDetail';
 
-// ── Design tokens ─────────────────────────────────────────────────────────────
+// ── Design tokens ────
 export const T = {
     text:   '#172033',
     muted:  '#667085',
@@ -57,13 +56,13 @@ export const DescriptionContent = ({ html }: { html: string }) => (
     />
 );
 
-// ── Props ─────────────────────────────────────────────────────────────────────
+// ── Props ───
 export interface TaskDetailContentProps {
     detail: ReturnType<typeof useTaskDetail>;
     task: Task;
 }
 
-// ── Shared body sections ──────────────────────────────────────────────────────
+// ── Shared body sections ─────
 export function TaskDetailContent({ detail, task }: TaskDetailContentProps) {
     const {
         user, canEditDates, resolvedTaskId,
@@ -93,17 +92,14 @@ export function TaskDetailContent({ detail, task }: TaskDetailContentProps) {
 
     const sc = getStatusConfig(selectedStatus);
 
-    const statusOptions: Array<{ status: Task['status']; icon: React.ElementType; label: string }> = [
-        { status: 'pending',     icon: Clock,       label: 'Pending'     },
-        { status: 'backlog',     icon: ListTodo,    label: 'Backlog'     },
-        { status: 'in_progress', icon: PlayCircle,  label: 'In Progress' },
-        { status: 'completed',   icon: CheckCircle, label: 'Completed'   },
-        { status: 'deployed',    icon: CheckSquare, label: 'Deployed'    },
-        { status: 'deferred',    icon: Pause,       label: 'Deferred'    },
-        { status: 'review',      icon: Pause,       label: 'Review'      },
-    ];
+    // status options
+    const statusOptions = TASK_STATUS_OPTIONS.map(o => ({
+        status: o.value as Task['status'],
+        icon:   getStatusConfig(o.value).icon,
+        label:  o.label,
+    }));
 
-    // ── pool calculation for add-assignee ─────────────────────────────────────
+    // ── pool calculation for add-assignee ───
     let pool = availableUsers;
     if (projectMembers.length > 0) {
         const pmIds = projectMembers.map(m => m.user.id);
@@ -142,9 +138,9 @@ export function TaskDetailContent({ detail, task }: TaskDetailContentProps) {
                             <FieldLabel>Status</FieldLabel>
                             <button onClick={() => setShowStatusDropdown(v => !v)}
                                 style={{ ...T.input, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', justifyContent: 'space-between', fontWeight: 500 }}>
-                                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                               <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                     {React.createElement(sc.icon, { size: 13, className: sc.text })}
-                                    <span className={sc.text} style={{ fontSize: 13 }}>{sc.label}</span>
+                                    <span className={`${sc.text} font-bold`} style={{ fontSize: 13, letterSpacing: '0.03em' }}>{sc.label.toUpperCase()}</span>
                                 </span>
                                 <ChevronDown size={13} style={{ color: T.muted, flexShrink: 0 }} />
                             </button>
@@ -153,14 +149,14 @@ export function TaskDetailContent({ detail, task }: TaskDetailContentProps) {
                                     {statusOptions.map(opt => {
                                         const c = getStatusConfig(opt.status);
                                         return (
-                                            <button key={opt.status}
+                                           <button key={opt.status}
                                                 onClick={() => { setSelectedStatus(opt.status); setHasUnsavedChanges(true); setShowStatusDropdown(false); }}
                                                 style={{ width: '100%', padding: '9px 14px', fontSize: 13, color: T.text, background: selectedStatus === opt.status ? '#f7f8fb' : 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left' }}
                                                 onMouseEnter={e => (e.currentTarget.style.background = '#f7f8fb')}
                                                 onMouseLeave={e => (e.currentTarget.style.background = selectedStatus === opt.status ? '#f7f8fb' : 'transparent')}
                                             >
                                                 {React.createElement(opt.icon, { size: 13, className: c.text })}
-                                                {opt.label}
+                                                <span className={`${c.text} font-bold`} style={{ fontSize: 13, letterSpacing: '0.03em' }}>{c.label.toUpperCase()}</span>
                                                 {selectedStatus === opt.status && (
                                                     <svg style={{ marginLeft: 'auto' }} width="14" height="14" viewBox="0 0 20 20" fill={T.blue}>
                                                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />

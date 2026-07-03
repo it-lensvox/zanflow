@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { Project } from '@/types';
 import { projectsApi } from '@/services/api';
-import { BLUE, LINE, TEXT, MUTED, PROJECT_TYPES } from '../projectConstants';
+import { BLUE, LINE, TEXT, MUTED } from '@/config/tokens';
+import { PROJECT_TYPE_OPTIONS as PROJECT_TYPES } from '@/config/projectTypeConfig';
 
 interface MoveProjectModalProps {
   selectedIds: Set<number>;
@@ -75,19 +76,19 @@ export function MoveProjectModal({ selectedIds, projects, onClose, onSuccess }: 
                 style={{
                   display: 'flex', alignItems: 'center', gap: 12,
                   padding: '12px 14px', borderRadius: 10, cursor: isCurrent ? 'not-allowed' : 'pointer',
-                  border: `2px solid ${isSelected ? type.color : LINE}`,
-                  background: isSelected ? `${type.color}10` : isCurrent ? '#f9fafb' : '#fff',
+                  border: `2px solid ${isSelected ? type.hex : LINE}`,
+                  background: isSelected ? `${type.hex}10` : isCurrent ? '#f9fafb' : '#fff',
                   opacity: isCurrent ? 0.5 : 1,
                   transition: 'all 0.15s',
                 }}
               >
-                <div style={{ width: 12, height: 12, borderRadius: '50%', background: type.color, flexShrink: 0 }} />
+                <div style={{ width: 12, height: 12, borderRadius: '50%', background: type.hex, flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
                   <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: TEXT }}>{type.label}</p>
-                  <p style={{ margin: 0, fontSize: 12, color: MUTED }}>{type.desc}</p>
+                  <p style={{ margin: 0, fontSize: 12, color: MUTED }}>{type.description}</p>
                 </div>
                 {isCurrent  && <span style={{ fontSize: 11, color: MUTED, fontWeight: 600 }}>Current</span>}
-                {isSelected && <span style={{ fontSize: 16, color: type.color }}>✓</span>}
+               {isSelected && <span style={{ fontSize: 16, color: type.hex }}>✓</span>}
               </div>
             );
           })}

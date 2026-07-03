@@ -11,7 +11,7 @@ interface LabelSelectorProps {
   availableLabels: Label[];
 }
 
-export function LabelSelector({ documentId, currentLabels, availableLabels }: LabelSelectorProps) {
+export function DocumentLabelSelector({ documentId, currentLabels, availableLabels }: LabelSelectorProps) {
   const [showDropdown, setShowDropdown] = useState(false);
   const queryClient = useQueryClient();
 

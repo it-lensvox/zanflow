@@ -2,9 +2,7 @@ import { Sparkles } from 'lucide-react';
 import { markdownToHtml, RichTextEditor } from '@/components/common/RichTextEditor';
 import { EntityCards, parseToolResult } from './Entitycard';
 import type { AgentUIMessage } from '@/types';
-
-const TEXT  = '#172033';
-const MUTED = '#667085';
+import { TEXT, MUTED } from '@/config/tokens';
 
 interface MessageBubbleProps {
   message:     AgentUIMessage;

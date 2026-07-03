@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { CheckCircle, Trash2, Users } from 'lucide-react';
-import { priorityOptions, getStatusConfig } from '@/components/layout/DualView/taskConfig';
+import { getStatusConfig } from '@/components/layout/DualView/taskConfig';
+import { getPriorityConfig } from '@/config/priorityConfig';
 import type { PreviewTask } from '@/hooks/useJsonPreview';
 
 interface JsonTaskPreviewListProps {
@@ -26,9 +27,7 @@ export function JsonTaskPreviewList({ tasks, onDelete }: JsonTaskPreviewListProp
       {/* Preview cards */}
       <div className="flex flex-col gap-2 max-h-52 overflow-y-auto pr-1">
         {tasks.map((task, index) => {
-          const priorityConfig = priorityOptions.find(
-            (p) => p.value === task.priority?.toLowerCase()
-          );
+          const priorityConfig = task.priority ? getPriorityConfig(task.priority) : null;
           const statusConfig = task.status
             ? getStatusConfig(task.status as any)
             : null;
@@ -48,8 +47,8 @@ export function JsonTaskPreviewList({ tasks, onDelete }: JsonTaskPreviewListProp
 
                 <div className="flex items-center gap-2 flex-wrap">
                   {priorityConfig && (
-                    <span className={`text-[11px] font-medium ${priorityConfig.color} flex items-center gap-1`}>
-                      <span className={`w-1.5 h-1.5 rounded-full inline-block ${priorityConfig.dotColor}`} />
+                    <span className={`text-[11px] font-medium ${priorityConfig.twText} flex items-center gap-1`}>
+                      <span className={`w-1.5 h-1.5 rounded-full inline-block ${priorityConfig.twDot}`} />
                       {priorityConfig.label}
                     </span>
                   )}

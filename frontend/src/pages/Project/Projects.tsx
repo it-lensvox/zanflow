@@ -17,11 +17,12 @@ const th: React.CSSProperties = { textAlign: 'left', color: '#172033', fontSize:
 const td: React.CSSProperties = { padding: '14px 16px', borderBottom: `1px solid ${LINE}`, borderRight: `1px solid ${LINE}`, verticalAlign: 'middle', fontSize: 14, color: TEXT };
 
 const STATUS_OPTIONS = [
-  { value: '',          label: 'Status',    dot: '' },
-  { value: 'active',    label: 'Active',    dot: '#09925e' },
-  { value: 'in_review', label: 'In Review', dot: '#b86600' },
-  { value: 'draft',     label: 'Draft',     dot: '#475467' },
-  { value: 'archived',  label: 'Archived',  dot: '#475467' },
+  { value: '', label: 'Status', dot: '' },
+  ...Object.entries(STATUS_MAP).map(([value, cfg]) => ({
+    value,
+    label: cfg.label,
+    dot:   cfg.color,
+  })),
 ];
 
 const TYPE_OPTIONS = [

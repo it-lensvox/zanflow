@@ -3,12 +3,7 @@ import { Plus, FolderPlus } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { useQuickNotes }       from './hooks/useQuickNotes';
 import { QuickNotesContent }   from './components/QuickNotesContent';
-
-// ─── Design tokens 
-const TEXT  = '#172033';
-const MUTED = '#667085';
-const LINE  = '#e6ebf2';
-const BLUE  = '#1663f6';
+import { TEXT, MUTED, LINE, BLUE } from '@/config/tokens';
 
 export function QuickNotesPage() {
   const [triggerFolderCreate, setTriggerFolderCreate] = useState(false);

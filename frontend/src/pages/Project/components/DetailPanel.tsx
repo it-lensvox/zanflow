@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { ExternalLink, MoreHorizontal, Clock, FileText } from 'lucide-react';
 import type { Project } from '@/types';
 import { formatRelativeTime } from '@/lib/utils';
-import { BLUE, LINE, TEXT, MUTED, getTypeHex, getTypeBg } from '../projectConstants';
+import { LINE, TEXT, MUTED } from '@/config/tokens';
+import { getTypeHex, getTypeBg } from '@/config/projectTypeConfig';
 import { StatusPill, TypePill, MemberAvatars } from './ProjectPills';
 
 interface DetailPanelProps {

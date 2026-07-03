@@ -9,7 +9,7 @@ interface CreateWorkspaceModalProps {
   onClose: () => void;
 }
 
-type MemberRole = 'admin' | 'manager' | 'developer' | 'annotator' | 'viewer';
+import { getRoleConfig, ROLE_OPTIONS, type UserRole as MemberRole } from '@/config/roleConfig';
 interface SelectedMember {
   user_id: number;
   username: string;
@@ -17,21 +17,6 @@ interface SelectedMember {
   role: MemberRole;
 }
 
-const ROLE_OPTIONS: { value: MemberRole; label: string }[] = [
-  { value: 'admin', label: 'Admin' },
-  { value: 'manager', label: 'Manager' },
-  { value: 'developer', label: 'Developer' },
-  { value: 'annotator', label: 'Annotator' },
-  { value: 'viewer', label: 'Viewer' },
-];
-
-const ROLE_COLORS: Record<MemberRole, { bg: string; color: string }> = {
-  admin:   { bg: '#FEE2E2', color: '#DC2626' },
-  manager: { bg: '#FEF3C7', color: '#D97706' },
-  developer:  { bg: '#DBEAFE', color: '#2563EB' },
-  annotator: { bg: '#F0F9FF', color: '#0EA5E9' },
-  viewer: { bg: '#F3F4F6', color: '#6B7280' },
-};
 
 export function CreateWorkspaceModal({ isOpen, onClose }: CreateWorkspaceModalProps) {
   const { user: currentUser } = useAuth();
@@ -356,8 +341,8 @@ export function CreateWorkspaceModal({ isOpen, onClose }: CreateWorkspaceModalPr
                           disabled={isLoading}
                           className="text-xs font-medium px-2 py-1 rounded-md border-0 cursor-pointer outline-none"
                           style={{
-                            background: ROLE_COLORS[member.role].bg,
-                            color: ROLE_COLORS[member.role].color,
+                            background: getRoleConfig(member.role).bg,
+                            color: getRoleConfig(member.role).color,
                           }}
                         >
                           {ROLE_OPTIONS.map((r) => (

@@ -3,7 +3,7 @@ import { Upload, Edit2, X, Plus, Download, Lock, Mail, Briefcase, ArrowRight, Lo
 import { useAuth } from '@/hooks/useAuth';
 import { projectsApi, authApi } from '@/services/api';
 import { useNavigate } from 'react-router-dom';
-import { getProjectTypeColor } from '@/lib/utils';
+import { getProjectTypeColor } from '@/config/projectTypeConfig';
 
 export function Profile() {
   const navigate = useNavigate();

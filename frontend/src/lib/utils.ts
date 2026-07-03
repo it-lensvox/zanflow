@@ -47,59 +47,10 @@ export function formatFileSize(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-export function getStatusColor(status: string): string {
-  const colors: Record<string, string> = {
-    // Document status
-    draft: 'bg-gray-100 text-gray-800',
-    in_review: 'bg-yellow-100 text-yellow-800',
-    approved: 'bg-green-100 text-green-800',
-    archived: 'bg-gray-100 text-gray-600',
-    // Test status
-    pending: 'bg-gray-100 text-gray-800',
-    running: 'bg-blue-100 text-blue-800',
-    completed: 'bg-green-100 text-green-800',
-    failed: 'bg-red-100 text-red-800',
-    cancelled: 'bg-gray-100 text-gray-600',
-    // Test result
-    pass: 'bg-green-100 text-green-800',
-    fail: 'bg-red-100 text-red-800',
-    error: 'bg-orange-100 text-orange-800',
-    skipped: 'bg-gray-100 text-gray-600',
-    // Issue status
-    open: 'bg-blue-100 text-blue-800',
-    in_progress: 'bg-yellow-100 text-yellow-800',
-    resolved: 'bg-green-100 text-green-800',
-    closed: 'bg-gray-100 text-gray-600',
-    wont_fix: 'bg-gray-100 text-gray-600',
-  };
-  return colors[status] || 'bg-gray-100 text-gray-800';
-}
-
-export function getPriorityColor(priority: string): string {
-  const colors: Record<string, string> = {
-    low: 'bg-gray-100 text-gray-800',
-    medium: 'bg-blue-100 text-blue-800',
-    high: 'bg-orange-100 text-orange-800',
-    critical: 'bg-red-100 text-red-800',
-  };
-  return colors[priority] || 'bg-gray-100 text-gray-800';
-}
-
 export function truncate(str: string, length: number): string {
   if (str.length <= length) return str;
   return str.slice(0, length) + '...';
 }
 
-// Tailwind class map — used by Sidebar & Profile avatars (Tailwind only)
-export const PROJECT_TYPE_COLORS: Record<string, string> = {
-  client:           'bg-blue-500',
-  internal:         'bg-violet-500',
-  content_creation: 'bg-pink-500',
-  ideas:            'bg-amber-400',
-  demo:             'bg-emerald-500',
-  default:          'bg-gray-400',
-};
-export const getProjectTypeColor = (type?: string) => {
-  const key = (type || '').toLowerCase().replace(/-/g, '_');
-  return PROJECT_TYPE_COLORS[key] || PROJECT_TYPE_COLORS.default;
-};
+// getProjectTypeColor moved to src/config/projectTypeConfig.ts
+export { getProjectTypeColor } from '@/config/projectTypeConfig';

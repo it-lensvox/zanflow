@@ -364,7 +364,11 @@ export function useCreateTask({
 
     const previousTasksSnapshot = queryClient.getQueryData(['tasks']);
 
-    queryClient.setQueryData(['tasks'], (old: any) => {
+    // Inject optimistic task into ALL active task board cache entries —
+    // the board uses ['tasks', statusParam, priorityParam, projectIdParam]
+    // so we must update every matching cache key, not just ['tasks'].
+    const injectOptimistic = (old: any) => {
+      if (!old) return { pages: [{ count: 1, next: null, previous: null, results: [optimisticTask] }], pageParams: [1] };
       if (old?.pages) {
         return {
           ...old,
@@ -374,9 +378,12 @@ export function useCreateTask({
           ],
         };
       }
-      if (!old) return { pages: [{ count: 1, next: null, previous: null, results: [optimisticTask] }], pageParams: [1] };
       if (Array.isArray(old)) return { pages: [{ count: old.length + 1, next: null, previous: null, results: [optimisticTask, ...old] }], pageParams: [1] };
       return old;
+    };
+
+    queryClient.getQueryCache().findAll({ queryKey: ['tasks'] }).forEach(query => {
+      queryClient.setQueryData(query.queryKey, injectOptimistic);
     });
 
     setShowSuccessView(true);
@@ -405,23 +412,26 @@ export function useCreateTask({
       const apiResponse = await taskApi.create(formData);
       const createdTask: Task = apiResponse?.task || apiResponse;
 
-      queryClient.setQueryData(['tasks'], (old: any) => {
-        if (old?.pages) {
-          return {
-            ...old,
-            pages: [
-              {
-                ...old.pages?.[0],
-                results: [
-                  createdTask,
-                  ...(old.pages?.[0]?.results ?? []).filter((t: Task) => t.id !== optimisticTask.id),
-                ],
-              },
-              ...(old.pages?.slice(1) ?? []),
-            ],
-          };
-        }
-        return old;
+      // Replace optimistic entry with real server task across ALL task cache entries
+      queryClient.getQueryCache().findAll({ queryKey: ['tasks'] }).forEach(query => {
+        queryClient.setQueryData(query.queryKey, (old: any) => {
+          if (old?.pages) {
+            return {
+              ...old,
+              pages: [
+                {
+                  ...old.pages?.[0],
+                  results: [
+                    createdTask,
+                    ...(old.pages?.[0]?.results ?? []).filter((t: Task) => t.id !== optimisticTask.id),
+                  ],
+                },
+                ...(old.pages?.slice(1) ?? []),
+              ],
+            };
+          }
+          return old;
+        });
       });
 
       queryClient.invalidateQueries({ queryKey: ['tasks-calendar'] });
@@ -435,9 +445,13 @@ export function useCreateTask({
         return merged;
       });
     } catch (err: any) {
-      if (previousTasksSnapshot !== undefined) {
-        queryClient.setQueryData(['tasks'], previousTasksSnapshot);
-      } else {
+      // Rollback all task cache entries on error
+      queryClient.getQueryCache().findAll({ queryKey: ['tasks'] }).forEach(query => {
+        if (previousTasksSnapshot !== undefined) {
+          queryClient.setQueryData(query.queryKey, previousTasksSnapshot);
+        }
+      });
+      if (previousTasksSnapshot === undefined) {
         queryClient.invalidateQueries({ queryKey: ['tasks'] });
       }
       queryClient.invalidateQueries({ queryKey: ['tasks-list'] });

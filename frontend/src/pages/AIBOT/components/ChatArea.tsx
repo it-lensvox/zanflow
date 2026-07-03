@@ -1,9 +1,9 @@
 import { Send, Sparkles, Zap, ListTodo, FolderKanban, FileText } from 'lucide-react';
 import { MessageBubble } from './MessageBubble';
 import type { AgentUIMessage } from '@/types';
+import { MUTED } from '@/config/tokens';
 
 const TEXT = '#0f172a';
-const MUTED = '#64748b';
 
 interface ChatAreaProps {
   messages:          AgentUIMessage[];

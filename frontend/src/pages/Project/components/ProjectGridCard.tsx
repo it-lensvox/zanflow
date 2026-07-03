@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { MoreHorizontal, CheckSquare } from 'lucide-react';
 import type { Project } from '@/types';
 import { formatRelativeTime } from '@/lib/utils';
-import { TEXT, MUTED, LINE } from '../projectConstants';
-import { getTypeHex, getTypeBg } from '../projectConstants';
+import { TEXT, MUTED, LINE } from '@/config/tokens';
+import { getTypeHex, getTypeBg } from '@/config/projectTypeConfig';
 import { StatusPill, MemberAvatars } from './ProjectPills';
 
 interface ProjectGridCardProps {

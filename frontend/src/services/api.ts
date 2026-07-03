@@ -514,10 +514,16 @@ export const documentsApi = {
     await api.delete(`/documents/${id}/`);
   },
 
+  addLabel: async (documentId: string, labelId: number) => {
+    const response = await api.post(`/documents/${documentId}/labels/`, { label_id: labelId });
+    return response.data;
+  },
+
   removeLabel: async (documentId: string, labelId: number) => {
     const response = await api.delete(`/documents/${documentId}/labels/${labelId}/`);
     return response.data;
   },
+  
   // Get all project and task documents with optional task filtering
   getAllDocuments: async (projectId: number, taskId?: number) => {
     const url = `/documents/project/${projectId}/all/`;

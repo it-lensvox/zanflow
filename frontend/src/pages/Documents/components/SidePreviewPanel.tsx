@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { FileText, X, Folder, ExternalLink, ZoomIn, ZoomOut, Clock, MessageSquare, Plus, SortDesc, Move, Share, Pencil } from 'lucide-react';
 import { documentsApi, usersApi } from '@/services/api';
+import { getDocStatusConfig, getFileExtColor } from '@/config/documentConfig';
 import type { Document } from '@/types';
 
 type PreviewTab = 'preview' | 'details' | 'activity' | 'comments';
@@ -86,13 +87,10 @@ export function SidePreviewPanel({ doc, previewUrl, onClose, onOpenFull }: SideP
 
   const fmtD = (d?: string) => d ? new Date(d).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A';
   const fmtS = (d?: string) => d ? new Date(d).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A';
-  const sc: Record<string, { b: string; t: string }> = { draft: { b: '#F3F4F6', t: '#6B7280' }, in_review: { b: '#FFF4E6', t: '#D97706' }, approved: { b: '#E8F5E9', t: '#16A34A' }, archived: { b: '#F3F4F6', t: '#6B7280' } };
-  const sl: Record<string, string> = { draft: 'Draft', in_review: 'In Review', approved: 'Approved', archived: 'Archived' };
   const fn = doc.original_file_name || doc.name || 'Document';
   const ext = fn.split('.').pop()?.toLowerCase() || '';
-  const icm: Record<string, string> = { pdf: '#EF4444', doc: '#2563EB', docx: '#2563EB', xls: '#16A34A', xlsx: '#16A34A', ppt: '#EA580C', pptx: '#EA580C' };
-  const ib = icm[ext] || '#6B7280';
-  const ss = sc[doc.status] || sc.draft;
+  const ss = getDocStatusConfig(doc.status);
+  const ib = getFileExtColor(fn);
   const tabs: { k: PreviewTab; l: string; badge?: number }[] = [
     { k: 'preview', l: 'Preview' }, { k: 'details', l: 'Details' }, { k: 'activity', l: 'Activity' },
     { k: 'comments', l: 'Comments', badge: comments.length > 0 ? comments.length : undefined }
@@ -134,7 +132,7 @@ export function SidePreviewPanel({ doc, previewUrl, onClose, onOpenFull }: SideP
           </div>
           <div>
             <DetailRow label="Type" value={ext.toUpperCase() || doc.file_type || 'Unknown'} />
-            <DetailRow label="Status" value={<span className="inline-flex rounded-full" style={{ padding: '4px 12px', fontSize: 12, fontWeight: 500, background: ss.b, color: ss.t }}>{sl[doc.status] || doc.status}</span>} />
+            <DetailRow label="Status" value={<span className="inline-flex rounded-full" style={{ padding: '4px 12px', fontSize: 12, fontWeight: 500, background: ss.bg, color: ss.text }}>{ss.label}</span>} />
             <DetailRow label="Project" value={<span className="inline-flex items-center gap-1.5 rounded-md" style={{ padding: '4px 10px', background: '#EEF2FF', color: '#4F46E5', fontSize: 13 }}><Folder className="w-3 h-3" />{doc.project_name || 'General'}</span>} />
             <DetailRow label="Owner" value={doc.created_by?.full_name || 'System'} />
             <DetailRow label="Created" value={fmtS(doc.created_at)} />
@@ -146,7 +144,7 @@ export function SidePreviewPanel({ doc, previewUrl, onClose, onOpenFull }: SideP
         {tab === 'details' && <div>
           <DetailRow label="File Name" value={<span style={{ fontWeight: 500, color: '#1a1a1a', wordBreak: 'break-all' as const }}>{fn}</span>} />
           <DetailRow label="Type" value={ext.toUpperCase() || 'Unknown'} />
-          <DetailRow label="Status" value={<span className="inline-flex rounded-full" style={{ padding: '4px 12px', fontSize: 12, fontWeight: 500, background: ss.b, color: ss.t }}>{sl[doc.status] || doc.status}</span>} />
+          <DetailRow label="Status" value={<span className="inline-flex rounded-full" style={{ padding: '4px 12px', fontSize: 12, fontWeight: 500, background: ss.bg, color: ss.text }}>{ss.label}</span>} />
           <DetailRow label="Project" value={doc.project_name || 'General'} />
           <DetailRow label="Owner" value={doc.created_by?.full_name || 'System'} />
           <DetailRow label="Created" value={fmtD(doc.created_at)} />

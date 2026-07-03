@@ -3,32 +3,11 @@ import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { CheckSquare, FileText, ArrowUpRight, Clock, User, MessageSquare, FolderKanban as FolderIcon, ExternalLink, Building2, AlertTriangle } from 'lucide-react';
 import { buildViewAllUrl } from '@/utils/filtersUsedNavigation';
+import { getPriorityConfig } from '@/config/priorityConfig';
+import { getStatusColors } from '@/config/statusColors';
 import { chatApi, documentsApi } from '@/services/api';
 import { DocumentPreview } from '@/components/common/DocumentPreview';
 import type { AgentFiltersUsed } from '@/types';
-
-// ─── Priority + status colour maps 
-const PRIORITY_COLOR: Record<string, { bg: string; text: string; border: string }> = {
-  critical: { bg: '#fff1f2', text: '#e11d48', border: '#fda4af' },
-  high:     { bg: '#fff7ed', text: '#ea580c', border: '#fdba74' },
-  medium:   { bg: '#fffbeb', text: '#d97706', border: '#fcd34d' },
-  low:      { bg: '#f0fdf4', text: '#16a34a', border: '#86efac' },
-};
-
-const STATUS_COLOR: Record<string, { bg: string; text: string }> = {
-  pending:     { bg: '#eff6ff', text: '#2563eb' },
-  in_progress: { bg: '#fff7ed', text: '#c2410c' },
-  completed:   { bg: '#f0fdf4', text: '#15803d' },
-  cancelled:   { bg: '#f1f5f9', text: '#64748b' },
-};
-
-const PROJECT_TYPE_COLOR: Record<string, string> = {
-  client:           '#3b82f6',
-  internal:         '#8b5cf6',
-  content_creation: '#ec4899',
-  ideas:            '#f59e0b',
-  demo:             '#22c36a',
-};
 
 // ─── Task Card 
 interface TaskCardProps {
@@ -38,10 +17,8 @@ interface TaskCardProps {
 
 function TaskCard({ id, title, project, status, priority, due, assignee }: TaskCardProps) {
   const navigate = useNavigate();
-  const p = (priority || '').toLowerCase();
-  const s = (status   || '').toLowerCase().replace(/\s+/g, '_');
-  const pc = PRIORITY_COLOR[p] || PRIORITY_COLOR.medium;
-  const sc = STATUS_COLOR[s]   || STATUS_COLOR.pending;
+  const pc = getPriorityConfig(priority);
+  const sc = getStatusColors(status || 'pending');
 
   return (
     <div onClick={() => navigate(`/tasks/${id}`)} style={{
@@ -56,7 +33,7 @@ function TaskCard({ id, title, project, status, priority, due, assignee }: TaskC
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, flex: 1, minWidth: 0 }}>
-          <CheckSquare style={{ width: 13, height: 13, color: pc.text, flexShrink: 0 }} />
+          <CheckSquare style={{ width: 13, height: 13, color: pc.color, flexShrink: 0 }} />
           <span style={{ fontSize: 13, fontWeight: 600, color: '#172033', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
         </div>
         <ArrowUpRight style={{ width: 12, height: 12, color: '#94a3b8', flexShrink: 0 }} />
@@ -65,7 +42,7 @@ function TaskCard({ id, title, project, status, priority, due, assignee }: TaskC
       <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 5, alignItems: 'center' }}>
         {project && <span style={{ fontSize: 10, fontWeight: 500, padding: '2px 7px', borderRadius: 99, background: '#eff6ff', color: '#2563eb' }}>{project}</span>}
         {status  && <span style={{ fontSize: 10, fontWeight: 500, padding: '2px 7px', borderRadius: 99, background: sc.bg, color: sc.text, textTransform: 'capitalize' as const }}>{status.replace(/_/g, ' ')}</span>}
-        {priority && <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 99, background: pc.bg, color: pc.text, textTransform: 'capitalize' as const }}>{priority}</span>}
+        {priority && <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 99, background: pc.bg, color: pc.color, textTransform: 'capitalize' as const }}>{priority}</span>}
         {due && <span style={{ fontSize: 10, color: '#667085', display: 'flex', alignItems: 'center', gap: 3 }}><Clock style={{ width: 9, height: 9 }} />{due}</span>}
         {assignee && <span style={{ fontSize: 10, color: '#667085', display: 'flex', alignItems: 'center', gap: 3 }}><User style={{ width: 9, height: 9 }} />{assignee}</span>}
       </div>
@@ -80,8 +57,13 @@ interface ProjectCardProps {
 
 function ProjectCard({ id, name, type, tasks, status }: ProjectCardProps) {
   const navigate = useNavigate();
-  const color    = PROJECT_TYPE_COLOR[(type || '').toLowerCase()] || '#667085';
-  const initial  = (name || 'P')[0].toUpperCase();
+  
+ const initial = (name || 'P')[0].toUpperCase();
+  const typeColorMap: Record<string, string> = {
+    client: '#3b82f6', internal: '#8b5cf6', content_creation: '#ec4899',
+    ideas: '#f59e0b', demo: '#22c55e',
+  };
+  const color = typeColorMap[(type || '').toLowerCase().replace(/-/g, '_')] ?? '#667085';
 
   return (
     <div onClick={() => navigate(`/projects/${id}`)} style={{

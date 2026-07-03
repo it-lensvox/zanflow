@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
     TrendingUp, CheckCircle, Clock, ListTodo, Activity, BarChart3, Users, Loader2
 } from 'lucide-react';
-import { usersApi, taskApi } from '@/services/api'; 
+import { usersApi, taskApi } from '@/services/api';
+import { getStatusColors } from '@/config/statusColors';
 import type { User as AppUser } from '@/types'; 
 import './TeamPerformance.scss'; 
 
@@ -324,11 +325,7 @@ export const TeamPerformance: React.FC = () => {
                                                     (performance.recent_activity ?? []).map((activity, idx) => (
                                                         <div key={idx} className="flex gap-4 group">
                                                            <div className="flex flex-col items-center">
-                                                                <div className={`w-3 h-3 rounded-full ${
-                                                                    activity.status === 'completed' || activity.status === 'deployed' ? 'bg-emerald-500' : // Treat deployed as complete for coloring
-                                                                    activity.status === 'in_progress' ? 'bg-amber-500' :
-                                                                    'bg-slate-400' 
-                                                                }`} />
+                                                                <div style={{ width: 12, height: 12, borderRadius: '50%', background: getStatusColors(activity.status).dot }} />
                                                                 {idx < (performance.recent_activity?.length ?? 0) - 1 && (
                                                                     <div className="w-0.5 h-full bg-slate-200 mt-2" />
                                                                 )}
@@ -337,11 +334,7 @@ export const TeamPerformance: React.FC = () => {
                                                                 <p className="font-medium text-slate-800 mb-1">{activity.task_name}</p>
                                                                 <p className="text-xs text-slate-500 mb-2">{activity.project_name}</p>
                                                                 <div className="flex items-center gap-2">
-                                                                    <span className={`text-xs px-3 py-1 rounded-full font-medium ${
-                                                                        activity.status === 'completed' || activity.status === 'deployed' ? 'bg-emerald-100 text-emerald-700' :
-                                                                        activity.status === 'in_progress' ? 'bg-amber-100 text-amber-700' :
-                                                                        'bg-slate-100 text-slate-600'
-                                                                    }`}>
+                                                                    <span style={{ fontSize: 12, padding: '2px 10px', borderRadius: 99, fontWeight: 500, background: getStatusColors(activity.status).bg, color: getStatusColors(activity.status).text }}>
                                                                         {activity.status.replace('_', ' ')}
                                                                     </span>
                                                                     <span className="text-xs text-slate-400">{activity.timestamp}</span>

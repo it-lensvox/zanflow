@@ -1,11 +1,6 @@
 import type { CSSProperties } from 'react';
-
-// ─── Dashboard Design Tokens
-export const BLUE  = '#1663F6';
-export const LINE  = '#E6EBF2';
-export const TEXT  = '#172033';
-export const MUTED = '#667085';
-export const BG    = '#F7F8FB';
+import { BLUE, LINE, TEXT, MUTED, BG } from '@/config/tokens';
+export { BLUE, LINE, TEXT, MUTED, BG };
 
 // ─── Reusable inline style objects
 export const CARD: CSSProperties = {

@@ -5,17 +5,8 @@ import { X, Plus, Trash2 } from 'lucide-react';
 import { Button, Input, } from '@/components/common';
 import { projectsApi, usersApi } from '@/services/api';
 import type { User as AppUser, ProjectCreatePayload } from '@/types';
-import { cn, getProjectTypeColor } from '@/lib/utils';
-import { RichTextEditor } from '@/components/common/RichTextEditor';
-
-
-const TASK_TYPES = [
-    { value: 'client', label: 'Client' },
-    { value: 'internal', label: 'Internal' },
-    { value: 'content_creation', label: 'Content Creation' },
-    { value: 'ideas', label: 'Ideas' },
-    { value: 'demo', label: 'Demo' },
-];
+import { getProjectTypeColor } from '@/config/projectTypeConfig';
+import { PROJECT_TYPE_OPTIONS as TASK_TYPES } from '@/config/projectTypeConfig';
 
 const PROJECT_ROLES = [
     { label: 'Manager', value: 'manager' },
@@ -396,7 +387,7 @@ export function CreateProjectModal({ isOpen, onClose, navigateOnSuccess = false 
                                         >
                                             <div className="flex items-center gap-2">
                                                 {/* Color Circle */}
-                                                <div className={cn("h-3 w-3 rounded-full", getProjectTypeColor(type.value))} />
+                                                <div className={`h-3 w-3 rounded-full ${getProjectTypeColor(type.value)}`} />
                                                 <span>{type.label}</span>
                                             </div>
                                             {formData.task_type === type.value && <span className="text-primary font-bold">✓</span>}
