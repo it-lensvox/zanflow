@@ -90,8 +90,12 @@ export function useDashboard() {
   const projects = (Array.isArray(projectsData) ? projectsData : projectsData?.results || []) as Project[];
   const documents = (documentsData?.results || []) as Document[];
   const totalDocsCount = documentsData?.count || documents.length;
-  const allTasks: DashboardTask[] =
+ const allTasks: DashboardTask[] =
     tasksResponse?.tasks || tasksResponse?.results || (Array.isArray(tasksResponse) ? tasksResponse : []);
+  const totalTasksCount: number = tasksResponse?.count ?? allTasks.length;
+  const isTaskOverdue = (t: DashboardTask) =>
+    !!t.end_date && new Date(t.end_date) < now &&
+    t.status !== 'completed' && t.status !== 'deployed';
 
   // ── Date Range Filter 
   const rangeStart = useMemo(() => {
@@ -111,22 +115,20 @@ export function useDashboard() {
   // ── Summary Stats 
   const now = new Date();
   const totalProjects = projects.length;
-  const totalTasks = allTasks.length;
+  const totalTasks = totalTasksCount;
   const completedTasks = allTasks.filter(t => t.status === 'completed' || t.status === 'deployed').length;
-  const overdueTasks = allTasks.filter(t =>
-    t.end_date && new Date(t.end_date) < now &&
-    t.status !== 'completed' && t.status !== 'deployed'
-  ).length;
+  const overdueTasks = allTasks.filter(isTaskOverdue).length;
   const pendingTasks = allTasks.filter(t => t.status === 'pending' || t.status === 'backlog').length;
   const completedPct = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
   const overduePct = totalTasks > 0 ? Math.round((overdueTasks / totalTasks) * 100) : 0;
 
-  // ── Donut Chart 
   const donut = [
-    { label: 'In Progress', value: allTasks.filter(t => t.status === 'in_progress').length, color: '#6366F1' },
-    { label: 'Pending', value: allTasks.filter(t => t.status === 'pending' || t.status === 'backlog').length, color: '#F59E0B' },
-    { label: 'Completed', value: allTasks.filter(t => t.status === 'completed' || t.status === 'deployed').length, color: '#22C55E' },
-    { label: 'Overdue', value: allTasks.filter(t => t.end_date && new Date(t.end_date) < now && t.status !== 'completed' && t.status !== 'deployed').length, color: '#EF4444' },
+    { label: 'Overdue',     value: allTasks.filter(t => isTaskOverdue(t)).length,                                                                                              color: '#EF4444' },
+    { label: 'In Progress', value: allTasks.filter(t => t.status === 'in_progress' && !isTaskOverdue(t)).length,                                                              color: '#6366F1' },
+    { label: 'Pending',     value: allTasks.filter(t => (t.status === 'pending' || t.status === 'backlog') && !isTaskOverdue(t)).length,                                      color: '#F59E0B' },
+    { label: 'Completed',   value: allTasks.filter(t => t.status === 'completed' || t.status === 'deployed').length,                                                          color: '#22C55E' },
+    { label: 'Deferred',    value: allTasks.filter(t => t.status === 'deferred' && !isTaskOverdue(t)).length,                                                                 color: '#9CA3AF' },
+    { label: 'Review',      value: allTasks.filter(t => t.status === 'review' && !isTaskOverdue(t)).length,                                                                   color: '#8B5CF6' },
   ].filter(d => d.value > 0);
   const donutTotal = donut.reduce((s, d) => s + d.value, 0);
 
