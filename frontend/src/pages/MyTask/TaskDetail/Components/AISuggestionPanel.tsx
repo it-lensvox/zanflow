@@ -4,8 +4,9 @@ import {
   AlertCircle, CheckCircle2, ChevronDown, User,
 } from 'lucide-react';
 import type { TaskSuggestion, SuggestionPriority, SuggestionStatus } from '../hooks/useAISuggestions';
+import { getStatusConfig, priorityOptions } from '@/components/layout/DualView/taskConfig';
 
-// ── Design tokens — match CreateTask / TaskDetailModal ───────────────────────
+// ── Design tokens 
 const T = {
   text:  '#172033',
   muted: '#667085',
@@ -13,29 +14,31 @@ const T = {
   blue:  '#1663f6',
 } as const;
 
-// ── Config maps ──────────────────────────────────────────────────────────────
-const PRIORITY_CONFIG: Record<SuggestionPriority, {
-  label: string; dot: string;
-  bg: string; color: string; border: string;
-}> = {
-  high:   { label: 'High',   dot: '#ef4444', bg: '#fef2f2', color: '#b91c1c', border: '#fecaca' },
-  medium: { label: 'Medium', dot: '#f59e0b', bg: '#fffbeb', color: '#92400e', border: '#fde68a' },
-  low:    { label: 'Low',    dot: '#22c55e', bg: '#f0fdf4', color: '#166534', border: '#bbf7d0' },
+// ── Priority 
+const PRIORITY_HEX: Record<SuggestionPriority, { dot: string; bg: string; color: string; border: string }> = {
+  high:   { dot: '#ef4444', bg: '#fef2f2', color: '#b91c1c', border: '#fecaca' },
+  medium: { dot: '#f59e0b', bg: '#fffbeb', color: '#92400e', border: '#fde68a' },
+  low:    { dot: '#22c55e', bg: '#f0fdf4', color: '#166534', border: '#bbf7d0' },
 };
 
-const STATUS_OPTS: { value: SuggestionStatus; label: string; dot: string }[] = [
-  { value: 'pending',     label: 'Pending',     dot: '#94a3b8' },
-  { value: 'backlog',     label: 'Backlog',     dot: '#f97316' },
-  { value: 'in_progress', label: 'In Progress', dot: '#3b82f6' },
-  { value: 'review',      label: 'Review',      dot: '#6366f1' },
-  { value: 'completed',   label: 'Completed',   dot: '#22c55e' },
-  { value: 'deployed',    label: 'Deployed',    dot: '#8b5cf6' },
-  { value: 'deferred',    label: 'Deferred',    dot: '#94a3b8' },
-];
+const PRIORITY_CONFIG: Record<SuggestionPriority, { label: string; dot: string; bg: string; color: string; border: string }> = {
+  high:   { label: priorityOptions.find(o => o.value === 'high')?.label   ?? 'High',   ...PRIORITY_HEX.high   },
+  medium: { label: priorityOptions.find(o => o.value === 'medium')?.label ?? 'Medium', ...PRIORITY_HEX.medium },
+  low:    { label: priorityOptions.find(o => o.value === 'low')?.label    ?? 'Low',    ...PRIORITY_HEX.low    },
+};
+
+// ── Status — dot colors pulled from getStatusConfig (single source of truth) ─
+const STATUS_OPTS: { value: SuggestionStatus; label: string; dot: string }[] = (
+  ['pending','backlog','in_progress','review','completed','deployed','deferred'] as SuggestionStatus[]
+).map(v => ({
+  value: v,
+  label: getStatusConfig(v).label.charAt(0) + getStatusConfig(v).label.slice(1).toLowerCase().replace(/_/g, ' '),
+  dot:   getStatusConfig(v).color,
+}));
 
 const PRIORITY_OPTS: SuggestionPriority[] = ['high', 'medium', 'low'];
 
-// ── Shared mini-dropdown ─────────────────────────────────────────────────────
+// ── Shared mini-dropdown ────
 function MiniDropdown<T extends string>({
   value,
   options,

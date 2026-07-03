@@ -98,12 +98,12 @@ export function useAISuggestions({
     }
   }, [taskId, taskTitle, taskDescription, projectName, taskType, existingChildTasks, parentAssigneeIds]);
 
-  // ── Panel open / close ───────────────────────────────────────────────────
+  // ── Panel open / close ──
   const open = useCallback(() => {
     setIsOpen(true);
     setCreatedCount(0);
     setCreateError(null);
-    fetchSuggestions(6, false);
+    fetchSuggestions(3, false);
   }, [fetchSuggestions]);
 
   const close = useCallback(() => {
@@ -113,8 +113,8 @@ export function useAISuggestions({
     setCreateError(null);
   }, []);
 
-  const regenerate   = useCallback(() => fetchSuggestions(6, false),  [fetchSuggestions]);
-  const generateMore = useCallback(() => fetchSuggestions(3, true),   [fetchSuggestions]);
+  const regenerate   = useCallback(() => fetchSuggestions(3, false), [fetchSuggestions]);
+  const generateMore = useCallback(() => fetchSuggestions(6, true),  [fetchSuggestions]);
 
   // ── Selection ────────────────────────────────────────────────────────────
   const toggleSelect = useCallback((clientId: string) => {

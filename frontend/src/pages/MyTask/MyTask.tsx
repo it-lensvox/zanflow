@@ -5,7 +5,7 @@ import { DualView }           from '@/components/layout/DualView/DualView';
 import { TaskGridCard, createTasksTableColumns, getStatusConfig, priorityOptions, statusOptions } from '@/components/layout/DualView/taskConfig';
 import { FilterHeaderWrapper, SearchFilter, ListFilter, DateFilter } from '@/components/layout/DualView/FilterComponents';
 import { InlineCreateRow }    from '@/components/layout/CreateTask/InlineCreateRow';
-import { TaskDetailModal }    from './components/TaskDetailModal';
+import { TaskDetailModal }    from './TaskDetail/Components/TaskDetailModal';
 import { AITask }             from './components/AITask';
 import { NotificationsPage }  from '../NotificationsPage';
 import { TaskBoardHeader }    from './components/TaskBoardHeader';

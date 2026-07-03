@@ -13,7 +13,7 @@ import { TaskListSidebar } from './components/TaskListSidebar';
 import { ShareCalendarModal } from './components/ShareCalendarModal';
 import DeclineModal from './components/DeclineModal';
 import RescheduleModal from './components/RescheduleModal';
-import { TaskDetailModal } from '../MyTask/components/TaskDetailModal';
+import { TaskDetailModal } from '../MyTask/TaskDetail/Components/TaskDetailModal';
 import { eventApi } from '@/services/api';
 import { DAYS_OF_WEEK } from './calendarConstants';
 import { getStatusConfig } from '@/components/layout/DualView/taskConfig';

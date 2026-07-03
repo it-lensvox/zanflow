@@ -8,7 +8,7 @@ import {
 import { DualView, ViewToggle } from '@/components/layout/DualView';
 import { createDocumentsTableColumns, DocumentGridCard } from '@/components/layout/DualView/documentsConfig';
 import { TaskGridCard, createTasksTableColumns, getStatusConfig, priorityOptions, statusOptions } from '@/components/layout/DualView/taskConfig';
-import { TaskDetailModal } from '../MyTask/components/TaskDetailModal';
+import { TaskDetailModal } from '../MyTask/TaskDetail/Components/TaskDetailModal';
 import { SearchFilter, ListFilter, DateFilter, FilterHeaderWrapper } from '@/components/layout/DualView/FilterComponents';
 import { CreateTask } from '@/pages/MyTask/pages/CreateTask/CreateTask';
 import { InlineCreateRow } from '@/components/layout/CreateTask/InlineCreateRow';
