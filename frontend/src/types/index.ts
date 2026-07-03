@@ -1682,6 +1682,42 @@ export interface CustomDashboard {
   updated_at: string;
 }
 
+// ── AI Child Task Suggestions
+
+export interface AIChildTaskSuggestionPayload {
+  task_id: number;
+  title: string;
+  description?: string;
+  project_name?: string;
+  task_type?: string;
+  existing_child_tasks?: string[];
+  suggestion_count?: number;
+}
+
+export interface AIChildTaskSuggestionResponse {
+  suggestions: Array<{
+    title:       string;
+    priority?:   'high' | 'medium' | 'low';
+    status?:     string;
+    assigned_to?: number[];
+  }>;
+}
+
+export interface CreateChildTasksBatchPayload {
+  parent_task_id: number;
+  tasks: Array<{
+    title:        string;
+    priority?:    string;
+    status?:      string;
+    assigned_to?: number[];
+  }>;
+}
+
+export interface CreateChildTasksBatchResponse {
+  created: Task[];
+  failed: Array<{ title: string; error: string }>;
+}
+
 // ── Social Auth Types
 
 export type SocialProvider = 'google' | 'microsoft';

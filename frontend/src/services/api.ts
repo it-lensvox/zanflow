@@ -813,6 +813,26 @@ export const taskApi = {
     return response.data;
   },
 
+  // AI-suggested child tasks
+  suggestChildTasks: async (payload: import('@/types').AIChildTaskSuggestionPayload) => {
+    const response = await api.post(`/tasksite/${payload.task_id}/ai-suggest-children/`, payload);
+    return response.data as import('@/types').AIChildTaskSuggestionResponse;
+  },
+
+  // Fetch child tasks for a parent
+  getChildTasks: async (taskId: number) => {
+    const response = await api.get(`/tasksite/${taskId}/children/`);
+    return response.data;
+  },
+
+  // Batch create child tasks
+  createChildTasksBatch: async (
+    taskId: number,
+    payload: import('@/types').CreateChildTasksBatchPayload
+  ) => {
+    const response = await api.post(`/tasksite/${taskId}/children/batch/`, payload);
+    return response.data as import('@/types').CreateChildTasksBatchResponse;
+  },
 
 };
 
