@@ -7,19 +7,19 @@ import type { User as AppUser } from '@/types';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { projectsApi, notificationSocket, gatewaySocket } from '@/services/api';
-import { TaskDraftsProvider } from '@/pages/MyTask/Taskdrafts';
-import { MyWork } from '@/pages/MyWork';
+import { TaskDraftsProvider } from '@/pages/MyTask/components/Taskdrafts';
+import { MyWork } from '@/pages/MyWork/MyWork';
 
 // Lazy-loaded page components for route-level code splitting
-const Dashboard = lazy(() => import('@/pages/Dashboard').then(m => ({ default: m.Dashboard })));
+const Dashboard = lazy(() => import('@/pages/Dashboard/Dashboard').then(m => ({ default: m.Dashboard })));
 const Login = lazy(() => import('@/pages/Login').then(m => ({ default: m.Login })));
 const Projects = lazy(() => import('@/pages/Project/Projects').then(m => ({ default: m.Projects })));
 const ProjectSettings = lazy(() => import('@/pages/Project/ProjectSettings').then(m => ({ default: m.ProjectSettings })));
 const DocumentCreate = lazy(() => import('@/pages/Documents/DocumentCreate').then(m => ({ default: m.DocumentCreate })));
 const Documents = lazy(() => import('@/pages/Documents/Documents').then(m => ({ default: m.Documents })));
 const SharedWithMe = lazy(() => import('@/pages/Documents/SharedWithMe').then(m => ({ default: m.SharedWithMe })));const MyTask = lazy(() => import('@/pages/MyTask/MyTask').then(m => ({ default: m.MyTask })));
-const CreateTask = lazy(() => import('@/pages/MyTask/CreateTask').then(m => ({ default: m.CreateTask })));
-const TaskDetailPage = lazy(() => import('@/pages/MyTask/TaskDetailPage').then(m => ({ default: m.TaskDetailPage })));
+const CreateTask = lazy(() => import('@/pages/MyTask/pages/CreateTask/CreateTask').then(m => ({ default: m.CreateTask })));
+const TaskDetailPage = lazy(() => import('@/pages/MyTask/TaskDetail/TaskDetailPage').then(m => ({ default: m.TaskDetailPage })));
 const Teams = lazy(() => import('@/pages/TeamManagement/Teams').then(m => ({ default: m.Teams })));
 const UserManagement = lazy(() => import('@/pages/TeamManagement/UserManagement').then(m => ({ default: m.UserManagement })));
 const TeamPerformance = lazy(() => import('@/pages/TeamManagement/TeamPerformance').then(m => ({ default: m.TeamPerformance })));
@@ -92,9 +92,9 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   const ALLOWED_ROLES: AppUser['role'][] = ['admin', 'manager', 'annotator', 'developer'];
     const isAuthorized = isAllowed(ALLOWED_ROLES);
 
-  if (isLoading && !isAuthenticated) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     );
@@ -110,9 +110,9 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
 
-  if (isLoading && !isAuthenticated) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     );
@@ -211,33 +211,33 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       >
-       <Route path="/dashboard" element={<Dashboard />} />
+       <Route path="/dashboard" element={<Suspense fallback={<PageLoader />}><Dashboard /></Suspense>} />
        <Route path="/my-work" element={<MyWork />} />
-               <Route path="/profile" element={<Profile />} />
-        <Route path="/resetPassword" element={<ResetPassword />} />
-        <Route path="/projects" element={<Projects />} />
+       <Route path="/profile" element={<Suspense fallback={<PageLoader />}><Profile /></Suspense>} />
+        <Route path="/resetPassword" element={<Suspense fallback={<PageLoader />}><ResetPassword /></Suspense>} />
+        <Route path="/projects" element={<Suspense fallback={<PageLoader />}><Projects /></Suspense>} />
         <Route path="/projects/:id" element={<ProjectDetailWrapper />} />
-        <Route path="/projects/:projectId/documents/new" element={<DocumentCreate />} />
-        <Route path="/projects/:id/settings" element={<ProjectSettings />} />
-        <Route path="/notifications" element={<NotificationsPage />} />
-<Route path="/documents" element={<Documents />} />
-<Route path="/documents/shared-with-me" element={<SharedWithMe />} />
-        <Route path="/calendar" element={<Calendar />} />
-        <Route path="/team-chat" element={<TeamChatModern />} />
-        <Route path="/team-chat/chat" element={<TeamChatModern />} />
-        <Route path="/team-chat/chat/:roomId" element={<TeamChatModern />} />
-        <Route path="/team-chat/teams" element={<TeamChatModern />} />
-        <Route path="/team-chat/teams/:roomId" element={<TeamChatModern />} />
-        <Route path="/team-chat/project" element={<TeamChatModern />} />
-        <Route path="/team-chat/:projectId/:roomId" element={<TeamChatModern />} />
-        <Route path="/team-chat/unread" element={<TeamChatModern />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/quick-notes" element={<QuickNotesPage />} />
-        <Route path="/tasks/:id" element={<TaskDetailPage />} />
+        <Route path="/projects/:projectId/documents/new" element={<Suspense fallback={<PageLoader />}><DocumentCreate /></Suspense>} />
+        <Route path="/projects/:id/settings" element={<Suspense fallback={<PageLoader />}><ProjectSettings /></Suspense>} />
+        <Route path="/notifications" element={<Suspense fallback={<PageLoader />}><NotificationsPage /></Suspense>} />
+        <Route path="/documents" element={<Suspense fallback={<PageLoader />}><Documents /></Suspense>} />
+        <Route path="/documents/shared-with-me" element={<Suspense fallback={<PageLoader />}><SharedWithMe /></Suspense>} />
+        <Route path="/calendar" element={<Suspense fallback={<PageLoader />}><Calendar /></Suspense>} />
+        <Route path="/team-chat" element={<Suspense fallback={<PageLoader />}><TeamChatModern /></Suspense>} />
+        <Route path="/team-chat/chat" element={<Suspense fallback={<PageLoader />}><TeamChatModern /></Suspense>} />
+        <Route path="/team-chat/chat/:roomId" element={<Suspense fallback={<PageLoader />}><TeamChatModern /></Suspense>} />
+        <Route path="/team-chat/teams" element={<Suspense fallback={<PageLoader />}><TeamChatModern /></Suspense>} />
+        <Route path="/team-chat/teams/:roomId" element={<Suspense fallback={<PageLoader />}><TeamChatModern /></Suspense>} />
+        <Route path="/team-chat/project" element={<Suspense fallback={<PageLoader />}><TeamChatModern /></Suspense>} />
+        <Route path="/team-chat/:projectId/:roomId" element={<Suspense fallback={<PageLoader />}><TeamChatModern /></Suspense>} />
+        <Route path="/team-chat/unread" element={<Suspense fallback={<PageLoader />}><TeamChatModern /></Suspense>} />
+        <Route path="/settings" element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
+        <Route path="/quick-notes" element={<Suspense fallback={<PageLoader />}><QuickNotesPage /></Suspense>} />
+        <Route path="/tasks/:id" element={<Suspense fallback={<PageLoader />}><TaskDetailPage /></Suspense>} />
         
 
         {/* Taskboard Routes */}
-        <Route path="/taskboard" element={<MyTask />}>
+       <Route path="/taskboard" element={<Suspense fallback={<PageLoader />}><MyTask /></Suspense>}>
           <Route index element={null} />
           <Route path="completed" element={null} />
           <Route path="pending" element={null} />
@@ -250,7 +250,7 @@ function AppRoutes() {
             path="create"
             element={
               <AdminRoute>
-                <CreateTask />
+                <Suspense fallback={<PageLoader />}><CreateTask /></Suspense>
               </AdminRoute>
             }
           />
@@ -258,10 +258,10 @@ function AppRoutes() {
 
         {/* Admin Accordion */}
         <Route path="/admin" element={<AdminDashboard />}>
-          <Route path="teams" element={<Teams />} />
-          <Route path="user-roles" element={<UserManagement />} />
-          <Route path="team-performance" element={<TeamPerformance />} />
-          <Route path="workspace" element={<WorkSpace />} />
+          <Route path="teams" element={<Suspense fallback={<PageLoader />}><Teams /></Suspense>} />
+          <Route path="user-roles" element={<Suspense fallback={<PageLoader />}><UserManagement /></Suspense>} />
+          <Route path="team-performance" element={<Suspense fallback={<PageLoader />}><TeamPerformance /></Suspense>} />
+          <Route path="workspace" element={<Suspense fallback={<PageLoader />}><WorkSpace /></Suspense>} />
           <Route index element={<Navigate to="teams" replace />} />
         </Route>
 
@@ -270,7 +270,7 @@ function AppRoutes() {
   );
 }
 
-const preloadDashboard = () => import('@/pages/Dashboard');
+const preloadDashboard = () => import('@/pages/Dashboard/Dashboard');
 
 function WebSocketProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();

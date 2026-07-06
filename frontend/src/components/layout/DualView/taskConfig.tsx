@@ -1,8 +1,8 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
-  Calendar, Users, CheckSquare, Clock, PlayCircle, Pause,
-  Eye, AlertCircle, CheckCircle, ListTodo, Pin
+  Calendar, Users, CheckSquare, Clock, PlayCircle, Pause, Eye, AlertCircle, CheckCircle, ListTodo, Pin
 } from 'lucide-react';
 import type { Task } from '@/types';
 import type { TableColumn } from '@/components/layout/DualView/TableView';
@@ -11,6 +11,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { formatRelativeTime } from '@/lib/utils';
 import { TablePopover } from '@/components/common';
+import { getTypeHex, getTypeBg } from '@/config/projectTypeConfig';
+import { PRIORITY_OPTIONS as _PRIORITY_OPTIONS } from '@/config/priorityConfig';
 
 // Utility function to format dates
 const formatDate = (dateString: string) => {
@@ -115,12 +117,13 @@ export const getStatusConfig = (status: Task['status']) => {
 };
 
 // Priority options
-export const priorityOptions = [
-  { value: 'critical', label: 'Critical', color: 'text-red-700', dotColor: 'bg-red-700', icon: '🚨' },
-  { value: 'high', label: 'High', color: 'text-red-600', dotColor: 'bg-red-500', icon: '🔴' },
-  { value: 'medium', label: 'Medium', color: 'text-orange-600', dotColor: 'bg-orange-200', icon: '🟡' },
-  { value: 'low', label: 'Low', color: 'text-green-600', dotColor: 'bg-green-500', icon: '🟢' },
-];
+export const priorityOptions = _PRIORITY_OPTIONS.map(p => ({
+  value:    p.value,
+  label:    p.label,
+  color:    p.twText,
+  dotColor: p.twDot,
+  icon:     p.icon,
+}));
 
 // Status options
 export const statusOptions = [
@@ -133,6 +136,73 @@ export const statusOptions = [
   { value: 'review', label: 'REVIEW', icon: Eye },
 ];
 
+// ─── Assignee popover via portal (escapes all stacking contexts) ──────────────
+function AssigneePopover({ task }: { task: Task }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseEnter = () => {
+    if (!triggerRef.current) return;
+    const r = triggerRef.current.getBoundingClientRect();
+    setPos({ top: r.bottom + window.scrollY + 6, left: r.left + window.scrollX });
+    setOpen(true);
+  };
+  const handleMouseLeave = () => setOpen(false);
+
+  return (
+    <>
+      <div
+        ref={triggerRef}
+        style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onClick={e => e.stopPropagation()}
+      >
+        <Users style={{ width: 12, height: 12 }} />
+        <span style={{ fontWeight: 600, fontSize: 12, color: '#667085' }}>{(task.assigned_to || []).length}</span>
+      </div>
+
+      {open && pos && ReactDOM.createPortal(
+        <div
+          onMouseEnter={() => setOpen(true)}
+          onMouseLeave={() => setOpen(false)}
+          style={{
+            position: 'absolute',
+            top: pos.top,
+            left: pos.left,
+            zIndex: 99999,
+            minWidth: 180,
+            background: '#fff',
+            border: '1px solid #e5e7eb',
+            borderRadius: 10,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.14)',
+            padding: 8,
+          }}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 180, overflowY: 'auto' }}>
+            {(task.assigned_to_user_details || []).length > 0 ? (
+              (task.assigned_to_user_details || []).map(u => (
+                <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 6px', borderRadius: 6 }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <div style={{ width: 22, height: 22, borderRadius: '50%', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: '#fff', background: u.avatar ? 'transparent' : '#3b82f6', flexShrink: 0 }}>
+                    {u.avatar ? <img src={u.avatar} alt={u.first_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <>{u.first_name?.[0]}{u.last_name?.[0]}</>}
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 500, color: '#374151' }}>{u.first_name} {u.last_name}</span>
+                </div>
+              ))
+            ) : (
+              <span style={{ fontSize: 11, color: '#9ca3af', padding: '4px 6px', fontStyle: 'italic' }}>No users assigned</span>
+            )}
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
 // Grid Card Component
 interface TaskGridCardProps {
   task: Task;
@@ -144,110 +214,115 @@ export function TaskGridCard({ task, onTaskClick }: TaskGridCardProps) {
   const queryClient = useQueryClient();
   const { isPinned, isPending, handlePin } = usePinTask(task, queryClient);
 
+  // Project type colour
+  const taskType = (task as any).project_task_type || task.project_details?.task_type || '';
+  const accentHex = getTypeHex(taskType);
+  const tintBg = getTypeBg(taskType);
+  const initial = (task.project_details?.name || task.project_name || 'T')[0].toUpperCase();
+
   return (
     <div
       onClick={() => onTaskClick(task)}
-      className={`${statusConfig.cardClass} rounded-xl p-4 transition-all duration-300 cursor-pointer text-gray-800 hover:shadow-lg hover:-translate-y-0.5 border border-[#d0d5dd] relative hover:z-50 h-full group bg-white`}
+      className="group cursor-pointer"
+      style={{
+        background: '#fff',
+        border: '1px solid #E6EBF2',
+        borderRadius: 14,
+        position: 'relative',
+        boxShadow: '0 1px 4px rgba(16,24,40,.06)',
+        transition: 'box-shadow .2s, transform .2s',
+        minWidth: 0,
+        width: '100%',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 20px rgba(16,24,40,.12)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 1px 4px rgba(16,24,40,.06)'; e.currentTarget.style.transform = 'none'; }}
     >
-      {/* Header */}
-      <div className="flex justify-between items-start gap-2 mb-3">
-        <div className="pr-2 flex flex-col min-w-0 flex-1">
-          {/* Project Name */}
-          <span className="text-sm font-bold text-gray-700 line-clamp-1 mb-0.5" title={task.project_details?.name || task.project_name || undefined}>
-            {task.project_details?.name || task.project_name || 'No Project'}
-          </span>
-          {/* Task Heading */}
-          <span className="text-xs font-medium text-gray-600 line-clamp-2" title={task.heading}>
-            {task.heading || 'No Task'}
-          </span>
-        </div>
-        <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
-          <PinButton
-            isPinned={isPinned}
-            isPending={isPending}
-            handlePin={handlePin}
-            groupHoverClass="group-hover:opacity-100"
-          />
-          {task.updated_at && (
-            <div className="text-[10px] text-gray-400 whitespace-nowrap">
-              {formatRelativeTime(task.updated_at)}
-            </div>
-          )}
-        </div>
-      </div>
+      {/* ── Top accent bar (project type colour) ── */}
+      <div style={{ height: 4, background: accentHex, width: '100%', borderRadius: '14px 14px 0 0' }} />
 
-      {/* Details Section */}
-      <div className="space-y-1 text-xs text-gray-500 mb-6">
-        <div className="flex items-center">
-          <Calendar className="w-3 h-3 mr-1" />
-          <span className="font-medium">Due:</span>
-          <span className="ml-1">{formatDate(task.end_date)}</span>
-        </div>
+      <div style={{ padding: '14px 16px 16px' }}>
+        {/* ── Row 1: Avatar + project name + pin + timestamp ── */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
+          {/* <div style={{
+            width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+            background: tintBg, border: `1.5px solid ${accentHex}33`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <span style={{ fontSize: 16, fontWeight: 800, color: accentHex }}>{initial}</span>
+          </div> */}
 
-        {/* Assigned */}
-        <div
-          className="flex items-center relative group/assigned cursor-pointer hover:text-blue-600 transition-colors w-max"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Users className="w-3 h-3 mr-1" />
-          <span className="font-medium">Assigned:</span>
-          <span className="ml-1 font-bold">{(task.assigned_to || []).length}</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ margin: '0 0 2px', fontWeight: 700, fontSize: 14, color: '#172033', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {task.project_details?.name || task.project_name || 'No Project'}
+            </p>
+            <p style={{ margin: 0, fontSize: 12, color: '#667085', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {task.heading || 'No Task'}
+            </p>
+          </div>
 
-          {/* Hover Dropdown */}
-          <div className="absolute top-full left-0 mt-1 hidden group-hover/assigned:block z-50 min-w-[160px] bg-white border border-gray-200 rounded-lg shadow-xl p-2 animate-in fade-in zoom-in-95 duration-100">
-            <div className="flex flex-col gap-1 max-h-[150px] overflow-y-auto">
-            {(task.assigned_to_user_details || []).length > 0 ? (
-                (task.assigned_to_user_details || []).map((u) => (
-                  <div key={u.id} className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded">
-                    <div className="w-5 h-5 rounded-full overflow-hidden flex items-center justify-center text-[9px] font-bold shrink-0 text-white"
-                      style={{ background: u.avatar ? 'transparent' : '#3b82f6' }}>
-                      {u.avatar
-                        ? <img src={u.avatar} alt={u.first_name} className="w-full h-full object-cover" />
-                        : <>{u.first_name?.[0]}{u.last_name?.[0]}</>
-                      }
-                    </div>
-                    <span className="text-[11px] font-medium text-gray-700 truncate">
-                      {u.first_name} {u.last_name}
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <span className="text-[11px] text-gray-400 px-1 italic">No users assigned</span>
-              )}
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+            <PinButton isPinned={isPinned} isPending={isPending} handlePin={handlePin} groupHoverClass="group-hover:opacity-100" />
+            {task.updated_at && (
+              <span style={{ fontSize: 11, color: '#667085', whiteSpace: 'nowrap' }}>
+                {formatRelativeTime(task.updated_at)}
+              </span>
+            )}
           </div>
         </div>
-      </div>
 
-      {/* Status Badge */}
-      <div className="absolute bottom-3 right-3">
-        <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${statusConfig.badge}`}>
-          {statusConfig.label}
-        </span>
+        {/* ── Row 2: Due date + assignee count with hover dropdown ── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12, color: '#667085' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Calendar style={{ width: 12, height: 12 }} />
+            <span>{formatDate(task.end_date)}</span>
+          </div>
+
+          <AssigneePopover task={task} />
+        </div>
+
+        {/* ── Footer: Priority left · Status badge right ── */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          {task.priority ? (() => {
+            const p = priorityOptions.find(o => o.value === task.priority);
+            return (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span className={`w-2 h-2 rounded-full ${p?.dotColor || 'bg-gray-300'}`} />
+                <span style={{ fontSize: 11, fontWeight: 500, color: '#667085', textTransform: 'capitalize' as const }}>{task.priority}</span>
+              </div>
+            );
+          })() :
+            <span />}
+
+          <span
+            className={`inline-flex items-center rounded text-[10px] font-bold ${statusConfig.badge}`}
+            style={{ padding: '3px 10px' }}
+          >
+            {statusConfig.label}
+          </span>
+        </div>
       </div>
     </div>
   );
 }
 
-// ─── Shared pin logic — used by both table cell and grid card ────────────────
+// Shared pin logic 
 function usePinTask(task: Task, queryClient: ReturnType<typeof useQueryClient>) {
   const [isPinned, setIsPinned] = useState<boolean>(!!task.is_pinned);
   const [isPending, setIsPending] = useState(false);
 
   const applyReorder = useCallback((next: boolean) => {
-    queryClient.setQueryData(['tasks'], (old: any) => {
+    const reorder = (tasks: Task[]): Task[] => {
+      const updated = tasks.map((t) =>
+        t.id === task.id ? { ...t, is_pinned: next } : t
+      );
+      return [
+        ...updated.filter((t) => t.is_pinned),
+        ...updated.filter((t) => !t.is_pinned),
+      ];
+    };
+
+    const applyPin = (old: any) => {
       if (!old) return old;
-
-      const reorder = (tasks: Task[]): Task[] => {
-        const updated = tasks.map((t) =>
-          t.id === task.id ? { ...t, is_pinned: next } : t
-        );
-        return [
-          ...updated.filter((t) => t.is_pinned),
-          ...updated.filter((t) => !t.is_pinned),
-        ];
-      };
-
       if (old.pages) {
         const pageSizes = old.pages.map((p: any) => p.results.length);
         const allTasks = reorder(old.pages.flatMap((p: any) => p.results));
@@ -259,10 +334,14 @@ function usePinTask(task: Task, queryClient: ReturnType<typeof useQueryClient>) 
         });
         return { ...old, pages: newPages };
       }
-
       if (Array.isArray(old)) return reorder(old);
       if (old.results) return { ...old, results: reorder(old.results) };
       return old;
+    };
+
+    // Update ALL active task cache entries — board uses ['tasks', status, priority, projectId]
+    queryClient.getQueryCache().findAll({ queryKey: ['tasks'] }).forEach(query => {
+      queryClient.setQueryData(query.queryKey, applyPin);
     });
   }, [task.id, queryClient]);
 
@@ -292,7 +371,7 @@ function usePinTask(task: Task, queryClient: ReturnType<typeof useQueryClient>) 
   return { isPinned, isPending, handlePin };
 }
 
-// ─── Shared pin button — rendered identically in table and grid ──────────────
+// Shared pin button 
 function PinButton({
   isPinned,
   isPending,
@@ -326,7 +405,7 @@ function PinButton({
   );
 }
 
-// ─── Pin cell used in the Task Title table column ────────────────────────────
+// Pin cell 
 function TaskTitleCell({
   task,
   queryClient,
@@ -363,21 +442,17 @@ interface TaskTableColumnsProps {
 }
 
 export const createTasksTableColumns = ({ onTaskClick, queryClient, user, navigate, dateField = 'end_date', personField = 'assigned_to' }: TaskTableColumnsProps & { dateField?: 'end_date' | 'start_date' | 'created_at'; personField?: 'assigned_to' | 'created_by' | 'updated_by' }): TableColumn<Task>[] => {
-  // Helper: update ALL ['tasks-list', *] caches that exist in the cache
-  // This ensures project pages update instantly, not just the TaskBoard
+
   const updateAllTaskListCaches = (updatedTask: Task) => {
     const allTaskListQueries = queryClient.getQueryCache().findAll({ queryKey: ['tasks-list'], exact: false });
-    console.log('[taskConfig] updateAllTaskListCaches — found caches:', allTaskListQueries.map(q => q.queryKey));
     allTaskListQueries.forEach((query) => {
       queryClient.setQueryData(query.queryKey, (old: any) => {
         if (!old) return old;
         const list: Task[] = old.tasks ?? old.results ?? (Array.isArray(old) ? old : []);
-        // Only update if this task exists in this project's list
         const exists = list.some((t: Task) => t.id === updatedTask.id);
         if (!exists) return old;
         const withoutTask = list.filter((t: Task) => t.id !== updatedTask.id);
         const merged = [updatedTask, ...withoutTask];
-        console.log('[taskConfig] updateAllTaskListCaches — updated cache key:', query.queryKey);
         if (old.tasks) return { ...old, tasks: merged };
         if (old.results) return { ...old, results: merged };
         if (Array.isArray(old)) return merged;
@@ -389,20 +464,11 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
   const StatusDropdown = ({ task }: { task: Task }) => {
     const [activeDropdown, setActiveDropdown] = useState(false);
     const statusConfig = getStatusConfig(task.status);
-
     const handleStatusChange = (newStatus: string) => {
-      console.log('[StatusChange] 🔍 Writing to cache key: ["tasks"]');
-      console.log('[StatusChange] 🔍 Task ID:', task.id, '| New status:', newStatus);
-      const taskListKeys = queryClient.getQueryCache().findAll({ queryKey: ['tasks-list'] });
-      console.log('[StatusChange] 🔍 Other task caches that exist (tasks-list):', taskListKeys.map(q => q.queryKey));
-      queryClient.setQueryData(['tasks'], (old: any) => {
-        if (!old) {
-          console.warn('[StatusChange] Cache is empty — cannot reorder.');
-          return old;
-        }
-        const updatedTask = { ...task, status: newStatus, updated_at: new Date().toISOString() };
+      const updatedTask = { ...task, status: newStatus, updated_at: new Date().toISOString() };
 
-        // useInfiniteQuery shape
+      const applyUpdate = (old: any) => {
+        if (!old) return old;
         if (old.pages) {
           const pagesWithoutTask = old.pages.map((page: any) => ({
             ...page,
@@ -416,54 +482,41 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
             ],
           };
         }
-        if (Array.isArray(old)) {
-          const newList = [updatedTask, ...old.filter((t: Task) => t.id !== task.id)];
-          return newList;
-        }
-        if (old.tasks) {
-          const newTasks = [updatedTask, ...old.tasks.filter((t: Task) => t.id !== task.id)];
-          return { ...old, tasks: newTasks };
-        }
-        if (old.results) {
-          const newResults = [updatedTask, ...old.results.filter((t: Task) => t.id !== task.id)];
-          return { ...old, results: newResults };
-        }
-        console.warn('[StatusChange] ⚠️ Unknown cache shape — task not reordered:', old);
+        if (Array.isArray(old)) return [updatedTask, ...old.filter((t: Task) => t.id !== task.id)];
+        if (old.tasks)   return { ...old, tasks:   [updatedTask, ...old.tasks.filter((t: Task) => t.id !== task.id)] };
+        if (old.results) return { ...old, results: [updatedTask, ...old.results.filter((t: Task) => t.id !== task.id)] };
         return old;
+      };
+
+      // Update ALL active task cache entries (board uses ['tasks', status, priority, projectId])
+      queryClient.getQueryCache().findAll({ queryKey: ['tasks'] }).forEach(query => {
+        queryClient.setQueryData(query.queryKey, applyUpdate);
       });
 
-      // Also update all project-specific caches
-      const updatedTaskForProjects = { ...task, status: newStatus, updated_at: new Date().toISOString() };
-      updateAllTaskListCaches(updatedTaskForProjects);
+      updateAllTaskListCaches(updatedTask);
 
       setActiveDropdown(false);
       taskApi.update(task.id, { status: newStatus } as any)
         .then((response) => {
-          // Update cache with the full task data from the API response (includes status_updated_by_details)
           const updatedTaskFromServer = response.task || response;
-          queryClient.setQueryData(['tasks'], (old: any) => {
+          const applyServerUpdate = (old: any) => {
             if (!old) return old;
             if (old.pages) {
               return {
                 ...old,
                 pages: old.pages.map((page: any) => ({
                   ...page,
-                  results: page.results.map((t: Task) =>
-                    t.id === task.id ? updatedTaskFromServer : t
-                  ),
+                  results: page.results.map((t: Task) => t.id === task.id ? updatedTaskFromServer : t),
                 })),
               };
             }
-            if (Array.isArray(old)) {
-              return old.map((t: Task) => (t.id === task.id ? updatedTaskFromServer : t));
-            }
-            if (old.tasks) {
-              return { ...old, tasks: old.tasks.map((t: Task) => (t.id === task.id ? updatedTaskFromServer : t)) };
-            }
-            if (old.results) {
-              return { ...old, results: old.results.map((t: Task) => (t.id === task.id ? updatedTaskFromServer : t)) };
-            }
+            if (Array.isArray(old)) return old.map((t: Task) => t.id === task.id ? updatedTaskFromServer : t);
+            if (old.tasks)   return { ...old, tasks:   old.tasks.map((t: Task) => t.id === task.id ? updatedTaskFromServer : t) };
+            if (old.results) return { ...old, results: old.results.map((t: Task) => t.id === task.id ? updatedTaskFromServer : t) };
             return old;
+          };
+          queryClient.getQueryCache().findAll({ queryKey: ['tasks'] }).forEach(query => {
+            queryClient.setQueryData(query.queryKey, applyServerUpdate);
           });
           updateAllTaskListCaches(updatedTaskFromServer);
         })
@@ -523,18 +576,10 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     const priorityOption = priorityOptions.find(opt => opt.value === task.priority);
 
     const handlePriorityChange = (newPriority: string) => {
-      console.log('[PriorityChange] 🔍 Writing to cache key: ["tasks"]');
-      console.log('[PriorityChange] 🔍 Task ID:', task.id, '| New priority:', newPriority);
-      const taskListKeys = queryClient.getQueryCache().findAll({ queryKey: ['tasks-list'] });
-      console.log('[PriorityChange] 🔍 Other task caches (tasks-list):', taskListKeys.map(q => q.queryKey));
-      queryClient.setQueryData(['tasks'], (old: any) => {
-        if (!old) {
-          console.warn('[PriorityChange] Cache is empty — cannot reorder.');
-          return old;
-        }
-        const updatedTask = { ...task, priority: newPriority, updated_at: new Date().toISOString() };
+      const updatedTask = { ...task, priority: newPriority, updated_at: new Date().toISOString() };
 
-        // useInfiniteQuery shape
+      const applyUpdate = (old: any) => {
+        if (!old) return old;
         if (old.pages) {
           const pagesWithoutTask = old.pages.map((page: any) => ({
             ...page,
@@ -548,25 +593,18 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
             ],
           };
         }
-        if (Array.isArray(old)) {
-          const newList = [updatedTask, ...old.filter((t: Task) => t.id !== task.id)];
-          return newList;
-        }
-        if (old.tasks) {
-          const newTasks = [updatedTask, ...old.tasks.filter((t: Task) => t.id !== task.id)];
-          return { ...old, tasks: newTasks };
-        }
-        if (old.results) {
-          const newResults = [updatedTask, ...old.results.filter((t: Task) => t.id !== task.id)];
-          return { ...old, results: newResults };
-        }
-        console.warn('[PriorityChange] ⚠️ Unknown cache shape — task not reordered:', old);
+        if (Array.isArray(old)) return [updatedTask, ...old.filter((t: Task) => t.id !== task.id)];
+        if (old.tasks)   return { ...old, tasks:   [updatedTask, ...old.tasks.filter((t: Task) => t.id !== task.id)] };
+        if (old.results) return { ...old, results: [updatedTask, ...old.results.filter((t: Task) => t.id !== task.id)] };
         return old;
+      };
+
+      // Update ALL active task cache entries (board uses ['tasks', status, priority, projectId])
+      queryClient.getQueryCache().findAll({ queryKey: ['tasks'] }).forEach(query => {
+        queryClient.setQueryData(query.queryKey, applyUpdate);
       });
 
-      // Also update all project-specific caches
-      const updatedTaskForProjects = { ...task, priority: newPriority, updated_at: new Date().toISOString() };
-      updateAllTaskListCaches(updatedTaskForProjects);
+      updateAllTaskListCaches(updatedTask);
 
       setActiveDropdown(false);
 
@@ -620,14 +658,10 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
 
       const isoValue = `${value}T12:00:00Z`;
 
-      queryClient.setQueryData(['tasks'], (old: any) => {
-        if (!old) {
-          console.warn('[DateChange] Cache is empty — cannot reorder.');
-          return old;
-        }
-        const updatedTask = { ...task, [field]: isoValue, updated_at: new Date().toISOString() };
+      const updatedTask = { ...task, [field]: isoValue, updated_at: new Date().toISOString() };
 
-        // useInfiniteQuery shape
+      const applyDateUpdate = (old: any) => {
+        if (!old) return old;
         if (old.pages) {
           const pagesWithoutTask = old.pages.map((page: any) => ({
             ...page,
@@ -641,25 +675,17 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
             ],
           };
         }
-        if (Array.isArray(old)) {
-          const newList = [updatedTask, ...old.filter((t: Task) => t.id !== task.id)];
-          return newList;
-        }
-        if (old.tasks) {
-          const newTasks = [updatedTask, ...old.tasks.filter((t: Task) => t.id !== task.id)];
-          return { ...old, tasks: newTasks };
-        }
-        if (old.results) {
-          const newResults = [updatedTask, ...old.results.filter((t: Task) => t.id !== task.id)];
-          return { ...old, results: newResults };
-        }
-        console.warn('[DateChange] ⚠️ Unknown cache shape — task not reordered:', old);
+        if (Array.isArray(old)) return [updatedTask, ...old.filter((t: Task) => t.id !== task.id)];
+        if (old.tasks)   return { ...old, tasks:   [updatedTask, ...old.tasks.filter((t: Task) => t.id !== task.id)] };
+        if (old.results) return { ...old, results: [updatedTask, ...old.results.filter((t: Task) => t.id !== task.id)] };
         return old;
+      };
+
+      queryClient.getQueryCache().findAll({ queryKey: ['tasks'] }).forEach(query => {
+        queryClient.setQueryData(query.queryKey, applyDateUpdate);
       });
 
-      // Also update all project-specific caches
-      const updatedTaskForProjects = { ...task, [field]: isoValue, updated_at: new Date().toISOString() };
-      updateAllTaskListCaches(updatedTaskForProjects);
+      updateAllTaskListCaches(updatedTask);
 
       taskApi.update(task.id, { [field]: isoValue }).catch((error) => {
         console.error('Failed to update date:', error);
@@ -691,29 +717,36 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
   return [
     {
       key: 'project',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Project</span>,
+      label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">Project</span>,
       width: '10%',
       render: (task: Task) => (
-        <span className="text-[12px] text-gray-700 font-medium">
-          {task.project_details?.name || task.project_name || 'No Project'}
+        <span
+          title={task.project_details?.name || task.project_name || ''}
+          style={{
+            fontSize: 13, fontWeight: 700, color: '#172033',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            display: 'block', maxWidth: 130,
+          }}
+        >
+          {task.project_details?.name || task.project_name || '—'}
         </span>
       ),
     },
     {
       key: 'heading',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Task Title</span>,
-      width: '20%',
+      label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">Task Title</span>,
+      width: '10%',
       render: (task: Task) => <TaskTitleCell task={task} queryClient={queryClient} />,
     },
     {
       key: 'status',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Status</span>,
+      label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">Status</span>,
       width: '8%',
       render: (task: Task) => <StatusDropdown task={task} />,
     },
     {
       key: personField,
-      label: <span className="text-[14px] font-bold tracking-wide text-gray-700">{personField === 'assigned_to' ? 'Assignee' : personField === 'created_by' ? 'Created By' : 'Updated By'}</span>, width: '8%',
+      label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">{personField === 'assigned_to' ? 'Assignee' : personField === 'created_by' ? 'Created By' : 'Updated By'}</span>, width: '8%',
       render: (task: Task) => {
         if (personField === 'created_by') {
           // Show Created By
@@ -805,7 +838,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
               </span>
             </div>
             <div className="max-h-48 overflow-y-auto p-1">
-            {(task.assigned_to_user_details || []).length > 0 ? (
+              {(task.assigned_to_user_details || []).length > 0 ? (
                 (task.assigned_to_user_details || []).map((u) => (
                   <div key={u.id} className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded">
                     <div className="w-6 h-6 rounded-full overflow-hidden flex items-center justify-center text-[10px] font-semibold shrink-0 text-white"
@@ -831,13 +864,13 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     },
     {
       key: 'priority',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Priority</span>,
+     label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">Priority</span>,
       width: '8%',
       render: (task: Task) => <PriorityDropdown task={task} />,
     },
     {
       key: 'labels',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Labels</span>,
+      label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">Labels</span>,
       width: '8%',
       render: (task: Task) => (
         <div className="flex flex-wrap gap-1.5 items-center h-full min-h-[24px]" onClick={(e) => e.stopPropagation()}>
@@ -859,7 +892,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     },
     {
       key: dateField,
-      label: <span className="text-[14px] font-bold tracking-wide text-gray-700">{dateField === 'end_date' ? 'Due Date' : dateField === 'start_date' ? 'Start Date' : 'Created At'}</span>,
+      label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">{dateField === 'end_date' ? 'Due Date' : dateField === 'start_date' ? 'Start Date' : 'Created At'}</span>,
       width: '8%',
       render: (task: Task) =>
         dateField === 'created_at'
@@ -868,7 +901,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     },
     {
       key: 'updated_at',
-      label: <span className="text-[14px] font-bold tracking-wide text-gray-700">Updated</span>,
+      label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">Updated</span>,
       width: '8%',
       render: (task: Task) => {
         if (!task) return <span className="text-[13px] text-gray-600 pl-1">—</span>;
@@ -881,7 +914,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     },
     {
       key: 'duration',
-      label: <span className="text-[14px] font-bold  tracking-wide text-gray-700">Duration</span>,
+      label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">Duration</span>,
       width: '8%',
       render: (task: Task) => (
         <input

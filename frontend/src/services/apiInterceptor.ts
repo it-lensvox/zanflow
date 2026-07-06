@@ -38,14 +38,7 @@ export const fetchWithWorkspace = async (
   if (workspaceId) {
     headers['X-Workspace-ID'] = workspaceId;
   }
-  
-  console.log('🌐 API Request:', {
-    url,
-    method: options.method || 'GET',
-    workspaceId,
-    hasAuth: !!token,
-  });
-  
+
   // Make the request
   return fetch(url, {
     ...options,

@@ -1,30 +1,27 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { Link } from 'react-router-dom';
 import {
-  ArrowLeft,
-  Loader2,
-  Upload,
-  List,
-  Grid3X3,
-  Settings,
-  MessageCircle,
+  ArrowLeft, Loader2, Upload, List, Grid3X3, Settings, MessageCircle, Copy, Check,
   Search, FileText, Info, X, Calendar, User, NotebookPen, Pencil, Plus, Trash2
 } from 'lucide-react';
 import { DualView, ViewToggle } from '@/components/layout/DualView';
 import { createDocumentsTableColumns, DocumentGridCard } from '@/components/layout/DualView/documentsConfig';
 import { TaskGridCard, createTasksTableColumns, getStatusConfig, priorityOptions, statusOptions } from '@/components/layout/DualView/taskConfig';
-import { TaskDetailModal } from '../MyTask/TaskDetailModal';
+import { TaskDetailModal } from '../MyTask/TaskDetail/Components/TaskDetailModal';
 import { SearchFilter, ListFilter, DateFilter, FilterHeaderWrapper } from '@/components/layout/DualView/FilterComponents';
-import { CreateTask } from '@/pages/MyTask/CreateTask';
+import { CreateTask } from '@/pages/MyTask/pages/CreateTask/CreateTask';
 import { InlineCreateRow } from '@/components/layout/CreateTask/InlineCreateRow';
 import { DocumentPreview, useDocumentPreviewKeyboard } from '@/components/common/DocumentPreview';
 import { DocumentShareModal } from '@/pages/Documents/DocumentShareModal';
 import DeleteModal from '@/components/common/Deletemodal';
 import Threads from '../Project/Thread';
 import { useProjectDetails, TabType } from '@/hooks/useTaskDetails';
-import type { Task, FilteredDocument, QuickNote } from '@/types';
+import type { Task, QuickNote } from '@/types';
 import { taskApi } from '@/services/api';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
+import { useJsonPreview } from '@/hooks/useJsonPreview';
+import { TaskPreviewOverlay } from '@/pages/Project/components/TaskPreviewOverlay';
 
 //Date Field Dropdown
 function DateFieldDropdown({
@@ -225,9 +222,52 @@ export function TaskDetails() {
   const bulkFileInputRef = React.useRef<HTMLInputElement>(null);
   const [isBulkUploading, setIsBulkUploading] = React.useState(false);
   const [uploadResultModal, setUploadResultModal] = React.useState<{ type: 'success' | 'error', message: string } | null>(null);
-
   const [isBulkUploadModalOpen, setIsBulkUploadModalOpen] = React.useState(false);
   const [pastedJson, setPastedJson] = React.useState("");
+  const { copied: jsonExampleCopied, copy: copyJsonExample } = useCopyToClipboard();
+  const { tasks: parsedTasks, error: previewError } = useJsonPreview(pastedJson);
+  const [previewTasks, setPreviewTasks] = useState(parsedTasks);
+  const [showPreviewOverlay, setShowPreviewOverlay] = useState(false);
+
+  // Re-sync preview whenever the textarea JSON changes
+  // (only when the overlay is NOT open, to avoid resetting edits mid-preview)
+  useEffect(() => {
+    if (!showPreviewOverlay) {
+      setPreviewTasks(parsedTasks);
+    }
+  }, [parsedTasks, showPreviewOverlay]);
+
+  const handleDeletePreviewTask = (index: number) => {
+    const updated = previewTasks.filter((_, i) => i !== index);
+    setPreviewTasks(updated);
+    setPastedJson(JSON.stringify({ tasks: updated }, null, 2));
+  };
+
+  const handleEditPreviewTaskTitle = (index: number, newTitle: string) => {
+    const updated = previewTasks.map((t, i) => i === index ? { ...t, heading: newTitle } : t);
+    setPreviewTasks(updated);
+    setPastedJson(JSON.stringify({ tasks: updated }, null, 2));
+  };
+
+  const handleShowPreview = () => {
+    if (previewTasks.length === 0) return;
+    setIsBulkUploadModalOpen(false);
+    setShowPreviewOverlay(true);
+  };
+
+  const handleBackToImport = () => {
+    setShowPreviewOverlay(false);
+    setIsBulkUploadModalOpen(true);
+  };
+
+  const handleCreateFromPreview = async () => {
+    if (previewTasks.length === 0) return;
+    const json = JSON.stringify({ tasks: previewTasks }, null, 2);
+    const file = new File([json], 'pasted_tasks.json', { type: 'application/json' });
+    setShowPreviewOverlay(false);
+    await processBulkFile(file);
+    setPreviewTasks([]);
+  };
 
   const dummyJsonExample = `{
   "tasks": [
@@ -243,7 +283,7 @@ export function TaskDetails() {
       "description": "Ensure WebSocket connections handle disconnects gracefully.",
       "priority": "medium",
       "status": "backlog",
-      "assignee_emails": ["megha@example.com"]
+      "assignee_emails": ["lensvox@example.com"]
     }
   ]
 }`;
@@ -257,8 +297,8 @@ export function TaskDetails() {
         ctx.queryClient.invalidateQueries();
       }
       setUploadResultModal({ type: 'success', message: 'Tasks successfully created from JSON!' });
-      setIsBulkUploadModalOpen(false); // Close the input modal on success
-      setPastedJson(""); // Clear pasted text
+      setIsBulkUploadModalOpen(false);
+      setPastedJson("");
     } catch (error: any) {
       console.error('Bulk upload error:', error);
       const errorMessage = error.response?.data?.error || error.response?.data?.message || 'Failed to upload tasks.';
@@ -272,7 +312,10 @@ export function TaskDetails() {
   const handleBulkUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    await processBulkFile(file);
+
+    // Read file content into pastedJson so the preview renders
+    const text = await file.text();
+    setPastedJson(text);
   };
 
   const handlePasteUpload = async () => {
@@ -291,8 +334,6 @@ export function TaskDetails() {
     await processBulkFile(file);
   };
 
-  // DateFieldLabel
-
   // DateFieldLabel 
   const DateFieldLabel = useMemo(
     () => (
@@ -307,7 +348,6 @@ export function TaskDetails() {
         </svg>
       </button>
     ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [ctx.showDateFieldDropdown, ctx.dateField, ctx.activeDateLabel],
   );
   // PersonFieldLabel
@@ -362,8 +402,8 @@ export function TaskDetails() {
   return (
     <>
       {/* ── Outer layout wrapper ── */}
-      <div className="flex min-h-screen bg-[#f8fafc] text-black">
-        <div className="flex-1 w-full p-8">
+      <div className="min-h-screen bg-[#f8fafc] text-black">
+        <div className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 py-8">
 
           {/* ── Header ── */}
           <div className="flex items-center gap-4 mb-8">
@@ -398,7 +438,7 @@ export function TaskDetails() {
               </button>
             ))}
 
-            {/* List / Grid toggle (tasks only) */}
+            {/* List / Grid toggle */}
             {ctx.activeTab === 'tasks' && (
               <div className="flex items-center bg-white p-1 gap-1 ml-auto">
                 <button
@@ -483,10 +523,11 @@ export function TaskDetails() {
                   <>
                     {ctx.viewMode === 'list' ? (
                       <div className="bg-white rounded-lg shadow-sm">
-                        <DualView
-                          viewMode="table"
-                          gridProps={{
-                            data: ctx.filteredTasks,
+                        <div className="overflow-x-auto pb-4">
+                          <DualView
+                            viewMode="table"
+                            gridProps={{
+                              data: ctx.filteredTasks,
                             renderCard: (task: Task) => (
                               <TaskGridCard task={task} onTaskClick={ctx.setSelectedTask} />
                             ),
@@ -626,6 +667,7 @@ export function TaskDetails() {
                             onFilter: ctx.handleFilter,
                           }}
                         />
+                        </div>
 
                         {/* Inline create row  */}
                         {ctx.viewMode === 'list' && !ctx.isInlineCreating && (
@@ -811,7 +853,7 @@ export function TaskDetails() {
           onClose={() => ctx.setPreviewDocument(null)}
         />
       )}
-      {/* Document Info Panel — same as /documents page */}
+      {/* Document Info Panel */}
       {ctx.infoDoc && (
         <div className="fixed inset-0 z-50 flex justify-end pointer-events-none">
           <div className="pointer-events-auto w-[340px] h-full bg-white border-l border-gray-200 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
@@ -844,7 +886,7 @@ export function TaskDetails() {
         </div>
       )}
 
-      {/* Document Share Modal — same as /documents page */}
+      {/* Document Share Modal */}
       <DocumentShareModal
         isOpen={!!ctx.shareDoc}
         onClose={() => ctx.setShareDoc(null)}
@@ -1074,6 +1116,18 @@ export function TaskDetails() {
         </div>
       )}
 
+      {/* ── Task Preview Overlay ── */}
+      {showPreviewOverlay && (
+        <TaskPreviewOverlay
+          tasks={previewTasks}
+          onRemoveTask={handleDeletePreviewTask}
+          onEditTitle={handleEditPreviewTaskTitle}
+          onBack={handleBackToImport}
+          onCreateTasks={handleCreateFromPreview}
+          isCreating={isBulkUploading}
+        />
+      )}
+
       {/* ── Import Tasks Modal ── */}
       {isBulkUploadModalOpen && (
         <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
@@ -1097,9 +1151,30 @@ export function TaskDetails() {
                 <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
                   <Info className="w-4 h-4 text-blue-500" /> Expected Format
                 </h3>
-                <pre className="bg-slate-900 text-green-400 p-4 rounded-lg text-[12px] overflow-x-auto font-mono leading-relaxed">
-                  {dummyJsonExample}
-                </pre>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => copyJsonExample(dummyJsonExample)}
+                    aria-label={jsonExampleCopied ? 'Copied' : 'Copy sample JSON'}
+                    className={`absolute top-2 right-2 z-10 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${jsonExampleCopied
+                      ? 'bg-green-500/20 text-green-300'
+                      : 'bg-white/10 text-gray-200 hover:bg-white/20'
+                      }`}
+                  >
+                    {jsonExampleCopied ? (
+                      <>
+                        <Check className="w-3.5 h-3.5" /> Copied!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" /> Copy
+                      </>
+                    )}
+                  </button>
+                  <pre className="bg-slate-900 text-green-400 p-4 rounded-lg text-[12px] overflow-x-auto font-mono leading-relaxed">
+                    {dummyJsonExample}
+                  </pre>
+                </div>
               </div>
 
               {/* Paste or Upload Section */}
@@ -1111,6 +1186,21 @@ export function TaskDetails() {
                   placeholder="Paste your JSON array here..."
                   className="w-full h-48 p-3 text-[13px] text-gray-700 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#65408b] font-mono resize-y bg-gray-50"
                 />
+
+                {/* Inline count + preview hint */}
+                {previewTasks.length > 0 && !previewError && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
+                    <Check className="w-3.5 h-3.5 text-green-600 flex-shrink-0" />
+                    <span className="text-[12px] font-semibold text-green-700">
+                      {previewTasks.length} {previewTasks.length === 1 ? 'task' : 'tasks'} detected — click Preview to review before creating.
+                    </span>
+                  </div>
+                )}
+
+                {/* Inline syntax error hint */}
+                {pastedJson.trim() && previewError && (
+                  <p className="text-[11px] text-red-500 mt-1">{previewError}</p>
+                )}
 
                 <div className="flex items-center justify-between mt-2 pt-4 border-t border-gray-100">
                   <div className="flex items-center gap-3">
@@ -1133,12 +1223,12 @@ export function TaskDetails() {
                   </div>
 
                   <button
-                    onClick={handlePasteUpload}
-                    disabled={isBulkUploading || !pastedJson.trim()}
+                    onClick={handleShowPreview}
+                    disabled={isBulkUploading || previewTasks.length === 0 || !!previewError}
                     className="px-6 py-2 bg-[#65408b] hover:bg-[#553675] text-white text-sm font-bold rounded-lg transition-all shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                   >
-                    {isBulkUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                    Create Tasks
+                    <Search className="w-4 h-4" />
+                    Preview
                   </button>
                 </div>
               </div>
@@ -1172,8 +1262,8 @@ export function TaskDetails() {
               <button
                 onClick={() => setUploadResultModal(null)}
                 className={`w-full py-2.5 px-4 rounded-lg font-bold text-white transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 ${uploadResultModal.type === 'success'
-                    ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500 hover:shadow-lg hover:-translate-y-0.5'
-                    : 'bg-red-600 hover:bg-red-700 focus:ring-red-500 hover:shadow-lg hover:-translate-y-0.5'
+                  ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500 hover:shadow-lg hover:-translate-y-0.5'
+                  : 'bg-red-600 hover:bg-red-700 focus:ring-red-500 hover:shadow-lg hover:-translate-y-0.5'
                   }`}
               >
                 Continue

@@ -45,16 +45,7 @@ export function WorkspaceSwitcher({ onCreateWorkspace }: WorkspaceSwitcherProps)
 
   useEffect(() => {
     if (workspaces.length > 0) {
-      console.log('🔍 DEBUG: All workspaces:', workspaces);
-      console.log('🔍 DEBUG: Current user:', user);
       workspaces.forEach((w: Workspace) => {
-        console.log(`📋 Workspace: "${w.name}"`);
-        console.log(`   - ID: ${w.id}`);
-        console.log(`   - created_by: ${w.created_by}`);
-        console.log(`   - is_default: ${w.is_default}`);
-        console.log(`   - user.id: ${user?.id}`);
-        console.log(`   - canDelete: ${canDeleteWorkspace(w)}`);
-        console.log('---');
       });
     }
   }, [workspaces, user]);
@@ -68,9 +59,7 @@ export function WorkspaceSwitcher({ onCreateWorkspace }: WorkspaceSwitcherProps)
     setIsSwitching(true);
 
     try {
-      console.log(`🔄 Switching to workspace ${workspaceId}...`);
       await workspaceApi.switchWorkspace(workspaceId);
-      console.log(`✅ Workspace switched to ${workspaceId}, reloading...`);
       window.location.reload();
     } catch (error: any) {
       console.error('❌ Failed to switch workspace:', error);
@@ -85,7 +74,7 @@ export function WorkspaceSwitcher({ onCreateWorkspace }: WorkspaceSwitcherProps)
     setWorkspaceToDelete(workspace);
     setShowDeleteConfirm(true);
     setIsOpen(false);
-    setDeleteConfirmText(''); // ✅ Reset input on open
+    setDeleteConfirmText('');
   };
   
 
@@ -95,10 +84,7 @@ export function WorkspaceSwitcher({ onCreateWorkspace }: WorkspaceSwitcherProps)
     setIsDeleting(true);
 
     try {
-      console.log(`🗑️ Deleting workspace ${workspaceToDelete.id}...`);
       const result = await workspaceApi.deleteWorkspace(workspaceToDelete.id);
-
-      console.log(`✅ Workspace deleted:`, result);
 
       // If we deleted the active workspace, switch to default
       if (workspaceToDelete.id === activeWorkspaceId) {

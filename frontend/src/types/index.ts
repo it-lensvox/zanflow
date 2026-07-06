@@ -81,6 +81,7 @@ export interface ProjectMember {
 export interface ProjectMinimal {
   id: number;
   name: string;
+  task_type?: string;
 }
 
 // In project listing page with pagination
@@ -1232,39 +1233,223 @@ export interface AIBotContext {
   id: number | string | null;
 }
 
-// Outgoing message payload to WebSocket
-export interface AIBotSendPayload {
-  message: string;
-  context: AIBotContext;
+// ─── OLD WebSocket AI Bot types (commented — replaced by REST Agent API) ──────
+// export interface AIBotSendPayload { message: string; context: AIBotContext; }
+// export type AIBotMessageType = 'system' | 'ai_chunk' | 'ai_done' | 'ai_complete' | 'ai_response' | 'chat_title' | 'error';
+// export interface AIBotIncomingMessage { type: AIBotMessageType; text: string; }
+// export interface AIBotUIMessage { id: string; text: string; sender: 'user' | 'bot'; timestamp: Date; }
+// export interface AIBotSession { id: string; title: string; messages: AIBotUIMessage[]; createdAt: Date; updatedAt: Date; }
+
+// ─── NEW REST Agent API types ─────────────────────────────────────────────────
+
+// POST /api/v1/agent/query/
+export interface AgentQueryPayload {
+  query:      string;
+  session_id: number | null;   // null = new conversation
 }
 
-// Incoming message types from backend WebSocket
-export type AIBotMessageType = 'system' | 'ai_chunk' | 'ai_done' | 'ai_complete' | 'ai_response' | 'chat_title' | 'error';
+// Response from POST /api/v1/agent/query/
+export interface AgentQueryResponse {
+  response:     string;   
+  session_id:   number;
+  tool_called:  string | null;  
+  tool_result:  Record<string, unknown> | null;  
+  filters_used: AgentFiltersUsed | null;  
+}
 
-export interface AIBotIncomingMessage {
-  type: AIBotMessageType;
+// Item from GET /api/v1/agent/sessions/
+export interface AgentSession {
+  id:            number;
+  title:         string;
+  is_pinned:     boolean;
+  is_active:     boolean;
+  message_count: number;
+  created_at:    string;
+  updated_at:    string;
+}
+
+export interface AgentSessionUpdatePayload {
+  title?:     string;
+  is_pinned?: boolean;
+}
+
+export interface AgentSessionUpdateResponse {
+  id:       number;
+  title:    string;
+  is_pinned: boolean;
+}
+// Message inside a session detail
+export interface AgentMessage {
+  role:        'user' | 'assistant';
+  content:     string | Array<{ type: string; text?: string; [key: string]: unknown }>;
+  tool_called?: string | null;
+  tool_result?: Record<string, unknown> | null;
+}
+
+// GET /api/v1/agent/sessions/<id>/
+export interface AgentSessionDetail {
+  id:         number;
+  is_active:  boolean;
+  messages:   AgentMessage[];
+  created_at: string;
+  updated_at: string;
+}
+
+// Local UI message (what we render in the chat)
+export interface AgentUIMessage {
+  id:           string;
+  role:         'user' | 'assistant';
+  content:      string;
+  timestamp:    string;
+  toolCalled?:  string | null;
+  toolResult?:  Record<string, unknown> | null;
+  filtersUsed?: AgentFiltersUsed | null;
+}
+
+// ─── Streaming types 
+export interface AgentStreamChunk {
+  type: 'chunk';
   text: string;
 }
 
-// UI message stored in session history
-export interface AIBotUIMessage {
-  id: string;
-  text: string;
-  sender: 'user' | 'bot';
-  timestamp: Date;
+export interface AgentStreamDone {
+  type:         'done';
+  session_id:   number;
+  tool_called:  string | null;
+  tool_result:  Record<string, unknown> | null;
+  filters_used: AgentFiltersUsed | null;
 }
 
-// AI Bot chat session
-export interface AIBotSession {
-  id: string;
+export type AgentStreamEvent = AgentStreamChunk | AgentStreamDone;
+
+// ─── AI Search types 
+export interface AgentSearchPayload {
+  query:      string;
+  page?:      number;
+  page_size?: number;
+  models?:    ('task' | 'note' | 'project' | 'event' | 'document')[];
+}
+
+export interface AgentSearchTask {
+  id: number;
+  heading: string;
+  status: string;
+  priority: string;
+  project: string;
+  assigned_to: string[];
+  end_date: string;
+}
+
+export interface AgentSearchDocument {
+  id:         string;
+  name:       string;
+  project:    string;
+  status:     string;
+  file_type:  string;
+}
+
+export interface AgentSearchNote {
+  id: number;
   title: string;
-  messages: AIBotUIMessage[];
-  createdAt: Date;
-  updatedAt: Date;
+  preview: string;
+  project: string;
 }
+
+export interface AgentSearchProject {
+  id: number;
+  name: string;
+}
+
+export interface AgentSearchEvent {
+  id:         number;
+  title:      string;
+  event_type: string;
+  start_time: string;
+  end_time:   string;
+  location:   string;
+  is_online:  boolean;
+  organizer:  string;
+}
+
+export interface AgentSearchMember {
+  id:       number;
+  name:     string;
+  email:    string;
+  room_id?: string | null;
+}
+
+export interface AgentSearchDocument {
+  id:        string;
+  name:      string;
+  project:   string;
+  status:    string;
+  file_type: string;
+}
+
+export interface AgentSearchResults {
+  tasks:      AgentSearchTask[];
+  notes:      AgentSearchNote[];
+  projects:   AgentSearchProject[];
+  events:     AgentSearchEvent[];
+  documents?: AgentSearchDocument[];
+  members?:   AgentSearchMember[];
+}
+export interface AgentSearchTotals {
+  tasks:      number;
+  notes:      number;
+  projects:   number;
+  events:     number;
+  documents?: number;
+  members?:   number;
+}
+export interface AgentSearchResponseSearch {
+  type:         'search';
+  query:        string;
+  results:      AgentSearchResults;
+  totals:       AgentSearchTotals;
+  total:        number;
+  page:         number;
+  page_size:    number;
+  has_more:     boolean;
+  filters_used: AgentFiltersUsed | null;  
+  fallback:     boolean;
+}
+
+// ─── Shared filters_used shape 
+export interface AgentFiltersUsed {
+  status?:         string;
+  priority?:       string;
+  assignee_name?:  string;
+  overdue?:        boolean;
+  assigned_to_me?: boolean;
+  today?:          boolean;
+  date?:           string;
+  is_favourite?:   boolean;
+  search_text?:    string;
+  // open_chat filters
+  room_id?:        string;
+  room_type?:      'private' | 'project';
+  member_id?:      number;
+  member_name?:    string;
+  project_id?:     number;
+  // label filters
+  label_name?:     string;
+  label_names?:    string[];
+  heading?:        string;
+  // document filters
+  file_type?:      string;
+  project_name?:   string;
+}
+
+export interface AgentSearchResponseAction {
+  type:    'action';
+  query:   string;
+  message: string;
+}
+
+export type AgentSearchResponse = AgentSearchResponseSearch | AgentSearchResponseAction;
 
 // ─── Organization / Workspace Types (Superuser only)
-
 export interface OrgAdmin {
   id: number;
   username: string;
@@ -1392,7 +1577,7 @@ export interface UpdateQuickNotePayload {
 
 // Calendar Daily Update Types
 
-// Single daily update entry (matches backend response)
+// Single daily update entry 
 export interface DailyUpdate {
   id: number;
   user: number;
@@ -1417,7 +1602,6 @@ export interface DailyUpdateListResponse {
   results: DailyUpdate[];
 }
 
-// Add this new type (keep this)
 export type InvitationStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'ORGANIZER';
 
 export interface Event {
@@ -1465,4 +1649,104 @@ export interface DyuksaAIResponse {
     reply: string;
 }
 
+
+// ── Custom Dashboard Types
+
+export type WidgetType =
+  | 'stat_projects'
+  | 'stat_documents'
+  | 'stat_tasks'
+  | 'stat_completed'
+  | 'stat_overdue'
+  | 'donut_chart'
+  | 'line_chart'
+  | 'my_tasks'
+  | 'recent_activity'
+  | 'projects_table';
+
+export type WidgetSize = 'sm' | 'md' | 'lg';
+
+export interface WidgetConfig {
+  id: string;
+  type: WidgetType;
+  size: WidgetSize;
+  order: number;
+}
+
+export interface CustomDashboard {
+  id: number;
+  name: string;
+  is_default: boolean;
+  widgets: WidgetConfig[];
+  created_at: string;
+  updated_at: string;
+}
+
+// ── AI Child Task Suggestions
+
+export interface AIChildTaskSuggestionPayload {
+  task_id: number;
+  title: string;
+  description?: string;
+  project_name?: string;
+  task_type?: string;
+  existing_child_tasks?: string[];
+  suggestion_count?: number;
+}
+
+export interface AIChildTaskSuggestionResponse {
+  suggestions: Array<{
+    title:       string;
+    priority?:   'high' | 'medium' | 'low';
+    status?:     string;
+    assigned_to?: number[];
+  }>;
+}
+
+export interface CreateChildTasksBatchPayload {
+  parent_task_id: number;
+  tasks: Array<{
+    title:        string;
+    priority?:    string;
+    status?:      string;
+    assigned_to?: number[];
+  }>;
+}
+
+export interface CreateChildTasksBatchResponse {
+  created: Task[];
+  failed: Array<{ title: string; error: string }>;
+}
+
+// ── Social Auth Types
+
+export type SocialProvider = 'google' | 'microsoft';
+// company_name is optional — present for Signup, absent for Login.
+export interface SocialAuthPayload {
+  provider: SocialProvider;
+  token: string;
+  company_name?: string;
+}
+
+// Matches the success response from POST /api/auth/social-auth/
+export interface SocialAuthResponse {
+  message: string;
+  user: {
+    id: number;
+    username: string;
+    email: string;
+    role: User['role'];
+    auth_provider: SocialProvider;
+  };
+  tokens: {
+    access: string;
+    refresh: string;
+  };
+  // Only present in Signup (201) response
+  organization?: {
+    id: number;
+    name: string;
+    slug: string;
+  };
+}
 

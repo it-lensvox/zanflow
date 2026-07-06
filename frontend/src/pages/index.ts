@@ -1,9 +1,9 @@
-export { Dashboard } from './Dashboard';
+export { Dashboard } from './Dashboard/Dashboard';
 export { Login } from './Login';
 export { Projects } from './Project/Projects';
 export { DocumentCreate } from './Documents/DocumentCreate';
 export { MyTask } from './MyTask/MyTask';
-export { CreateTask } from './MyTask/CreateTask'
+export { CreateTask } from './MyTask/pages/CreateTask/CreateTask'
 export { Teams } from './TeamManagement/Teams';
 export { UserManagement } from './TeamManagement/UserManagement'
 export { TeamPerformance } from './TeamManagement/TeamPerformance';

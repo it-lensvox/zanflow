@@ -1,8 +1,10 @@
 import path from 'path';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
+// import basicSsl from '@vitejs/plugin-basic-ssl';
 
 export default defineConfig({
+  // plugins: [react(), basicSsl()], 
   plugins: [react()],
   resolve: {
     alias: {
@@ -18,13 +20,9 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          // Core React runtime
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          // Data fetching
           'vendor-query': ['@tanstack/react-query'],
-          // Heavy UI: PDF viewer
           'vendor-pdf': ['react-pdf', 'pdfjs-dist'],
-          // Rich text editor (tiptap packages)
           'vendor-tiptap': [
             '@tiptap/react',
             '@tiptap/starter-kit',

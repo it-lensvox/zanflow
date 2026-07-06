@@ -140,7 +140,6 @@ export function Teams() {
       setTeamToDelete(null);
     } catch (error) {
       console.error('Failed to delete team:', error);
-      // You can add a toast notification here if you have one
     }
   };
 
@@ -195,79 +194,85 @@ export function Teams() {
 
   return (
     <>
-      <div className="w-full h-full flex flex-col">
-        {/* Static Header */}
-        <div className="flex-shrink-0 px-8 pt-8 pb-4 bg-white border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold">Teams</h1>
-              <p className="text-muted-foreground">
-                Manage your team structure and members
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <ViewToggle viewMode={viewMode} onViewModeChange={setViewMode} />
-              <Button onClick={() => setIsCreateModalOpen(true)}>
-                Create Team
-              </Button>
+      {/* ── Main Responsive Wrapper ── */}
+      <div className="w-full h-full flex flex-col bg-[#F7F8FB] px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 pt-6 pb-8">
+
+        {/* Inner Card Container */}
+        <div className="flex flex-col flex-1 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+
+          {/* Static Header */}
+          <div className="flex-shrink-0 px-6 pt-8 pb-4 bg-white border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Teams</h1>
+                <p className="text-muted-foreground text-sm">
+                  Manage your team structure and members
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <ViewToggle viewMode={viewMode} onViewModeChange={setViewMode} />
+                <Button onClick={() => setIsCreateModalOpen(true)}>
+                  Create Team
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-auto px-8 py-6">
-          <DualView
-            viewMode={viewMode}
-            isLoading={isLoading}
-            gridProps={{
-              data: filteredTeams,
-              renderCard: (team: Team) => (
-                <TeamGridCard
-                  key={team.id}
-                  team={team}
-                  onToggleFavorite={toggleFavorite}
-                  onMemberAdded={handleMemberAdded}
-                />
-              ),
-              emptyState,
-              gridClassName: 'grid gap-4 md:grid-cols-2 lg:grid-cols-3',
-            }}
-            tableProps={{
-              data: filteredTeams,
-              activeFilterKey: activeFilterKey,
-              columns: columns.map(col => ({
-                ...col,
-                headerClassName: `relative ${activeFilterKey === col.key ? 'z-[100]' : ''}`,
-                label: col.key === 'name' ? (
-                  <div ref={activeFilterKey === col.key ? filterContainerRef : null}>
-                    <FilterHeaderWrapper
-                      columnLabel="Team Name"
-                      filterType="search"
-                      isActive={activeFilterKey === col.key}
-                    >
-                      <SearchFilter
-                        columnKey={col.key}
-                        placeholder="Search..."
-                        value={columnFilters[col.key] || ''}
-                        onChange={(value) => setColumnFilters(prev => ({ ...prev, [col.key]: value }))}
+          {/* Scrollable Content */}
+          <div className="flex-1 overflow-auto p-6">
+            <DualView
+              viewMode={viewMode}
+              isLoading={isLoading}
+              gridProps={{
+                data: filteredTeams,
+                renderCard: (team: Team) => (
+                  <TeamGridCard
+                    key={team.id}
+                    team={team}
+                    onToggleFavorite={toggleFavorite}
+                    onMemberAdded={handleMemberAdded}
+                  />
+                ),
+                emptyState,
+                gridClassName: 'grid gap-4 md:grid-cols-2 lg:grid-cols-3',
+              }}
+              tableProps={{
+                data: filteredTeams,
+                activeFilterKey: activeFilterKey,
+                columns: columns.map(col => ({
+                  ...col,
+                  headerClassName: `relative ${activeFilterKey === col.key ? 'z-[100]' : ''}`,
+                  label: col.key === 'name' ? (
+                    <div ref={activeFilterKey === col.key ? filterContainerRef : null}>
+                      <FilterHeaderWrapper
+                        columnLabel="Team Name"
+                        filterType="search"
                         isActive={activeFilterKey === col.key}
-                      />
-                    </FilterHeaderWrapper>
-                  </div>
-                ) : col.label
-              })),
-              rowKey: (team: Team) => team.id,
-              onRowClick: (team: Team) => { },
-              emptyState,
-              rowClassName: () => 'group',
-              onSort: handleSort,
-              onFilter: (key: string) => {
-                if (key === 'name') {
-                  handleFilter(key);
-                }
-              },
-            }}
-          />
+                      >
+                        <SearchFilter
+                          columnKey={col.key}
+                          placeholder="Search..."
+                          value={columnFilters[col.key] || ''}
+                          onChange={(value) => setColumnFilters(prev => ({ ...prev, [col.key]: value }))}
+                          isActive={activeFilterKey === col.key}
+                        />
+                      </FilterHeaderWrapper>
+                    </div>
+                  ) : col.label
+                })),
+                rowKey: (team: Team) => team.id,
+                onRowClick: (team: Team) => { },
+                emptyState,
+                rowClassName: () => 'group',
+                onSort: handleSort,
+                onFilter: (key: string) => {
+                  if (key === 'name') {
+                    handleFilter(key);
+                  }
+                },
+              }}
+            />
+          </div>
         </div>
       </div>
 

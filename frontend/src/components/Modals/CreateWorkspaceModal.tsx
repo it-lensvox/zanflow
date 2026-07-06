@@ -9,8 +9,7 @@ interface CreateWorkspaceModalProps {
   onClose: () => void;
 }
 
-type MemberRole = 'admin' | 'manager' | 'member';
-
+import { getRoleConfig, ROLE_OPTIONS, type UserRole as MemberRole } from '@/config/roleConfig';
 interface SelectedMember {
   user_id: number;
   username: string;
@@ -18,17 +17,6 @@ interface SelectedMember {
   role: MemberRole;
 }
 
-const ROLE_OPTIONS: { value: MemberRole; label: string }[] = [
-  { value: 'admin', label: 'Admin' },
-  { value: 'manager', label: 'Manager' },
-  { value: 'member', label: 'Member' },
-];
-
-const ROLE_COLORS: Record<MemberRole, { bg: string; color: string }> = {
-  admin:   { bg: '#FEE2E2', color: '#DC2626' },
-  manager: { bg: '#FEF3C7', color: '#D97706' },
-  member:  { bg: '#DBEAFE', color: '#2563EB' },
-};
 
 export function CreateWorkspaceModal({ isOpen, onClose }: CreateWorkspaceModalProps) {
   const { user: currentUser } = useAuth();
@@ -71,7 +59,7 @@ export function CreateWorkspaceModal({ isOpen, onClose }: CreateWorkspaceModalPr
     const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username;
     setSelectedMembers((prev) => [
       ...prev,
-      { user_id: user.id, username: user.username, full_name: fullName, role: 'member' },
+      { user_id: user.id, username: user.username, full_name: fullName, role: 'viewer' },
     ]);
     setMemberSearch('');
     setShowMemberDropdown(false);
@@ -123,8 +111,6 @@ export function CreateWorkspaceModal({ isOpen, onClose }: CreateWorkspaceModalPr
         payload.description,
         payload.members,
       );
-
-      console.log('✅ Workspace created:', response);
 
       // Show skipped members if any
       if (response.members_skipped?.length > 0) {
@@ -355,8 +341,8 @@ export function CreateWorkspaceModal({ isOpen, onClose }: CreateWorkspaceModalPr
                           disabled={isLoading}
                           className="text-xs font-medium px-2 py-1 rounded-md border-0 cursor-pointer outline-none"
                           style={{
-                            background: ROLE_COLORS[member.role].bg,
-                            color: ROLE_COLORS[member.role].color,
+                            background: getRoleConfig(member.role).bg,
+                            color: getRoleConfig(member.role).color,
                           }}
                         >
                           {ROLE_OPTIONS.map((r) => (

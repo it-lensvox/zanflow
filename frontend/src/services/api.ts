@@ -1,20 +1,17 @@
-import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import axios, { InternalAxiosRequestConfig } from 'axios';
 import type {
   AuthTokens, User as AppUser, PaginatedResponse, PaginatedProjectsResponse, GetUploadUrlPayload, GetUploadUrlResponse, ConfirmUploadResponse, GetDownloadUrlPayload, ConfirmUploadPayload, GetDownloadUrlResponse, AllDocumentsResponse,
   TaskComment, CreateTaskCommentPayload, AITaskSuggestionResponse, AITaskSuggestionPayload, ProjectCreatePayload, Label, DocumentStatus, ChatMessage, ChatRoom, ChatRoomMessagesResponse, CreatePrivateChatPayload,
-  GatewaySendMessagePayload, GatewayIncomingMessage, RefineTextPayload, RefineTextResponse, TaskResponse, TeamTypeChoicesResponse, PinTaskResponse,
-  CreateTeamPayload, ProjectChatRoom, TeamChatRoom, ChatUnreadResponse, NotificationData, NotificationCallback, Team, ThreadRoom, ThreadSession, ThreadStorage, ThreadUIMessage, CreateThreadRoomPayload, WSJoinRoomCommand, WSSendMessageCommand, WSIncomingThreadMessage, WSUnreadUpdateSignal, ThreadMessagesResponse,
-  InviteUserPayload, InviteUserResponse, InviteVerifyResponse, InviteAcceptPayload, InviteAcceptResponse, AIBotSendPayload, AIBotIncomingMessage, OrganizationSignupPayload, OrganizationSignupResponse,
-  DailyUpdate, DailyUpdatePayload, DailyUpdateListResponse, TaskFilterParams, Event as CalendarEventType,
+  GatewaySendMessagePayload, GatewayIncomingMessage, RefineTextPayload, RefineTextResponse, TaskResponse, TeamTypeChoicesResponse, PinTaskResponse, CreateTeamPayload, ProjectChatRoom, TeamChatRoom, ChatUnreadResponse, 
+  NotificationData, NotificationCallback, Team, ThreadRoom, ThreadSession, ThreadStorage, ThreadUIMessage, CreateThreadRoomPayload, WSJoinRoomCommand, WSSendMessageCommand, WSIncomingThreadMessage, WSUnreadUpdateSignal, ThreadMessagesResponse,
+  InviteUserPayload, InviteUserResponse, InviteVerifyResponse, InviteAcceptPayload, InviteAcceptResponse, OrganizationSignupPayload, OrganizationSignupResponse,
+  DailyUpdate, DailyUpdatePayload, DailyUpdateListResponse, TaskFilterParams, Event as CalendarEventType, SocialAuthPayload, SocialAuthResponse,
 } from '@/types';
 
-//export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.164:8000/api/v1';
-//const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://192.168.1.164:8000/ws/gateway';
-//const WS_AI_BOT_URL = (import.meta as any).env.VITE_WS_AI_BOT_URL || 'ws://192.168.1.164:8000/ws/ai-bot/';
-export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.164:8000/api/v1';
-const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://192.168.1.164:8000/ws/gateway';
-const WS_AI_BOT_URL = (import.meta as any).env.VITE_WS_AI_BOT_URL || 'ws://192.168.1.164:8000/ws/ai-bot/';
-// export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://zanflow.lensvox.com/api/v1';
+export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.17:8000/api/v1';
+const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://192.168.1.17:8000/ws/gateway';
+const WS_AI_BOT_URL = (import.meta as any).env.VITE_WS_AI_BOT_URL || 'ws://192.168.1.17:8000/ws/ai-bot/';
+
 export const api = axios.create({
   baseURL: API_URL,
   headers: {
@@ -38,14 +35,6 @@ api.interceptors.request.use(
     if (workspaceId) {
       config.headers['X-Workspace-ID'] = workspaceId;
     }
-
-    console.log('🌐 API Request:', {
-      method: config.method?.toUpperCase(),
-      url: config.url,
-      workspaceId: config.headers['X-Workspace-ID'],
-      hasAuth: !!token,
-    });
-
     return config;
   },
   (error) => {
@@ -54,7 +43,6 @@ api.interceptors.request.use(
 );
 
 // ✅ Response interceptor for token refresh with queue
-// Only refreshes on ACTUAL auth failures, not permission errors
 let isRefreshingToken = false;
 let failedRequestsQueue: Array<{
   resolve: (value: any) => void;
@@ -75,16 +63,16 @@ const processQueue = (error: any, token: string | null = null) => {
 // Check if a 403 is an auth issue (expired token) vs a permission issue
 const isAuthError = (error: any): boolean => {
   const status = error.response?.status;
-  
+
   // 401 is always an auth issue
   if (status === 401) return true;
-  
+
   // For 403, check the response body to distinguish auth vs permission
   if (status === 403) {
     const data = error.response?.data;
     const detail = (data?.detail || '').toLowerCase();
     const code = data?.code || '';
-    
+
     // These indicate expired/missing token (should refresh)
     if (
       code === 'not_authenticated' ||
@@ -95,12 +83,12 @@ const isAuthError = (error: any): boolean => {
     ) {
       return true;
     }
-    
+
     // Everything else is a permission error (don't refresh)
     // e.g. "Only admins can create workspaces", "You are not a member"
     return false;
   }
-  
+
   return false;
 };
 
@@ -224,12 +212,10 @@ function scheduleProactiveRefresh() {
   const expMs = decodeTokenExp(accessToken);
   if (!expMs) return;
 
-  // Refresh 2 minutes before expiry (or halfway if token lives < 4 min)
+  // Refresh 2 minutes before expiry
   const now = Date.now();
   const timeUntilExpiry = expMs - now;
   const refreshIn = Math.max(timeUntilExpiry - 120000, timeUntilExpiry / 2, 5000);
-
-  console.log(`🔄 Token refresh scheduled in ${Math.round(refreshIn / 1000)}s`);
 
   proactiveRefreshTimer = setTimeout(async () => {
     try {
@@ -249,8 +235,6 @@ function scheduleProactiveRefresh() {
       }
       setTokens({ access, refresh: refresh || refreshToken });
       api.defaults.headers.common['Authorization'] = `Bearer ${access}`;
-
-      console.log('🔄 Token proactively refreshed');
 
       // Schedule next refresh
       scheduleProactiveRefresh();
@@ -530,10 +514,16 @@ export const documentsApi = {
     await api.delete(`/documents/${id}/`);
   },
 
+  addLabel: async (documentId: string, labelId: number) => {
+    const response = await api.post(`/documents/${documentId}/labels/`, { label_id: labelId });
+    return response.data;
+  },
+
   removeLabel: async (documentId: string, labelId: number) => {
     const response = await api.delete(`/documents/${documentId}/labels/${labelId}/`);
     return response.data;
   },
+  
   // Get all project and task documents with optional task filtering
   getAllDocuments: async (projectId: number, taskId?: number) => {
     const url = `/documents/project/${projectId}/all/`;
@@ -647,9 +637,12 @@ export const taskApi = {
     return data;
   },
 
-  // Paginated fetch — used by the Task Board infinite scroll
-  listPaginated: async (page: number = 1): Promise<import('@/types').TaskPaginatedResponse> => {
-    const response = await api.get('/tasksite/', { params: { page } });
+  // Paginated fetch 
+  listPaginated: async (
+    page: number = 1,
+    filters?: { status?: string; priority?: string; project_id?: number | string },
+  ): Promise<import('@/types').TaskPaginatedResponse> => {
+    const response = await api.get('/tasksite/', { params: { page, ...filters } });
     const data = response.data;
     const rawResults: any[] = data.results ?? data.tasks ?? [];
     const results = rawResults.map((task: any) => ({
@@ -826,6 +819,26 @@ export const taskApi = {
     return response.data;
   },
 
+  // AI-suggested child tasks
+  suggestChildTasks: async (payload: import('@/types').AIChildTaskSuggestionPayload) => {
+    const response = await api.post(`/tasksite/${payload.task_id}/ai-suggest-children/`, payload);
+    return response.data as import('@/types').AIChildTaskSuggestionResponse;
+  },
+
+  // Fetch child tasks for a parent
+  getChildTasks: async (taskId: number) => {
+    const response = await api.get(`/tasksite/${taskId}/children/`);
+    return response.data;
+  },
+
+  // Batch create child tasks
+  createChildTasksBatch: async (
+    taskId: number,
+    payload: import('@/types').CreateChildTasksBatchPayload
+  ) => {
+    const response = await api.post(`/tasksite/${taskId}/children/batch/`, payload);
+    return response.data as import('@/types').CreateChildTasksBatchResponse;
+  },
 
 };
 
@@ -1254,10 +1267,10 @@ export class NotificationWebSocketService {
 
           // Check if this is a notification event
           if (message.type === 'SIGNAL' && message.event === 'NEW_NOTIFICATION') {
-    const notificationData: NotificationData = message.data;
-    const currentWorkspaceId = parseInt(localStorage.getItem('active_workspace_id') || '0');
-    notificationData._isCurrentWorkspace = notificationData.workspace_id === currentWorkspaceId;
-    this.notificationCallbacks.forEach(callback => {
+            const notificationData: NotificationData = message.data;
+            const currentWorkspaceId = parseInt(localStorage.getItem('active_workspace_id') || '0');
+            notificationData._isCurrentWorkspace = notificationData.workspace_id === currentWorkspaceId;
+            this.notificationCallbacks.forEach(callback => {
               try {
                 callback(notificationData);
               } catch (err) {
@@ -1598,29 +1611,102 @@ export const threadsStorageApi = {
   },
 };
 
-// AI BOT WEBSOCKET API
-export const aiBotApi = {
-  // Connect to the AI Bot WebSocket using JWT token
-  connect: (): WebSocket => {
+// ─── OLD WebSocket AI Bot API (commented — replaced by REST Agent API) ────────
+// export const aiBotApi = {
+//   connect: (): WebSocket => { const tokens = getTokens(); return new WebSocket(`${WS_AI_BOT_URL}?token=${tokens?.access ?? ''}`); },
+//   sendMessage: (socket: WebSocket, payload: AIBotSendPayload): void => { if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(payload)); },
+//   parseMessage: (event: MessageEvent): AIBotIncomingMessage | null => { try { const p = JSON.parse(event.data); return p?.type ? p : null; } catch { return null; } },
+// };
+
+// ─── NEW REST Agent API 
+// X-Workspace-ID is automatically added by the axios request interceptor
+export const agentApi = {
+  query: async (payload: import('@/types').AgentQueryPayload): Promise<import('@/types').AgentQueryResponse> => {
+    const response = await api.post('/agent/query/', payload);
+    return response.data;
+  },
+
+  search: async (payload: import('@/types').AgentSearchPayload): Promise<import('@/types').AgentSearchResponse> => {
+    const response = await api.post('/agent/search/', payload);
+    return response.data;
+  },
+
+  // list all sessions for current user
+  listSessions: async (): Promise<import('@/types').AgentSession[]> => {
+    const workspaceId = localStorage.getItem('active_workspace_id') || '1';
+    const response = await api.get('/agent/sessions/', {
+      headers: { 'X-Workspace-ID': workspaceId },
+    });
+    return response.data;
+  },
+
+  // get full message history
+  getSession: async (sessionId: number): Promise<import('@/types').AgentSessionDetail> => {
+    const response = await api.get(`/agent/sessions/${sessionId}/`);
+    return response.data;
+  },
+
+  // rename or pin/unpin a session
+  updateSession: async (sessionId: number, payload: import('@/types').AgentSessionUpdatePayload): Promise<import('@/types').AgentSessionUpdateResponse> => {
+    const response = await api.patch(`/agent/sessions/${sessionId}/`, payload);
+    return response.data;
+  },
+
+  // delete a session
+  deleteSession: async (sessionId: number): Promise<void> => {
+    await api.delete(`/agent/sessions/${sessionId}/`);
+  },
+
+  stream: async (
+    payload:   import('@/types').AgentQueryPayload,
+    onChunk:   (text: string) => void,
+    onDone:    (event: import('@/types').AgentStreamDone) => void,
+    onError?:  (err: string) => void,
+  ): Promise<void> => {
     const tokens = getTokens();
-    const token = tokens?.access ?? '';
-    return new WebSocket(`${WS_AI_BOT_URL}?token=${token}`);
-  },
+    const workspaceId = localStorage.getItem('active_workspace_id') || '1';
 
-  // Send a message with page context
-  sendMessage: (socket: WebSocket, payload: AIBotSendPayload): void => {
-    if (socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify(payload));
+    const response = await fetch(
+      `${API_URL}/agent/query/stream/`,
+      {
+        method:  'POST',
+        headers: {
+          'Content-Type':   'application/json',
+          'Authorization':  `Bearer ${tokens?.access ?? ''}`,
+          'X-Workspace-ID': workspaceId,
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    if (!response.ok || !response.body) {
+      onError?.(`Request failed: ${response.status}`);
+      return;
     }
-  },
 
-  parseMessage: (event: MessageEvent): AIBotIncomingMessage | null => {
-    try {
-      const parsed = JSON.parse(event.data) as AIBotIncomingMessage;
-      if (parsed?.type) return parsed;
-      return null;
-    } catch {
-      return null;
+    const reader  = response.body.getReader();
+    const decoder = new TextDecoder();
+    let   buffer  = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? ''; 
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) continue;
+        const jsonStr = trimmed.slice(5).trim();
+        if (!jsonStr) continue;
+        try {
+          const event = JSON.parse(jsonStr) as import('@/types').AgentStreamEvent;
+          if (event.type === 'chunk') onChunk(event.text);
+          if (event.type === 'done')  onDone(event);
+        } catch { }
+      }
     }
   },
 };
@@ -1796,10 +1882,7 @@ export const eventApi = {
     window.URL.revokeObjectURL(url);
   },
 
-  // ═══════════════════════════════════════════════════════════════════════
   // INVITATION API FUNCTIONS
-  // ═══════════════════════════════════════════════════════════════════════
-
   acceptInvitation: async (invitationId: number): Promise<void> => {
     await api.patch(`/daily-updates/events/invitations/${invitationId}/accept/`, {});
   },
@@ -1814,10 +1897,7 @@ export const eventApi = {
     });
   },
 
-  // ═══════════════════════════════════════════════════════════════════════
-  // RSVP STATUS API - Get all attendees' response status for an event
-  // ═══════════════════════════════════════════════════════════════════════
-
+  // RSVP STATUS API 
   getEventRsvpStatus: async (eventId: number): Promise<{
     event_id: number;
     organizer: string;
@@ -1832,7 +1912,6 @@ export const eventApi = {
     const { data } = await api.get(`/daily-updates/events/${eventId}/rsvp-status/`);
     return data;
   },
-  // Suggest available time slots for a group of attendees
   suggestSlots: async (
     attendeeIds: number[],
     targetDate: string,
@@ -1850,10 +1929,8 @@ export const eventApi = {
     return data;
   },
 };
-// ═══════════════════════════════════════════════════════════════════════
-// DYUKSA AI SCHEDULING ASSISTANT
-// ═══════════════════════════════════════════════════════════════════════
 
+// DYUKSA AI SCHEDULING ASSISTANT
 export const dyuksaAI = {
   // Send a natural language scheduling request to the AI
   chat: async (message: string): Promise<{
@@ -1874,7 +1951,6 @@ export const dyuksaAI = {
   },
 };
 
-// Add to your api.ts exports
 export const calendarShareApi = {
   list: async () => {
     const response = await api.get('/daily-updates/calendar-shares/');
@@ -1893,10 +1969,7 @@ export const calendarShareApi = {
   },
 };
 
-// ═══════════════════════════════════════════════════════════════════════
 // CALENDAR PUBLIC LINK API
-// ═══════════════════════════════════════════════════════════════════════
-
 export const calendarLinkApi = {
   list: async () => {
     const response = await api.get('/daily-updates/calendar-links/');
@@ -1914,7 +1987,6 @@ export const calendarLinkApi = {
   getPublicCalendar: async (token: string) => {
     const response = await api.get(`/daily-updates/shared-calendar/${token}/`, {
       headers: {
-        // Remove auth header for public endpoint
         Authorization: undefined
       }
     });
@@ -2004,17 +2076,11 @@ export const workspaceApi = {
   async getWorkspaces() {
     const response = await api.get('/organizations/workspaces/');
     const data = response.data;
-
-    console.log('✅ Raw backend response:', data);
-
     let normalizedData;
 
     if (Array.isArray(data)) {
-      console.log('⚠️ Backend returned array, normalizing...');
-
       const storedId = localStorage.getItem('active_workspace_id');
       const storedIdNum = storedId ? parseInt(storedId) : null;
-
       const storedExists = storedIdNum && data.some((w: any) => w.id === storedIdNum);
 
       let activeId;
@@ -2025,13 +2091,11 @@ export const workspaceApi = {
         activeId = defaultWorkspace?.id || data[0]?.id;
 
         if (storedIdNum && !storedExists) {
-          console.log(`⚠️ Stored workspace ${storedIdNum} not found, using ${activeId}`);
         }
       }
 
       if (activeId && activeId !== storedIdNum) {
         localStorage.setItem('active_workspace_id', String(activeId));
-        console.log(`🔄 Updated workspace ID from ${storedIdNum} to ${activeId}`);
       }
 
       normalizedData = {
@@ -2044,11 +2108,8 @@ export const workspaceApi = {
       const storedId = localStorage.getItem('active_workspace_id');
       if (data.active_workspace_id && storedId !== String(data.active_workspace_id)) {
         localStorage.setItem('active_workspace_id', String(data.active_workspace_id));
-        console.log(`🔄 Updated workspace ID to ${data.active_workspace_id}`);
       }
     }
-
-    console.log('✅ Normalized data:', normalizedData);
     return normalizedData;
   },
 
@@ -2072,18 +2133,10 @@ export const workspaceApi = {
 
     // ✅ 2. Update axios default header immediately
     api.defaults.headers.common['X-Workspace-ID'] = String(workspaceId);
-
-    console.log(`✅ Workspace switched to ${workspaceId}, axios header updated`);
     return data;
   },
 
   // 4️⃣ GET WORKSPACE DETAILS
-  // async getWorkspaceDetails(workspaceId: number) {
-  //   const response = await api.get(`/organizations/workspaces/${workspaceId}/`);
-  //   return response.data;
-  // },
-
-  // Helper methods
   setActiveWorkspace(workspaceId: number): void {
     localStorage.setItem('active_workspace_id', String(workspaceId));
   },
@@ -2091,13 +2144,56 @@ export const workspaceApi = {
   clearActiveWorkspace(): void {
     localStorage.removeItem('active_workspace_id');
   }
-
-  
 };
 
-// ✅ Auto-start proactive refresh if user is already logged in (page reload)
+// ✅ Auto-start proactive refresh if user is already logged
 if (localStorage.getItem('access_token')) {
   startProactiveRefresh();
 }
+
+export const dashboardApi = {
+  getProjects: () => projectsApi.list(),
+  getDocuments: (params?: { page_size?: number; page?: number }) =>
+    documentsApi.list({ page_size: params?.page_size ?? 200, page: params?.page ?? 1 }),
+  getTasks: () => taskApi.list({ disable_pagination: true }),
+};
+
+// ── Social Auth API
+export const socialAuthApi = {
+  authenticate: (payload: SocialAuthPayload): Promise<SocialAuthResponse> =>
+    api.post<SocialAuthResponse>('/auth/social-auth/', payload).then((res) => res.data),
+};
+
+// ── Custom Dashboards API
+export const customDashboardsApi = {
+  getAll: async (): Promise<import('@/types').CustomDashboard[]> => {
+    const response = await api.get('/dashboard/custom/');
+    const data = response.data;
+    // Normalize: handle array,
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.results)) return data.results;
+    if (Array.isArray(data?.data)) return data.data;
+    return [];
+  },
+
+  create: async (
+    payload: Pick<import('@/types').CustomDashboard, 'name' | 'is_default' | 'widgets'>
+  ): Promise<import('@/types').CustomDashboard> => {
+    const response = await api.post('/dashboard/custom/', payload);
+    return response.data;
+  },
+
+  update: async (
+    id: number,
+    payload: Partial<Pick<import('@/types').CustomDashboard, 'name' | 'is_default' | 'widgets'>>
+  ): Promise<import('@/types').CustomDashboard> => {
+    const response = await api.patch(`/dashboard/custom/${id}/`, payload);
+    return response.data;
+  },
+
+  remove: async (id: number): Promise<void> => {
+    await api.delete(`/dashboard/custom/${id}/`);
+  },
+};
 
 export default api;
