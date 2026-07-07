@@ -274,7 +274,7 @@ export function useMyTask() {
     setSelectedTask(updatedTask);
   }, [queryClient, statusParam, priorityParam, projectIdParam, currentPage]);
 
-  // ── Bulk task selection ────────────────────────────────────────────────────
+  // ── Bulk task selection 
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<number>>(new Set());
 
   const toggleTaskSelect = useCallback((taskId: number) => {

@@ -23,6 +23,20 @@ export const MyTask: React.FC = () => {
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [showBulkDeleteDenied, setShowBulkDeleteDenied] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  // Grid selection mode — activated on double-click, exits when all deselected
+  const [isGridSelectionMode, setIsGridSelectionMode] = useState(false);
+
+  // Exit grid selection mode when all tasks are deselected
+  React.useEffect(() => {
+    if (isGridSelectionMode && t.selectedTaskIds.size === 0) {
+      setIsGridSelectionMode(false);
+    }
+  }, [t.selectedTaskIds.size, isGridSelectionMode]);
+
+  const handleGridDoubleClick = (task: Task) => {
+    setIsGridSelectionMode(true);
+    t.toggleTaskSelect(task.id);
+  };
 
   const handleBulkDeleteClick = () => {
     // Mirror the same permission check used in TaskDetailModal:
@@ -129,10 +143,21 @@ export const MyTask: React.FC = () => {
         className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40"
         style={{ flex: 1, overflowY: 'auto', paddingTop: 24, paddingBottom: 32 }}
       >
-        {t.viewMode === 'table' && t.selectedTaskIds.size > 0 && (
+       {/* Bulk action bar — table and grid share the same bar and logic */}
+        {t.selectedTaskIds.size > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', marginBottom: 4, background: '#f8faff', border: '1px solid #dfe1e6', borderRadius: 8 }}>
+            {/* Select-all toggle */}
+            <div
+              onClick={() => t.toggleAllTasks(t.filteredTasks)}
+              title={t.selectedTaskIds.size === t.filteredTasks.length ? 'Deselect all' : 'Select all'}
+              style={{ width: 26, height: 26, borderRadius: 7, background: '#1663f6', display: 'grid', placeItems: 'center', cursor: 'pointer', flexShrink: 0 }}
+            >
+              {t.selectedTaskIds.size === t.filteredTasks.length && (
+                <Check size={12} color="#fff" strokeWidth={3} />
+              )}
+            </div>
             <span style={{ fontSize: 13, fontWeight: 700, color: '#1663f6', background: '#EEF4FF', border: '1px solid #c7d7fd', borderRadius: 6, padding: '4px 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Check size={13} strokeWidth={3} /> {t.selectedTaskIds.size} selected
+              {t.selectedTaskIds.size} selected
             </span>
             <button
               onClick={handleBulkDeleteClick}
@@ -141,7 +166,7 @@ export const MyTask: React.FC = () => {
               <Trash2 size={13} /> Delete
             </button>
             <button
-              onClick={() => t.toggleAllTasks(t.filteredTasks)}
+              onClick={() => { t.toggleAllTasks([]); setIsGridSelectionMode(false); }}
               style={{ marginLeft: 'auto', height: 32, border: '1px solid #e5e7eb', borderRadius: 6, background: 'none', padding: '0 12px', fontSize: 13, fontWeight: 500, cursor: 'pointer', color: '#667085' }}
             >
               Clear
@@ -153,7 +178,16 @@ export const MyTask: React.FC = () => {
           isLoading={t.loading}
           gridProps={{
             data: t.filteredTasks,
-            renderCard: (task: Task) => <TaskGridCard task={task} onTaskClick={t.handleTaskClick} />,
+            renderCard: (task: Task) => (
+              <TaskGridCard
+                task={task}
+                onTaskClick={t.handleTaskClick}
+                selectionMode={isGridSelectionMode}
+                isSelected={t.selectedTaskIds.has(task.id)}
+                onSelect={task => t.toggleTaskSelect(task.id)}
+                onDoubleClick={handleGridDoubleClick}
+              />
+            ),
             gridClassName: 'task-grid',
           }}
           tableProps={{
@@ -258,6 +292,12 @@ export const MyTask: React.FC = () => {
         />
 
         {/* ── Pagination bar — shown for both table and grid ── */}
+        {t.viewMode === 'grid' && !isGridSelectionMode && t.filteredTasks.length > 0 && (
+          <p style={{ fontSize: 12, color: '#94a3b8', textAlign: 'center', padding: '4px 0 0', margin: 0 }}>
+            Double-click any card to enter selection mode
+          </p>
+        )}
+
         {(t.viewMode === 'table' || t.viewMode === 'grid') && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 4px', marginTop: 4, gap: 12 }}>
             <span style={{ fontSize: 13, color: '#667085' }}>

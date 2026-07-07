@@ -362,13 +362,16 @@ export function useCreateTask({
       updated_at: new Date().toISOString(),
     } satisfies Task;
 
-    const previousTasksSnapshot = queryClient.getQueryData(['tasks']);
+    const previousTasksSnapshot = queryClient.getQueryCache()
+      .findAll({ queryKey: ['tasks'] })
+      .map(q => ({ key: q.queryKey, data: queryClient.getQueryData(q.queryKey) }));
 
-    // Inject optimistic task into ALL active task board cache entries —
-    // the board uses ['tasks', statusParam, priorityParam, projectIdParam]
-    // so we must update every matching cache key, not just ['tasks'].
     const injectOptimistic = (old: any) => {
-      if (!old) return { pages: [{ count: 1, next: null, previous: null, results: [optimisticTask] }], pageParams: [1] };
+      // New per-page shape: { count, next, previous, results }
+      if (old?.results && Array.isArray(old.results)) {
+        return { ...old, count: (old.count ?? 0) + 1, results: [optimisticTask, ...old.results] };
+      }
+      // Old infinite query shape: { pages: [...] }
       if (old?.pages) {
         return {
           ...old,
@@ -378,8 +381,9 @@ export function useCreateTask({
           ],
         };
       }
-      if (Array.isArray(old)) return { pages: [{ count: old.length + 1, next: null, previous: null, results: [optimisticTask, ...old] }], pageParams: [1] };
-      return old;
+      if (Array.isArray(old)) return [optimisticTask, ...old];
+      // Cache miss — seed with just this task
+      return { count: 1, next: null, previous: null, results: [optimisticTask] };
     };
 
     queryClient.getQueryCache().findAll({ queryKey: ['tasks'] }).forEach(query => {
@@ -415,6 +419,17 @@ export function useCreateTask({
       // Replace optimistic entry with real server task across ALL task cache entries
       queryClient.getQueryCache().findAll({ queryKey: ['tasks'] }).forEach(query => {
         queryClient.setQueryData(query.queryKey, (old: any) => {
+          // New per-page shape
+          if (old?.results && Array.isArray(old.results)) {
+            return {
+              ...old,
+              results: [
+                createdTask,
+                ...old.results.filter((t: Task) => t.id !== optimisticTask.id && t.id !== createdTask.id),
+              ],
+            };
+          }
+          // Old infinite query shape
           if (old?.pages) {
             return {
               ...old,
@@ -446,12 +461,11 @@ export function useCreateTask({
       });
     } catch (err: any) {
       // Rollback all task cache entries on error
-      queryClient.getQueryCache().findAll({ queryKey: ['tasks'] }).forEach(query => {
-        if (previousTasksSnapshot !== undefined) {
-          queryClient.setQueryData(query.queryKey, previousTasksSnapshot);
-        }
-      });
-      if (previousTasksSnapshot === undefined) {
+      if (previousTasksSnapshot.length > 0) {
+        previousTasksSnapshot.forEach(({ key, data }) => {
+          queryClient.setQueryData(key, data);
+        });
+      } else {
         queryClient.invalidateQueries({ queryKey: ['tasks'] });
       }
       queryClient.invalidateQueries({ queryKey: ['tasks-list'] });
