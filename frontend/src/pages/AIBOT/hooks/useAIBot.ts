@@ -2,12 +2,12 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { agentApi } from '@/services/api';
 import type { AgentSession, AgentUIMessage } from '@/types';
 
-// ─── Local helpers
+// Local helpers
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-// ─── Hook 
+// Hook 
 export function useAIBot() {
   const [sessions, setSessions] = useState<AgentSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
@@ -43,12 +43,12 @@ export function useAIBot() {
   const activeSessionRef = useRef<number | null>(null);
   const sessionsFetchedRef = useRef(false);
 
-  // ── Scroll to bottom on new messages 
+  // Scroll to bottom on new messages 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
-  // ── Scroll to bottom + focus when restored from minimized
+  // Scroll to bottom + focus when restored from minimized
   useEffect(() => {
     if (isExpanded && !isMinimized) {
       inputRef.current?.focus();
@@ -58,7 +58,7 @@ export function useAIBot() {
     }
   }, [isExpanded, isMinimized]);
 
-  // ── ESC key minimizes instead of closing
+  // ESC key minimizes instead of closing
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isExpanded && !isMinimized) {
@@ -124,7 +124,7 @@ export function useAIBot() {
       const detail = await agentApi.getSession(sessionId);
       const rawMessages = Array.isArray(detail.messages) ? detail.messages : [];
 
-      // ── Step 1: extract tool_called name and tool_result data from the raw
+      // Step 1: extract tool_called name and tool_result data from the raw
       const toolCallMap: Record<string, { toolCalled: string; toolResult: Record<string, unknown> }> = {};
 
       rawMessages.forEach((m: any) => {
@@ -154,13 +154,27 @@ export function useAIBot() {
         }
       });
 
-      // The most recent completed tool pair — attached to the next assistant text
-      const toolEntries = Object.values(toolCallMap);
-      const lastTool = toolEntries.length > 0 ? toolEntries[toolEntries.length - 1] : null;
+     // ── Step 2: build UI messages
+      let pendingToolId: string | null = null;
 
-      // ── Step 2: build UI messages 
       const uiMessages: AgentUIMessage[] = rawMessages
         .reduce((acc: AgentUIMessage[], m: any) => {
+
+          if (m.role === 'assistant' && Array.isArray(m.content)) {
+            const toolUseBlock = m.content.find((b: any) => b.type === 'tool_use');
+            if (toolUseBlock?.id) {
+              pendingToolId = toolUseBlock.id;
+            }
+          }
+
+          if (m.role === 'user' && Array.isArray(m.content)) {
+            const toolResultBlock = m.content.find((b: any) => b.type === 'tool_result');
+            if (toolResultBlock?.tool_use_id && toolCallMap[toolResultBlock.tool_use_id]) {
+              pendingToolId = toolResultBlock.tool_use_id;
+            }
+          }
+
+          // Extract visible text content
           let content = '';
           if (typeof m.content === 'string') {
             content = m.content.trim();
@@ -171,15 +185,27 @@ export function useAIBot() {
 
           if (!content) return acc;
 
-          // For assistant messages: 
           const isAssistant = m.role === 'assistant';
+
+          let toolCalled: string | null | undefined = undefined;
+          let toolResult: Record<string, unknown> | null | undefined = undefined;
+
+          if (isAssistant && pendingToolId && toolCallMap[pendingToolId]) {
+            toolCalled = toolCallMap[pendingToolId].toolCalled;
+            toolResult = toolCallMap[pendingToolId].toolResult;
+            pendingToolId = null; 
+          } else if (isAssistant) {
+            toolCalled = null;
+            toolResult = null;
+          }
+
           const uiMsg: AgentUIMessage = {
-            id:         generateId(),
-            role:       isAssistant ? 'assistant' : 'user',
+            id:        generateId(),
+            role:      isAssistant ? 'assistant' : 'user',
             content,
-            timestamp:  detail.created_at ?? new Date().toISOString(),
-            toolCalled: isAssistant ? (lastTool?.toolCalled ?? null) : undefined,
-            toolResult: isAssistant ? (lastTool?.toolResult ?? null) : undefined,
+            timestamp: detail.created_at ?? new Date().toISOString(),
+            toolCalled,
+            toolResult,
           };
           acc.push(uiMsg);
           return acc;

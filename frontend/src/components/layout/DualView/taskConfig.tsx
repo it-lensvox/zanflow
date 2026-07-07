@@ -12,6 +12,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { formatRelativeTime } from '@/lib/utils';
 import { TablePopover } from '@/components/common';
 import { getTypeHex, getTypeBg } from '@/config/projectTypeConfig';
+import { Check } from 'lucide-react';
 import { PRIORITY_OPTIONS as _PRIORITY_OPTIONS } from '@/config/priorityConfig';
 
 // Utility function to format dates
@@ -118,11 +119,11 @@ export const getStatusConfig = (status: Task['status']) => {
 
 // Priority options
 export const priorityOptions = _PRIORITY_OPTIONS.map(p => ({
-  value:    p.value,
-  label:    p.label,
-  color:    p.twText,
+  value: p.value,
+  label: p.label,
+  color: p.twText,
   dotColor: p.twDot,
-  icon:     p.icon,
+  icon: p.icon,
 }));
 
 // Status options
@@ -433,15 +434,22 @@ function TaskTitleCell({
   );
 }
 
-// Table Columns Configuration
+export interface TaskSelectionProps {
+  selectedIds: Set<number>;
+  toggleSelect: (id: number) => void;
+  toggleAll: (tasks: Task[]) => void;
+  visibleTasks: Task[];
+}
+
 interface TaskTableColumnsProps {
+  selectionProps?: TaskSelectionProps;
   onTaskClick: (task: Task) => void;
   queryClient: ReturnType<typeof useQueryClient>;
   user: ReturnType<typeof useAuth>['user'];
   navigate: ReturnType<typeof useNavigate>;
 }
 
-export const createTasksTableColumns = ({ onTaskClick, queryClient, user, navigate, dateField = 'end_date', personField = 'assigned_to' }: TaskTableColumnsProps & { dateField?: 'end_date' | 'start_date' | 'created_at'; personField?: 'assigned_to' | 'created_by' | 'updated_by' }): TableColumn<Task>[] => {
+export const createTasksTableColumns = ({ onTaskClick, queryClient, user, navigate, dateField = 'end_date', personField = 'assigned_to', selectionProps }: TaskTableColumnsProps & { dateField?: 'end_date' | 'start_date' | 'created_at'; personField?: 'assigned_to' | 'created_by' | 'updated_by' }): TableColumn<Task>[] => {
 
   const updateAllTaskListCaches = (updatedTask: Task) => {
     const allTaskListQueries = queryClient.getQueryCache().findAll({ queryKey: ['tasks-list'], exact: false });
@@ -483,7 +491,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
           };
         }
         if (Array.isArray(old)) return [updatedTask, ...old.filter((t: Task) => t.id !== task.id)];
-        if (old.tasks)   return { ...old, tasks:   [updatedTask, ...old.tasks.filter((t: Task) => t.id !== task.id)] };
+        if (old.tasks) return { ...old, tasks: [updatedTask, ...old.tasks.filter((t: Task) => t.id !== task.id)] };
         if (old.results) return { ...old, results: [updatedTask, ...old.results.filter((t: Task) => t.id !== task.id)] };
         return old;
       };
@@ -511,7 +519,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
               };
             }
             if (Array.isArray(old)) return old.map((t: Task) => t.id === task.id ? updatedTaskFromServer : t);
-            if (old.tasks)   return { ...old, tasks:   old.tasks.map((t: Task) => t.id === task.id ? updatedTaskFromServer : t) };
+            if (old.tasks) return { ...old, tasks: old.tasks.map((t: Task) => t.id === task.id ? updatedTaskFromServer : t) };
             if (old.results) return { ...old, results: old.results.map((t: Task) => t.id === task.id ? updatedTaskFromServer : t) };
             return old;
           };
@@ -594,7 +602,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
           };
         }
         if (Array.isArray(old)) return [updatedTask, ...old.filter((t: Task) => t.id !== task.id)];
-        if (old.tasks)   return { ...old, tasks:   [updatedTask, ...old.tasks.filter((t: Task) => t.id !== task.id)] };
+        if (old.tasks) return { ...old, tasks: [updatedTask, ...old.tasks.filter((t: Task) => t.id !== task.id)] };
         if (old.results) return { ...old, results: [updatedTask, ...old.results.filter((t: Task) => t.id !== task.id)] };
         return old;
       };
@@ -676,7 +684,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
           };
         }
         if (Array.isArray(old)) return [updatedTask, ...old.filter((t: Task) => t.id !== task.id)];
-        if (old.tasks)   return { ...old, tasks:   [updatedTask, ...old.tasks.filter((t: Task) => t.id !== task.id)] };
+        if (old.tasks) return { ...old, tasks: [updatedTask, ...old.tasks.filter((t: Task) => t.id !== task.id)] };
         if (old.results) return { ...old, results: [updatedTask, ...old.results.filter((t: Task) => t.id !== task.id)] };
         return old;
       };
@@ -714,7 +722,58 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     );
   };
 
-  return [
+  // ── Avatar-checkbox column
+  const avatarCol: TableColumn<Task> | null = selectionProps ? {
+    key: '__select__',
+    width: '5%',
+    label: (() => {
+      const allSelected = selectionProps.visibleTasks.length > 0 &&
+        selectionProps.visibleTasks.every(t => selectionProps.selectedIds.has(t.id));
+      const someSelected = selectionProps.visibleTasks.some(t => selectionProps.selectedIds.has(t.id));
+      return (
+        <div
+          onClick={e => { e.stopPropagation(); selectionProps.toggleAll(selectionProps.visibleTasks); }}
+          title={allSelected ? 'Deselect all' : 'Select all'}
+          style={{ width: 26, height: 26, borderRadius: 7, background: someSelected ? '#1663f6' : '#e5e7eb', display: 'grid', placeItems: 'center', cursor: 'pointer', transition: 'background 0.15s', flexShrink: 0 }}
+        >
+          {allSelected
+            ? <Check size={13} color="#fff" strokeWidth={3} />
+            : someSelected
+              ? <span style={{ width: 9, height: 2, background: '#fff', borderRadius: 2, display: 'block' }} />
+              : null}
+        </div>
+      );
+    })(),
+    render: (task: Task) => {
+      const taskType = (task as any).project_task_type || task.project_details?.task_type || '';
+      const color = getTypeHex(taskType);
+      const tint = getTypeBg(taskType);
+      const initial = (task.project_details?.name || task.project_name || 'T')[0].toUpperCase();
+      const isSel = selectionProps.selectedIds.has(task.id);
+      return (
+        <div
+          onClick={e => { e.stopPropagation(); selectionProps.toggleSelect(task.id); }}
+          title={isSel ? 'Deselect' : 'Select'}
+          style={{ position: 'relative', width: 26, height: 26, borderRadius: 7, cursor: 'pointer', flexShrink: 0 }}
+        >
+          <div style={{ width: 26, height: 26, borderRadius: 7, background: isSel ? color : tint, border: isSel ? `1.5px solid ${color}` : `1.5px solid ${color}33`, display: 'grid', placeItems: 'center', color: isSel ? '#fff' : color, fontWeight: 800, fontSize: 12, transition: 'background 0.15s, color 0.15s' }}>
+            {isSel ? <Check size={12} strokeWidth={3} /> : initial}
+          </div>
+          {!isSel && (
+            <div
+              style={{ position: 'absolute', inset: 0, borderRadius: 7, background: `${color}cc`, display: 'grid', placeItems: 'center', opacity: 0, transition: 'opacity 0.15s' }}
+              onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+              onMouseLeave={e => e.currentTarget.style.opacity = '0'}
+            >
+              <Check size={12} color="#fff" strokeWidth={3} />
+            </div>
+          )}
+        </div>
+      );
+    },
+  } : null;
+
+  const baseColumns: TableColumn<Task>[] = [
     {
       key: 'project',
       label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">Project</span>,
@@ -864,7 +923,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     },
     {
       key: 'priority',
-     label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">Priority</span>,
+      label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">Priority</span>,
       width: '8%',
       render: (task: Task) => <PriorityDropdown task={task} />,
     },
@@ -937,4 +996,6 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     },
 
   ];
+
+  return avatarCol ? [avatarCol, ...baseColumns] : baseColumns;
 };

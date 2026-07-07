@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useNavigate, useLocation, useOutletContext, useSearchParams } from 'react-router-dom';
-import { useQuery, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { taskApi, usersApi, projectsApi } from '@/services/api';
 import { useTableFilters, ColumnFilterConfig } from '@/hooks/useTableFilters';
@@ -26,35 +26,35 @@ function sanitiseTaskCache(queryClient: ReturnType<typeof useQueryClient>) {
 }
 
 export function useMyTask() {
-  const navigate  = useNavigate();
-  const location  = useLocation();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
-  const { user }  = useAuth();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const { unreadCount } = useNotifications();
 
   sanitiseTaskCache(queryClient);
 
   // ── UI state
-  const [viewMode,              setViewMode]              = useState<'grid' | 'table'>('table');
-  const [dateField,             setDateField]             = useState<'end_date' | 'start_date' | 'created_at'>('end_date');
-  const [personField,           setPersonField]           = useState<'assigned_to' | 'created_by' | 'updated_by'>('assigned_to');
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
+  const [dateField, setDateField] = useState<'end_date' | 'start_date' | 'created_at'>('end_date');
+  const [personField, setPersonField] = useState<'assigned_to' | 'created_by' | 'updated_by'>('assigned_to');
   const [showDateFieldDropdown, setShowDateFieldDropdown] = useState(false);
   const [showPersonFieldDropdown, setShowPersonFieldDropdown] = useState(false);
-  const [dropdownPos,           setDropdownPos]           = useState<{ top: number; left: number } | null>(null);
-  const [searchQuery,           setSearchQuery]           = useState('');
-  const [selectedTask,          setSelectedTask]          = useState<Task | null>(null);
-  const [showAITaskModal,       setShowAITaskModal]       = useState(false);
-  const [isInlineCreating,      setIsInlineCreating]      = useState(false);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [showAITaskModal, setShowAITaskModal] = useState(false);
+  const [isInlineCreating, setIsInlineCreating] = useState(false);
 
-  const dateTriggerRef   = useRef<HTMLButtonElement>(null);
+  const dateTriggerRef = useRef<HTMLButtonElement>(null);
   const personTriggerRef = useRef<HTMLButtonElement>(null);
 
- // Active status filter from URL path
+  // Active status filter from URL path
   const activeFilter = location.pathname.split('/').filter(Boolean)[1]?.toUpperCase() || 'ALL';
 
   // ── Server-side filters from URL query params (e.g. /taskboard/pending?priority=critical&project_id=1)
-  const priorityParam  = searchParams.get('priority')   || undefined;
+  const priorityParam = searchParams.get('priority') || undefined;
   const projectIdParam = searchParams.get('project_id') || undefined;
   const labelNameParam = searchParams.get('label_name') || undefined;
   const statusParam = activeFilter !== 'ALL' ? activeFilter.toLowerCase() : undefined;
@@ -67,8 +67,8 @@ export function useMyTask() {
     isActivityOpen: boolean;
     setIsActivityOpen: (v: boolean) => void;
   } | null>();
-  const isActivityOpen    = outletContext?.isActivityOpen    ?? false;
-  const setIsActivityOpen = outletContext?.setIsActivityOpen ?? (() => {});
+  const isActivityOpen = outletContext?.isActivityOpen ?? false;
+  const setIsActivityOpen = outletContext?.setIsActivityOpen ?? (() => { });
 
   // ── Close person dropdown on outside click 
   useEffect(() => {
@@ -95,14 +95,14 @@ export function useMyTask() {
   // ── Data: users list 
   const { data: usersData } = useQuery({
     queryKey: ['all-users'],
-    queryFn:  () => usersApi.listAll(),
-    enabled:  !!user,
+    queryFn: () => usersApi.listAll(),
+    enabled: !!user,
   });
 
   // ── Data: projects (for project type colour lookup)
   const { data: projectsData } = useQuery({
     queryKey: ['projects'],
-    queryFn:  () => projectsApi.list(),
+    queryFn: () => projectsApi.list(),
     staleTime: 60_000,
   });
 
@@ -115,90 +115,63 @@ export function useMyTask() {
     }, {} as Record<number, string>);
   }, [projectsData]);
 
-  // ── Data: infinite task pages
+  const PAGE_SIZE = 20;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // ── Data: explicit page-by-page fetching
   const {
-    data: infiniteData,
+    data: pageData,
     isLoading: loading,
-    isFetchingNextPage,
-    fetchNextPage,
-    hasNextPage,
-  } = useInfiniteQuery({
-    queryKey: ['tasks', statusParam, priorityParam, projectIdParam],
-    queryFn:  async ({ pageParam = 1 }) => {
-      const res = await taskApi.listPaginated(pageParam as number, {
+    isFetching,
+  } = useQuery({
+    queryKey: ['tasks', statusParam, priorityParam, projectIdParam, currentPage],
+    queryFn:  async () => {
+      const res = await taskApi.listPaginated(currentPage, {
         status: statusParam,
         priority: priorityParam,
         project_id: projectIdParam,
       });
+      console.log(`[TaskBoard] page=${currentPage} fetched=${res.results.length} total=${res.count}`);
       return res;
     },
-    getNextPageParam: (lastPage) => {
-      if (!lastPage || typeof lastPage !== 'object' || Array.isArray(lastPage)) return undefined;
-      if (!('next' in lastPage) || !lastPage.next) return undefined;
-      if (!Array.isArray((lastPage as any).results)) return undefined;
-      try {
-        const url = new URL(lastPage.next);
-        const p = url.searchParams.get('page');
-        return p ? Number(p) : undefined;
-      } catch { return undefined; }
-    },
-    initialPageParam: 1,
     enabled: !!user && !pendingStatusRedirect,
     staleTime: 1000 * 60 * 2,
     placeholderData: (prev: any) => prev,
   });
 
-  // ── Flatten + role-filter pages into a single array 
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusParam, priorityParam, projectIdParam]);
+
+  // ── Role-filter the current page results
   const tasks = useMemo(() => {
-    const all: Task[] = infiniteData?.pages?.flatMap(p =>
-      p && Array.isArray((p as any).results) ? (p as any).results : []
-    ) ?? [];
-    let filtered = all;
+    const raw: Task[] = (pageData as any)?.results ?? [];
+    let filtered = raw;
     if (user?.role === 'manager') {
-      filtered = all.filter(t => t.assigned_by === user.id || t.assigned_to.includes(user.id));
+      filtered = raw.filter(t => t.assigned_by === user.id || t.assigned_to.includes(user.id));
     } else if (user?.role !== 'admin') {
-      filtered = all.filter(t => t.assigned_to.includes(user?.id ?? -1));
+      filtered = raw.filter(t => t.assigned_to.includes(user?.id ?? -1));
     }
-    const mapped = filtered.map(t => ({ ...t, status_label: (t.status || '').toLowerCase().replace(/_/g, ' ') }));
-    return mapped;
-  }, [infiniteData, user]);
+    return filtered.map(t => ({ ...t, status_label: (t.status || '').toLowerCase().replace(/_/g, ' ') }));
+  }, [pageData, user]);
 
-  // ── Infinite scroll sentinel
- const sentinelRef         = useRef<HTMLDivElement>(null);
-  const isFetchingRef       = useRef(false);
-
-  useEffect(() => { isFetchingRef.current = isFetchingNextPage; }, [isFetchingNextPage]);
-
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el || !hasNextPage) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && !isFetchingRef.current) {
-          fetchNextPage();
-        }
-      },
-      { threshold: 1.0, rootMargin: '0px 0px 100px 0px' }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [hasNextPage, fetchNextPage]);
-
-  const hasUrlFilter = !!(statusParam || priorityParam || projectIdParam);
-  useEffect(() => {
-    if (hasUrlFilter && hasNextPage && !isFetchingNextPage) {
-      fetchNextPage();
-    }
-  }, [hasUrlFilter, hasNextPage, isFetchingNextPage, fetchNextPage]);
+  const totalCount = (pageData as any)?.count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const hasNextPage = currentPage < totalPages;
+  const hasPrevPage = currentPage > 1;
+  // sentinel ref kept for API compatibility — no longer used for infinite scroll
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const isFetchingNextPage = isFetching;
 
   // ── Column filter config 
   const filterConfig: ColumnFilterConfig[] = [
-    { key: 'project',  type: 'search', searchFields: ['project_details', 'name'] },
-    { key: 'heading',  type: 'search' },
-    { key: 'labels',   type: 'search' },
-    { key: 'status',   type: 'list', listOptions: statusOptions.map(o => ({ value: o.value.toUpperCase(), label: o.label })) },
+    { key: 'project', type: 'search', searchFields: ['project_details', 'name'] },
+    { key: 'heading', type: 'search' },
+    { key: 'labels', type: 'search' },
+    { key: 'status', type: 'list', listOptions: statusOptions.map(o => ({ value: o.value.toUpperCase(), label: o.label })) },
     { key: 'priority', type: 'list', listOptions: priorityOptions.map(o => ({ value: o.value, label: o.label })) },
-    { key: dateField,  type: 'date' },
+    { key: dateField, type: 'date' },
   ];
 
   const {
@@ -211,8 +184,8 @@ export function useMyTask() {
     setActiveFilterKey,
     filterContainerRef,
   } = useTableFilters<Task>({
-    data:               tasks,
-    columns:            filterConfig,
+    data: tasks,
+    columns: filterConfig,
     globalSearchFields: ['heading', 'description', 'status', 'priority', 'project_name', 'status_label'],
   });
 
@@ -232,8 +205,8 @@ export function useMyTask() {
     if (!projectsData) return;
     urlFiltersAppliedRef.current = true;
 
-   const projectIdParam = searchParams.get('project_id');
-    const priorityParam  = searchParams.get('priority');
+    const projectIdParam = searchParams.get('project_id');
+    const priorityParam = searchParams.get('priority');
     const labelNameParam = searchParams.get('label_name');
 
     setColumnFilters(prev => {
@@ -256,26 +229,26 @@ export function useMyTask() {
   }, [searchParams, projectsData, location.pathname, location.search, navigate, setColumnFilters]);
 
   // ── Final filtered list
- const filteredTasks = useMemo(() => {
+  const filteredTasks = useMemo(() => {
     if (!hookFilteredTasks) return [];
     return hookFilteredTasks
       .filter(task => {
         if (!task?.status) return false;
-        const matchesFilter   = activeFilter === 'ALL' || task.status.toUpperCase() === activeFilter;
+        const matchesFilter = activeFilter === 'ALL' || task.status.toUpperCase() === activeFilter;
         const q = searchQuery.trim().toLowerCase();
-        const matchesSearch   = !q ||
+        const matchesSearch = !q ||
           (task.heading || '').toLowerCase().includes(q) ||
-          (task.status  || '').toLowerCase().replace(/_/g, ' ').includes(q) ||
+          (task.status || '').toLowerCase().replace(/_/g, ' ').includes(q) ||
           (task.project_details?.name || '').toLowerCase().includes(q) ||
           (task.description || '').replace(/<[^>]*>/g, '').toLowerCase().includes(q) ||
           (task.priority || '').toLowerCase().includes(q) ||
           (task.labels || []).some((l: any) => (l.name || l.label || '').toLowerCase().includes(q));
-        const assigneeVal     = columnFilters['assigned_to'];
+        const assigneeVal = columnFilters['assigned_to'];
         const matchesAssignee = !assigneeVal || (task.assigned_to || []).map(String).includes(String(assigneeVal));
-        const createdByVal    = columnFilters['created_by'];
+        const createdByVal = columnFilters['created_by'];
         const matchesCreatedBy = !createdByVal || String(task.assigned_by) === String(createdByVal);
-        const labelsVal       = columnFilters['labels'];
-        const matchesLabel    = !labelsVal || (task.labels || []).some(
+        const labelsVal = columnFilters['labels'];
+        const matchesLabel = !labelsVal || (task.labels || []).some(
           (l: any) => (l.name || l.label || '').toLowerCase().includes(String(labelsVal).toLowerCase())
         );
         return matchesFilter && matchesSearch && matchesAssignee && matchesCreatedBy && matchesLabel;
@@ -291,40 +264,84 @@ export function useMyTask() {
   const handleCloseTaskDetail = useCallback(() => setSelectedTask(null), []);
 
   const handleSelectedTaskUpdate = useCallback((updatedTask: Task) => {
-    queryClient.setQueryData(['tasks'], (old: any) => {
-      if (!old?.pages) return old;
-      const stripped = old.pages.map((page: any) => ({
-        ...page,
-        results: page.results.filter((t: Task) => t.id !== updatedTask.id),
-      }));
-      return {
-        ...old,
-        pages: [
-          { ...stripped[0], results: [updatedTask, ...(stripped[0]?.results ?? [])] },
-          ...stripped.slice(1),
-        ],
-      };
-    });
+    queryClient.setQueryData(
+      ['tasks', statusParam, priorityParam, projectIdParam, currentPage],
+      (old: any) => {
+        if (!old?.results) return old;
+        return { ...old, results: old.results.map((t: Task) => t.id === updatedTask.id ? { ...t, ...updatedTask } : t) };
+      }
+    );
     setSelectedTask(updatedTask);
-  }, [queryClient]);
+  }, [queryClient, statusParam, priorityParam, projectIdParam, currentPage]);
+
+  // ── Bulk task selection ────────────────────────────────────────────────────
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<number>>(new Set());
+
+  const toggleTaskSelect = useCallback((taskId: number) => {
+    setSelectedTaskIds(prev => {
+      const next = new Set(prev);
+      next.has(taskId) ? next.delete(taskId) : next.add(taskId);
+      return next;
+    });
+  }, []);
+
+  const toggleAllTasks = useCallback((visibleTasks: Task[]) => {
+    setSelectedTaskIds(prev => {
+      const allSelected = visibleTasks.every(t => prev.has(t.id));
+      return allSelected ? new Set() : new Set(visibleTasks.map(t => t.id));
+    });
+  }, []);
+
+  const handleBulkDeleteTasks = useCallback(async () => {
+    const ids = [...selectedTaskIds];
+    if (ids.length === 0) return;
+    // Optimistic removal from the current page cache only
+    queryClient.setQueryData(
+      ['tasks', statusParam, priorityParam, projectIdParam, currentPage],
+      (old: any) => {
+        if (!old?.results) return old;
+        return { ...old, results: old.results.filter((t: Task) => !ids.includes(t.id)) };
+      }
+    );
+    setSelectedTask(null);
+    setSelectedTaskIds(new Set());
+    await Promise.all(ids.map(taskId =>
+      taskApi.delete(taskId).catch(() =>
+        // On error, refetch only the current page — not all cached pages
+        queryClient.invalidateQueries({
+          queryKey: ['tasks', statusParam, priorityParam, projectIdParam, currentPage],
+          exact: true,
+        })
+      )
+    ));
+  }, [selectedTaskIds, queryClient, statusParam, priorityParam, projectIdParam, currentPage]);
 
   const handleDeleteTask = useCallback(async (id: number) => {
-    queryClient.getQueryCache().findAll({ queryKey: ['tasks'] }).forEach(query => {
-      queryClient.setQueryData(query.queryKey, (old: any) => {
-        if (!old?.pages) return old;
-        return { ...old, pages: old.pages.map((page: any) => ({ ...page, results: page.results.filter((t: Task) => t.id !== id) })) };
-      });
-    });
+    // Optimistic removal from current page only
+    queryClient.setQueryData(
+      ['tasks', statusParam, priorityParam, projectIdParam, currentPage],
+      (old: any) => {
+        if (!old?.results) return old;
+        return { ...old, results: old.results.filter((t: Task) => t.id !== id) };
+      }
+    );
     setSelectedTask(null);
-    try { await taskApi.delete(id); } catch { queryClient.invalidateQueries({ queryKey: ['tasks'] }); }
-  }, [queryClient]);
+    try {
+      await taskApi.delete(id);
+    } catch {
+      queryClient.invalidateQueries({
+        queryKey: ['tasks', statusParam, priorityParam, projectIdParam, currentPage],
+        exact: true,
+      });
+    }
+  }, [queryClient, statusParam, priorityParam, projectIdParam, currentPage]);
 
   const handleFilter = useCallback((key: string) => {
     setShowDateFieldDropdown(false);
     setActiveFilterKey(prev => prev === key ? null : key);
   }, [setActiveFilterKey]);
 
-  const handleAITaskGenerate = useCallback(async (_projectId: number, _description: string) => {}, []);
+  const handleAITaskGenerate = useCallback(async (_projectId: number, _description: string) => { }, []);
 
   const openDateDropdown = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -344,7 +361,7 @@ export function useMyTask() {
     setShowPersonFieldDropdown(v => !v);
   };
 
-  const activeDateLabel   = DATE_FIELD_OPTIONS.find(o => o.value === dateField)?.label   ?? 'Due Date';
+  const activeDateLabel = DATE_FIELD_OPTIONS.find(o => o.value === dateField)?.label ?? 'Due Date';
   const activePersonLabel = PERSON_FIELD_OPTIONS.find(o => o.value === personField)?.label ?? 'Assignee';
 
   return {
@@ -354,16 +371,16 @@ export function useMyTask() {
     // view
     viewMode, setViewMode,
     // fields
-    dateField,   setDateField,   activeDateLabel,
+    dateField, setDateField, activeDateLabel,
     personField, setPersonField, activePersonLabel,
     // dropdown state
-    showDateFieldDropdown,   setShowDateFieldDropdown,
+    showDateFieldDropdown, setShowDateFieldDropdown,
     showPersonFieldDropdown, setShowPersonFieldDropdown,
     dropdownPos, setDropdownPos,
     dateTriggerRef, personTriggerRef,
     openDateDropdown, openPersonDropdown,
     // data
-    usersData, loading, isFetchingNextPage,
+    usersData, loading,
     filteredTasks,
     // filter
     searchQuery, setSearchQuery,
@@ -373,12 +390,17 @@ export function useMyTask() {
     // tasks
     selectedTask, handleTaskClick, handleCloseTaskDetail,
     handleSelectedTaskUpdate, handleDeleteTask,
+    selectedTaskIds, toggleTaskSelect, toggleAllTasks, handleBulkDeleteTasks,
     handleAITaskGenerate,
     // modals
     showAITaskModal, setShowAITaskModal,
     isInlineCreating, setIsInlineCreating,
     // scroll
     sentinelRef,
+    currentPage, setCurrentPage,
+    totalCount, totalPages,
+    hasNextPage, hasPrevPage,
+    isFetchingNextPage,
     // cache
     queryClient,
   };

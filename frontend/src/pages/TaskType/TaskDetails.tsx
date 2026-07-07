@@ -19,6 +19,7 @@ import Threads from '../Project/Thread';
 import { useProjectDetails, TabType } from '@/hooks/useTaskDetails';
 import type { Task, QuickNote } from '@/types';
 import { taskApi } from '@/services/api';
+import type { TaskSelectionProps } from '@/components/layout/DualView/taskConfig';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { useJsonPreview } from '@/hooks/useJsonPreview';
 import { TaskPreviewOverlay } from '@/pages/Project/components/TaskPreviewOverlay';
@@ -228,9 +229,29 @@ export function TaskDetails() {
   const { tasks: parsedTasks, error: previewError } = useJsonPreview(pastedJson);
   const [previewTasks, setPreviewTasks] = useState(parsedTasks);
   const [showPreviewOverlay, setShowPreviewOverlay] = useState(false);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [showBulkDeleteDenied, setShowBulkDeleteDenied] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
-  // Re-sync preview whenever the textarea JSON changes
-  // (only when the overlay is NOT open, to avoid resetting edits mid-preview)
+  const handleBulkDeleteClick = () => {
+    const unauthorised = ctx.filteredTasks
+      .filter((task: Task) => ctx.selectedTaskIds.has(task.id))
+      .some((task: Task) => task.assigned_by !== ctx.user?.id);
+
+    if (unauthorised) {
+      setShowBulkDeleteDenied(true);
+    } else {
+      setShowBulkDeleteConfirm(true);
+    }
+  };
+
+  const handleBulkDeleteConfirmed = async () => {
+    setIsBulkDeleting(true);
+    await ctx.handleBulkDeleteTasks();
+    setIsBulkDeleting(false);
+    setShowBulkDeleteConfirm(false);
+  };
+
   useEffect(() => {
     if (!showPreviewOverlay) {
       setPreviewTasks(parsedTasks);
@@ -523,6 +544,26 @@ export function TaskDetails() {
                   <>
                     {ctx.viewMode === 'list' ? (
                       <div className="bg-white rounded-lg shadow-sm">
+                        {/* ── Bulk selection toolbar ── */}
+                        {ctx.selectedTaskIds.size > 0 && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: '1px solid #dfe1e6', background: '#f8faff' }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: '#1663f6', background: '#EEF4FF', border: '1px solid #c7d7fd', borderRadius: 6, padding: '4px 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <Check size={13} strokeWidth={3} /> {ctx.selectedTaskIds.size} selected
+                            </span>
+                            <button
+                              onClick={handleBulkDeleteClick}
+                              style={{ height: 32, border: '1px solid #fca5a5', borderRadius: 6, background: '#fff', padding: '0 14px', fontSize: 13, fontWeight: 600, display: 'inline-flex', gap: 6, alignItems: 'center', cursor: 'pointer', color: '#dc2626' }}
+                            >
+                              <Trash2 size={13} /> Delete
+                            </button>
+                            <button
+                              onClick={() => ctx.toggleAllTasks(ctx.filteredTasks)}
+                              style={{ marginLeft: 'auto', height: 32, border: '1px solid #e5e7eb', borderRadius: 6, background: 'none', padding: '0 12px', fontSize: 13, fontWeight: 500, cursor: 'pointer', color: '#667085' }}
+                            >
+                              Clear
+                            </button>
+                          </div>
+                        )}
                         <div className="overflow-x-auto pb-4">
                           <DualView
                             viewMode="table"
@@ -542,6 +583,12 @@ export function TaskDetails() {
                               navigate: ctx.navigate,
                               dateField: ctx.dateField,
                               personField: ctx.personField,
+                              selectionProps: {
+                                selectedIds: ctx.selectedTaskIds,
+                                toggleSelect: ctx.toggleTaskSelect,
+                                toggleAll: ctx.toggleAllTasks,
+                                visibleTasks: ctx.filteredTasks,
+                              } satisfies TaskSelectionProps,
                             }).map((col) => ({
                               ...col,
                               headerClassName: `relative ${ctx.activeFilterKey === col.key ? 'z-[100]' : ''}`,
@@ -924,6 +971,25 @@ export function TaskDetails() {
         onConfirm={ctx.handleDeleteConfirm}
         onCancel={() => ctx.setDeleteConfirm(null)}
         isDeleting={ctx.isDeleting}
+      />
+
+      {/* Bulk delete — confirm */}
+      <DeleteModal
+        isOpen={showBulkDeleteConfirm}
+        type="confirm"
+        itemType="task"
+        itemName={ctx.selectedTaskIds.size === 1 ? undefined : `${ctx.selectedTaskIds.size} tasks`}
+        onConfirm={handleBulkDeleteConfirmed}
+        onCancel={() => setShowBulkDeleteConfirm(false)}
+        isDeleting={isBulkDeleting}
+      />
+
+      {/* Bulk delete — permission denied */}
+      <DeleteModal
+        isOpen={showBulkDeleteDenied}
+        type="denied"
+        itemType="task"
+        onCancel={() => setShowBulkDeleteDenied(false)}
       />
 
       {/* Quick Notes Slide-Out Panel */}
