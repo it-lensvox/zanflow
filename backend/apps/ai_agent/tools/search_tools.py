@@ -103,7 +103,6 @@ def search_workspace(args: dict, user, workspace_id: str) -> dict:
             from apps.projects.models import Project
             projects = Project.objects.filter(
                 workspace_id=workspace_id,
-                status="active",
                 members=user,                   # ← user-scoped
             ).filter(
                 Q(name__icontains=query) | Q(description__icontains=query)

@@ -21,6 +21,5 @@ def get_user_project_queryset(user, workspace_id: str):
 
     return Project.objects.filter(
         workspace_id=workspace_id,
-        status="active",
         members=user,
     ).distinct()

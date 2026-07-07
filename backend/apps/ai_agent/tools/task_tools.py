@@ -344,7 +344,6 @@ def get_project_labels(args: dict, user, workspace_id: str) -> dict:
             id=project_id,
             workspace_id=workspace_id,
             members=user,
-            status="active",
         ).first()
 
         if not project:
@@ -578,7 +577,6 @@ def get_user_projects(args: dict, user, workspace_id: str) -> dict:
 
         qs = Project.objects.filter(
             workspace_id=workspace_id,
-            status="active",
             members=user,
         ).distinct()
 
@@ -614,7 +612,6 @@ def create_task(args: dict, user, workspace_id: str) -> dict:
         project = Project.objects.filter(
             id=args["project_id"],
             workspace_id=workspace_id,
-            status="active",
             members=user,
         ).distinct().first()
 
@@ -622,7 +619,6 @@ def create_task(args: dict, user, workspace_id: str) -> dict:
             valid_projects = list(
                 Project.objects.filter(
                     workspace_id=workspace_id,
-                    status="active",
                     members=user,
                 ).distinct().values("id", "name").order_by("name")[:30]
             )
