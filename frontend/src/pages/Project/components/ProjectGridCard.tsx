@@ -5,6 +5,7 @@ import { formatRelativeTime } from '@/lib/utils';
 import { TEXT, MUTED, LINE } from '@/config/tokens';
 import { getTypeHex, getTypeBg } from '@/config/projectTypeConfig';
 import { StatusPill, MemberAvatars } from './ProjectPills';
+import { stripHtml } from '@/lib/utils';
 
 interface ProjectGridCardProps {
   project: Project;
@@ -53,40 +54,8 @@ export function ProjectGridCard({ project, selected, onSelect, onFav, onClick }:
       {/* ── Card body ── */}
       <div style={{ padding: '14px 16px 16px' }}>
 
-        {/* ── Row 1: Avatar + Name + Status + Menu ── */}
+        {/* ── Row 1:  Name + Status + Menu ── */}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
-
-          {/* Checkbox  */}
-          {/* <input
-            type="checkbox"
-            checked={selected}
-            onClick={onSelect}
-            onChange={() => {}}
-            style={{
-              position: 'absolute', top: 16, left: 12,
-              accentColor: accentHex, width: 14, height: 14,
-              cursor: 'pointer', zIndex: 2,
-            }}
-          /> */}
-
-          {/* Avatar circle */}
-          {/* <div style={{
-            width: 40, height: 40, borderRadius: 10,
-            background: tintBg, border: `1.5px solid ${accentHex}33`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0, marginLeft: 18,
-          }}> */}
-          {/* Avatar circle */}
-          <div style={{
-            width: 40, height: 40, borderRadius: 10,
-            background: tintBg, border: `1.5px solid ${accentHex}33`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            flexShrink: 0,
-          }}>
-            <span style={{ fontSize: 17, fontWeight: 800, color: accentHex }}>
-              {initial}
-            </span>
-          </div>
 
           {/* Name + status */}
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -147,7 +116,7 @@ export function ProjectGridCard({ project, selected, onSelect, onFav, onClick }:
             display: '-webkit-box', WebkitLineClamp: 2,
             WebkitBoxOrient: 'vertical', overflow: 'hidden',
           } as React.CSSProperties}>
-            {project.description}
+            {stripHtml(project.description)}
           </p>
         ) : (
           <div style={{ height: 8 }} />

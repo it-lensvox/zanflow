@@ -5,6 +5,7 @@ import { formatRelativeTime } from '@/lib/utils';
 import { LINE, TEXT, MUTED } from '@/config/tokens';
 import { getTypeHex, getTypeBg } from '@/config/projectTypeConfig';
 import { StatusPill, TypePill, MemberAvatars } from './ProjectPills';
+import { stripHtml } from '@/lib/utils';
 
 interface DetailPanelProps {
   project: Project;
@@ -60,7 +61,7 @@ export function DetailPanel({ project, onClose, onOpen }: DetailPanelProps) {
             </div>
           ))}
           {project.description && (
-            <p style={{ marginTop: 10, fontSize: 12, color: MUTED, lineHeight: 1.5 }}>{project.description}</p>
+            <p style={{ marginTop: 10, fontSize: 12, color: MUTED, lineHeight: 1.5 }}>{stripHtml(project.description)}</p>
           )}
         </div>
       )}

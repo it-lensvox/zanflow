@@ -52,5 +52,13 @@ export function truncate(str: string, length: number): string {
   return str.slice(0, length) + '...';
 }
 
+// Strips HTML tags from a string and returns clean, readable plain text.
+export function stripHtml(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s{2,}/g, ' ') 
+    .trim();
+}
+
 // getProjectTypeColor moved to src/config/projectTypeConfig.ts
 export { getProjectTypeColor } from '@/config/projectTypeConfig';

@@ -12,6 +12,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { formatRelativeTime } from '@/lib/utils';
 import { TablePopover } from '@/components/common';
 import { getTypeHex, getTypeBg } from '@/config/projectTypeConfig';
+import { Check } from 'lucide-react';
 import { PRIORITY_OPTIONS as _PRIORITY_OPTIONS } from '@/config/priorityConfig';
 
 // Utility function to format dates
@@ -118,11 +119,11 @@ export const getStatusConfig = (status: Task['status']) => {
 
 // Priority options
 export const priorityOptions = _PRIORITY_OPTIONS.map(p => ({
-  value:    p.value,
-  label:    p.label,
-  color:    p.twText,
+  value: p.value,
+  label: p.label,
+  color: p.twText,
   dotColor: p.twDot,
-  icon:     p.icon,
+  icon: p.icon,
 }));
 
 // Status options
@@ -207,9 +208,14 @@ function AssigneePopover({ task }: { task: Task }) {
 interface TaskGridCardProps {
   task: Task;
   onTaskClick: (task: Task) => void;
+  // Selection props — optional, only present when grid selection mode is active
+  selectionMode?: boolean;
+  isSelected?: boolean;
+  onSelect?: (task: Task) => void;
+  onDoubleClick?: (task: Task) => void;
 }
 
-export function TaskGridCard({ task, onTaskClick }: TaskGridCardProps) {
+export function TaskGridCard({ task, onTaskClick, selectionMode = false, isSelected = false, onSelect, onDoubleClick }: TaskGridCardProps) {
   const statusConfig = getStatusConfig(task.status);
   const queryClient = useQueryClient();
   const { isPinned, isPending, handlePin } = usePinTask(task, queryClient);
@@ -220,36 +226,91 @@ export function TaskGridCard({ task, onTaskClick }: TaskGridCardProps) {
   const tintBg = getTypeBg(taskType);
   const initial = (task.project_details?.name || task.project_name || 'T')[0].toUpperCase();
 
+  // Distinguish single-click (open task) from double-click (enter selection mode).
+  // Without this, onClick fires on every double-click and opens the task modal
+  // before onDoubleClick can activate selection mode.
+  const clickTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleClick = () => {
+    if (selectionMode && onSelect) {
+      // In selection mode single-click always toggles — no delay needed
+      onSelect(task);
+      return;
+    }
+    // Outside selection mode: wait briefly to see if a double-click follows
+    if (clickTimer.current) clearTimeout(clickTimer.current);
+    clickTimer.current = setTimeout(() => {
+      clickTimer.current = null;
+      onTaskClick(task);
+    }, 220);
+  };
+
+  const handleDoubleClick = () => {
+    // Cancel the pending single-click so the modal doesn't open
+    if (clickTimer.current) {
+      clearTimeout(clickTimer.current);
+      clickTimer.current = null;
+    }
+    onDoubleClick?.(task);
+  };
+
   return (
     <div
-      onClick={() => onTaskClick(task)}
+      onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
       className="group cursor-pointer"
       style={{
         background: '#fff',
-        border: '1px solid #E6EBF2',
+        border: isSelected ? `2px solid ${accentHex}` : '1px solid #E6EBF2',
         borderRadius: 14,
         position: 'relative',
-        boxShadow: '0 1px 4px rgba(16,24,40,.06)',
-        transition: 'box-shadow .2s, transform .2s',
+        boxShadow: isSelected ? `0 0 0 3px ${accentHex}22` : '0 1px 4px rgba(16,24,40,.06)',
+        transition: 'box-shadow .2s, transform .2s, border-color .15s',
         minWidth: 0,
         width: '100%',
       }}
-      onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 20px rgba(16,24,40,.12)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
-      onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 1px 4px rgba(16,24,40,.06)'; e.currentTarget.style.transform = 'none'; }}
+      onMouseEnter={e => { if (!isSelected) { e.currentTarget.style.boxShadow = '0 4px 20px rgba(16,24,40,.12)'; e.currentTarget.style.transform = 'translateY(-2px)'; } }}
+      onMouseLeave={e => { if (!isSelected) { e.currentTarget.style.boxShadow = '0 1px 4px rgba(16,24,40,.06)'; e.currentTarget.style.transform = 'none'; } }}
     >
       {/* ── Top accent bar (project type colour) ── */}
       <div style={{ height: 4, background: accentHex, width: '100%', borderRadius: '14px 14px 0 0' }} />
 
       <div style={{ padding: '14px 16px 16px' }}>
-        {/* ── Row 1: Avatar + project name + pin + timestamp ── */}
+        {/* ── Row 1: Avatar/checkbox + project name + pin + timestamp ── */}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
-          {/* <div style={{
-            width: 40, height: 40, borderRadius: 10, flexShrink: 0,
-            background: tintBg, border: `1.5px solid ${accentHex}33`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <span style={{ fontSize: 16, fontWeight: 800, color: accentHex }}>{initial}</span>
-          </div> */}
+
+          {/* Avatar — doubles as selection indicator in selection mode */}
+          {selectionMode && (
+            <div
+              onClick={e => { e.stopPropagation(); onSelect?.(task); }}
+              title={isSelected ? 'Deselect' : 'Select'}
+              style={{ position: 'relative', width: 30, height: 30, borderRadius: 7, cursor: 'pointer', flexShrink: 0 }}
+            >
+              <div style={{
+                width: 30, height: 30, borderRadius: 7,
+                background: isSelected ? accentHex : tintBg,
+                border: isSelected ? `1.5px solid ${accentHex}` : `1.5px solid ${accentHex}33`,
+                display: 'grid', placeItems: 'center',
+                color: isSelected ? '#fff' : accentHex,
+                fontWeight: 800, fontSize: 13,
+                transition: 'background .15s, color .15s',
+              }}>
+                {isSelected
+                  ? <Check size={13} strokeWidth={3} />
+                  : initial
+                }
+              </div>
+              {!isSelected && (
+                <div
+                  style={{ position: 'absolute', inset: 0, borderRadius: 7, background: `${accentHex}cc`, display: 'grid', placeItems: 'center', opacity: 0, transition: 'opacity .15s' }}
+                  onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                  onMouseLeave={e => e.currentTarget.style.opacity = '0'}
+                >
+                  <Check size={13} color="#fff" strokeWidth={3} />
+                </div>
+              )}
+            </div>
+          )}
 
           <div style={{ flex: 1, minWidth: 0 }}>
             <p style={{ margin: '0 0 2px', fontWeight: 700, fontSize: 14, color: '#172033', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -433,15 +494,22 @@ function TaskTitleCell({
   );
 }
 
-// Table Columns Configuration
+export interface TaskSelectionProps {
+  selectedIds: Set<number>;
+  toggleSelect: (id: number) => void;
+  toggleAll: (tasks: Task[]) => void;
+  visibleTasks: Task[];
+}
+
 interface TaskTableColumnsProps {
+  selectionProps?: TaskSelectionProps;
   onTaskClick: (task: Task) => void;
   queryClient: ReturnType<typeof useQueryClient>;
   user: ReturnType<typeof useAuth>['user'];
   navigate: ReturnType<typeof useNavigate>;
 }
 
-export const createTasksTableColumns = ({ onTaskClick, queryClient, user, navigate, dateField = 'end_date', personField = 'assigned_to' }: TaskTableColumnsProps & { dateField?: 'end_date' | 'start_date' | 'created_at'; personField?: 'assigned_to' | 'created_by' | 'updated_by' }): TableColumn<Task>[] => {
+export const createTasksTableColumns = ({ onTaskClick, queryClient, user, navigate, dateField = 'end_date', personField = 'assigned_to', selectionProps }: TaskTableColumnsProps & { dateField?: 'end_date' | 'start_date' | 'created_at'; personField?: 'assigned_to' | 'created_by' | 'updated_by' }): TableColumn<Task>[] => {
 
   const updateAllTaskListCaches = (updatedTask: Task) => {
     const allTaskListQueries = queryClient.getQueryCache().findAll({ queryKey: ['tasks-list'], exact: false });
@@ -483,7 +551,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
           };
         }
         if (Array.isArray(old)) return [updatedTask, ...old.filter((t: Task) => t.id !== task.id)];
-        if (old.tasks)   return { ...old, tasks:   [updatedTask, ...old.tasks.filter((t: Task) => t.id !== task.id)] };
+        if (old.tasks) return { ...old, tasks: [updatedTask, ...old.tasks.filter((t: Task) => t.id !== task.id)] };
         if (old.results) return { ...old, results: [updatedTask, ...old.results.filter((t: Task) => t.id !== task.id)] };
         return old;
       };
@@ -511,7 +579,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
               };
             }
             if (Array.isArray(old)) return old.map((t: Task) => t.id === task.id ? updatedTaskFromServer : t);
-            if (old.tasks)   return { ...old, tasks:   old.tasks.map((t: Task) => t.id === task.id ? updatedTaskFromServer : t) };
+            if (old.tasks) return { ...old, tasks: old.tasks.map((t: Task) => t.id === task.id ? updatedTaskFromServer : t) };
             if (old.results) return { ...old, results: old.results.map((t: Task) => t.id === task.id ? updatedTaskFromServer : t) };
             return old;
           };
@@ -594,7 +662,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
           };
         }
         if (Array.isArray(old)) return [updatedTask, ...old.filter((t: Task) => t.id !== task.id)];
-        if (old.tasks)   return { ...old, tasks:   [updatedTask, ...old.tasks.filter((t: Task) => t.id !== task.id)] };
+        if (old.tasks) return { ...old, tasks: [updatedTask, ...old.tasks.filter((t: Task) => t.id !== task.id)] };
         if (old.results) return { ...old, results: [updatedTask, ...old.results.filter((t: Task) => t.id !== task.id)] };
         return old;
       };
@@ -676,7 +744,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
           };
         }
         if (Array.isArray(old)) return [updatedTask, ...old.filter((t: Task) => t.id !== task.id)];
-        if (old.tasks)   return { ...old, tasks:   [updatedTask, ...old.tasks.filter((t: Task) => t.id !== task.id)] };
+        if (old.tasks) return { ...old, tasks: [updatedTask, ...old.tasks.filter((t: Task) => t.id !== task.id)] };
         if (old.results) return { ...old, results: [updatedTask, ...old.results.filter((t: Task) => t.id !== task.id)] };
         return old;
       };
@@ -714,7 +782,53 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     );
   };
 
-  return [
+  // ── Avatar-checkbox column
+  const avatarCol: TableColumn<Task> | null = selectionProps ? {
+    key: '__select__',
+    width: '5%',
+    label: (() => {
+      const allSelected = selectionProps.visibleTasks.length > 0 &&
+        selectionProps.visibleTasks.every(t => selectionProps.selectedIds.has(t.id));
+      return (
+        <div
+          onClick={e => { e.stopPropagation(); selectionProps.toggleAll(selectionProps.visibleTasks); }}
+          title={allSelected ? 'Deselect all' : 'Select all'}
+          style={{ width: 26, height: 26, borderRadius: 7, background: '#e5e7eb', display: 'grid', placeItems: 'center', cursor: 'pointer', transition: 'background 0.15s', flexShrink: 0 }}
+        >
+          {allSelected && <Check size={13} color="#fff" strokeWidth={3} />}
+        </div>
+      );
+    })(),
+    render: (task: Task) => {
+      const taskType = (task as any).project_task_type || task.project_details?.task_type || '';
+      const color = getTypeHex(taskType);
+      const tint = getTypeBg(taskType);
+      const initial = (task.project_details?.name || task.project_name || 'T')[0].toUpperCase();
+      const isSel = selectionProps.selectedIds.has(task.id);
+      return (
+        <div
+          onClick={e => { e.stopPropagation(); selectionProps.toggleSelect(task.id); }}
+          title={isSel ? 'Deselect' : 'Select'}
+          style={{ position: 'relative', width: 26, height: 26, borderRadius: 7, cursor: 'pointer', flexShrink: 0 }}
+        >
+          <div style={{ width: 26, height: 26, borderRadius: 7, background: isSel ? color : tint, border: isSel ? `1.5px solid ${color}` : `1.5px solid ${color}33`, display: 'grid', placeItems: 'center', color: isSel ? '#fff' : color, fontWeight: 800, fontSize: 12, transition: 'background 0.15s, color 0.15s' }}>
+            {isSel ? <Check size={12} strokeWidth={3} /> : initial}
+          </div>
+          {!isSel && (
+            <div
+              style={{ position: 'absolute', inset: 0, borderRadius: 7, background: `${color}cc`, display: 'grid', placeItems: 'center', opacity: 0, transition: 'opacity 0.15s' }}
+              onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+              onMouseLeave={e => e.currentTarget.style.opacity = '0'}
+            >
+              <Check size={12} color="#fff" strokeWidth={3} />
+            </div>
+          )}
+        </div>
+      );
+    },
+  } : null;
+
+  const baseColumns: TableColumn<Task>[] = [
     {
       key: 'project',
       label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">Project</span>,
@@ -864,7 +978,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     },
     {
       key: 'priority',
-     label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">Priority</span>,
+      label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">Priority</span>,
       width: '8%',
       render: (task: Task) => <PriorityDropdown task={task} />,
     },
@@ -937,4 +1051,6 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     },
 
   ];
+
+  return avatarCol ? [avatarCol, ...baseColumns] : baseColumns;
 };

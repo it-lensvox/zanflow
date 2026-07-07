@@ -39,6 +39,52 @@ export function useProjectDetails() {
     // ─── Modal State ─────────────────────────────────────────────────────────────
     const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+
+    // ── Bulk task selection (avatar-checkbox) ──────────────────────────────
+    const [selectedTaskIds, setSelectedTaskIds] = useState<Set<number>>(new Set());
+
+    const toggleTaskSelect = useCallback((taskId: number) => {
+      setSelectedTaskIds(prev => {
+        const next = new Set(prev);
+        next.has(taskId) ? next.delete(taskId) : next.add(taskId);
+        return next;
+      });
+    }, []);
+
+    const toggleAllTasks = useCallback((visibleTasks: Task[]) => {
+      setSelectedTaskIds(prev => {
+        const allSelected = visibleTasks.every(t => prev.has(t.id));
+        return allSelected ? new Set() : new Set(visibleTasks.map(t => t.id));
+      });
+    }, []);
+
+    const handleBulkDeleteTasks = useCallback(async () => {
+      const ids = [...selectedTaskIds];
+      if (ids.length === 0) return;
+      // Optimistic removal from all caches
+      const removeIds = (list: Task[]) => list.filter(t => !ids.includes(t.id));
+      queryClient.setQueryData(['tasks-list', id], (old: any) => {
+        if (!old) return old;
+        const list: Task[] = old.tasks ?? old.results ?? (Array.isArray(old) ? old : []);
+        const filtered = removeIds(list);
+        if (old.tasks) return { ...old, tasks: filtered };
+        if (old.results) return { ...old, results: filtered };
+        return filtered;
+      });
+      queryClient.getQueryCache().findAll({ queryKey: ['tasks'] }).forEach(query => {
+        queryClient.setQueryData(query.queryKey, (old: any) => {
+          if (!old?.pages) return old;
+          return { ...old, pages: old.pages.map((page: any) => ({ ...page, results: removeIds(page.results) })) };
+        });
+      });
+      setSelectedTaskIds(new Set());
+      await Promise.all(ids.map(taskId =>
+        taskApi.delete(taskId).catch(() => {
+          queryClient.invalidateQueries({ queryKey: ['tasks'] });
+          queryClient.invalidateQueries({ queryKey: ['tasks-list', id] });
+        })
+      ));
+    }, [selectedTaskIds, queryClient, id]);
     const [isInlineCreating, setIsInlineCreating] = useState(false);
     const [showNotesPanel, setShowNotesPanel] = useState(false);
 
@@ -919,6 +965,7 @@ useEffect(() => {
         handleTaskCreated,
         handleTaskUpdated,
         handleDeleteTask,
+        selectedTaskIds, toggleTaskSelect, toggleAllTasks, handleBulkDeleteTasks,
         handleFileUpload,
         handleDragEnter,
         handleDragLeave,

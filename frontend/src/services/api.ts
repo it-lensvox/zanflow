@@ -4,7 +4,7 @@ import type {
   TaskComment, CreateTaskCommentPayload, AITaskSuggestionResponse, AITaskSuggestionPayload, ProjectCreatePayload, Label, DocumentStatus, ChatMessage, ChatRoom, ChatRoomMessagesResponse, CreatePrivateChatPayload,
   GatewaySendMessagePayload, GatewayIncomingMessage, RefineTextPayload, RefineTextResponse, TaskResponse, TeamTypeChoicesResponse, PinTaskResponse, CreateTeamPayload, ProjectChatRoom, TeamChatRoom, ChatUnreadResponse, 
   NotificationData, NotificationCallback, Team, ThreadRoom, ThreadSession, ThreadStorage, ThreadUIMessage, CreateThreadRoomPayload, WSJoinRoomCommand, WSSendMessageCommand, WSIncomingThreadMessage, WSUnreadUpdateSignal, ThreadMessagesResponse,
-  InviteUserPayload, InviteUserResponse, InviteVerifyResponse, InviteAcceptPayload, InviteAcceptResponse, OrganizationSignupPayload, OrganizationSignupResponse,
+  InviteUserPayload, InviteUserResponse, InviteVerifyResponse, InviteAcceptPayload, InviteAcceptResponse, OrganizationSignupPayload, OrganizationSignupResponse, ProjectStatus,
   DailyUpdate, DailyUpdatePayload, DailyUpdateListResponse, TaskFilterParams, Event as CalendarEventType, SocialAuthPayload, SocialAuthResponse,
 } from '@/types';
 
@@ -366,7 +366,7 @@ export const authApi = {
 
 // Projects API
 export const projectsApi = {
-  list: async (params?: { task_type?: string; is_active?: boolean; page?: number }) => {
+  list: async (params?: { task_type?: string; status?: ProjectStatus; page?: number }) => {
     const response = await api.get<PaginatedProjectsResponse>('/projects/', { params });
     return response.data;
   },
