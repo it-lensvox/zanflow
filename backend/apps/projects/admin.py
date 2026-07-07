@@ -15,8 +15,9 @@ class LabelInline(admin.TabularInline):
 
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
-    list_display = ["name", "task_type", "is_active", "created_by", "created_at"]
-    list_filter = ["task_type", "is_active", "created_at"]
+    # Updated to use 'status' instead of 'is_active'
+    list_display = ["name", "task_type", "status", "created_by", "created_at"]
+    list_filter = ["task_type", "status", "created_at"]
     search_fields = ["name", "description"]
     inlines = [ProjectMembershipInline, LabelInline]
 

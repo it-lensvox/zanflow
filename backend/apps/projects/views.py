@@ -36,11 +36,10 @@ class ProjectFilter(filters.FilterSet):
     Filter for projects.
     """
     task_type = filters.ChoiceFilter(choices=Project.TaskType.choices)
-    is_active = filters.BooleanFilter()
-    
+    status = filters.ChoiceFilter(choices=Project.Status.choices)
     class Meta:
         model = Project
-        fields = ["task_type", "is_active"]
+        fields = ["task_type", "status"]
 
 
 class ProjectViewSet(viewsets.ModelViewSet):

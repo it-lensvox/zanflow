@@ -21,7 +21,15 @@ class Project(TenantModel, UserStampedModel):
         Internal = "internal", "Internal"
         CONTENT_CREATION = "content_creation", "Content Creation"
         Ideas = "ideas", "Ideas"
-        Demo = "demo", "Demo" # Added Demo as a valid choice
+        Demo = "demo", "Demo" 
+    
+    # ADD THIS: Status choices mapped exactly to the frontend requirements
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Active"
+        IN_REVIEW = "in_review", "In Review"
+        DRAFT = "draft", "Draft"
+        ARCHIVED = "archived", "Archived"
+        COMPLETED = "completed", "Completed"
     
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
@@ -35,27 +43,28 @@ class Project(TenantModel, UserStampedModel):
         related_name="favorite_projects",
         blank=True
     )    
-    # Project settings (JSON)
     project_settings = models.JSONField(default=dict, blank=True)
-    
-    # Default labels for this project
     default_labels = models.JSONField(default=list, blank=True)
-    
-    # Default assignees (for issues, reviews, etc.)
     default_assignees = models.ManyToManyField(
         django_settings.AUTH_USER_MODEL,
         related_name="assigned_projects",
         blank=True,
     )
-    
-    # Project members with access
     members = models.ManyToManyField(
         django_settings.AUTH_USER_MODEL,
         through="ProjectMembership",
         related_name="projects",
     )
     
-    is_active = models.BooleanField(default=True)
+    # REMOVE THIS:
+    # is_active = models.BooleanField(default=True)
+    
+    # ADD THIS:
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.ACTIVE,
+    )
     
     class Meta:
         db_table = "projects"
@@ -63,7 +72,6 @@ class Project(TenantModel, UserStampedModel):
     
     def __str__(self):
         return self.name
-
 
 class ProjectMembership(models.Model):
     """
