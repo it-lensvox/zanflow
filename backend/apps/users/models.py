@@ -28,6 +28,28 @@ class User(AbstractUser):
     # NEW: Store skills as a list of strings
     skills = models.JSONField(default=list, blank=True)
 
+    # ── SOCIAL AUTH ───────────────────────────────────────────────────────────
+    # Tracks which provider was used to create / authenticate this account.
+    # 'local' = traditional email + password (existing behaviour, unchanged)
+    # 'google' / 'microsoft' = OAuth SSO
+    AUTH_PROVIDER_LOCAL = "local"
+    AUTH_PROVIDER_GOOGLE = "google"
+    AUTH_PROVIDER_MICROSOFT = "microsoft"
+    AUTH_PROVIDER_CHOICES = [
+        (AUTH_PROVIDER_LOCAL, "Local"),
+        (AUTH_PROVIDER_GOOGLE, "Google"),
+        (AUTH_PROVIDER_MICROSOFT, "Microsoft"),
+    ]
+    auth_provider = models.CharField(
+        max_length=20,
+        choices=AUTH_PROVIDER_CHOICES,
+        default=AUTH_PROVIDER_LOCAL,
+    )
+    # Stores the unique ID returned by the OAuth provider so we can look the
+    # user up on subsequent logins without relying on email alone.
+    social_uid = models.CharField(max_length=255, null=True, blank=True, db_index=True)
+    # ──────────────────────────────────────────────────────────────────────────
+
     # ── MULTI-TENANCY ─────────────────────────────────────────────────────
     organization = models.ForeignKey(
         "organizations.Organization",
@@ -143,6 +165,7 @@ class ContactMessage(models.Model):
     email = models.EmailField()
     company = models.CharField(max_length=255, blank=True, null=True)
     problem = models.TextField()
+    source = models.CharField(max_length=100, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

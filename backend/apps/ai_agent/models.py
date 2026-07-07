@@ -21,10 +21,16 @@ class AgentSession(models.Model):
     messages = models.JSONField(default=list)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    is_active = models.BooleanField(default=True)
+    is_active  = models.BooleanField(default=True)
+    is_pinned  = models.BooleanField(default=False)
+    title      = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Auto-generated from first message or manually renamed by user",
+    )
 
     class Meta:
-        ordering = ["-updated_at"]
+        ordering = ["-is_pinned", "-updated_at"]  # pinned sessions appear first
         indexes = [
             models.Index(fields=["user", "workspace_id"]),
         ]

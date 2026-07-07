@@ -1,0 +1,95 @@
+{
+  "run_id": "search_run_2026-06-26_16-15-26_event_test_v2",
+  "model": "event_test_v2",
+  "run_at": "2026-06-26T16:15:42.737885",
+  "endpoint": "http://192.168.1.6:8000/api/v1/agent/search/",
+  "workspace_id": "1",
+  "total": 5,
+  "passed": 5,
+  "failed": 0,
+  "partial": 0,
+  "pass_rate": 100.0,
+  "fallback_rate": 0.0,
+  "avg_latency_ms": 2694,
+  "category_breakdown": {
+    "model_event": {
+      "pass": 5,
+      "partial": 0,
+      "fail": 0,
+      "dry-run": 0,
+      "total": 5
+    }
+  },
+  "results": [
+    {
+      "id": "S051",
+      "category": "model_event",
+      "difficulty": "easy",
+      "query": "find my all events that are scheduled today",
+      "expected_intent": "search",
+      "expected_type": "search",
+      "actual_type": "search",
+      "total_results": 1,
+      "fallback": false,
+      "latency_ms": 4206,
+      "status": "pass",
+      "failure_reason": null
+    },
+    {
+      "id": "S052",
+      "category": "model_event",
+      "difficulty": "easy",
+      "query": "show my meetings today",
+      "expected_intent": "search",
+      "expected_type": "search",
+      "actual_type": "search",
+      "total_results": 1,
+      "fallback": false,
+      "latency_ms": 2671,
+      "status": "pass",
+      "failure_reason": null
+    },
+    {
+      "id": "S053",
+      "category": "model_event",
+      "difficulty": "easy",
+      "query": "what events do I have",
+      "expected_intent": "search",
+      "expected_type": "search",
+      "actual_type": "search",
+      "total_results": 10,
+      "fallback": false,
+      "latency_ms": 2169,
+      "status": "pass",
+      "failure_reason": null
+    },
+    {
+      "id": "S054",
+      "category": "model_event",
+      "difficulty": "medium",
+      "query": "find meeting about API",
+      "expected_intent": "search",
+      "expected_type": "search",
+      "actual_type": "search",
+      "total_results": 0,
+      "fallback": false,
+      "latency_ms": 2062,
+      "status": "pass",
+      "failure_reason": null
+    },
+    {
+      "id": "S055",
+      "category": "model_event",
+      "difficulty": "hard",
+      "query": "show all events and tasks in ZanFlow today",
+      "expected_intent": "search",
+      "expected_type": "search",
+      "actual_type": "search",
+      "total_results": 11,
+      "fallback": false,
+      "latency_ms": 2364,
+      "status": "pass",
+      "failure_reason": null
+    }
+  ]
+}

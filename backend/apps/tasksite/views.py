@@ -79,7 +79,21 @@ class TaskListCreateView(WorkspaceAPIView):
         project_id = request.query_params.get('project_id')
         if project_id:
             tasks = tasks.filter(project__id=project_id)
-            
+
+        # 1b. Filters by status — matches Task.STATUS_CHOICES exactly
+        status_param = request.query_params.get('status')
+        if status_param:
+            valid_statuses = {'pending', 'in_progress', 'completed', 'review', 'deployed', 'deferred', 'backlog'}
+            if status_param in valid_statuses:
+                tasks = tasks.filter(status=status_param)
+
+        # 1c. Filters by priority — matches Task.PRIORITY_CHOICES exactly
+        priority_param = request.query_params.get('priority')
+        if priority_param:
+            valid_priorities = {'low', 'medium', 'high', 'critical'}
+            if priority_param in valid_priorities:
+                tasks = tasks.filter(priority=priority_param)
+
         tasks = tasks.annotate(
             user_has_pinned=Case(
                 When(pinned_by=user, then=Value(True)),

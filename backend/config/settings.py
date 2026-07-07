@@ -16,7 +16,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config("SECRET_KEY", default="django-insecure-dev-key-change-in-production")
 DEBUG = config("DEBUG", default=True, cast=bool)
 # ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1,192.168.1.12").split(",")
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", "192.168.1.164"," 192.168.1.229", "*"]
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", "192.168.1.17"," 192.168.1.229", "*"]
 
 
 # Application definition
@@ -57,6 +57,7 @@ LOCAL_APPS = [
     "apps.quicknotes",
     "apps.daily_updates.apps.DailyUpdatesConfig",
     "apps.ai_agent.apps.AiAgentConfig",
+    "apps.dashboard",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -159,7 +160,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # CORS
 _cors_origins = config(
     "CORS_ALLOWED_ORIGINS",
-    default="http://localhost:3001,http://localhost:3000,http://127.0.0.1:5173,http://192.168.1.121:5173,http://192.168.1.12:5173,http://192.168.1.160:3001,http://192.168.1.164:3001, http://192.168.1.188:8000"
+    default="http://localhost:3001,http://localhost:3000,http://127.0.0.1:5173,http://192.168.1.121:5173,http://192.168.1.15:3001,http://192.168.1.160:3001,http://192.168.1.164:3001, http://192.168.1.188:8000"
 )
 CORS_ALLOWED_ORIGINS = [origin.strip() for origin in _cors_origins.split(",") if origin.strip()]
 CORS_ALLOW_CREDENTIALS = True
@@ -224,6 +225,8 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 EMAIL_HOST_USER = os.getenv('SES_SMTP_USER')
 EMAIL_HOST_PASSWORD = os.getenv('SES_SMTP_PASSWORD')
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL')
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+MICROSOFT_TENANT_ID = os.getenv("MICROSOFT_TENANT_ID", "")
 # --- CHANGE STARTS HERE ---
 # define these OUTSIDE the 'if' block so 'views.py' can always find them.
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
@@ -232,6 +235,9 @@ AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME")
 AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME", default="us-east-1")
 AWS_REGION = os.getenv("AWS_REGION", default="us-east-1")
 BEDROCK_MODEL_ID = os.getenv('BEDROCK_MODEL_ID')
+LLM_PROVIDER   = os.getenv("LLM_PROVIDER", "bedrock")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_MODEL   = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 if USE_S3:
     # Keep the storage configuration inside the IF block
     AWS_S3_FILE_OVERWRITE = False

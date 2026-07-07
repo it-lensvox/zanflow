@@ -32,37 +32,47 @@ class Task(TenantModel):
     start_date = models.DateTimeField(null=True, blank=True)
     end_date = models.DateTimeField(null=True, blank=True)
     duration_time = models.DurationField(null=True, blank=True)
-    
+
     priority = models.CharField(
-        max_length=20, 
-        choices=PRIORITY_CHOICES, 
+        max_length=20,
+        choices=PRIORITY_CHOICES,
         default='medium'
     )
     labels = models.ManyToManyField(
-        Label, 
-        blank=True, 
+        Label,
+        blank=True,
         related_name='tasks'
     )
 
     project = models.ForeignKey(
         Project,
-        on_delete=models.CASCADE, 
-        null=True, 
+        on_delete=models.CASCADE,
+        null=True,
         blank=True,
         related_name='tasks'
     )
 
+    # ✅ NEW: self-referential FK for parent/child task hierarchy
+    parent_task = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='children',
+        verbose_name='Parent Task',
+    )
+
     assigned_to = models.ManyToManyField(User, related_name='assigned_tasks', blank=True)
     assigned_by = models.ForeignKey(
-        User, 
-        on_delete=models.SET_NULL, 
-        null=True, 
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
         related_name='created_tasks'
     )
     pinned_by = models.ManyToManyField(User, related_name='pinned_tasks', blank=True)
     status = models.CharField(
-        max_length=20, 
-        choices=STATUS_CHOICES, 
+        max_length=20,
+        choices=STATUS_CHOICES,
         default='pending'
     )
     status_updated_by = models.ForeignKey(
@@ -72,7 +82,7 @@ class Task(TenantModel):
         blank=True,
         related_name='status_updated_tasks'
     )
-    
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -83,7 +93,7 @@ class Task(TenantModel):
 class TaskLink(models.Model):
     """Not directly tenant-scoped — implicitly scoped via Task FK."""
     task = models.ForeignKey(
-        Task, 
+        Task,
         related_name='links',
         on_delete=models.CASCADE
     )
@@ -97,7 +107,7 @@ class TaskLink(models.Model):
 class TaskAttachment(models.Model):
     """Not directly tenant-scoped — implicitly scoped via Task FK."""
     task = models.ForeignKey(
-        Task, 
+        Task,
         related_name='attachments',
         on_delete=models.CASCADE
     )
@@ -111,13 +121,13 @@ class TaskAttachment(models.Model):
 class TaskComment(models.Model):
     """Not directly tenant-scoped — implicitly scoped via Task FK."""
     task = models.ForeignKey(
-        Task, 
-        related_name='comments', 
+        Task,
+        related_name='comments',
         on_delete=models.CASCADE
     )
     user = models.ForeignKey(
-        User, 
-        related_name='task_comments', 
+        User,
+        related_name='task_comments',
         on_delete=models.CASCADE
     )
     content = models.TextField()

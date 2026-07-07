@@ -6,6 +6,7 @@ class AgentQuerySerializer(serializers.Serializer):
     """Validates the incoming POST body for /agent/query/"""
     query = serializers.CharField(
         max_length=2000,
+        allow_blank=True,  # blank handled gracefully in views.py
         help_text="The natural language query or command from the user",
     )
     session_id = serializers.IntegerField(
@@ -26,7 +27,10 @@ class AgentResponseSerializer(serializers.Serializer):
 class AgentSessionSerializer(serializers.ModelSerializer):
     class Meta:
         model = AgentSession
-        fields = ["id", "workspace_id", "messages", "created_at", "updated_at", "is_active"]
+        fields = [
+            "id", "workspace_id", "title", "is_pinned",
+            "messages", "created_at", "updated_at", "is_active",
+        ]
         read_only_fields = fields
 
 
