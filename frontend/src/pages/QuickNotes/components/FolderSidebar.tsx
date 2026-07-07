@@ -166,10 +166,10 @@ export function FolderSidebar({
                 <p style={{ fontSize: 11, color: '#667085', padding: '6px 10px' }}>Loading…</p>
               ) : projectsError ? (
                 <p style={{ fontSize: 11, color: '#ef4444', padding: '6px 10px' }}>{projectsError}</p>
-              ) : projects.filter(p => p.is_active).length === 0 ? (
+              ) : projects.filter(p => p.status !== 'archived').length === 0 ? (
                 <p style={{ fontSize: 11, color: '#667085', padding: '6px 10px' }}>No projects found</p>
               ) : (
-                projects.filter(p => p.is_active).map(project => {
+                projects.filter(p => p.status !== 'archived').map(project => {
                   const typeHex  = getTypeHex(project.task_type || '');
                   const isActive = state.selectedFolderId === `project-${project.id}`;
                   return (

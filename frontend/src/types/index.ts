@@ -51,6 +51,8 @@ export interface UserMinimal {
 }
 
 // Project page  types 
+export type ProjectStatus = 'active' | 'in_review' | 'draft' | 'archived' | 'completed';
+
 export interface Project {
   is_favourite: boolean;
   id: number;
@@ -59,7 +61,7 @@ export interface Project {
   task_type: TaskType;
   settings: ProjectSettings;
   default_labels: string[];
-  is_active: boolean;
+  status: ProjectStatus;
   created_by: UserMinimal;
   created_at: string;
   updated_at: string;
@@ -67,6 +69,8 @@ export interface Project {
   member_count: number;
   document_count: number;
   members?: ProjectMember[];
+  task_count?: number;
+  completion_percentage?: number;
 }
 
 // In Project page  render member list on card
@@ -1240,12 +1244,12 @@ export interface AIBotContext {
 // export interface AIBotUIMessage { id: string; text: string; sender: 'user' | 'bot'; timestamp: Date; }
 // export interface AIBotSession { id: string; title: string; messages: AIBotUIMessage[]; createdAt: Date; updatedAt: Date; }
 
-// ─── NEW REST Agent API types ─────────────────────────────────────────────────
+// ─── NEW REST Agent API types 
 
 // POST /api/v1/agent/query/
 export interface AgentQueryPayload {
   query:      string;
-  session_id: number | null;   // null = new conversation
+  session_id: number | null; 
 }
 
 // Response from POST /api/v1/agent/query/

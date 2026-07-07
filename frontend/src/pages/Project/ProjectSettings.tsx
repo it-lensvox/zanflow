@@ -1,16 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Save, Trash2, Plus, X, Tags, Settings, AlertTriangle, } from 'lucide-react';
-import {
-  Button, Input, Card, CardHeader, CardTitle, CardContent,
-} from '@/components/common';
+import { Save, Trash2, Plus, X, Tags, Settings, AlertTriangle, FolderKanban, Users, Tag } from 'lucide-react';
+import { Button, Input } from '@/components/common';
 import { projectsApi, usersApi } from '@/services/api';
 import DeleteModal from '@/components/common/Deletemodal';
 import { useAuth } from '@/hooks/useAuth';
-import { getProjectTypeColor } from '@/config/projectTypeConfig';
-import type { Project, Label, TaskType, User as AppUser } from '@/types';
 import { PROJECT_TYPE_OPTIONS as TASK_TYPES } from '@/config/projectTypeConfig';
+import type { Project, Label, TaskType, User as AppUser, ProjectStatus } from '@/types';
+import { Modal, ModalHeader } from '@/components/common/Modal';
+import { FormField } from '@/pages/MyTask/pages/CreateTask/components/FormField';
+import { BLUE, LINE, MUTED, TEXT, BG, INPUT_STYLE, CARD_STYLE } from '@/pages/MyTask/pages/CreateTask/createTaskConstants';
+import { STATUS_MAP } from '@/pages/Project/projectConstants';
+import { PROJECT_ROLES, DropdownTrigger, DropdownList, DropdownItem } from '@/pages/Project/components/ProjectDropdowns';
 
 const PRESET_COLORS = [
   '#ef4444', '#f97316', '#f59e0b', '#eab308',
@@ -19,14 +21,6 @@ const PRESET_COLORS = [
   '#8b5cf6', '#a855f7', '#d946ef', '#ec4899',
 ];
 
-const PROJECT_ROLES = [
-  { label: 'Manager', value: 'manager' },
-  { label: 'Frontend Developer', value: 'frontend' },
-  { label: 'Backend Developer', value: 'backend' },
-  { label: 'Testing Engineer', value: 'tester' },
-  { label: 'DevOps Engineer', value: 'devops' },
-  { label: 'Social Media', value: 'social_media' }
-];
 
 export function ProjectSettings() {
   const { id } = useParams<{ id: string }>();
@@ -38,11 +32,15 @@ export function ProjectSettings() {
     name: string;
     description: string;
     task_type: TaskType;
+    status: ProjectStatus;
   }>({
     name: '',
     description: '',
-    task_type: 'key_value' as TaskType,
+    task_type: 'client' as TaskType,
+    status: 'active',
   });
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const statusDropdownRef = useRef<HTMLDivElement>(null);
   const [isFormDirty, setIsFormDirty] = useState(false);
   const [assignedTo, setAssignedTo] = useState<{ userId: number; role: string }[]>([]);
   const [tempUser, setTempUser] = useState<number | null>(null);
@@ -50,9 +48,13 @@ export function ProjectSettings() {
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
   const [taskTypeDropdownOpen, setTaskTypeDropdownOpen] = useState(false);
-  const userDropdownRef = useRef<HTMLDivElement>(null);
+ const userDropdownRef = useRef<HTMLDivElement>(null);
   const roleDropdownRef = useRef<HTMLDivElement>(null);
   const taskTypeDropdownRef = useRef<HTMLDivElement>(null);
+  const taskTypeTriggerRef = useRef<HTMLDivElement>(null);
+  const statusTriggerRef = useRef<HTMLDivElement>(null);
+  const userTriggerRef = useRef<HTMLDivElement>(null);
+  const roleTriggerRef = useRef<HTMLDivElement>(null);
   const [newLabel, setNewLabel] = useState({ name: '', color: '#3b82f6' });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -90,27 +92,19 @@ export function ProjectSettings() {
       name: project.name,
       description: strippedDescription,
       task_type: project.task_type,
+      status: (project.status || 'active') as ProjectStatus,
     });
     setIsProjectDataLoaded(true);
   }
-
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (userDropdownRef.current && !userDropdownRef.current.contains(event.target as Node)) {
-        setUserDropdownOpen(false);
-      }
-      if (roleDropdownRef.current && !roleDropdownRef.current.contains(event.target as Node)) {
-        setRoleDropdownOpen(false);
-      }
-      if (taskTypeDropdownRef.current && !taskTypeDropdownRef.current.contains(event.target as Node)) {
-        setTaskTypeDropdownOpen(false);
-      }
+      if (userDropdownRef.current && !userDropdownRef.current.contains(event.target as Node)) setUserDropdownOpen(false);
+      if (roleDropdownRef.current && !roleDropdownRef.current.contains(event.target as Node)) setRoleDropdownOpen(false);
+      if (taskTypeDropdownRef.current && !taskTypeDropdownRef.current.contains(event.target as Node)) setTaskTypeDropdownOpen(false);
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) setStatusDropdownOpen(false);
     };
-
     document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const updateMutation = useMutation({
@@ -261,476 +255,303 @@ export function ProjectSettings() {
                   project?.created_by === currentUser?.id || 
                   project?.members?.some((m: any) => m.user?.id === currentUser?.id && m.role === 'owner');
 
+  const selectedTypeConfig = TASK_TYPES.find(t => t.value === formData.task_type);
+  const selectedStatusConfig = STATUS_MAP[formData.status];
+
   return (
-    <div className="w-full max-w-3xl mx-auto px-6 py-8 space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4 mb-8">
-        <Link
-          to={`/projects/${id}`}
-          className="p-3 bg-white rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.1)] hover:bg-slate-50 hover:shadow-md hover:-translate-x-0.5 transition-all duration-200 text-black flex items-center justify-center"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-        <div>
-          <h1 className="text-[1.3rem] font-bold text-black leading-tight tracking-tight">
-            Project Settings
-          </h1>
-          <p className="text-base text-slate-500 mt-0.5">
-            {project?.name}
-          </p>
-        </div>
+    <Modal isOpen onClose={() => navigate(`/projects/${id}`)} maxWidth="max-w-3xl">
+      <ModalHeader
+        title="Project Settings"
+        subtitle={project?.name}
+        onClose={() => navigate(`/projects/${id}`)}
+        actions={
+          activeTab === 'general' ? (
+            <button
+              onClick={handleSave}
+              disabled={!isFormDirty || updateMutation.isPending}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 18px', borderRadius: 8, border: 'none', background: (!isFormDirty || updateMutation.isPending) ? '#94a3b8' : BLUE, color: '#fff', fontSize: 13, fontWeight: 600, cursor: (!isFormDirty || updateMutation.isPending) ? 'not-allowed' : 'pointer', transition: 'background .15s', whiteSpace: 'nowrap' }}
+            >
+              <Save size={13} />
+              {updateMutation.isPending ? 'Saving…' : 'Save Changes'}
+            </button>
+          ) : null
+        }
+      />
+
+      {/* Tabs — single set, inline style system matching the rest of the modal */}
+      <div style={{ display: 'flex', gap: 4, borderBottom: `1px solid ${LINE}`, padding: '0 24px', background: '#fff' }}>
+        {([
+          { key: 'general', label: 'General',              icon: <Settings size={13} /> },
+          { key: 'labels',  label: `Labels (${labels.length})`, icon: <Tags size={13} /> },
+          { key: 'danger',  label: 'Danger Zone',          icon: <AlertTriangle size={13} /> },
+        ] as const).map(tab => (
+          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '14px 12px', fontSize: 13, fontWeight: 600, border: 'none', background: 'none', cursor: 'pointer', color: activeTab === tab.key ? (tab.key === 'danger' ? '#ef4444' : BLUE) : MUTED, borderBottom: `2px solid ${activeTab === tab.key ? (tab.key === 'danger' ? '#ef4444' : BLUE) : 'transparent'}`, transition: 'all .15s', marginBottom: -1 }}>
+            {tab.icon}{tab.label}
+          </button>
+        ))}
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-2 border-b">
-        <button
-          onClick={() => setActiveTab('general')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'general'
-            ? 'border-primary text-primary'
-            : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-        >
-          <Settings className="h-4 w-4 inline mr-2" />
-          General
-        </button>
-        <button
-          onClick={() => setActiveTab('labels')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'labels'
-            ? 'border-primary text-primary'
-            : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-        >
-          <Tags className="h-4 w-4 inline mr-2" />
-          Labels ({labels.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('danger')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'danger'
-            ? 'border-red-500 text-red-500'
-            : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-        >
-          <AlertTriangle className="h-4 w-4 inline mr-2" />
-          Danger Zone
-        </button>
-      </div>
+      <div style={{ padding: 24, background: BG, display: 'flex', flexDirection: 'column', gap: 20, fontFamily: '-apple-system,BlinkMacSystemFont,"Inter",system-ui,sans-serif' }}>
 
-      {/* General Tab */}
-      {activeTab === 'general' && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-[1.3rem] font-bold text-black leading-tight tracking-tight">
-              Project Details
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label htmlFor="name" className="text-sm font-medium">
-                  Project Name <span className="text-destructive">*</span>
-                </label>
-                <Input
-                  id="name"
-                  name="name"
-                  type="text"
-                  value={formData.name}
-                  onChange={handleChange}
-                  placeholder="Enter project name"
-                />
-              </div>
+     {/* ── General Tab ── */}
+        {activeTab === 'general' && (
+          <>
+            {/* Core Details card */}
+            <div style={{ ...CARD_STYLE, padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium ">
-                  Project created by
-                </label>
-                <div className="min-h-[40px] w-full rounded-md border border-input bg-muted/20 px-3 py-2 flex items-center">
-                  <span className="text-sm font-medium">
-                    {project.created_by?.full_name || project.created_by?.username || '—'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-
-
-            <div className="space-y-2">
-              <label htmlFor="description" className="text-sm font-medium">
-                Description
-              </label>
-              <textarea
-                id="description"
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                placeholder="Describe the project"
-                rows={4}
-                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              />
-            </div>
-
-            {/* Assigned To */}
-            <div className="space-y-3">
-              <label className="text-sm font-medium">
-                Assigned To <span className="text-destructive">*</span>
-              </label>
-
-              {/* Existing project members */}
-             {project.members && project.members.length > 0 && (
-                <div className="rounded-md border bg-muted/20 text-sm overflow-hidden">
-                  {project.members.map((member: any, index: number) => {
-                    const displayName =
-                      member.full_name ||
-                      member.user?.full_name ||
-                      (member.user?.first_name && member.user?.last_name
-                        ? `${member.user.first_name} ${member.user.last_name}`
-                        : member.user?.username) ||
-                      '—';
-                    const roleLabel =
-                      PROJECT_ROLES.find((r) => r.value === member.role)?.label || member.role || '—';
-                    return (
-                      <div
-                        key={member.id}
-                        className={`flex items-center justify-between px-3 py-2 ${index !== project.members.length - 1 ? 'border-b' : ''}`}
-                      >
-                        <div className="flex flex-col">
-                          <span className="font-medium">{displayName}</span>
-                          <span className="text-xs text-muted-foreground">{roleLabel}</span>
-                        </div>
-                        
-                        {/* Only render the delete button if the user is the owner */}
-                        {isOwner && (
-                          <button
-                            type="button"
-                            className="text-muted-foreground hover:text-destructive p-1 transition-colors"
-                            onClick={() => setMemberToDelete({ id: member.user.id, name: displayName })}
-                            disabled={removeMemberMutation.isPending}
-                            title="Remove member"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              <div className="flex gap-3">
-                {/* Left */}
-                <div className="relative flex-1" ref={userDropdownRef}>
-                  <div
-                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer"
-                    onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                  >
-                    <span className={tempUser ? "text-foreground" : "text-muted-foreground"}>
-                      {tempUser ? usersData?.find(u => u.value === tempUser)?.label : "Select User"}
-                    </span>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-50"><path d="m6 9 6 6 6-6" /></svg>
+              {/* Name + Created By */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <FormField label="Project Name" icon={<FolderKanban size={13} />} required>
+                  <input
+                    name="name"
+                    type="text"
+                    value={formData.name}
+                    onChange={e => { handleChange(e); }}
+                    placeholder="Enter project name"
+                    style={INPUT_STYLE}
+                    onFocus={e => { e.currentTarget.style.borderColor = BLUE; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(22,99,246,.08)'; }}
+                    onBlur={e => { e.currentTarget.style.borderColor = LINE; e.currentTarget.style.boxShadow = 'none'; }}
+                  />
+                </FormField>
+                <FormField label="Created By">
+                  <div style={{ ...INPUT_STYLE, height: 38, display: 'flex', alignItems: 'center', background: '#f9fafb', cursor: 'default' }}>
+                    <span style={{ fontSize: 13, color: TEXT }}>{project.created_by?.full_name || project.created_by?.username || '—'}</span>
                   </div>
+                </FormField>
+              </div>
 
-                  {userDropdownOpen && (
-                    <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md border bg-popover text-popover-foreground shadow-md">
-                      {usersData
-                        ?.filter((user) =>
-                          !assignedTo.some((a) => a.userId === user.value) &&
-                          !project.members?.some((m: any) => m.user.id === user.value)
-                        )
-                        .map((user) => (
-                          <div
-                            key={user.value}
-                            className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground"
-                            onClick={() => {
-                              setTempUser(user.value);
-                              setUserDropdownOpen(false);
-                            }}
-                          >
-                            {user.label}
-                          </div>
+              {/* Project Type + Status */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div ref={taskTypeDropdownRef}>
+                  <FormField label="Project Type" icon={<Tag size={13} />} required>
+                    <DropdownTrigger
+                      label={selectedTypeConfig?.label}
+                      placeholder="Select type…"
+                      onClick={() => { setTaskTypeDropdownOpen(v => !v); setStatusDropdownOpen(false); }}
+                      open={taskTypeDropdownOpen}
+                      dotColor={selectedTypeConfig?.hex}
+                      triggerRef={taskTypeTriggerRef}
+                    />
+                    {taskTypeDropdownOpen && (
+                      <DropdownList triggerRef={taskTypeTriggerRef}>
+                        {TASK_TYPES.map(type => (
+                          <DropdownItem key={type.value} label={type.label} selected={formData.task_type === type.value}
+                            onClick={() => { setFormData(prev => ({ ...prev, task_type: type.value as TaskType })); setTaskTypeDropdownOpen(false); setIsFormDirty(true); }}
+                            icon={<span style={{ width: 8, height: 8, borderRadius: '50%', background: type.hex, flexShrink: 0, display: 'inline-block' }} />}
+                          />
                         ))}
-                    </div>
-                  )}
+                      </DropdownList>
+                    )}
+                  </FormField>
                 </div>
 
-                {/* Right: Role Select + Add Button */}
-                <div className="flex flex-1 gap-2">
-                  <div className="relative flex-1" ref={roleDropdownRef}>
-                    <div
-                      className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer"
-                      onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
-                    >
-                      <span className={tempRole ? "text-foreground" : "text-muted-foreground"}>
-                        {PROJECT_ROLES.find(r => r.value === tempRole)?.label || "Select Role"}
-                      </span>
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-50"><path d="m6 9 6 6 6-6" /></svg>
-                    </div>
-
-                    {roleDropdownOpen && (
-                      <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md border bg-popover text-popover-foreground shadow-md">
-                        {PROJECT_ROLES.map((role) => (
-                          <div
-                            key={role.value}
-                            className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground"
-                            onClick={() => {
-                              setTempRole(role.value);
-                              setRoleDropdownOpen(false);
-                            }}
-                          >
-                            {role.label}
-                          </div>
+              <div ref={statusDropdownRef}>
+                  <FormField label="Status">
+                    <DropdownTrigger
+                      label={selectedStatusConfig?.label}
+                      placeholder="Select status…"
+                      onClick={() => { setStatusDropdownOpen(v => !v); setTaskTypeDropdownOpen(false); }}
+                      open={statusDropdownOpen}
+                      dotColor={selectedStatusConfig?.color}
+                      triggerRef={statusTriggerRef}
+                    />
+                    {statusDropdownOpen && (
+                      <DropdownList triggerRef={statusTriggerRef}>
+                        {Object.entries(STATUS_MAP).map(([value, cfg]) => (
+                          <DropdownItem key={value} label={cfg.label} selected={formData.status === value}
+                            onClick={() => { setFormData(prev => ({ ...prev, status: value as ProjectStatus })); setStatusDropdownOpen(false); setIsFormDirty(true); }}
+                            icon={<span style={{ width: 8, height: 8, borderRadius: '50%', background: cfg.color, flexShrink: 0, display: 'inline-block' }} />}
+                          />
                         ))}
-                      </div>
+                      </DropdownList>
+                    )}
+                  </FormField>
+                </div>
+              </div>
+
+              {/* Description */}
+              <FormField label="Description">
+                <textarea
+                  name="description"
+                  value={formData.description}
+                  onChange={handleChange}
+                  placeholder="Describe the project…"
+                  rows={3}
+                  style={{ ...INPUT_STYLE, height: 'auto', padding: '10px 12px', resize: 'vertical' }}
+                  onFocus={e => { e.currentTarget.style.borderColor = BLUE; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(22,99,246,.08)'; }}
+                  onBlur={e => { e.currentTarget.style.borderColor = LINE; e.currentTarget.style.boxShadow = 'none'; }}
+                />
+              </FormField>
+            </div>
+
+            {/* Team Members card */}
+            <div style={{ ...CARD_STYLE, padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <FormField label="Team Members" icon={<Users size={13} />}>
+                {/* Existing members */}
+                {project.members && project.members.length > 0 && (
+                  <div style={{ border: `1px solid ${LINE}`, borderRadius: 8, overflow: 'hidden', marginBottom: 10 }}>
+                    {project.members.map((member: any, index: number) => {
+                      const displayName = member.full_name || member.user?.full_name || (member.user?.first_name && member.user?.last_name ? `${member.user.first_name} ${member.user.last_name}` : member.user?.username) || '—';
+                      const roleLabel = PROJECT_ROLES.find(r => r.value === member.role)?.label || member.role || '—';
+                      return (
+                        <div key={member.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderBottom: index !== project.members.length - 1 ? `1px solid ${LINE}` : 'none', background: '#fff' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#EEF4FF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: BLUE }}>{displayName.charAt(0)}</div>
+                            <div>
+                              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: TEXT }}>{displayName}</p>
+                              <p style={{ margin: 0, fontSize: 11, color: MUTED }}>{roleLabel}</p>
+                            </div>
+                          </div>
+                          {isOwner && (
+                            <button type="button" onClick={() => setMemberToDelete({ id: member.user.id, name: displayName })} disabled={removeMemberMutation.isPending}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: MUTED, padding: 4, borderRadius: 4, display: 'flex' }}
+                              onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
+                              onMouseLeave={e => e.currentTarget.style.color = MUTED}>
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Add new member row */}
+                <div style={{ display: 'flex', gap: 8 }}>
+                 <div style={{ flex: 1 }} ref={userDropdownRef}>
+                    <DropdownTrigger label={tempUser ? usersData?.find(u => u.value === tempUser)?.label : undefined} placeholder="Select member…" onClick={() => setUserDropdownOpen(v => !v)} open={userDropdownOpen} triggerRef={userTriggerRef} />
+                    {userDropdownOpen && (
+                      <DropdownList triggerRef={userTriggerRef}>
+                        {usersData?.filter(u => !assignedTo.some(a => a.userId === u.value) && !project.members?.some((m: any) => m.user.id === u.value)).map(user => (
+                          <DropdownItem key={user.value} label={user.label} onClick={() => { setTempUser(user.value); setUserDropdownOpen(false); }} />
+                        ))}
+                      </DropdownList>
                     )}
                   </div>
-
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="icon"
-                    className="h-10 w-12 bg-muted/50 hover:bg-muted shrink-0"
-                    onClick={handleAddMember}
-                    disabled={!tempUser || !tempRole}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
+                  <div style={{ flex: 1 }} ref={roleDropdownRef}>
+                    <DropdownTrigger label={tempRole ? PROJECT_ROLES.find(r => r.value === tempRole)?.label : undefined} placeholder="Select role…" onClick={() => setRoleDropdownOpen(v => !v)} open={roleDropdownOpen} triggerRef={roleTriggerRef} />
+                    {roleDropdownOpen && (
+                      <DropdownList triggerRef={roleTriggerRef}>
+                        {PROJECT_ROLES.map(role => (
+                          <DropdownItem key={role.value} label={role.label} selected={tempRole === role.value} onClick={() => { setTempRole(role.value); setRoleDropdownOpen(false); }} />
+                        ))}
+                      </DropdownList>
+                    )}
+                  </div>
+                  <button type="button" onClick={handleAddMember} disabled={!tempUser || !tempRole}
+                    style={{ height: 38, width: 44, borderRadius: 8, border: `1px solid ${LINE}`, background: (!tempUser || !tempRole) ? '#f3f4f6' : BLUE, color: (!tempUser || !tempRole) ? MUTED : '#fff', cursor: (!tempUser || !tempRole) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .15s' }}>
+                    <Plus size={16} />
+                  </button>
                 </div>
-              </div>
 
-              {/* Rendered List  */}
-              {assignedTo.length > 0 && (
-                <div className="space-y-2 mt-2 max-w-md">
-                  {assignedTo.map((assignment) => {
-                    const user = usersData?.find((u) => u.value === assignment.userId);
-                    const roleLabel = PROJECT_ROLES.find((r) => r.value === assignment.role)?.label;
-                    if (!user) return null;
-
-                    return (
-                      <div key={assignment.userId} className="flex items-center justify-between p-2 rounded-md border bg-card">
-                        <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
-                            {user.label.charAt(0)}
+                {/* Pending new members */}
+                {assignedTo.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+                    {assignedTo.map(assignment => {
+                      const user = usersData?.find(u => u.value === assignment.userId);
+                      const roleLabel = PROJECT_ROLES.find(r => r.value === assignment.role)?.label;
+                      if (!user) return null;
+                      return (
+                        <div key={assignment.userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, border: `1px solid ${LINE}`, background: '#fff' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#EEF4FF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: BLUE }}>{user.label.charAt(0)}</div>
+                            <div>
+                              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: TEXT }}>{user.label}</p>
+                              <p style={{ margin: 0, fontSize: 11, color: MUTED }}>{roleLabel} · pending</p>
+                            </div>
                           </div>
-                          <div className="flex flex-col">
-                            <span className="text-sm font-medium">{user.label}</span>
-                            <span className="text-xs text-muted-foreground">{roleLabel}</span>
-                          </div>
+                          <button type="button" onClick={() => setAssignedTo(assignedTo.filter(a => a.userId !== assignment.userId))}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: MUTED, padding: 4, borderRadius: 4, display: 'flex' }}
+                            onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
+                            onMouseLeave={e => e.currentTarget.style.color = MUTED}>
+                            <Trash2 size={14} />
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          className="text-muted-foreground hover:text-destructive p-1"
-                          onClick={() => setAssignedTo(assignedTo.filter((a) => a.userId !== assignment.userId))}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                      );
+                    })}
+                  </div>
+                )}
+              </FormField>
             </div>
 
-            {/* Task Type */}
-            <div className="relative space-y-2" ref={taskTypeDropdownRef}>
-              <label className="text-sm font-medium">
-                Task Type <span className="text-destructive">*</span>
-              </label>
-
-              <div
-                className="w-full p-3 rounded-lg border border-input bg-background cursor-pointer flex items-center justify-between min-h-[50px] text-sm"
-                onClick={() => setTaskTypeDropdownOpen(!taskTypeDropdownOpen)}
-              >
-                <span className={formData.task_type ? "text-foreground" : "text-muted-foreground"}>
-                  {TASK_TYPES.find(t => t.value === formData.task_type)?.label || "Select Task Type..."}
-                </span>
-                <svg
-                  className={`h-4 w-4 text-muted-foreground transition-transform ${taskTypeDropdownOpen ? 'rotate-180' : ''}`}
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
+            {/* Discard row — only shown when dirty */}
+            {isFormDirty && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button type="button"
+                  onClick={() => { if (project) { setFormData({ name: project.name, description: project.description || '', task_type: project.task_type, status: (project.status || 'active') as ProjectStatus }); } setIsFormDirty(false); }}
+                  style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid ${LINE}`, background: '#fff', fontSize: 13, fontWeight: 500, color: MUTED, cursor: 'pointer' }}>
+                  Discard Changes
+                </button>
               </div>
+            )}
+          </>
+        )}
 
-              {taskTypeDropdownOpen && (
-                <div className="absolute z-30 mt-1 w-full bg-popover border rounded-lg shadow-lg max-h-56 overflow-y-auto">
-                  {TASK_TYPES.map((type) => (
-                    <div
-                      key={type.value}
-                      className={`px-4 py-2 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground flex justify-between ${formData.task_type === type.value ? "bg-accent/50" : ""
-                        }`}
-                      onClick={() => {
-                        setFormData(prev => ({ ...prev, task_type: type.value as TaskType }));
-                        setTaskTypeDropdownOpen(false);
-                        setIsFormDirty(true);
-                      }}
-                    >
-                      <div className="flex items-center gap-2">
-                        {/* Color Circle */}
-                        <div className={`h-3 w-3 rounded-full ${getProjectTypeColor(type.value)}`} />
-                        <span>{type.label}</span>
-                      </div>
-                      {formData.task_type === type.value && <span className="text-primary font-bold">✓</span>}
-                    </div>
-                  ))}
+        {/* ── Labels Tab ── */}
+        {activeTab === 'labels' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ ...CARD_STYLE, padding: 20 }}>
+              <p style={{ margin: '0 0 14px', fontSize: 13, fontWeight: 700, color: TEXT }}>Create New Label</p>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: 160 }}>
+                  <Input value={newLabel.name} onChange={e => setNewLabel(prev => ({ ...prev, name: e.target.value }))} placeholder="e.g., High Priority, Needs Review" />
                 </div>
-              )}
-            </div>
-
-            <div className="flex gap-3 pt-4 border-t">
-              <Button
-                onClick={handleSave}
-                disabled={!isFormDirty || updateMutation.isPending}
-              >
-                <Save className="h-4 w-4 mr-2" />
-                {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
-              </Button>
-              {isFormDirty && (
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    if (project) {
-                      setFormData({
-                        name: project.name,
-                        description: project.description || '',
-                        task_type: project.task_type,
-                      });
-                    }
-                    setIsFormDirty(false);
-                  }}
-                >
-                  Cancel
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Labels Tab */}
-      {activeTab === 'labels' && (
-        <div className="space-y-6">
-          {/* Create Label */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Create New Label</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-4 items-end">
-                <div className="flex-1 space-y-2">
-                  <label className="text-sm font-medium">Label Name</label>
-                  <Input
-                    value={newLabel.name}
-                    onChange={(e) => setNewLabel((prev) => ({ ...prev, name: e.target.value }))}
-                    placeholder="e.g., High Priority, Needs Review"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Color</label>
-                  <div className="flex gap-2 items-center">
-                    <input
-                      type="color"
-                      value={newLabel.color}
-                      onChange={(e) => setNewLabel((prev) => ({ ...prev, color: e.target.value }))}
-                      className="w-10 h-10 rounded border cursor-pointer"
-                    />
-                    <div className="flex gap-1 flex-wrap max-w-48">
-                      {PRESET_COLORS.slice(0, 8).map((color) => (
-                        <button
-                          key={color}
-                          type="button"
-                          onClick={() => setNewLabel((prev) => ({ ...prev, color }))}
-                          className={`w-5 h-5 rounded ${newLabel.color === color ? 'ring-2 ring-offset-1 ring-primary' : ''}`}
-                          style={{ backgroundColor: color }}
-                        />
-                      ))}
-                    </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="color" value={newLabel.color} onChange={e => setNewLabel(prev => ({ ...prev, color: e.target.value }))} style={{ width: 36, height: 36, borderRadius: 6, border: `1px solid ${LINE}`, cursor: 'pointer' }} />
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', maxWidth: 140 }}>
+                    {PRESET_COLORS.slice(0, 8).map(color => (
+                      <button key={color} type="button" onClick={() => setNewLabel(prev => ({ ...prev, color }))}
+                        style={{ width: 18, height: 18, borderRadius: 4, background: color, border: newLabel.color === color ? `2px solid ${BLUE}` : '2px solid transparent', cursor: 'pointer' }} />
+                    ))}
                   </div>
                 </div>
-                <Button
-                  onClick={handleCreateLabel}
-                  disabled={!newLabel.name.trim() || createLabelMutation.isPending}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add
+                <Button onClick={handleCreateLabel} disabled={!newLabel.name.trim() || createLabelMutation.isPending}>
+                  <Plus className="h-4 w-4 mr-1" />Add
                 </Button>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Existing Labels */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Project Labels</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {labels.length > 0 ? (
-                <div className="space-y-2">
-                  {labels.map((label: Label) => (
-                    <div
-                      key={label.id}
-                      className="flex items-center justify-between p-3 border rounded-lg"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span
-                          className="w-4 h-4 rounded-full"
-                          style={{ backgroundColor: label.color }}
-                        />
-                        <span className="font-medium">{label.name}</span>
-                        {label.description && (
-                          <span className="text-sm text-muted-foreground">
-                            {label.description}
-                          </span>
-                        )}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deleteLabelMutation.mutate(label.id)}
-                        disabled={deleteLabelMutation.isPending}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
+            </div>
+            <div style={{ ...CARD_STYLE, padding: 20 }}>
+              <p style={{ margin: '0 0 14px', fontSize: 13, fontWeight: 700, color: TEXT }}>Project Labels</p>
+              {labels.length > 0 ? labels.map((label: Label) => (
+                <div key={label.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: `1px solid ${LINE}` }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ width: 14, height: 14, borderRadius: '50%', background: label.color, display: 'inline-block', flexShrink: 0 }} />
+                    <span style={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{label.name}</span>
+                    {label.description && <span style={{ fontSize: 12, color: MUTED }}>{label.description}</span>}
+                  </div>
+                  <button type="button" onClick={() => deleteLabelMutation.mutate(label.id)} disabled={deleteLabelMutation.isPending}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: MUTED, padding: 4, display: 'flex' }}
+                    onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
+                    onMouseLeave={e => e.currentTarget.style.color = MUTED}>
+                    <X size={14} />
+                  </button>
                 </div>
-              ) : (
-                <div className="text-center py-8">
-                  <Tags className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-                  <p className="text-muted-foreground">No labels created yet</p>
+              )) : (
+                <div style={{ textAlign: 'center', padding: '32px 0', color: MUTED }}>
+                  <Tags size={32} style={{ margin: '0 auto 8px', opacity: 0.4 }} />
+                  <p style={{ margin: 0, fontSize: 13 }}>No labels created yet</p>
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Danger Zone Tab */}
-      {activeTab === 'danger' && (
-        <Card className="border-red-200">
-          <CardHeader>
-            <CardTitle className="text-red-600">Danger Zone</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="p-4 border border-red-200 rounded-lg bg-red-50">
-              <h4 className="font-medium text-red-800 mb-2">Delete Project</h4>
-              <p className="text-sm text-red-600 mb-4">
-                This will permanently delete the project, all documents, task
-                and associated data. This action cannot be undone.
-              </p>
-
-              <Button
-                variant="outline"
-                className="border-red-300 text-red-600 hover:bg-red-100"
-                onClick={handleDeleteClick}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete Project
-              </Button>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        )}
+
+        {/* ── Danger Zone Tab ── */}
+        {activeTab === 'danger' && (
+          <div style={{ ...CARD_STYLE, padding: 20, border: '1px solid #fecaca', background: '#fff' }}>
+            <p style={{ margin: '0 0 6px', fontSize: 14, fontWeight: 700, color: '#dc2626' }}>Delete Project</p>
+            <p style={{ margin: '0 0 16px', fontSize: 13, color: '#b91c1c' }}>
+              This will permanently delete the project, all documents, tasks and associated data. This action cannot be undone.
+            </p>
+            <Button variant="outline" className="border-red-300 text-red-600 hover:bg-red-100" onClick={handleDeleteClick}>
+              <Trash2 className="h-4 w-4 mr-2" />Delete Project
+            </Button>
+          </div>
+        )}
+
+      </div>{/* end scrollable body */}
+
       <DeleteModal
         isOpen={deleteModalOpen}
         type={deleteModalType}
@@ -761,7 +582,7 @@ export function ProjectSettings() {
         isDeleting={removeMemberMutation.isPending}
       />
 
-      {showErrorModal && (
+     {showErrorModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in zoom-in duration-200">
           <div className="bg-background border rounded-lg shadow-xl max-w-md w-full p-6 space-y-4 mx-4">
             <div className="flex items-center gap-3 text-destructive">
@@ -770,22 +591,13 @@ export function ProjectSettings() {
               </div>
               <h3 className="text-lg font-semibold">Action Failed</h3>
             </div>
-
-            <p className="text-muted-foreground text-sm leading-relaxed">
-              {errorMessage}
-            </p>
-
+            <p className="text-muted-foreground text-sm leading-relaxed">{errorMessage}</p>
             <div className="flex justify-end pt-2">
-              <Button
-                onClick={() => setShowErrorModal(false)}
-                className="min-w-[100px]"
-              >
-                Close
-              </Button>
+              <Button onClick={() => setShowErrorModal(false)} className="min-w-[100px]">Close</Button>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </Modal>
   );
 }

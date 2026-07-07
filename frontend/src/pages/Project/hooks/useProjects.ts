@@ -1,9 +1,10 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { projectsApi, notificationSocket, gatewaySocket } from '@/services/api';
 import type { Project } from '@/types';
 import { TREE_GROUPS } from '../projectConstants';
+import { useTableFilters, ColumnFilterConfig } from '@/hooks/useTableFilters';
 
 const ROWS_PER_PAGE = 25;
 
@@ -92,17 +93,45 @@ export function useProjects() {
     });
   }, [queryClient]);
 
-  // ── Filtering 
-  const filtered = allProjects.filter(p => {
-    if (treeFilter && p.id !== treeFilter) return false;
-    if (treeGroupFilter) {
-      const group = TREE_GROUPS.find(g => g.label === treeGroupFilter);
-      if (group && !group.types.includes(((p as any).task_type || '').toLowerCase())) return false;
-    }
-    if (statusFilter && (p as any).status !== statusFilter) return false;
-    if (searchTerm && !p.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-    return true;
+  // ── Column filter config for useTableFilters ──────────────────────────────
+  const projectFilterConfig: ColumnFilterConfig[] = [
+    { key: 'name', type: 'search' },
+    { key: 'task_type', type: 'list' },
+    { key: 'status', type: 'list' },
+    { key: 'updated_at', type: 'date' },
+    { key: 'document_count', type: 'none' },
+  ];
+
+  const {
+    filteredData: tableFilteredProjects,
+    sortConfig,
+    handleSort: handleTableSort,
+    columnFilters,
+    setColumnFilters,
+    clearFilter,
+    clearAllFilters: clearTableFilters,
+    activeFilterKey,
+    setActiveFilterKey,
+    filterContainerRef,
+  } = useTableFilters<Project>({
+    data: allProjects,
+    columns: projectFilterConfig,
+    globalSearchFields: ['name'],
   });
+
+  // ── Filtering — tree + top-bar status/type/search applied on top of useTableFilters result
+  const filtered = useMemo(() => {
+    return tableFilteredProjects.filter(p => {
+      if (treeFilter && p.id !== treeFilter) return false;
+      if (treeGroupFilter) {
+        const group = TREE_GROUPS.find(g => g.label === treeGroupFilter);
+        if (group && !group.types.includes(((p as any).task_type || '').toLowerCase())) return false;
+      }
+      if (statusFilter && (p as any).status !== statusFilter) return false;
+      if (searchTerm && !p.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+      return true;
+    });
+  }, [tableFilteredProjects, treeFilter, treeGroupFilter, statusFilter, searchTerm]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / ROWS_PER_PAGE));
   const paginated  = filtered.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE);
@@ -115,7 +144,20 @@ export function useProjects() {
     setSelectedIds(selectedIds.size === paginated.length ? new Set() : new Set(paginated.map(p => p.id)));
 
   // ── Filter helpers 
-  const clearAllFilters = () => { setStatusFilter(''); setTypeFilter(''); setSearchTerm(''); setCurrentPage(1); };
+  const clearAllFilters = () => {
+    setStatusFilter('');
+    setTypeFilter('');
+    setSearchTerm('');
+    clearTableFilters();
+    setCurrentPage(1);
+  };
+
+  const handleFilter = useCallback(
+    (key: string) => {
+      setActiveFilterKey(prev => (prev === key ? null : key));
+    },
+    [setActiveFilterKey],
+  );
 
   // ── Tree navigation helpers 
   const handleTreeSelect = (id: number | null) => { setTreeFilter(id); setCurrentPage(1); setDetailProject(null); };
@@ -127,11 +169,16 @@ export function useProjects() {
     // data
     allProjects, filtered, paginated, isLoading,
     totalPages, rowsPerPage: ROWS_PER_PAGE,
-    // filters
+    // top-bar filters (existing)
     typeFilter,      setTypeFilter:      (v: string) => { setTypeFilter(v);      setCurrentPage(1); },
     statusFilter,    setStatusFilter:    (v: string) => { setStatusFilter(v);    setCurrentPage(1); },
     searchTerm,      setSearchTerm:      (v: string) => { setSearchTerm(v);      setCurrentPage(1); },
     clearAllFilters,
+    // column-level filter/sort (new, from useTableFilters)
+    columnFilters, setColumnFilters, clearFilter,
+    activeFilterKey, setActiveFilterKey,
+    filterContainerRef,
+    sortConfig, handleTableSort, handleFilter,
     // view
     viewMode, setViewMode,
     // pagination

@@ -1,21 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { X, Plus, Trash2 } from 'lucide-react';
-import { Button, Input, } from '@/components/common';
+import { Plus, Trash2, FolderKanban, AlertCircle, Tag, Users } from 'lucide-react';
 import { projectsApi, usersApi } from '@/services/api';
-import type { User as AppUser, ProjectCreatePayload } from '@/types';
-import { getProjectTypeColor } from '@/config/projectTypeConfig';
+import type { User as AppUser, ProjectCreatePayload, ProjectStatus } from '@/types';
 import { PROJECT_TYPE_OPTIONS as TASK_TYPES } from '@/config/projectTypeConfig';
-
-const PROJECT_ROLES = [
-    { label: 'Manager', value: 'manager' },
-    { label: 'Frontend Developer', value: 'frontend' },
-    { label: 'Backend Developer', value: 'backend' },
-    { label: 'Testing Engineer', value: 'tester' },
-    { label: 'DevOps Engineer', value: 'devops' },
-    { label: 'Social Media', value: 'social_media' }
-];
+import { Modal, ModalHeader } from '@/components/common/Modal';
+import { FormField } from '@/pages/MyTask/pages/CreateTask/components/FormField';
+import { BLUE, LINE, MUTED, TEXT, BG, INPUT_STYLE, CARD_STYLE } from '@/pages/MyTask/pages/CreateTask/createTaskConstants';
+import { STATUS_MAP } from '@/pages/Project/projectConstants';
+import { PROJECT_ROLES, DropdownTrigger, DropdownList, DropdownItem } from '@/pages/Project/components/ProjectDropdowns';
 
 interface CreateProjectModalProps {
     isOpen: boolean;
@@ -29,18 +23,25 @@ export function CreateProjectModal({ isOpen, onClose, navigateOnSuccess = false 
     const [formData, setFormData] = useState({
         name: '',
         description: '',
-        task_type: 'key_value',
+        task_type: 'client',
+        status: 'active' as ProjectStatus,
     });
     const [assignedTo, setAssignedTo] = useState<{ userId: number; role: string }[]>([]);
     const [tempUser, setTempUser] = useState<number | null>(null);
     const [tempRole, setTempRole] = useState<string>('');
     const [userDropdownOpen, setUserDropdownOpen] = useState(false);
     const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
+    const [taskTypeDropdownOpen, setTaskTypeDropdownOpen] = useState(false);
+    const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
     const userDropdownRef = useRef<HTMLDivElement>(null);
     const roleDropdownRef = useRef<HTMLDivElement>(null);
     const taskTypeDropdownRef = useRef<HTMLDivElement>(null);
+    const statusDropdownRef = useRef<HTMLDivElement>(null);
+    const taskTypeTriggerRef = useRef<HTMLDivElement>(null);
+    const statusTriggerRef = useRef<HTMLDivElement>(null);
+    const userTriggerRef = useRef<HTMLDivElement>(null);
+    const roleTriggerRef = useRef<HTMLDivElement>(null);
     const [error, setError] = useState('');
-    const [taskTypeDropdownOpen, setTaskTypeDropdownOpen] = useState(false);
 
     const { data: usersData, isLoading: usersLoading } = useQuery({
         queryKey: ['allUsers'],
@@ -60,8 +61,6 @@ export function CreateProjectModal({ isOpen, onClose, navigateOnSuccess = false 
             queryClient.invalidateQueries({ queryKey: ['projects'] });
             queryClient.invalidateQueries({ queryKey: ['project-chat-rooms'] });
             queryClient.invalidateQueries({ queryKey: ['sidebar-all-chat-rooms'] });
-
-            // ✅ seed cache immediately so ProjectDetail loads without blank page
             queryClient.setQueryData(['project', String(newProject.id)], newProject);
 
             onClose();
@@ -72,7 +71,7 @@ export function CreateProjectModal({ isOpen, onClose, navigateOnSuccess = false 
     });
 
     const handleClose = () => {
-        setFormData({ name: '', description: '', task_type: 'key_value' });
+        setFormData({ name: '', description: '', task_type: 'client', status: 'active' });
         setAssignedTo([]);
         setTempUser(null);
         setTempRole('');
@@ -80,6 +79,7 @@ export function CreateProjectModal({ isOpen, onClose, navigateOnSuccess = false 
         setUserDropdownOpen(false);
         setRoleDropdownOpen(false);
         setTaskTypeDropdownOpen(false);
+        setStatusDropdownOpen(false);
         onClose();
     };
 
@@ -121,21 +121,16 @@ export function CreateProjectModal({ isOpen, onClose, navigateOnSuccess = false 
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (userDropdownRef.current && !userDropdownRef.current.contains(event.target as Node)) {
-                setUserDropdownOpen(false);
-            }
-            if (roleDropdownRef.current && !roleDropdownRef.current.contains(event.target as Node)) {
-                setRoleDropdownOpen(false);
-            }
-            if (taskTypeDropdownRef.current && !taskTypeDropdownRef.current.contains(event.target as Node)) {
-                setTaskTypeDropdownOpen(false);
-            }
-        };
+            const target = event.target as Element;
+            if (target.closest?.('[data-project-dropdown-portal]')) return;
 
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
+            if (userDropdownRef.current && !userDropdownRef.current.contains(target)) setUserDropdownOpen(false);
+            if (roleDropdownRef.current && !roleDropdownRef.current.contains(target)) setRoleDropdownOpen(false);
+            if (taskTypeDropdownRef.current && !taskTypeDropdownRef.current.contains(target)) setTaskTypeDropdownOpen(false);
+            if (statusDropdownRef.current && !statusDropdownRef.current.contains(target)) setStatusDropdownOpen(false);
         };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
     const handleAddMember = () => {
@@ -170,252 +165,200 @@ export function CreateProjectModal({ isOpen, onClose, navigateOnSuccess = false 
         };
     }, [isOpen]);
 
-    if (!isOpen) return null;
+    const selectedTypeConfig = TASK_TYPES.find(t => t.value === formData.task_type);
+    const selectedStatusConfig = STATUS_MAP[formData.status];
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-            {/* Backdrop */}
-            <div
-                className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-                onClick={handleClose}
+        <Modal isOpen={isOpen} onClose={handleClose} maxWidth="max-w-2xl">
+            <ModalHeader
+                title="Create Project"
+                subtitle="Fill in the details below to create a new project"
+                onClose={handleClose}
+                actions={
+                    <button
+                        type="submit"
+                        form="create-project-form"
+                        disabled={createMutation.isPending}
+                        style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: createMutation.isPending ? '#94a3b8' : BLUE, color: '#fff', fontSize: 13, fontWeight: 600, cursor: createMutation.isPending ? 'not-allowed' : 'pointer', transition: 'background .15s', whiteSpace: 'nowrap' }}
+                    >
+                        {createMutation.isPending ? 'Creating…' : 'Create Project'}
+                    </button>
+                }
             />
 
-            {/* Modal */}
-            <div className="relative bg-card border rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4 animate-in fade-in zoom-in-95 duration-200">
-                {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-card z-10">
-                    <div>
-                        <h2 className="text-2xl font-bold">Create Project</h2>
-                        <p className="text-sm text-muted-foreground mt-1">
-                        </p>
+            <form
+                id="create-project-form"
+                onSubmit={handleSubmit}
+                style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20, background: BG, fontFamily: '-apple-system,BlinkMacSystemFont,"Inter",system-ui,sans-serif' }}
+            >
+                {/* Error banner */}
+                {error && (
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 16px', borderRadius: 10, background: '#fef2f2', border: '1px solid #fecaca' }}>
+                        <AlertCircle size={15} color="#ef4444" style={{ flexShrink: 0, marginTop: 1 }} />
+                        <p style={{ fontSize: 13, color: '#b91c1c', margin: 0 }}>{error}</p>
                     </div>
-                    <button
-                        onClick={handleClose}
-                        className="p-2 hover:bg-accent rounded-lg transition-colors"
-                    >
-                        <X className="h-5 w-5" />
-                    </button>
-                </div>
+                )}
 
-                {/* Form */}
-                <form onSubmit={handleSubmit} className="p-6 space-y-6">
-                    {error && (
-                        <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
-                            {error}
-                        </div>
-                    )}
+                {/* ── Section 1: Core Info ── */}
+                <div style={{ ...CARD_STYLE, padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-                    <div className="space-y-2">
-                        <label htmlFor="name" className="text-sm font-medium">
-                            Project Name <span className="text-destructive">*</span>
-                        </label>
-                        <Input
-                            id="name"
-                            name="name"
+                    {/* Project Name */}
+                    <FormField label="Project Name" icon={<FolderKanban size={13} />} required>
+                        <input
                             type="text"
                             value={formData.name}
-                            onChange={(e) => {
-                                // ✅ Auto capitalize first letter of every word
+                            onChange={e => {
                                 const raw = e.target.value;
-                                const titled = raw
-                                    .split(' ')
-                                    .map(word => word.length > 0
-                                        ? word[0].toLocaleUpperCase() + word.slice(1)
-                                        : ''
-                                    )
-                                    .join(' ');
+                                const titled = raw.split(' ').map(w => w.length > 0 ? w[0].toLocaleUpperCase() + w.slice(1) : '').join(' ');
                                 setFormData(prev => ({ ...prev, name: titled }));
                             }}
-                            placeholder="Enter project name"
+                            placeholder="Enter project name…"
                             required
+                            style={INPUT_STYLE}
+                            onFocus={e => { e.currentTarget.style.borderColor = BLUE; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(22,99,246,.08)'; }}
+                            onBlur={e => { e.currentTarget.style.borderColor = LINE; e.currentTarget.style.boxShadow = 'none'; }}
                         />
+                    </FormField>
+
+                    {/* Project Type + Status — side by side */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+
+                        {/* Project Type */}
+                        <div ref={taskTypeDropdownRef}>
+                            <FormField label="Project Type" icon={<Tag size={13} />} required>
+                                <DropdownTrigger
+                                    label={selectedTypeConfig ? selectedTypeConfig.label : undefined}
+                                    placeholder="Select type…"
+                                    onClick={() => { setTaskTypeDropdownOpen(v => !v); setStatusDropdownOpen(false); }}
+                                    open={taskTypeDropdownOpen}
+                                    dotColor={selectedTypeConfig?.hex}
+                                    triggerRef={taskTypeTriggerRef}
+                                />
+                                {taskTypeDropdownOpen && (
+                                    <DropdownList triggerRef={taskTypeTriggerRef}>
+                                        {TASK_TYPES.map(type => (
+                                            <DropdownItem
+                                                key={type.value}
+                                                label={type.label}
+                                                selected={formData.task_type === type.value}
+                                                onClick={() => { setFormData(prev => ({ ...prev, task_type: type.value })); setTaskTypeDropdownOpen(false); }}
+                                                icon={<span style={{ width: 8, height: 8, borderRadius: '50%', background: type.hex, flexShrink: 0, display: 'inline-block' }} />}
+                                            />
+                                        ))}
+                                    </DropdownList>
+                                )}
+                            </FormField>
+                        </div>
+
+                        {/* Status */}
+                        <div ref={statusDropdownRef}>
+                            <FormField label="Status">
+                                <DropdownTrigger
+                                    label={selectedStatusConfig ? selectedStatusConfig.label : undefined}
+                                    placeholder="Select status…"
+                                    onClick={() => { setStatusDropdownOpen(v => !v); setTaskTypeDropdownOpen(false); }}
+                                    open={statusDropdownOpen}
+                                    dotColor={selectedStatusConfig?.color}
+                                    triggerRef={statusTriggerRef}
+                                />
+                                {statusDropdownOpen && (
+                                    <DropdownList triggerRef={statusTriggerRef}>
+                                        {Object.entries(STATUS_MAP).map(([value, cfg]) => (
+                                            <DropdownItem
+                                                key={value}
+                                                label={cfg.label}
+                                                selected={formData.status === value}
+                                                onClick={() => { setFormData(prev => ({ ...prev, status: value as ProjectStatus })); setStatusDropdownOpen(false); }}
+                                                icon={<span style={{ width: 8, height: 8, borderRadius: '50%', background: cfg.color, flexShrink: 0, display: 'inline-block' }} />}
+                                            />
+                                        ))}
+                                    </DropdownList>
+                                )}
+                            </FormField>
+                        </div>
                     </div>
+                </div>
 
-
-
-                    {/* Assigned To (Split UI) */}
-                    <div className="space-y-3">
-                        <label className="text-sm font-medium">
-                            Assigned To <span className="text-destructive">*</span>
-                        </label>
-
-                        <div className="flex gap-3">
-                            {/* Left: User Select (50%) */}
-                            <div className="relative flex-1" ref={userDropdownRef}>
-                                <div
-                                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer"
-                                    onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                                >
-                                    <span className={tempUser ? "text-foreground" : "text-muted-foreground"}>
-                                        {tempUser ? usersData?.find(u => u.value === tempUser)?.label : "Select User"}
-                                    </span>
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-50"><path d="m6 9 6 6 6-6" /></svg>
-                                </div>
-
+                {/* ── Section 2: Team Members ── */}
+                <div style={{ ...CARD_STYLE, padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <FormField label="Team Members" icon={<Users size={13} />}>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                            {/* User dropdown */}
+                            <div style={{ flex: 1 }} ref={userDropdownRef}>
+                                <DropdownTrigger
+                                    label={tempUser ? usersData?.find(u => u.value === tempUser)?.label : undefined}
+                                    placeholder="Select member…"
+                                    onClick={() => setUserDropdownOpen(v => !v)}
+                                    open={userDropdownOpen}
+                                    triggerRef={userTriggerRef}
+                                />
                                 {userDropdownOpen && (
-                                    <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md border bg-popover text-popover-foreground shadow-md">
-                                        {usersData
-                                            ?.filter((user) => !assignedTo.some((a) => a.userId === user.value))
-                                            .map((user) => (
-                                                <div
-                                                    key={user.value}
-                                                    className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground"
-                                                    onClick={() => {
-                                                        setTempUser(user.value);
-                                                        setUserDropdownOpen(false);
-                                                    }}
-                                                >
-                                                    {user.label}
-                                                </div>
-                                            ))}
-                                    </div>
+                                    <DropdownList triggerRef={userTriggerRef}>
+                                        {usersData?.filter(u => !assignedTo.some(a => a.userId === u.value)).map(user => (
+                                            <DropdownItem key={user.value} label={user.label} onClick={() => { setTempUser(user.value); setUserDropdownOpen(false); }} />
+                                        ))}
+                                    </DropdownList>
                                 )}
                             </div>
 
-                            {/* Right: Role Select + Add Button (50%) */}
-                            <div className="flex flex-1 gap-2">
-                                <div className="relative flex-1" ref={roleDropdownRef}>
-                                    <div
-                                        className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer"
-                                        onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
-                                    >
-                                        <span className={tempRole ? "text-foreground" : "text-muted-foreground"}>
-                                            {PROJECT_ROLES.find(r => r.value === tempRole)?.label || "Select Role"}
-                                        </span>
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-50"><path d="m6 9 6 6 6-6" /></svg>
-                                    </div>
-
-                                    {roleDropdownOpen && (
-                                        <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md border bg-popover text-popover-foreground shadow-md">
-                                            {PROJECT_ROLES.map((role) => (
-                                                <div
-                                                    key={role.value}
-                                                    className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground"
-                                                    onClick={() => {
-                                                        setTempRole(role.value);
-                                                        setRoleDropdownOpen(false);
-                                                    }}
-                                                >
-                                                    {role.label}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-
-                                <Button
-                                    type="button"
-                                    variant="secondary"
-                                    size="icon"
-                                    className="h-10 w-12 bg-muted/50 hover:bg-muted shrink-0"
-                                    onClick={handleAddMember}
-                                    disabled={!tempUser || !tempRole}
-                                >
-                                    <Plus className="h-4 w-4" />
-                                </Button>
+                          {/* Role dropdown */}
+                            <div style={{ flex: 1 }} ref={roleDropdownRef}>
+                                <DropdownTrigger
+                                    label={tempRole ? PROJECT_ROLES.find(r => r.value === tempRole)?.label : undefined}
+                                    placeholder="Select role…"
+                                    onClick={() => setRoleDropdownOpen(v => !v)}
+                                    open={roleDropdownOpen}
+                                    triggerRef={roleTriggerRef}
+                                />
+                                {roleDropdownOpen && (
+                                    <DropdownList triggerRef={roleTriggerRef}>
+                                        {PROJECT_ROLES.map(role => (
+                                            <DropdownItem key={role.value} label={role.label} selected={tempRole === role.value} onClick={() => { setTempRole(role.value); setRoleDropdownOpen(false); }} />
+                                        ))}
+                                    </DropdownList>
+                                )}
                             </div>
-                        </div>
 
-                        {/* Rendered List Below */}
-                        {assignedTo.length > 0 && (
-                            <div className="space-y-2 mt-2 max-w-md">
-                                {assignedTo.map((assignment) => {
-                                    const user = usersData?.find((u) => u.value === assignment.userId);
-                                    const roleLabel = PROJECT_ROLES.find((r) => r.value === assignment.role)?.label;
-                                    if (!user) return null;
-
-                                    return (
-                                        <div key={assignment.userId} className="flex items-center justify-between p-2 rounded-md border bg-card">
-                                            <div className="flex items-center gap-3">
-                                                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
-                                                    {user.label.charAt(0)}
-                                                </div>
-                                                <div className="flex flex-col">
-                                                    <span className="text-sm font-medium">{user.label}</span>
-                                                    <span className="text-xs text-muted-foreground">{roleLabel}</span>
-                                                </div>
-                                            </div>
-                                            <button
-                                                type="button"
-                                                className="text-muted-foreground hover:text-destructive p-1"
-                                                onClick={() => setAssignedTo(assignedTo.filter((a) => a.userId !== assignment.userId))}
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </button>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Task Type*/}
-                        <div className="relative space-y-2" ref={taskTypeDropdownRef}>
-                            <label className="text-sm font-medium">
-                                Project Type <span className="text-destructive">*</span>
-                            </label>
-
-                            <div
-                                className="w-full p-3 rounded-lg border border-input bg-background cursor-pointer flex items-center justify-between min-h-[50px] text-sm"
-                                onClick={() => setTaskTypeDropdownOpen(!taskTypeDropdownOpen)}
+                            {/* Add button */}
+                            <button
+                                type="button"
+                                onClick={handleAddMember}
+                                disabled={!tempUser || !tempRole}
+                                style={{ height: 38, width: 44, borderRadius: 8, border: `1px solid ${LINE}`, background: (!tempUser || !tempRole) ? '#f3f4f6' : BLUE, color: (!tempUser || !tempRole) ? MUTED : '#fff', cursor: (!tempUser || !tempRole) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .15s' }}
                             >
-                                <span className={formData.task_type ? "text-foreground" : "text-muted-foreground"}>
-                                    {TASK_TYPES.find(t => t.value === formData.task_type)?.label || "Select Project Type..."}                                </span>
-                                <svg
-                                    className={`h-4 w-4 text-muted-foreground transition-transform ${taskTypeDropdownOpen ? 'rotate-180' : ''}`}
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                >
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                </svg>
-                            </div>
-
-                            {taskTypeDropdownOpen && (
-                                <div className="absolute z-30 mt-1 w-full bg-popover border rounded-lg shadow-lg max-h-56 overflow-y-auto">
-                                    {TASK_TYPES.map((type) => (
-                                        <div
-                                            key={type.value}
-                                            className={`px-4 py-2 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground flex justify-between ${formData.task_type === type.value ? "bg-accent/50" : ""
-                                                }`}
-                                            onClick={() => {
-                                                setFormData(prev => ({ ...prev, task_type: type.value }));
-                                                setTaskTypeDropdownOpen(false);
-                                            }}
-                                        >
-                                            <div className="flex items-center gap-2">
-                                                {/* Color Circle */}
-                                                <div className={`h-3 w-3 rounded-full ${getProjectTypeColor(type.value)}`} />
-                                                <span>{type.label}</span>
-                                            </div>
-                                            {formData.task_type === type.value && <span className="text-primary font-bold">✓</span>}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+                                <Plus size={16} />
+                            </button>
                         </div>
-                    </div>
+                    </FormField>
 
-                    {/* Footer Buttons */}
-                    <div className="flex gap-3 pt-4 border-t">
-                        <Button
-                            type="submit"
-                            disabled={createMutation.isPending}
-                        >
-                            {createMutation.isPending ? 'Creating...' : 'Create Project'}
-                        </Button>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={handleClose}
-                        >
-                            Cancel
-                        </Button>
-                    </div>
-                </form>
-            </div>
-        </div>
+                    {/* Member list */}
+                    {assignedTo.length > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {assignedTo.map(assignment => {
+                                const user = usersData?.find(u => u.value === assignment.userId);
+                                const roleLabel = PROJECT_ROLES.find(r => r.value === assignment.role)?.label;
+                                if (!user) return null;
+                                return (
+                                    <div key={assignment.userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, border: `1px solid ${LINE}`, background: '#fff' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                            <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#EEF4FF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: BLUE }}>{user.label.charAt(0)}</div>
+                                            <div>
+                                                <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: TEXT }}>{user.label}</p>
+                                                <p style={{ margin: 0, fontSize: 11, color: MUTED }}>{roleLabel}</p>
+                                            </div>
+                                        </div>
+                                        <button type="button" onClick={() => setAssignedTo(assignedTo.filter(a => a.userId !== assignment.userId))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: MUTED, padding: 4, borderRadius: 4, display: 'flex' }}
+                                            onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
+                                            onMouseLeave={e => e.currentTarget.style.color = MUTED}>
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            </form>
+        </Modal>
     );
 }

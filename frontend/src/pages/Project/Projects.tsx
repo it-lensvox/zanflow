@@ -1,20 +1,100 @@
 import React from 'react';
-import { Search, Plus, X, FolderKanban, Folder, ChevronDown, Check, Move, Settings } from 'lucide-react';
+import { Search, Plus, X, FolderKanban, Folder, ChevronDown, Check, Move, Settings, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { ViewToggle } from '@/components/layout/DualView';
 import { Pagination } from '@/components/ui/Pagination';
 import { formatRelativeTime } from '@/lib/utils';
 import { CreateProjectModal } from './CreateProjectModal';
 import { useProjects } from './hooks/useProjects';
-import { BLUE, LINE, TEXT, MUTED, STATUS_MAP, TREE_GROUPS, getTypeHex, getTypeBg } from './projectConstants';
+import { BLUE, LINE, TEXT, MUTED, STATUS_MAP, TREE_GROUPS, getTypeHex, getTypeBg, PROJECT_TYPE_HEX } from './projectConstants';
 import { TreePanel }        from './components/TreePanel';
 import { BulkToolbar } from '@/components/ui/BulkToolbar';
 import { DetailPanel }      from './components/DetailPanel';
 import { ProjectGridCard }  from './components/ProjectGridCard';
 import { MoveProjectModal } from './components/MoveProjectModal';
 import { StatusPill, TypePill, MemberAvatars } from './components/ProjectPills';
+import { SearchFilter, ListFilter, FilterHeaderWrapper } from '@/components/layout/DualView/FilterComponents';
+import { PROJECT_TYPE_OPTIONS } from '@/config/projectTypeConfig';
 
 const th: React.CSSProperties = { textAlign: 'left', color: '#172033', fontSize: 14, fontWeight: 800, padding: '14px 16px', borderBottom: `1px solid ${LINE}`, borderRight: `1px solid ${LINE}`, background: '#f9fafb', whiteSpace: 'nowrap' as const, position: 'sticky', top: 0, zIndex: 1 };
 const td: React.CSSProperties = { padding: '14px 16px', borderBottom: `1px solid ${LINE}`, borderRight: `1px solid ${LINE}`, verticalAlign: 'middle', fontSize: 14, color: TEXT };
+
+// ── Reusable sortable + filterable column header 
+function ProjectThHeader({
+  label,
+  columnKey,
+  sortConfig,
+  onSort,
+  onFilter,
+  activeFilterKey,
+  filterContent,
+  filterContainerRef,
+}: {
+  label: string;
+  columnKey: string;
+  sortConfig: { key: string; direction: 'asc' | 'desc' | null };
+  onSort?: (key: string) => void;
+  onFilter?: (key: string) => void;
+  activeFilterKey: string | null;
+  filterContent?: React.ReactNode;
+  filterContainerRef?: React.RefObject<HTMLDivElement>;
+}) {
+  const isActive = activeFilterKey === columnKey;
+  const isSorted = sortConfig.key === columnKey;
+  const filterType = onFilter ? (filterContent ? 'search' : 'none') : 'none';
+
+  const SortIcon = isSorted
+    ? sortConfig.direction === 'asc' ? ArrowUp : ArrowDown
+    : ArrowUpDown;
+
+  // Sort + filter icon controls — shown on hover or when active
+  const controls = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+      {onSort && (
+        <button
+          onClick={e => { e.stopPropagation(); onSort(columnKey); }}
+          title={`Sort by ${label}`}
+          style={{ background: isSorted ? '#EEF4FF' : 'none', border: 'none', cursor: 'pointer', padding: '2px 3px', borderRadius: 4, display: 'flex', alignItems: 'center', color: isSorted ? BLUE : MUTED }}
+        >
+          <SortIcon size={12} />
+        </button>
+      )}
+      {onFilter && (
+        <button
+          onClick={e => { e.stopPropagation(); onFilter(columnKey); }}
+          title={`Filter by ${label}`}
+          style={{ background: isActive ? '#EEF4FF' : 'none', border: 'none', cursor: 'pointer', padding: '2px 3px', borderRadius: 4, display: 'flex', alignItems: 'center', color: isActive ? BLUE : MUTED }}
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
+
+  return (
+    <th
+      className={`relative ${isActive ? 'z-[100]' : ''}`}
+      style={{ ...th, position: 'relative', zIndex: isActive ? 100 : 1 }}
+      ref={isActive ? (filterContainerRef as any) : undefined}
+    >
+      <FilterHeaderWrapper
+        columnLabel={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ flex: 1 }}>{label}</span>
+            {(isSorted || isActive || onSort || onFilter) && controls}
+          </div>
+        }
+        filterType={filterType}
+        isActive={isActive}
+        filterContent={filterContent}
+      >
+        {/* children = search input, rendered above the label by FilterHeaderWrapper */}
+        {filterContent}
+      </FilterHeaderWrapper>
+    </th>
+  );
+}
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Status', dot: '' },
@@ -26,11 +106,8 @@ const STATUS_OPTIONS = [
 ];
 
 const TYPE_OPTIONS = [
-  { value: '',                 label: 'All Types' },
-  { value: 'client',           label: 'Client' },
-  { value: 'internal',         label: 'Internal' },
-  { value: 'content_creation', label: 'Content Creation' },
-  { value: 'ideas',            label: 'Ideas' },
+  { value: '', label: 'All Types', dot: '' },
+  ...PROJECT_TYPE_OPTIONS.map(t => ({ value: t.value, label: t.label, dot: t.hex })),
 ];
 
 export function Projects() {
@@ -102,6 +179,9 @@ export function Projects() {
               onClick={() => { setShowTypeDrop(v => !v); setShowStatusDrop(false); }}
               style={{ height: 40, display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', border: `1px solid ${showTypeDrop ? BLUE : LINE}`, borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 16, fontWeight: 600, color: p.typeFilter ? TEXT : MUTED, whiteSpace: 'nowrap', minWidth: 120 }}
             >
+              {p.typeFilter && TYPE_OPTIONS.find(o => o.value === p.typeFilter)?.dot && (
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: TYPE_OPTIONS.find(o => o.value === p.typeFilter)?.dot, flexShrink: 0 }} />
+              )}
               {typeLabel}
               <ChevronDown size={14} color={MUTED} style={{ marginLeft: 'auto', transition: 'transform 0.2s', transform: showTypeDrop ? 'rotate(180deg)' : 'none' }} />
             </button>
@@ -113,6 +193,7 @@ export function Projects() {
                     onMouseEnter={e => { if (p.typeFilter !== opt.value) e.currentTarget.style.background = '#F7F8FB'; }}
                     onMouseLeave={e => { if (p.typeFilter !== opt.value) e.currentTarget.style.background = 'transparent'; }}
                   >
+                    {opt.dot ? <span style={{ width: 8, height: 8, borderRadius: '50%', background: opt.dot, flexShrink: 0 }} /> : <span style={{ width: 8 }} />}
                     <span style={{ flex: 1 }}>{opt.label}</span>
                     {p.typeFilter === opt.value && <Check size={14} color={BLUE} />}
                   </button>
@@ -153,7 +234,13 @@ export function Projects() {
             <button onClick={() => p.setShowMoveModal(true)} style={{ height: 34, border: `1px solid ${LINE}`, borderRadius: 6, background: '#fff', padding: '0 14px', fontSize: 16, fontWeight: 600, display: 'inline-flex', gap: 7, alignItems: 'center', cursor: 'pointer', color: TEXT }}>
               <Move size={14} />Move
             </button>
-            <button style={{ height: 34, border: `1px solid ${LINE}`, borderRadius: 6, background: '#fff', padding: '0 14px', fontSize: 16, fontWeight: 600, display: 'inline-flex', gap: 7, alignItems: 'center', cursor: 'pointer', color: TEXT }}>
+            <button
+              onClick={() => {
+                const firstSelectedId = [...p.selectedIds][0];
+                if (firstSelectedId) p.navigate(`/projects/${firstSelectedId}/settings`);
+              }}
+              style={{ height: 34, border: `1px solid ${LINE}`, borderRadius: 6, background: '#fff', padding: '0 14px', fontSize: 16, fontWeight: 600, display: 'inline-flex', gap: 7, alignItems: 'center', cursor: 'pointer', color: TEXT }}
+            >
               <Settings size={14} />Edit
             </button>
           </BulkToolbar>
@@ -181,8 +268,35 @@ export function Projects() {
                         const color = getTypeHex((proj as any).task_type); const tint = getTypeBg((proj as any).task_type); const members = (proj as any).members || []; const isSel = p.selectedIds.has(proj.id);
                         return (
                           <div key={proj.id} onClick={() => p.handleDetailProject(proj)} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderBottom: idx < groupProjects.length - 1 ? `1px solid ${LINE}` : 'none', background: isSel ? '#f7faff' : '#fff', cursor: 'pointer', paddingLeft: 36, minHeight: 56 }} onMouseOver={e => { if (!isSel) e.currentTarget.style.background = '#f3f4f6'; }} onMouseOut={e => { e.currentTarget.style.background = isSel ? '#f7faff' : '#fff'; }}>
-                            <input type="checkbox" checked={isSel} onChange={() => p.toggleSelect(proj.id)} onClick={e => e.stopPropagation()} style={{ accentColor: color, width: 16, height: 16, cursor: 'pointer', flexShrink: 0 }} />
-                            <div style={{ width: 32, height: 32, borderRadius: 7, background: tint, border: `1.5px solid ${color}33`, display: 'grid', placeItems: 'center', color: color, fontWeight: 800, fontSize: 14, flexShrink: 0 }}>{proj.name[0].toUpperCase()}</div>
+                            <div
+                              onClick={e => { e.stopPropagation(); p.toggleSelect(proj.id); }}
+                              title={isSel ? 'Deselect' : 'Select'}
+                              style={{ position: 'relative', width: 32, height: 32, flexShrink: 0, cursor: 'pointer' }}
+                            >
+                              <div style={{
+                                width: 32, height: 32, borderRadius: 7,
+                                background: isSel ? color : tint,
+                                border: isSel ? `1.5px solid ${color}` : `1.5px solid ${color}33`,
+                                display: 'grid', placeItems: 'center',
+                                color: isSel ? '#fff' : color,
+                                fontWeight: 800, fontSize: 14,
+                                transition: 'background 0.15s, color 0.15s',
+                              }}>
+                                {isSel ? <Check size={14} strokeWidth={3} /> : proj.name[0].toUpperCase()}
+                              </div>
+                              {!isSel && (
+                                <div style={{
+                                  position: 'absolute', inset: 0, borderRadius: 7,
+                                  background: `${color}cc`, display: 'grid', placeItems: 'center',
+                                  opacity: 0, transition: 'opacity 0.15s',
+                                }}
+                                  onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                                  onMouseLeave={e => e.currentTarget.style.opacity = '0'}
+                                >
+                                  <Check size={14} color="#fff" strokeWidth={3} />
+                                </div>
+                              )}
+                            </div>
                             <span style={{ flex: 1, fontWeight: 600, fontSize: 14, color: TEXT, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{proj.name}</span>
                             <span style={{ fontSize: 13, color: MUTED, minWidth: 70 }}>{(proj as any).document_count ?? 0} docs</span>
                             <div style={{ minWidth: 90 }}><MemberAvatars members={members} /></div>
@@ -240,8 +354,108 @@ export function Projects() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#f9fafb' }}>
-                    <th style={{ ...th, width: 40 }}><input type="checkbox" checked={p.selectedIds.size === p.paginated.length && p.paginated.length > 0} onChange={p.toggleAll} style={{ accentColor: BLUE, width: 15, height: 15, cursor: 'pointer' }} /></th>
-                    <th style={th}>Project</th><th style={th}>Type</th><th style={th}>Documents</th><th style={th}>Members</th><th style={th}>Status</th><th style={th}>Updated ↓</th><th style={{ ...th, textAlign: 'center' }}>Favorite</th>
+                    <th style={{ ...th, width: 40 }}>
+                      <input type="checkbox" checked={p.selectedIds.size === p.paginated.length && p.paginated.length > 0} onChange={p.toggleAll} style={{ accentColor: BLUE, width: 15, height: 15, cursor: 'pointer' }} />
+                    </th>
+                    <ProjectThHeader
+                      label="Project"
+                      columnKey="name"
+                      sortConfig={p.sortConfig}
+                      onSort={p.handleTableSort}
+                      onFilter={p.handleFilter}
+                      activeFilterKey={p.activeFilterKey}
+                      filterContainerRef={p.filterContainerRef}
+                      filterContent={
+                        <SearchFilter
+                          columnKey="name"
+                          placeholder="Search by name..."
+                          value={p.columnFilters['name'] || ''}
+                          onChange={v => p.setColumnFilters(prev => ({ ...prev, name: v }))}
+                          isActive={p.activeFilterKey === 'name'}
+                        />
+                      }
+                    />
+                    <ProjectThHeader
+                      label="Type"
+                      columnKey="task_type"
+                      sortConfig={p.sortConfig}
+                      onSort={p.handleTableSort}
+                      onFilter={p.handleFilter}
+                      activeFilterKey={p.activeFilterKey}
+                      filterContainerRef={p.filterContainerRef}
+                      filterContent={
+                        <ListFilter
+                          columnKey="task_type"
+                          options={[
+                            { value: 'client', label: 'Client' },
+                            { value: 'internal', label: 'Internal' },
+                            { value: 'content_creation', label: 'Content Creation' },
+                            { value: 'ideas', label: 'Ideas' },
+                          ].map(opt => ({
+                            ...opt,
+                            icon: (
+                              <span style={{
+                                display: 'inline-block',
+                                width: 8, height: 8, borderRadius: '50%',
+                                background: PROJECT_TYPE_HEX[opt.value]?.hex ?? '#667085',
+                                flexShrink: 0,
+                              }} />
+                            ),
+                          }))}
+                          selectedValue={p.columnFilters['task_type'] || ''}
+                          onSelect={v => { p.setColumnFilters(prev => ({ ...prev, task_type: v })); p.setActiveFilterKey(null); }}
+                          onClear={() => { p.clearFilter('task_type'); p.setActiveFilterKey(null); }}
+                          isActive={p.activeFilterKey === 'task_type'}
+                          containerRef={p.filterContainerRef}
+                        />
+                      }
+                    />
+                    <ProjectThHeader
+                      label="Documents"
+                      columnKey="document_count"
+                      sortConfig={p.sortConfig}
+                      onSort={p.handleTableSort}
+                      activeFilterKey={p.activeFilterKey}
+                    />
+                    <th style={th}>Members</th>
+                    <ProjectThHeader
+                      label="Status"
+                      columnKey="status"
+                      sortConfig={p.sortConfig}
+                      onSort={p.handleTableSort}
+                      onFilter={p.handleFilter}
+                      activeFilterKey={p.activeFilterKey}
+                      filterContainerRef={p.filterContainerRef}
+                      filterContent={
+                        <ListFilter
+                          columnKey="status"
+                          options={Object.entries(STATUS_MAP).map(([value, cfg]) => ({
+                            value,
+                            label: cfg.label,
+                            icon: (
+                              <span style={{
+                                display: 'inline-block',
+                                width: 8, height: 8, borderRadius: '50%',
+                                background: cfg.color, flexShrink: 0,
+                              }} />
+                            ),
+                          }))}
+                          selectedValue={p.columnFilters['status'] || ''}
+                          onSelect={v => { p.setColumnFilters(prev => ({ ...prev, status: v })); p.setActiveFilterKey(null); }}
+                          onClear={() => { p.clearFilter('status'); p.setActiveFilterKey(null); }}
+                          isActive={p.activeFilterKey === 'status'}
+                          containerRef={p.filterContainerRef}
+                        />
+                      }
+                    />
+                    <ProjectThHeader
+                      label="Updated"
+                      columnKey="updated_at"
+                      sortConfig={p.sortConfig}
+                      onSort={p.handleTableSort}
+                      activeFilterKey={p.activeFilterKey}
+                    />
+                    <th style={{ ...th, textAlign: 'center' }}>Favorite</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -258,8 +472,46 @@ export function Projects() {
                     const color = getTypeHex((proj as any).task_type); const tint = getTypeBg((proj as any).task_type); const members = (proj as any).members || []; const isSel = p.selectedIds.has(proj.id); const isDetail = p.detailProject?.id === proj.id;
                     return (
                       <tr key={proj.id} onClick={() => p.handleDetailProject(proj)} onMouseEnter={() => p.handleRowHover(proj)} style={{ background: isSel ? '#f7faff' : idx % 2 === 0 ? '#fff' : '#fafbfc', cursor: 'pointer', borderLeft: isDetail ? `3px solid ${color}` : '3px solid transparent' }} onMouseOver={e => { if (!isSel && !isDetail) e.currentTarget.style.background = '#f3f4f6'; }} onMouseOut={e => { e.currentTarget.style.background = isSel ? '#f7faff' : idx % 2 === 0 ? '#fff' : '#fafbfc'; }}>
-                        <td style={{ ...td, width: 40 }}><input type="checkbox" checked={isSel} onChange={() => p.toggleSelect(proj.id)} onClick={e => e.stopPropagation()} style={{ accentColor: color, width: 15, height: 15, cursor: 'pointer' }} /></td>
-                        <td style={td}><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ width: 30, height: 30, borderRadius: 7, background: tint, border: `1.5px solid ${color}33`, display: 'grid', placeItems: 'center', color: color, fontWeight: 800, fontSize: 14, flexShrink: 0 }}>{proj.name[0].toUpperCase()}</div><span style={{ color: TEXT, fontWeight: 500 }}>{proj.name}</span></div></td>
+                        <td style={{ ...td, width: 48 }}>
+                          {/* Avatar doubles as checkbox — hover reveals checkmark, click toggles selection */}
+                          <div
+                            className="group/avatar"
+                            onClick={e => { e.stopPropagation(); p.toggleSelect(proj.id); }}
+                            title={isSel ? 'Deselect' : 'Select'}
+                            style={{ position: 'relative', width: 30, height: 30, borderRadius: 7, cursor: 'pointer', margin: '0 auto', flexShrink: 0 }}
+                          >
+                            {/* Base avatar */}
+                            <div style={{
+                              width: 30, height: 30, borderRadius: 7,
+                              background: isSel ? color : tint,
+                              border: isSel ? `1.5px solid ${color}` : `1.5px solid ${color}33`,
+                              display: 'grid', placeItems: 'center',
+                              color: isSel ? '#fff' : color,
+                              fontWeight: 800, fontSize: 14,
+                              transition: 'background 0.15s, color 0.15s',
+                            }}>
+                              {isSel
+                                ? <Check size={14} strokeWidth={3} />
+                                : proj.name[0].toUpperCase()
+                              }
+                            </div>
+                            {/* Hover overlay when not selected */}
+                            {!isSel && (
+                              <div style={{
+                                position: 'absolute', inset: 0, borderRadius: 7,
+                                background: `${color}cc`,
+                                display: 'grid', placeItems: 'center',
+                                opacity: 0, transition: 'opacity 0.15s',
+                              }}
+                                onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                                onMouseLeave={e => e.currentTarget.style.opacity = '0'}
+                              >
+                                <Check size={14} color="#fff" strokeWidth={3} />
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td style={td}><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><span style={{ color: TEXT, fontWeight: 500 }}>{proj.name}</span></div></td>
                         <td style={td}><TypePill type={(proj as any).task_type} /></td>
                         <td style={{ ...td, color: MUTED }}>{(proj as any).document_count ?? 0} docs</td>
                         <td style={td}><MemberAvatars members={members} /></td>

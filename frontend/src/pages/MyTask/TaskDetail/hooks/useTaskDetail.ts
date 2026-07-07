@@ -7,21 +7,20 @@ import { useDocumentPreviewKeyboard } from '@/components/common/DocumentPreview'
 import { useAISuggestions } from './useAISuggestions';
 import type { Task, TaskAttachment, TaskLink, Label } from '@/types';
 
-// ── Helpers (exported so Modal/Page can use them without re-defining) ─────────
 export const getInitialLinks = (taskLinks: TaskLink[] | undefined): string[] => {
     if (!taskLinks) return [];
     return taskLinks.map(link => typeof link === 'object' && link.url ? link.url : String(link));
 };
 
-// ── Hook options ─────────────────────────────────────────────────────────────
+// ── Hook options
 export interface UseTaskDetailOptions {
     task: Task;
-    onClose?: () => void;          // provided by Modal, undefined in Page
+    onClose?: () => void;
     onDelete: (id: number) => Promise<void>;
-    onTaskUpdated?: (t: Task) => void; // provided by Modal
+    onTaskUpdated?: (t: Task) => void;
 }
 
-// ── The hook ─────────────────────────────────────────────────────────────────
+// ── The hook
 export function useTaskDetail({ task, onClose, onDelete, onTaskUpdated }: UseTaskDetailOptions) {
     const { user } = useAuth();
     const navigate  = useNavigate();
@@ -39,7 +38,7 @@ export function useTaskDetail({ task, onClose, onDelete, onTaskUpdated }: UseTas
         return num;
     }, [task.id, task.heading]);
 
-    // ── State ────────────────────────────────────────────────────────────────
+    // ── State 
     const [selectedStatus,        setSelectedStatus]        = useState<Task['status']>(task.status);
     const [showStatusDropdown,    setShowStatusDropdown]    = useState(false);
     const [showDeleteConfirm,     setShowDeleteConfirm]     = useState(false);
@@ -73,7 +72,7 @@ export function useTaskDetail({ task, onClose, onDelete, onTaskUpdated }: UseTas
     const attachmentContainerRef = useRef<HTMLDivElement>(null);
     const canEditDates = ['admin', 'manager'].includes(user?.role || '');
 
-    // ── Queries ──────────────────────────────────────────────────────────────
+    // ── Queries 
     const { data: fullTaskDetails } = useQuery<any>({
         queryKey: ['task-detail', resolvedTaskId],
         queryFn: () => taskApi.get(resolvedTaskId),
@@ -140,7 +139,7 @@ export function useTaskDetail({ task, onClose, onDelete, onTaskUpdated }: UseTas
         return Array.from(uniqueMap.values());
     }, [resolvedApiAttachments, taskDocuments]);
 
-    // ── AI suggestions ───────────────────────────────────────────────────────
+    // ── AI suggestions 
     const aiSuggestions = useAISuggestions({
         taskId:             resolvedTaskId,
         taskTitle:          editableTitle,
@@ -151,7 +150,7 @@ export function useTaskDetail({ task, onClose, onDelete, onTaskUpdated }: UseTas
         parentAssigneeIds:  (task.assigned_to || []).map(Number),
     });
 
-    // ── Effects ──────────────────────────────────────────────────────────────
+    // ── Effects
     useEffect(() => { setSelectedStatus(task.status); }, [task.status]);
 
     useEffect(() => {
@@ -234,7 +233,7 @@ export function useTaskDetail({ task, onClose, onDelete, onTaskUpdated }: UseTas
 
     useDocumentPreviewKeyboard(() => setPreviewDocument(null));
 
-    // ── Mutations ────────────────────────────────────────────────────────────
+    // ── Mutations 
     const updateTaskMutation = useMutation({
         mutationFn: (updates: any) => {
             if (!resolvedTaskId || resolvedTaskId <= 0) return Promise.reject(new Error(`Invalid id: ${resolvedTaskId}`));
@@ -284,7 +283,7 @@ export function useTaskDetail({ task, onClose, onDelete, onTaskUpdated }: UseTas
         onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['task-comments', task.id] }); setNewComment(''); },
     });
 
-    // ── Handlers ─────────────────────────────────────────────────────────────
+    // ── Handlers 
     const handleOpenFullPage = () => { onClose?.(); navigate(`/tasks/${task.id}`); };
     const handleAddLink      = () => { if (linkInput.trim()) { setLinks([...links, linkInput.trim()]); setLinkInput(''); } };
     const removeLink         = (i: number) => setLinks(links.filter((_, idx) => idx !== i));
