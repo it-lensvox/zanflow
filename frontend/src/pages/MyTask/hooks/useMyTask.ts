@@ -244,9 +244,16 @@ export function useMyTask() {
           (task.priority || '').toLowerCase().includes(q) ||
           (task.labels || []).some((l: any) => (l.name || l.label || '').toLowerCase().includes(q));
         const assigneeVal = columnFilters['assigned_to'];
-        const matchesAssignee = !assigneeVal || (task.assigned_to || []).map(String).includes(String(assigneeVal));
+        const matchesAssignee = !assigneeVal
+          || (assigneeVal === '__empty__'
+            ? (task.assigned_to || []).length === 0
+            : (task.assigned_to || []).map(String).includes(String(assigneeVal)));
+
         const createdByVal = columnFilters['created_by'];
-        const matchesCreatedBy = !createdByVal || String(task.assigned_by) === String(createdByVal);
+        const matchesCreatedBy = !createdByVal
+          || (createdByVal === '__empty__'
+            ? !task.assigned_by || task.assigned_by === 0
+            : String(task.assigned_by) === String(createdByVal));
         const labelsVal = columnFilters['labels'];
         const matchesLabel = !labelsVal || (task.labels || []).some(
           (l: any) => (l.name || l.label || '').toLowerCase().includes(String(labelsVal).toLowerCase())

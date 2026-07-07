@@ -1,5 +1,40 @@
 import React from 'react';
+import ReactDOM from 'react-dom';
 import { ColumnFilters } from '@/hooks/useTableFilters';
+
+/** Measures a ref element and renders children via portal into document.body.
+ *  Ensures dropdown is never clipped by table overflow or sticky headers. */
+function FilterPortal({ anchorRef, children }: { anchorRef?: React.RefObject<HTMLDivElement>; children: React.ReactNode }) {
+  const [rect, setRect] = React.useState<DOMRect | null>(null);
+
+  React.useEffect(() => {
+    const el = anchorRef?.current;
+    if (!el) return;
+    setRect(el.getBoundingClientRect());
+
+    const onResize = () => setRect(el.getBoundingClientRect());
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [anchorRef]);
+
+  if (!rect) return null;
+
+  return ReactDOM.createPortal(
+    <div
+      data-filter-portal="true"
+      style={{
+        position: 'fixed',
+        top: rect.bottom + 4,
+        left: rect.left,
+        minWidth: Math.max(rect.width, 160),
+        zIndex: 99999,
+      }}
+    >
+      {children}
+    </div>,
+    document.body,
+  );
+}
 
 export interface SearchFilterProps {
     columnKey: string;
@@ -58,22 +93,21 @@ export const ListFilter: React.FC<ListFilterProps> = ({
 }) => {
     if (!isActive) return null;
 
-    return (
+    const dropdown = (
         <div
-            ref={containerRef}
-            className="absolute top-full left-0 mt-2 bg-white border border-[#dfe1e6] shadow-xl rounded-lg py-1 min-w-[160px] z-[110]"
+            onMouseDown={e => e.stopPropagation()}
+            onClick={e => e.stopPropagation()}
+            className="bg-white border border-[#dfe1e6] shadow-xl rounded-lg py-1"
         >
-            <div className="flex flex-col">
+            <div className="flex flex-col" style={{ maxHeight: 280, overflowY: 'auto' }}>
                 {options.map((option) => (
                     <div
                         key={option.value}
-                        className={`px-3 py-2 hover:bg-gray-50 cursor-pointer text-[12px] flex items-center gap-2 ${option.className || ''
-                            }`}
-                        onClick={() => {
-                            onSelect(option.value);
-                        }}
+                        className={`px-3 py-2 hover:bg-gray-50 cursor-pointer text-[12px] flex items-center gap-2 ${option.className || ''}`}
+                        onMouseDown={e => e.stopPropagation()}
+                        onClick={() => onSelect(option.value)}
                     >
-                        {option.icon && <span className="w-3.5 h-3.5">{option.icon}</span>}
+                        {option.icon && <span className="w-3.5 h-3.5 flex-shrink-0">{option.icon}</span>}
                         <span className={`font-medium ${selectedValue === option.value ? 'text-blue-600' : ''}`}>
                             {option.label}
                         </span>
@@ -82,14 +116,27 @@ export const ListFilter: React.FC<ListFilterProps> = ({
             </div>
             <button
                 className="mt-1 px-3 py-1 text-[10px] text-red-500 hover:bg-red-50 w-full text-left border-t border-gray-100"
+                onMouseDown={e => e.stopPropagation()}
                 onClick={onClear}
             >
                 Clear Filter
             </button>
         </div>
     );
-};
 
+    // Render via portal when an anchor ref is provided (table view)
+    // so the dropdown escapes overflow:hidden table containers
+    if (containerRef) {
+        return <FilterPortal anchorRef={containerRef}>{dropdown}</FilterPortal>;
+    }
+
+    // Fallback: inline absolute positioning (non-table usage)
+    return (
+        <div className="absolute top-full left-0 mt-2 min-w-[160px] z-[110]">
+            {dropdown}
+        </div>
+    );
+};
 export interface DateFilterProps {
     columnKey: string;
     value: string;
@@ -109,10 +156,11 @@ export const DateFilter: React.FC<DateFilterProps> = ({
 }) => {
     if (!isActive) return null;
 
-    return (
+    const dropdown = (
         <div
-            ref={containerRef}
-            className="absolute top-full left-0 mt-2 bg-white border border-[#dfe1e6] shadow-xl rounded-lg py-1 min-w-[160px] z-[110]"
+            onMouseDown={e => e.stopPropagation()}
+            onClick={e => e.stopPropagation()}
+            className="bg-white border border-[#dfe1e6] shadow-xl rounded-lg py-1"
         >
             <div className="p-2">
                 <input
@@ -125,19 +173,26 @@ export const DateFilter: React.FC<DateFilterProps> = ({
                         e.stopPropagation();
                         e.currentTarget.showPicker?.();
                     }}
-                    onChange={(e) => {
-                        onChange(e.target.value);
-                    }}
+                    onChange={(e) => onChange(e.target.value)}
                 />
             </div>
-
-            {/* Clear Button */}
             <button
                 className="mt-1 px-3 py-1 text-[10px] text-red-500 hover:bg-red-50 w-full text-left border-t border-gray-100"
+                onMouseDown={e => e.stopPropagation()}
                 onClick={onClear}
             >
                 Clear Filter
             </button>
+        </div>
+    );
+
+    if (containerRef) {
+        return <FilterPortal anchorRef={containerRef}>{dropdown}</FilterPortal>;
+    }
+
+    return (
+        <div className="absolute top-full left-0 mt-2 min-w-[160px] z-[110]">
+            {dropdown}
         </div>
     );
 };

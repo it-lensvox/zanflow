@@ -250,10 +250,22 @@ export const MyTask: React.FC = () => {
                           {col.key === t.personField && (
                             <ListFilter
                               columnKey={t.personField}
-                              options={(t.usersData || []).map(u => ({
-                                value: String(u.id),
-                                label: `${u.first_name} ${u.last_name}`.trim() || u.username,
-                              }))}
+                              options={[
+                                // "Empty" always at the top — filters tasks with no assignee/creator
+                                {
+                                  value: '__empty__',
+                                  label: 'Empty',
+                                  icon: (
+                                    <span style={{ width: 18, height: 18, borderRadius: '50%', border: '1.5px dashed #94a3b8', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                      <span style={{ fontSize: 9, color: '#94a3b8' }}>–</span>
+                                    </span>
+                                  ),
+                                },
+                                ...(t.usersData || []).map(u => ({
+                                  value: String(u.id),
+                                  label: `${u.first_name} ${u.last_name}`.trim() || u.username,
+                                })),
+                              ]}
                               selectedValue={t.columnFilters[t.personField] || ''}
                               onSelect={v => { t.setColumnFilters(p => ({ ...p, [t.personField]: v })); t.setActiveFilterKey(null); }}
                               onClear={() => { t.clearFilter(t.personField); t.setActiveFilterKey(null); }}
