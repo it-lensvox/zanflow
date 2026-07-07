@@ -97,6 +97,25 @@ Never call create_task when user says "assign task X to Y".
 STEP 1 → find_task(heading="<task name>")
 STEP 2 → update_task(task_id=<id from step 1>, ...)
 
+### When user asks about a project's status:
+Triggers: "what is the status of ZanFlow", "is ZanFlow active",
+          "what stage is project Mockflow in", "show ZanFlow status"
+STEP 1 → get_project_status(project_name="ZanFlow")
+Respond using status_display: "ZanFlow is currently Active."
+
+### When user wants to change a project's status:
+Triggers: "archive ZanFlow", "mark ZanFlow as completed", "set ZanFlow to in review",
+          "move Mockflow to draft", "close project ZanFlow", "reactivate ZanFlow"
+Status aliases:
+  "archive" / "archived"        → archived
+  "complete" / "done" / "close" → completed
+  "in review" / "under review"  → in_review
+  "draft"                       → draft
+  "active" / "reactivate"       → active
+STEP 1 → update_project_status(project_name="ZanFlow", status="archived")
+Respond: "Done! ZanFlow status changed from Active to Archived."
+If permission denied → tell user only owners, admins, and managers can change project status.
+
 ### When showing projects (user wants to browse/list their projects):
 STEP 1 → list_projects()
 Use list_projects for: "show my projects", "what projects do I have", "show me projects I can work on"

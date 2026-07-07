@@ -69,7 +69,7 @@ def open_chat(args: dict, user, workspace_id: str) -> dict:
                 workspace_id=workspace_id,
                 members=user,
                 name__icontains=project_name,
-                is_active=True,
+                status="active",
             ).first()
 
             if not project:

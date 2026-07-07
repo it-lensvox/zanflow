@@ -8,6 +8,48 @@ logger = logging.getLogger(__name__)
 
 PROJECT_TOOL_SCHEMAS = [
     {
+        "name": "get_project_status",
+        "description": (
+            "Get the current status of a project. "
+            "Use when user asks 'what is the status of ZanFlow', "
+            "'is project ZanFlow active', 'what stage is ZanFlow in'."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "project_name": {
+                    "type": "string",
+                    "description": "Name of the project to check status for",
+                },
+            },
+            "required": ["project_name"],
+        },
+    },
+    {
+        "name": "update_project_status",
+        "description": (
+            "Update the status of a project. "
+            "Use when user says 'archive project ZanFlow', 'mark ZanFlow as completed', "
+            "'set ZanFlow to in review', 'move ZanFlow to draft'. "
+            "Valid statuses: active, in_review, draft, archived, completed."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "project_name": {
+                    "type": "string",
+                    "description": "Name of the project to update",
+                },
+                "status": {
+                    "type": "string",
+                    "enum": ["active", "in_review", "draft", "archived", "completed"],
+                    "description": "New status for the project",
+                },
+            },
+            "required": ["project_name", "status"],
+        },
+    },
+    {
         "name": "create_project",
         "description": (
             "Create a new project in the current workspace. "
@@ -91,7 +133,7 @@ def create_project(args: dict, user, workspace_id: str) -> dict:
             return {"success": False, "error": f"Workspace {workspace_id} not found."}
 
         # Check for duplicate name in this workspace
-        if Project.objects.filter(workspace_id=workspace_id, name__iexact=name, is_active=True).exists():
+        if Project.objects.filter(workspace_id=workspace_id, name__iexact=name, status="active").exists():
             return {
                 "success": False,
                 "error":   f"A project named '{name}' already exists in this workspace.",
@@ -151,6 +193,106 @@ def list_projects(args: dict, user, workspace_id: str) -> dict:
 
     except Exception as exc:
         logger.exception("list_projects failed: %s", exc)
+        return {"success": False, "error": str(exc)}
+
+
+def get_project_status(args: dict, user, workspace_id: str) -> dict:
+    """
+    Returns the current status of a project.
+    """
+    try:
+        from apps.projects.models import Project
+
+        project_name = args.get("project_name", "").strip()
+        if not project_name:
+            return {"success": False, "error": "project_name is required."}
+
+        project = Project.objects.filter(
+            workspace_id=workspace_id,
+            members=user,
+            name__icontains=project_name,
+        ).first()
+
+        if not project:
+            return {"success": False, "error": f"Project '{project_name}' not found or you are not a member."}
+
+        return {
+            "success":      True,
+            "project_id":   project.id,
+            "project_name": project.name,
+            "status":       project.status,
+            "status_display": project.get_status_display(),
+            "task_type":    project.task_type,
+        }
+
+    except Exception as exc:
+        logger.exception("get_project_status failed: %s", exc)
+        return {"success": False, "error": str(exc)}
+
+
+def update_project_status(args: dict, user, workspace_id: str) -> dict:
+    """
+    Updates the status of a project.
+    Only the project owner or admin can change status.
+    Valid statuses: active, in_review, draft, archived, completed.
+    """
+    try:
+        from apps.projects.models import Project, ProjectMembership
+
+        project_name = args.get("project_name", "").strip()
+        new_status   = args.get("status", "").strip()
+
+        if not project_name:
+            return {"success": False, "error": "project_name is required."}
+        if not new_status:
+            return {"success": False, "error": "status is required."}
+
+        valid_statuses = ["active", "in_review", "draft", "archived", "completed"]
+        if new_status not in valid_statuses:
+            return {
+                "success": False,
+                "error":   f"Invalid status '{new_status}'. Valid values: {', '.join(valid_statuses)}",
+            }
+
+        # Find the project
+        project = Project.objects.filter(
+            workspace_id=workspace_id,
+            members=user,
+            name__icontains=project_name,
+        ).first()
+
+        if not project:
+            return {"success": False, "error": f"Project '{project_name}' not found or you are not a member."}
+
+        # Check user has permission — must be owner or admin
+        membership = ProjectMembership.objects.filter(
+            project=project,
+            user=user,
+            role__in=["owner", "admin", "manager"],
+        ).first()
+
+        if not membership:
+            return {
+                "success": False,
+                "error":   f"You don't have permission to change the status of '{project.name}'. Only owners, admins, and managers can do this.",
+            }
+
+        old_status = project.status
+        project.status     = new_status
+        project.updated_by = user
+        project.save(update_fields=["status", "updated_by", "updated_at"])
+
+        return {
+            "success":          True,
+            "project_id":       project.id,
+            "project_name":     project.name,
+            "old_status":       old_status,
+            "new_status":       new_status,
+            "status_display":   project.get_status_display(),
+        }
+
+    except Exception as exc:
+        logger.exception("update_project_status failed: %s", exc)
         return {"success": False, "error": str(exc)}
 
 

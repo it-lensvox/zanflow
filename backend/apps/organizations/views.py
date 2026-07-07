@@ -198,7 +198,7 @@ class TenantSignupView(APIView):
         subject = f"🔔 New Tenant Signup: {org.name}"
 
         message = (
-            f"A new organization has signed up on ZanFlow.\n\n"
+            f"A new organization has signed up on Dyuksa.\n\n"
             f"────────────────────────────────\n"
             f"Organization:  {org.name}\n"
             f"Slug:          {org.slug}\n"
@@ -213,7 +213,7 @@ class TenantSignupView(APIView):
             f"────────────────────────────────\n\n"
             f"You can view this tenant at:\n"
             f"  API: /api/v1/organizations/overview/{org.id}/\n\n"
-            f"— ZanFlow Platform"
+            f"— Dyuksa Platform"
         )
 
         try:

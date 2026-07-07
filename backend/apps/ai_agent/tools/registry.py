@@ -39,6 +39,8 @@ from apps.ai_agent.tools.project_tools import (
     create_project,
     list_projects,
     get_project_summary,
+    get_project_status,
+    update_project_status,
 )
 from apps.ai_agent.tools.note_tools import (
     NOTE_TOOL_SCHEMAS,
@@ -102,6 +104,8 @@ TOOL_EXECUTORS = {
     # Project tools
     "list_projects":         list_projects,
     "get_project_summary":   get_project_summary,
+    "get_project_status":    get_project_status,
+    "update_project_status": update_project_status,
     # Note tools
     "create_note":           create_note,
     "list_notes":            list_notes,

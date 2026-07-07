@@ -461,9 +461,13 @@ class TaskBulkUploadView(WorkspaceAPIView):
                         # Save the task
                         task = serializer.save(assigned_by=request.user)
                         
-                        # Map emails to user objects and assign them
+                        # ✅ THE FIX: Normalize emails to lowercase before querying
                         if assignee_emails:
-                            users = User.objects.filter(email__in=assignee_emails)
+                            # Strip whitespace and convert to lowercase
+                            cleaned_emails = [email.strip().lower() for email in assignee_emails if email]
+                            
+                            # Query using the cleaned lowercase emails
+                            users = User.objects.filter(email__in=cleaned_emails)
                             task.assigned_to.set(users)
                             
                         created_tasks.append(task)

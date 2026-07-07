@@ -666,7 +666,7 @@ class AgentOrchestrator:
                             workspace_id=self.workspace_id,
                             members=self.user,
                             name__icontains=tool_input["project_name"],
-                            is_active=True,
+                            status="active",
                         ).first()
                         if _proj:
                             _pid = _proj.id
