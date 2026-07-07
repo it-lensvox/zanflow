@@ -2,8 +2,6 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import { ColumnFilters } from '@/hooks/useTableFilters';
 
-/** Measures a ref element and renders children via portal into document.body.
- *  Ensures dropdown is never clipped by table overflow or sticky headers. */
 function FilterPortal({ anchorRef, children }: { anchorRef?: React.RefObject<HTMLDivElement>; children: React.ReactNode }) {
   const [rect, setRect] = React.useState<DOMRect | null>(null);
 
@@ -124,13 +122,10 @@ export const ListFilter: React.FC<ListFilterProps> = ({
         </div>
     );
 
-    // Render via portal when an anchor ref is provided (table view)
-    // so the dropdown escapes overflow:hidden table containers
     if (containerRef) {
         return <FilterPortal anchorRef={containerRef}>{dropdown}</FilterPortal>;
     }
 
-    // Fallback: inline absolute positioning (non-table usage)
     return (
         <div className="absolute top-full left-0 mt-2 min-w-[160px] z-[110]">
             {dropdown}
