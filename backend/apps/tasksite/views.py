@@ -410,6 +410,71 @@ class TaskPinToggleView(WorkspaceAPIView):
             "is_pinned": is_pinned
         }, status=status.HTTP_200_OK)
     
+def convert_description_to_html(text: str) -> str:
+    """
+    Convert plain-text task descriptions (from bulk JSON imports) to basic HTML
+    so Tiptap renders them correctly in both view and edit mode.
+
+    Rules (applied per line after splitting on \n):
+      • Lines starting with '-' or '•'  →  <ul><li> … </li></ul>
+      • Lines starting with '1.', '2.', etc.  →  <ol><li> … </li></ol>
+      • Everything else  →  <p> … </p>
+
+    Consecutive list items of the same type are merged into a single list tag.
+    Empty / whitespace-only lines are skipped.
+    """
+    import re
+
+    if not text or not text.strip():
+        return text  # Nothing to convert; leave the field as-is.
+
+    lines = text.split('\n')
+    html_parts = []
+    ul_buffer = []
+    ol_buffer = []
+
+    def flush_ul():
+        if ul_buffer:
+            items = ''.join(f'<li>{item}</li>' for item in ul_buffer)
+            html_parts.append(f'<ul>{items}</ul>')
+            ul_buffer.clear()
+
+    def flush_ol():
+        if ol_buffer:
+            items = ''.join(f'<li>{item}</li>' for item in ol_buffer)
+            html_parts.append(f'<ol>{items}</ol>')
+            ol_buffer.clear()
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue  # skip blank lines
+
+        if stripped.startswith('-') or stripped.startswith('•'):
+            # Bullet list item — flush any open ordered list first
+            flush_ol()
+            content = stripped.lstrip('-•').strip()
+            ul_buffer.append(content)
+
+        elif re.match(r'^\d+\.', stripped):
+            # Numbered list item — flush any open unordered list first
+            flush_ul()
+            content = re.sub(r'^\d+\.\s*', '', stripped)
+            ol_buffer.append(content)
+
+        else:
+            # Plain paragraph — flush any open lists first
+            flush_ul()
+            flush_ol()
+            html_parts.append(f'<p>{stripped}</p>')
+
+    # Flush any remaining list buffers
+    flush_ul()
+    flush_ol()
+
+    return ''.join(html_parts)
+
+
 class TaskBulkUploadView(WorkspaceAPIView):
     authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
     permission_classes = [IsAuthenticated]
@@ -454,6 +519,12 @@ class TaskBulkUploadView(WorkspaceAPIView):
                     # Extract assignee emails if provided in JSON to map to User IDs
                     assignee_emails = task_data.pop('assignee_emails', [])
 
+                    # Convert plain-text description to HTML for Tiptap compatibility.
+                    # Only applied here (bulk import); regular create/update endpoints
+                    # already receive HTML from the frontend editor.
+                    if task_data.get('description'):
+                        task_data['description'] = convert_description_to_html(task_data['description'])
+
                     # Pass data to your existing serializer
                     serializer = TaskSerializer(data=task_data, context={'request': request})
                     
@@ -461,13 +532,20 @@ class TaskBulkUploadView(WorkspaceAPIView):
                         # Save the task
                         task = serializer.save(assigned_by=request.user)
                         
-                        # ✅ THE FIX: Normalize emails to lowercase before querying
+                        # ✅ THE FIX: Use case-insensitive email lookup via __iexact
                         if assignee_emails:
-                            # Strip whitespace and convert to lowercase
-                            cleaned_emails = [email.strip().lower() for email in assignee_emails if email]
-                            
-                            # Query using the cleaned lowercase emails
-                            users = User.objects.filter(email__in=cleaned_emails)
+                            # Strip whitespace from each email
+                            cleaned_emails = [email.strip() for email in assignee_emails if email]
+
+                            # Build a Q filter with __iexact per email so PostgreSQL
+                            # ignores case on BOTH sides — works regardless of how the
+                            # address was stored in the DB (e.g. "HarshitJindal@lensvox.com"
+                            # vs "harshitjindal@lensvox.com").
+                            email_query = Q()
+                            for email_stripped in cleaned_emails:
+                                email_query |= Q(email__iexact=email_stripped)
+
+                            users = User.objects.filter(email_query)
                             task.assigned_to.set(users)
                             
                         created_tasks.append(task)

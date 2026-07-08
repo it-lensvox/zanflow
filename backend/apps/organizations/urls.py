@@ -17,6 +17,7 @@ from .views import (
     WorkspaceMemberDetailView,
     WorkspaceAvailableUsersView,
     AddPlatformAccessView,
+    TenantPlatformAccessView,
 )
 
 router = DefaultRouter()
@@ -44,6 +45,7 @@ urlpatterns = [
     path("overview/<int:org_id>/",             TenantDetailView.as_view(),       name="tenant-detail"),
     path("overview/<int:org_id>/toggle-status/", TenantToggleStatusView.as_view(), name="tenant-toggle-status"),
     path("overview/<int:org_id>/delete/",      TenantDeleteView.as_view(),       name="tenant-delete"),
+    path("overview/<int:org_id>/platform-access/", TenantPlatformAccessView.as_view(), name="tenant-platform-access"),
 
     # Admin CRUD for organizations
     path("", include(router.urls)),

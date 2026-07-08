@@ -273,7 +273,7 @@ class TenantSignupView(APIView):
         subject = f"🔔 New Tenant Signup: {org.name}"
 
         message = (
-            f"A new organization has signed up on ZanFlow.\n\n"
+            f"A new organization has signed up on DYUKSA.\n\n"
             f"────────────────────────────────\n"
             f"Organization:  {org.name}\n"
             f"Slug:          {org.slug}\n"
@@ -288,7 +288,7 @@ class TenantSignupView(APIView):
             f"────────────────────────────────\n\n"
             f"You can view this tenant at:\n"
             f"  API: /api/v1/organizations/overview/{org.id}/\n\n"
-            f"— ZanFlow Platform"
+            f"— Dyuksa Platform"
         )
 
         try:
@@ -384,9 +384,10 @@ class TenantDetailView(APIView):
     """
     Super-admin only: Get detailed info for a specific tenant.
 
-    GET /api/v1/organizations/dashboard/<org_id>/
+    GET /api/v1/organizations/overview/<org_id>/
 
-    Returns full stats, all users, recent projects, and activity.
+    Returns full stats, all users, recent projects, activity,
+    and the platforms list showing which platforms the org has access to.
     """
 
     permission_classes = [IsSuperUser]
@@ -394,6 +395,7 @@ class TenantDetailView(APIView):
     def get(self, request, org_id):
         from apps.projects.models import Project
         from apps.tasksite.models import Task
+        from .models import Platform, PlatformAccess
 
         User = get_user_model()
 
@@ -417,7 +419,7 @@ class TenantDetailView(APIView):
         recent_projects = Project.original_objects.filter(
             organization=org
         ).order_by("-created_at").values(
-            "id", "name", "task_type", "is_active", "created_at"
+            "id", "name", "task_type", "status", "created_at"
         )[:10]
 
         # Recent tasks
@@ -427,19 +429,41 @@ class TenantDetailView(APIView):
             "id", "heading", "status", "priority", "created_at"
         )[:10]
 
+        # ── SSO: platforms list ───────────────────────────────────────────
+        # Fetch ALL active platforms and mark which ones this org has access to.
+        # Frontend renders a toggle per platform row — fully dynamic,
+        # no hardcoding needed. Adding ERP in future shows up automatically.
+        all_platforms = Platform.objects.filter(is_active=True).order_by("key")
+        granted_keys  = set(
+            PlatformAccess.objects.filter(
+                organization=org,
+                is_active=True,
+            ).values_list("platform__key", flat=True)
+        )
+        platforms_data = [
+            {
+                "key":        p.key,
+                "name":       p.name,
+                "has_access": p.key in granted_keys,
+            }
+            for p in all_platforms
+        ]
+        # ── End SSO addition ──────────────────────────────────────────────
+
         return Response({
             "organization": {
-                "id": org.id,
-                "name": org.name,
-                "slug": org.slug,
-                "is_active": org.is_active,
+                "id":         org.id,
+                "name":       org.name,
+                "slug":       org.slug,
+                "is_active":  org.is_active,
                 "created_at": org.created_at,
                 "updated_at": org.updated_at,
             },
-            "stats": stats,
-            "users": list(users),
+            "stats":           stats,
+            "users":           list(users),
             "recent_projects": list(recent_projects),
-            "recent_tasks": list(recent_tasks),
+            "recent_tasks":    list(recent_tasks),
+            "platforms":       platforms_data,
         })
 
 
@@ -1428,6 +1452,151 @@ class AddPlatformAccessView(APIView):
                     "access":  str(refresh.access_token),
                     "refresh": str(refresh),
                 },
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class TenantPlatformAccessView(APIView):
+    """
+    Super-admin only: Grant or revoke platform access for an organisation.
+
+    POST /api/v1/organizations/overview/<org_id>/platform-access/
+
+    Request body:
+        {
+            "platform": "hrms",   ← platform key: "pm", "hrms", "crm", etc.
+            "enable":   true      ← true = grant, false = revoke
+        }
+
+    Response:
+        {
+            "message":           "HRMS access enabled for Acme Corp.",
+            "org_id":            4,
+            "platform":          "hrms",
+            "is_active":         true,
+            "updated_platforms": ["pm", "hrms"]
+        }
+
+    updated_platforms returns the full current list for the org so the
+    frontend can update all toggles in one go without a separate GET call.
+
+    The change takes effect on the user's next login — their new JWT will
+    automatically reflect the updated platforms list.
+    """
+
+    permission_classes = [IsSuperUser]
+
+    def post(self, request, org_id):
+        from .models import Platform, PlatformAccess
+
+        # ── Validate org ──────────────────────────────────────────────────
+        try:
+            org = Organization.objects.get(id=org_id)
+        except Organization.DoesNotExist:
+            return Response(
+                {"detail": "Organization not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # ── Validate request body ─────────────────────────────────────────
+        platform_key = request.data.get("platform", "").strip().lower()
+        enable       = request.data.get("enable")
+
+        if not platform_key:
+            return Response(
+                {"detail": "platform field is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if enable is None:
+            return Response(
+                {"detail": "enable field is required (true or false)."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not isinstance(enable, bool):
+            return Response(
+                {"detail": "enable must be a boolean (true or false)."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # ── Validate platform exists ──────────────────────────────────────
+        try:
+            platform_obj = Platform.objects.get(key=platform_key)
+        except Platform.DoesNotExist:
+            return Response(
+                {
+                    "detail": f"Platform '{platform_key}' does not exist.",
+                    "available_platforms": list(
+                        Platform.objects.filter(is_active=True)
+                        .values_list("key", flat=True)
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # ── Grant or revoke ───────────────────────────────────────────────
+        if enable:
+            # Grant — get_or_create so it's safe to call multiple times
+            access, created = PlatformAccess.objects.get_or_create(
+                organization=org,
+                platform=platform_obj,
+                defaults={"is_active": True},
+            )
+            if not created and not access.is_active:
+                # Row exists but was previously revoked — reactivate it
+                access.is_active = True
+                access.save(update_fields=["is_active", "updated_at"])
+
+            action_msg = "enabled"
+            logger.info(
+                "Superuser granted platform access: org=%s, platform=%s, by=%s",
+                org.name, platform_key, request.user,
+            )
+        else:
+            # Revoke — set is_active=False (keeps the row for audit trail)
+            updated = PlatformAccess.objects.filter(
+                organization=org,
+                platform=platform_obj,
+            ).update(is_active=False)
+
+            if not updated:
+                return Response(
+                    {
+                        "detail": (
+                            f"Organisation '{org.name}' does not have "
+                            f"'{platform_key}' access to revoke."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            action_msg = "disabled"
+            logger.info(
+                "Superuser revoked platform access: org=%s, platform=%s, by=%s",
+                org.name, platform_key, request.user,
+            )
+
+        # ── Build updated platforms list ──────────────────────────────────
+        updated_platforms = list(
+            PlatformAccess.objects.filter(
+                organization=org,
+                is_active=True,
+                platform__is_active=True,
+            ).values_list("platform__key", flat=True)
+        )
+
+        return Response(
+            {
+                "message":           (
+                    f"{platform_obj.name} access {action_msg} "
+                    f"for '{org.name}'."
+                ),
+                "org_id":            org.id,
+                "platform":          platform_key,
+                "is_active":         enable,
+                "updated_platforms": updated_platforms,
             },
             status=status.HTTP_200_OK,
         )
