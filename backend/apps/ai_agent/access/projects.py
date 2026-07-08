@@ -7,7 +7,7 @@ Used by BOTH:
   - apps/ai_agent/search/query_builder.py    (AI Search)
 
 Verified byte-for-byte identical in both original implementations
-before this extraction: workspace_id, is_active=True, members=user.
+before this extraction: workspace_id, status="active", members=user.
 """
 
 
@@ -21,6 +21,5 @@ def get_user_project_queryset(user, workspace_id: str):
 
     return Project.objects.filter(
         workspace_id=workspace_id,
-        is_active=True,
         members=user,
     ).distinct()

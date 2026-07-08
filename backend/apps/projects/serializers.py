@@ -68,7 +68,8 @@ class ProjectSerializer(serializers.ModelSerializer):
         model = Project
         fields = [
             "id", "name", "description", "task_type",
-            "project_settings", "default_labels", "is_active","is_favourite",
+            "project_settings", "default_labels", 
+            "status", "is_favourite",  # Replaced is_active with status
             "created_by", "created_at", "updated_at",
             "labels","members","member_count", "document_count",
         ]
@@ -149,7 +150,8 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         model = Project
         fields = [
             "id", "name", "description", "task_type",
-            "project_settings", "default_labels", "assigned_members", "members"
+            "project_settings", "default_labels", "assigned_members", "members",
+            "status" # Added status here as well
         ]
         read_only_fields = ["id", "members"]
 
