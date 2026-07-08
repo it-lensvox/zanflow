@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Plus, X, FolderKanban, Folder, ChevronDown, Check, Move, Settings, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, Plus, X, FolderKanban, Folder, ChevronDown, Check, Move, Settings, ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal } from 'lucide-react';
 import { ViewToggle } from '@/components/layout/DualView';
 import { Pagination } from '@/components/ui/Pagination';
 import { formatRelativeTime } from '@/lib/utils';
@@ -15,6 +15,44 @@ import { StatusPill, TypePill, MemberAvatars } from './components/ProjectPills';
 import { SearchFilter, ListFilter, FilterHeaderWrapper } from '@/components/layout/DualView/FilterComponents';
 import { PROJECT_TYPE_OPTIONS } from '@/config/projectTypeConfig';
 
+/** Compact ellipsis menu — reused in both table rows and grid cards */
+function ProjectEllipsisMenu({ onOpen, onFav, isFav }: { onOpen: () => void; onFav: (e: React.MouseEvent) => void; isFav: boolean }) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <div style={{ position: 'relative', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+      <button
+        onClick={e => { e.stopPropagation(); setOpen(v => !v); }}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', borderRadius: 6, color: MUTED, display: 'flex', alignItems: 'center', opacity: 0 }}
+        className="group-hover/row:opacity-100 transition-opacity"
+        onMouseEnter={e => { e.currentTarget.style.background = '#F7F8FB'; e.currentTarget.style.opacity = '1'; }}
+        onMouseLeave={e => { if (!open) { e.currentTarget.style.background = 'none'; e.currentTarget.style.opacity = ''; } }}
+        title="More options"
+      >
+        <MoreHorizontal size={15} />
+      </button>
+      {open && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 10 }} onClick={() => setOpen(false)} />
+          <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 200, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(16,24,40,.12)', minWidth: 148, overflow: 'hidden' }}>
+            {[
+              { label: 'Open Project', action: (e: React.MouseEvent) => { e.stopPropagation(); setOpen(false); onOpen(); } },
+              { label: isFav ? 'Remove Favourite' : 'Add to Favourites', action: (e: React.MouseEvent) => { setOpen(false); onFav(e); } },
+            ].map(item => (
+              <button key={item.label} onClick={item.action}
+                style={{ width: '100%', padding: '8px 12px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: TEXT, textAlign: 'left', fontFamily: 'inherit' }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#F7F8FB')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 const th: React.CSSProperties = { textAlign: 'left', color: '#172033', fontSize: 14, fontWeight: 800, padding: '14px 16px', borderBottom: `1px solid ${LINE}`, borderRight: `1px solid ${LINE}`, background: '#f9fafb', whiteSpace: 'nowrap' as const, position: 'sticky', top: 0, zIndex: 1 };
 const td: React.CSSProperties = { padding: '14px 16px', borderBottom: `1px solid ${LINE}`, borderRight: `1px solid ${LINE}`, verticalAlign: 'middle', fontSize: 14, color: TEXT };
 
@@ -28,6 +66,7 @@ function ProjectThHeader({
   activeFilterKey,
   filterContent,
   filterContainerRef,
+  style: extraStyle,
 }: {
   label: string;
   columnKey: string;
@@ -37,6 +76,7 @@ function ProjectThHeader({
   activeFilterKey: string | null;
   filterContent?: React.ReactNode;
   filterContainerRef?: React.RefObject<HTMLDivElement>;
+  style?: React.CSSProperties;
 }) {
   const isActive = activeFilterKey === columnKey;
   const isSorted = sortConfig.key === columnKey;
@@ -75,7 +115,7 @@ function ProjectThHeader({
   return (
     <th
       className={`relative ${isActive ? 'z-[100]' : ''}`}
-      style={{ ...th, position: 'relative', zIndex: isActive ? 100 : 1 }}
+      style={{ ...th, position: 'relative', zIndex: isActive ? 100 : 1, ...extraStyle }}
       ref={isActive ? (filterContainerRef as any) : undefined}
     >
       <FilterHeaderWrapper
@@ -340,7 +380,7 @@ export function Projects() {
                 })()}
               </div>
 
-            ) : p.viewMode === 'grid' ? (
+           ) : p.viewMode === 'grid' ? (
               <div style={{ display: 'grid', gap: 16, padding: 20 }} className="project-grid">
                 {p.paginated.length === 0
                   ? <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: 48, color: MUTED }}><FolderKanban style={{ margin: '0 auto 12px', opacity: 0.3, width: 48, height: 48 }} /><p>No projects found</p></div>
@@ -351,10 +391,10 @@ export function Projects() {
               </div>
 
             ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <table style={{ width: '100%', minWidth: 900, borderCollapse: 'collapse', tableLayout: 'fixed' }}>
                 <thead>
                   <tr style={{ background: '#f9fafb' }}>
-                    <th style={{ ...th, width: 40 }}>
+                    <th style={{ ...th, width: 44, minWidth: 44, maxWidth: 44, textAlign: 'center', padding: '14px 4px' }}>
                       <input type="checkbox" checked={p.selectedIds.size === p.paginated.length && p.paginated.length > 0} onChange={p.toggleAll} style={{ accentColor: BLUE, width: 15, height: 15, cursor: 'pointer' }} />
                     </th>
                     <ProjectThHeader
@@ -365,6 +405,7 @@ export function Projects() {
                       onFilter={p.handleFilter}
                       activeFilterKey={p.activeFilterKey}
                       filterContainerRef={p.filterContainerRef}
+                      style={{ width: 'auto', minWidth: 200 }}
                       filterContent={
                         <SearchFilter
                           columnKey="name"
@@ -383,6 +424,7 @@ export function Projects() {
                       onFilter={p.handleFilter}
                       activeFilterKey={p.activeFilterKey}
                       filterContainerRef={p.filterContainerRef}
+                      style={{ width: '12%', minWidth: 110 }}
                       filterContent={
                         <ListFilter
                           columnKey="task_type"
@@ -410,14 +452,15 @@ export function Projects() {
                         />
                       }
                     />
-                    <ProjectThHeader
+                   <ProjectThHeader
                       label="Documents"
                       columnKey="document_count"
                       sortConfig={p.sortConfig}
                       onSort={p.handleTableSort}
                       activeFilterKey={p.activeFilterKey}
+                      style={{ width: '9%', minWidth: 80 }}
                     />
-                    <th style={th}>Members</th>
+                    <th style={{ ...th, width: '11%', minWidth: 100 }}>Members</th>
                     <ProjectThHeader
                       label="Status"
                       columnKey="status"
@@ -426,6 +469,7 @@ export function Projects() {
                       onFilter={p.handleFilter}
                       activeFilterKey={p.activeFilterKey}
                       filterContainerRef={p.filterContainerRef}
+                      style={{ width: '10%', minWidth: 90 }}
                       filterContent={
                         <ListFilter
                           columnKey="status"
@@ -454,8 +498,9 @@ export function Projects() {
                       sortConfig={p.sortConfig}
                       onSort={p.handleTableSort}
                       activeFilterKey={p.activeFilterKey}
+                      style={{ width: '11%', minWidth: 100 }}
                     />
-                    <th style={{ ...th, textAlign: 'center' }}>Favorite</th>
+                    <th style={{ ...th, width: '7%', minWidth: 70, textAlign: 'center' }}>Favorite</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -472,8 +517,8 @@ export function Projects() {
                     const color = getTypeHex((proj as any).task_type); const tint = getTypeBg((proj as any).task_type); const members = (proj as any).members || []; const isSel = p.selectedIds.has(proj.id); const isDetail = p.detailProject?.id === proj.id;
                     return (
                       <tr key={proj.id} onClick={() => p.handleDetailProject(proj)} onMouseEnter={() => p.handleRowHover(proj)} style={{ background: isSel ? '#f7faff' : idx % 2 === 0 ? '#fff' : '#fafbfc', cursor: 'pointer', borderLeft: isDetail ? `3px solid ${color}` : '3px solid transparent' }} onMouseOver={e => { if (!isSel && !isDetail) e.currentTarget.style.background = '#f3f4f6'; }} onMouseOut={e => { e.currentTarget.style.background = isSel ? '#f7faff' : idx % 2 === 0 ? '#fff' : '#fafbfc'; }}>
-                        <td style={{ ...td, width: 48 }}>
-                          {/* Avatar doubles as checkbox — hover reveals checkmark, click toggles selection */}
+                        <td style={{ ...td, width: 44, minWidth: 44, maxWidth: 44, padding: '14px 4px', textAlign: 'center' }}>
+                          {/* Avatar doubles as checkbox  */}
                           <div
                             className="group/avatar"
                             onClick={e => { e.stopPropagation(); p.toggleSelect(proj.id); }}
@@ -511,7 +556,16 @@ export function Projects() {
                             )}
                           </div>
                         </td>
-                        <td style={td}><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><span style={{ color: TEXT, fontWeight: 500 }}>{proj.name}</span></div></td>
+                        <td style={{ ...td, position: 'relative' }} className="group/row">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ color: TEXT, fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{proj.name}</span>
+                            <ProjectEllipsisMenu
+                              onOpen={() => { p.handleDetailProject(proj); p.navigate(`/projects/${proj.id}`); }}
+                              onFav={e => p.toggleFavorite(e, proj)}
+                              isFav={!!(proj as any).is_favourite}
+                            />
+                          </div>
+                        </td>
                         <td style={td}><TypePill type={(proj as any).task_type} /></td>
                         <td style={{ ...td, color: MUTED }}>{(proj as any).document_count ?? 0} docs</td>
                         <td style={td}><MemberAvatars members={members} /></td>

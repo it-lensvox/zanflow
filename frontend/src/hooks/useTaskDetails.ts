@@ -321,12 +321,17 @@ export function useProjectDetails() {
     const filteredTasks = useMemo(() => {
         const assigneeFilterValue = columnFilters['assigned_to'];
         if (!assigneeFilterValue) return filteredTasksFromHook;
+        if (assigneeFilterValue === '__empty__') {
+            return filteredTasksFromHook.filter((task: Task) =>
+                (task.assigned_to || []).length === 0,
+            );
+        }
         return filteredTasksFromHook.filter((task: Task) =>
             task.assigned_to.map(String).includes(String(assigneeFilterValue)),
         );
     }, [filteredTasksFromHook, columnFilters]);
 
-    // ─── Effects ──────────────────────────────────────────────────────────────────
+    // ─── Effects
     useEffect(() => {
         if (!documentsData) return;
         const allResults = documentsData?.results || documentsData || [];

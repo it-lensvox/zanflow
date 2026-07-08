@@ -657,10 +657,21 @@ export function TaskDetails() {
                                         {col.key === 'assigned_to' && (
                                           <ListFilter
                                             columnKey="assigned_to"
-                                            options={(ctx.usersData || []).map((u: any) => ({
-                                              value: String(u.id),
-                                              label: `${u.first_name} ${u.last_name}`.trim() || u.username,
-                                            }))}
+                                            options={[
+                                              {
+                                                value: '__empty__',
+                                                label: 'Empty',
+                                                icon: (
+                                                  <span style={{ width: 18, height: 18, borderRadius: '50%', border: '1.5px dashed #94a3b8', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                    <span style={{ fontSize: 9, color: '#94a3b8' }}>–</span>
+                                                  </span>
+                                                ),
+                                              },
+                                              ...(ctx.usersData || []).map((u: any) => ({
+                                                value: String(u.id),
+                                                label: `${u.first_name} ${u.last_name}`.trim() || u.username,
+                                              })),
+                                            ]}
                                             selectedValue={ctx.columnFilters['assigned_to'] || ''}
                                             onSelect={(v) => {
                                               ctx.setColumnFilters((p) => ({ ...p, assigned_to: v }));

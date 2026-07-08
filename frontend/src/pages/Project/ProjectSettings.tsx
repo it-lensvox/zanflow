@@ -208,8 +208,8 @@ export function ProjectSettings() {
     setAssignedTo([]);
     setIsFormDirty(false);
 
-    // Navigate back to projects
-    navigate('/projects');
+    // Close the modal and return to the project the user came from
+    navigate(`/projects/${id}`);
   };
 
   const handleCreateLabel = () => {
