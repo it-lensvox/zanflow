@@ -106,14 +106,13 @@ const NameCell = ({ tenant, onDelete }: NameCellProps) => (
   </div>
 );
 
-// ─── Status Toggle Cell ───────────────────────────────────────────────────────
-
+// ─── Status Toggle Cell 
 interface StatusToggleCellProps {
   tenant: Tenant;
   onToggled: (id: number, isActive: boolean) => void;
 }
 
-const StatusToggleCell = ({ tenant, onToggled }: StatusToggleCellProps) => {
+export const StatusToggleCell = ({ tenant, onToggled }: StatusToggleCellProps) => {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleToggle = async (e: React.MouseEvent) => {
@@ -164,7 +163,7 @@ const StatusToggleCell = ({ tenant, onToggled }: StatusToggleCellProps) => {
   );
 };
 
-// ─── Column Definitions ───────────────────────────────────────────────────────
+// ─── Column Definitions
 
 export const getWorkspaceTableColumns = (
   onDelete: (tenant: Tenant) => void,

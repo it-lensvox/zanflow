@@ -1513,6 +1513,82 @@ export interface OrganizationToggleStatusResponse {
   is_active: boolean;
 }
 
+// ─── Org Detail (GET /organizations/overview/<id>/)
+export interface OrgDetailUser {
+  id: number;
+  username: string;
+  email: string;
+  role: string;
+  last_login: string | null;
+  is_active: boolean;
+  is_superuser: boolean;
+  date_joined: string;
+}
+
+export interface OrgDetailProject {
+  id: number;
+  name: string;
+  task_type: string;
+  status: string;   // "active" | "draft" | etc. — NOT is_active (backend uses status field)
+  created_at: string;
+}
+
+export interface OrgDetailTask {
+  id: number;
+  heading: string;
+  status: string;
+  priority: string;
+  created_at: string;
+}
+
+/** A single platform entry — dynamic, never hardcode keys */
+export interface OrgDetailPlatform {
+  key: string;    // e.g. "pm", "hrms", "crm"
+  name: string;   // e.g. "Project Management", "HRMS", "CRM"
+  has_access: boolean;
+}
+
+/** Response from POST /organizations/overview/<id>/platform-access/ */
+export interface OrgPlatformToggleResponse {
+  message: string;
+  org_id: number;
+  platform: string;
+  is_active: boolean;
+  updated_platforms: string[];  // full list of active platform keys after the change
+}
+
+/** The actual API response shape from GET /organizations/overview/<id>/
+ *  Note: org info is nested under "organization" key, not flat */
+export interface OrgDetailApiResponse {
+  organization: {
+    id: number;
+    name: string;
+    slug: string;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+  };
+  stats: OrgStats;
+  users: OrgDetailUser[];
+  recent_projects: OrgDetailProject[];
+  recent_tasks: OrgDetailTask[];
+  platforms: OrgDetailPlatform[];
+}
+
+/** Flattened shape used internally by the frontend after normalisation */
+export interface OrgDetail {
+  id: number;
+  name: string;
+  slug: string;
+  is_active: boolean;
+  created_at: string;
+  stats: OrgStats;
+  users: OrgDetailUser[];
+  recent_projects: OrgDetailProject[];
+  recent_tasks: OrgDetailTask[];
+  platforms: OrgDetailPlatform[];
+}
+
 // ─── Quick Notes Types
 
 // Backend folder shape 
