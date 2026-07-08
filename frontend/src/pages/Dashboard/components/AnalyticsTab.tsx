@@ -5,8 +5,7 @@ import { DonutChart } from '@/components/charts/DonutChart';
 import { LineChart } from '@/components/charts/LineChart';
 import { Sparkline } from '@/components/charts/Sparkline';
 import { CARD, TEXT, MUTED, LINE, BLUE, BG, MONTH_BTN, SkeletonBlock } from '../index';
-import type { DashboardTask } from '../hooks/useDashboard';
-import type { Project } from '@/types';
+
 
 // ── Metric card with sparkline (top row)
 function MetricCard({
@@ -42,10 +41,10 @@ function MetricCard({
 }
 
 // ── Bar chart for throughput
-function ThroughputBar({ data, total }: { data: { label: string; count: number }[]; total: number }) {
+function ThroughputBar({ data }: { data: { label: string; count: number }[]; total: number }) {
   const maxVal = Math.max(...data.map(d => d.count), 1);
-  const today = new Date().getDay(); // 0=Sun,1=Mon,...
-  const todayIdx = today === 0 ? 6 : today - 1; // map to Mon=0
+  const today = new Date().getDay();
+  const todayIdx = today === 0 ? 6 : today - 1;
 
   return (
     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 100, paddingTop: 8 }}>
@@ -94,6 +93,7 @@ interface AnalyticsTabProps {
   showChartMonthPicker: boolean;
   setShowChartMonthPicker: (fn: (v: boolean) => boolean) => void;
   projectCount: number;
+  navigate: (path: string) => void;
 }
 
 export function AnalyticsTab({
@@ -101,7 +101,7 @@ export function AnalyticsTab({
   totalTasks, completedTasks, overdueTasks, completionRate, avgCycleTime,
   donut, donutTotal, leaderboard, throughputData, totalThroughput,
   chartSeries, chartLabels, selectedMonth, setSelectedMonth,
-  showChartMonthPicker, setShowChartMonthPicker, projectCount,
+  showChartMonthPicker, setShowChartMonthPicker, projectCount, navigate,
 }: AnalyticsTabProps) {
   const monthOptions = Array.from({ length: 6 }, (_, i) => {
     const d = new Date();
@@ -270,14 +270,13 @@ export function AnalyticsTab({
             leaderboard.map((p, i) => (
               <div
                 key={p.id}
-                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 4px', borderBottom: i < leaderboard.length - 1 ? `1px solid ${LINE}` : 'none', borderRadius: 6 }}
+                onClick={() => navigate(`/projects/${p.id}`)}
+                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 4px', borderBottom: i < leaderboard.length - 1 ? `1px solid ${LINE}` : 'none', borderRadius: 6, cursor: 'pointer' }}
                 onMouseEnter={e => (e.currentTarget.style.background = BG)}
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
-                {/* Rank */}
-                <span style={{ fontSize: 13, fontWeight: 700, color: MUTED, width: 16, textAlign: 'center', flexShrink: 0 }}>{i + 1}</span>
-                {/* Avatar */}
-                <div style={{ width: 28, height: 28, borderRadius: 7, background: p.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: '#fff', flexShrink: 0 }}>
+                {/* Avatar — uses tint bg + type color text, matching ProjectGridCard */}
+                <div style={{ width: 28, height: 28, borderRadius: 7, background: `${p.color}1f`, border: `1.5px solid ${p.color}33`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: p.color, flexShrink: 0 }}>
                   {(p.name || '?')[0].toUpperCase()}
                 </div>
                 {/* Name + count */}

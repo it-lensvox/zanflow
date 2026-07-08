@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { PROJECT_COLORS } from '@/config/statusColors';
+import { getTypeHex } from '@/config/projectTypeConfig';
 import type { DashboardTask } from './useDashboard';
 import type { Project } from '@/types';
 
@@ -43,9 +43,9 @@ export function useAnalyticsTab(
   ].filter(d => d.value > 0);
   const donutTotal = donut.reduce((s, d) => s + d.value, 0);
 
-  // Project leaderboard: % completion
+   // Project leaderboard:
   const leaderboard = useMemo(() => {
-    return projects.map((p, i) => {
+    return projects.map((p) => {
       const pt = allTasks.filter(t =>
         String((t as any).project) === String(p.id) ||
         (t as any).project_details?.name === p.name ||
@@ -58,12 +58,12 @@ export function useAnalyticsTab(
         name: p.name,
         taskCount: pt.length,
         pct,
-        color: PROJECT_COLORS[i % PROJECT_COLORS.length],
+        color: getTypeHex((p as any).task_type),
         members: (p as any).members || [],
       };
     })
       .filter(p => p.taskCount > 0)
-      .sort((a, b) => b.pct - a.pct)
+      .sort((a, b) => b.taskCount - a.taskCount || b.pct - a.pct)
       .slice(0, 6);
   }, [projects, allTasks]);
 

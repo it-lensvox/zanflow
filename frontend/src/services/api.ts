@@ -2203,6 +2203,15 @@ export const dashboardApi = {
   getDocuments: (params?: { page_size?: number; page?: number }) =>
     documentsApi.list({ page_size: params?.page_size ?? 200, page: params?.page ?? 1 }),
   getTasks: () => taskApi.list({ disable_pagination: true }),
+
+  getPreferences: async (): Promise<{ dashboard_date_range: string }> => {
+    const response = await api.get('/dashboard/preferences/');
+    return response.data;
+  },
+
+  savePreferences: async (prefs: { dashboard_date_range: string }): Promise<void> => {
+    await api.patch('/dashboard/preferences/', prefs);
+  },
 };
 
 // ── Social Auth API

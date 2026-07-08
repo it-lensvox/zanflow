@@ -1543,8 +1543,8 @@ export interface OrgDetailTask {
 
 /** A single platform entry — dynamic, never hardcode keys */
 export interface OrgDetailPlatform {
-  key: string;    // e.g. "pm", "hrms", "crm"
-  name: string;   // e.g. "Project Management", "HRMS", "CRM"
+  key: string;
+  name: string;
   has_access: boolean;
 }
 
@@ -1554,11 +1554,10 @@ export interface OrgPlatformToggleResponse {
   org_id: number;
   platform: string;
   is_active: boolean;
-  updated_platforms: string[];  // full list of active platform keys after the change
+  updated_platforms: string[];
 }
 
-/** The actual API response shape from GET /organizations/overview/<id>/
- *  Note: org info is nested under "organization" key, not flat */
+// The actual API response shape from GET /organizations/overview/<id>
 export interface OrgDetailApiResponse {
   organization: {
     id: number;
