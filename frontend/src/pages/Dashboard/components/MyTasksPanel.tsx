@@ -87,16 +87,11 @@ export function MyTasksPanel({
         tabTasks.map(task => (
           <div
             key={task.id}
-            onClick={() => navigate('/taskboard')}
+            onClick={() => navigate(`/tasks/${task.id}`)}
             style={{ display: 'grid', gridTemplateColumns: '1fr 110px 28px', alignItems: 'center', gap: 12, padding: '11px 6px', borderBottom: `1px solid #F3F4F6`, cursor: 'pointer' }}
             onMouseEnter={e => (e.currentTarget.style.background = BG)}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           >
-            {/* Status circle */}
-            {/* <div style={{ width: 17, height: 17, borderRadius: '50%', border: `2px solid ${task.status === 'completed' ? '#22C55E' : '#D1D5DB'}`, background: task.status === 'completed' ? '#22C55E' : 'transparent', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {task.status === 'completed' && <CheckCircle size={10} color="#fff" strokeWidth={3} />}
-            </div> */}
-
             {/* Title + project */}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: TEXT, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{task.heading}</div>

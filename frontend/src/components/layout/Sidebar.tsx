@@ -490,7 +490,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
                     className={({ isActive }) => cn("flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs transition-colors",
                       isActive ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-primary")}
                   >
-                    <Building2 className="h-3.5 w-3.5" /> Workspace
+                    <Building2 className="h-3.5 w-3.5" /> Organizations
                   </NavLink>
                 )}
               </div>

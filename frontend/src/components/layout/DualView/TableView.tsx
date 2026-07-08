@@ -7,6 +7,7 @@ export interface TableColumn<T> {
   className?: string;
   render?: (item: T, index: number) => React.ReactNode;
   headerClassName?: string;
+  hideControls?: boolean;
 }
 
 export type SortDirection = 'asc' | 'desc' | null;
@@ -75,28 +76,30 @@ export function TableView<T>({
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex-1 min-w-0">{column.label}</div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover/header:opacity-100 transition-opacity">
-                    {onSort && (
-                      <button
-                        className="hover:bg-gray-200 p-0.5 rounded transition-colors"
-                        onClick={(e) => { e.stopPropagation(); onSort(column.key); }}
-                      >
-                        <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
-                        </svg>
-                      </button>
-                    )}
-                    {onFilter && (
-                      <button
-                        className="hover:bg-gray-200 p-0.5 rounded transition-colors"
-                        onClick={(e) => { e.stopPropagation(); onFilter(column.key); }}
-                      >
-                        <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
+                  {!column.hideControls && (
+                    <div className="flex items-center gap-1 opacity-0 group-hover/header:opacity-100 transition-opacity">
+                      {onSort && (
+                        <button
+                          className="hover:bg-gray-200 p-0.5 rounded transition-colors"
+                          onClick={(e) => { e.stopPropagation(); onSort(column.key); }}
+                        >
+                          <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+                          </svg>
+                        </button>
+                      )}
+                      {onFilter && (
+                        <button
+                          className="hover:bg-gray-200 p-0.5 rounded transition-colors"
+                          onClick={(e) => { e.stopPropagation(); onFilter(column.key); }}
+                        >
+                          <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </th>
             ))}

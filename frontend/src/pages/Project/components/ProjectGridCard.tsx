@@ -95,7 +95,7 @@ export function ProjectGridCard({ project, selected, onSelect, onFav, onClick }:
                     { label: (project as any).is_favourite ? 'Remove Favourite' : 'Add to Favourites', action: (e: React.MouseEvent) => { setMenuOpen(false); onFav(e); } },
                   ].map(item => (
                     <button key={item.label} onClick={item.action}
-                      style={{ width: '100%', padding: '10px 14px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 14, color: TEXT, textAlign: 'left', fontFamily: 'inherit' }}
+                      style={{ width: '100%', padding: '8px 12px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: TEXT, textAlign: 'left', fontFamily: 'inherit' }}
                       onMouseEnter={e => (e.currentTarget.style.background = '#F7F8FB')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                     >

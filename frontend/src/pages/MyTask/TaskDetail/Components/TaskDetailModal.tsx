@@ -50,16 +50,16 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
                 {/* Header */}
                 <div className="flex items-center justify-between gap-3 sticky top-0 z-20"
                     style={{ padding: '14px 20px', borderBottom: `1px solid ${T.line}`, background: '#fff' }}>
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0" style={{ borderLeft: `3px solid ${T.blue}`, paddingLeft: 10 }}>
                         <div className="flex items-center gap-1.5 min-w-0">
                             {isEditingTitle ? (
                                 <input autoFocus value={editableTitle}
                                     onChange={e => setEditableTitle(e.target.value)}
                                     onBlur={() => setIsEditingTitle(false)}
                                     onKeyDown={e => e.key === 'Enter' && setIsEditingTitle(false)}
-                                    style={{ ...T.input, height: 28, fontSize: 15, fontWeight: 600, padding: '0 6px', flex: 1 }} />
+                                    style={{ ...T.input, height: 30, fontSize: 16, fontWeight: 700, padding: '0 8px', flex: 1 }} />
                             ) : (
-                                <h2 className="truncate" style={{ fontSize: 15, fontWeight: 700, color: T.text, lineHeight: 1.3 }}>
+                                <h2 className="truncate" style={{ fontSize: 16, fontWeight: 700, color: T.text, lineHeight: 1.3, letterSpacing: '-0.01em' }}>
                                     {editableTitle || 'Untitled task'}
                                 </h2>
                             )}
@@ -69,9 +69,11 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
                                 <Edit3 size={13} />
                             </button>
                         </div>
-                        <p className="truncate" style={{ fontSize: 12, color: T.muted, marginTop: 2 }}>
-                            {task.project_details?.name || task.project_name || 'No project'}
-                        </p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: T.blue, background: '#EEF4FF', border: '1px solid #C7D7FD', borderRadius: 5, padding: '1px 7px', letterSpacing: '0.01em', whiteSpace: 'nowrap', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block' }}>
+                                {task.project_details?.name || task.project_name || 'No project'}
+                            </span>
+                        </div>
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
                         <button onClick={handleSave} disabled={isSaving || !hasUnsavedChanges}
@@ -108,7 +110,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
                     </div>
                 </div>
             </div>
-          <TaskDetailConfirms detail={detail} task={task} />
+            <TaskDetailConfirms detail={detail} task={task} />
 
             {/* ── Child task modal — opens on top when child task row is clicked ── */}
             {childTask && (

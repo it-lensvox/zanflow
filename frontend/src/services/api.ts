@@ -98,10 +98,9 @@ api.interceptors.response.use(
     const originalRequest = error.config;
 
     if (isAuthError(error) && !originalRequest._retry) {
-      // Don't retry the refresh endpoint itself
       if (originalRequest.url?.includes('/auth/refresh')) {
-        stopProactiveRefresh(); // Add this
-        localStorage.clear();   // Wipes access, refresh, and active_workspace_id completely
+        stopProactiveRefresh(); 
+        localStorage.clear();  
         window.location.href = '/login';
         return Promise.reject(error);
       }
@@ -139,8 +138,6 @@ api.interceptors.response.use(
           localStorage.setItem('refresh_token', refresh);
         }
 
-        // ✅ Save to zanflow_tokens (used by WebSockets and getTokens())
-        // This ensures WebSocket reconnection picks up the new token
         setTokens({ access, refresh: refresh || refreshToken });
 
         // Update default header
@@ -157,8 +154,8 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
-        stopProactiveRefresh(); // Add this
-        localStorage.clear();   // Wipes everything
+        stopProactiveRefresh();
+        localStorage.clear();
         window.location.href = '/login';
         return Promise.reject(refreshError);
       } finally {
@@ -305,6 +302,27 @@ export const authApi = {
 
   getMe: async () => {
     const response = await api.get('/auth/me/');
+    return response.data;
+  },
+
+  /**
+   * Add a platform (e.g. "pm") to an existing Dyuksa account.
+   * Called when signup returns 409 EMAIL_ALREADY_EXISTS and the
+   * user confirms they want to add PM to their existing account.
+   */
+  addPlatform: async (email: string, password: string, platform: string) => {
+    const response = await api.post('/organizations/add-platform/', {
+      email,
+      password,
+      platform,
+    });
+    // Response contains new tokens with updated platforms array
+    if (response.data.access) {
+      setTokens({ access: response.data.access, refresh: response.data.refresh });
+      localStorage.setItem('access_token', response.data.access);
+      localStorage.setItem('refresh_token', response.data.refresh);
+      api.defaults.headers.common['Authorization'] = `Bearer ${response.data.access}`;
+    }
     return response.data;
   },
 
@@ -900,8 +918,37 @@ export const organizationsApi = {
     const response = await api.post(`/organizations/overview/${id}/toggle-status/`);
     return response.data;
   },
-};
 
+  /** GET /organizations/overview/<id>/ — full org detail incl. dynamic platforms list.
+   *  Backend returns nested { organization: {...}, stats, users, ... } — we flatten it here
+   *  so the rest of the frontend always works with a consistent OrgDetail shape. */
+  getDetail: async (id: number): Promise<import('@/types').OrgDetail> => {
+    const response = await api.get(`/organizations/overview/${id}/`);
+    const raw: import('@/types').OrgDetailApiResponse = response.data;
+    // Normalise: lift org fields to top level, merge with the rest
+    return {
+      ...raw.organization,
+      stats:           raw.stats,
+      users:           raw.users           ?? [],
+      recent_projects: raw.recent_projects ?? [],
+      recent_tasks:    raw.recent_tasks    ?? [],
+      platforms:       raw.platforms       ?? [],
+    };
+  },
+
+  /** Toggle a specific platform for an org (endpoint TBD — placeholder) */
+  togglePlatform: async (
+    orgId: number,
+    platform: string,
+    enable: boolean,
+  ): Promise<import('@/types').OrgPlatformToggleResponse> => {
+    const response = await api.post(
+      `/organizations/overview/${orgId}/platform-access/`,
+      { platform, enable },
+    );
+    return response.data;
+  },
+};
 // User ManagementAPI
 export const usersApi = {
   list: async () => {
@@ -2156,6 +2203,15 @@ export const dashboardApi = {
   getDocuments: (params?: { page_size?: number; page?: number }) =>
     documentsApi.list({ page_size: params?.page_size ?? 200, page: params?.page ?? 1 }),
   getTasks: () => taskApi.list({ disable_pagination: true }),
+
+  getPreferences: async (): Promise<{ dashboard_date_range: string }> => {
+    const response = await api.get('/dashboard/preferences/');
+    return response.data;
+  },
+
+  savePreferences: async (prefs: { dashboard_date_range: string }): Promise<void> => {
+    await api.patch('/dashboard/preferences/', prefs);
+  },
 };
 
 // ── Social Auth API

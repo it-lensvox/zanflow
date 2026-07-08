@@ -17,7 +17,7 @@ const Projects = lazy(() => import('@/pages/Project/Projects').then(m => ({ defa
 const ProjectSettings = lazy(() => import('@/pages/Project/ProjectSettings').then(m => ({ default: m.ProjectSettings })));
 const DocumentCreate = lazy(() => import('@/pages/Documents/DocumentCreate').then(m => ({ default: m.DocumentCreate })));
 const Documents = lazy(() => import('@/pages/Documents/Documents').then(m => ({ default: m.Documents })));
-const SharedWithMe = lazy(() => import('@/pages/Documents/SharedWithMe').then(m => ({ default: m.SharedWithMe })));const MyTask = lazy(() => import('@/pages/MyTask/MyTask').then(m => ({ default: m.MyTask })));
+const SharedWithMe = lazy(() => import('@/pages/Documents/SharedWithMe').then(m => ({ default: m.SharedWithMe }))); const MyTask = lazy(() => import('@/pages/MyTask/MyTask').then(m => ({ default: m.MyTask })));
 const CreateTask = lazy(() => import('@/pages/MyTask/pages/CreateTask/CreateTask').then(m => ({ default: m.CreateTask })));
 const TaskDetailPage = lazy(() => import('@/pages/MyTask/TaskDetail/TaskDetailPage').then(m => ({ default: m.TaskDetailPage })));
 const Teams = lazy(() => import('@/pages/TeamManagement/Teams').then(m => ({ default: m.Teams })));
@@ -36,6 +36,35 @@ const WorkSpace = lazy(() => import('@/pages/TeamManagement/Workspace/Workspace'
 const QuickNotesPage = lazy(() => import('@/pages/QuickNotes/QuickNotesPage').then(m => ({ default: m.QuickNotesPage })));
 const LandingPage = lazy(() => import('@/pages/LandingPage/LandingPage').then(m => ({ default: m.LandingPage })));
 const Signup = lazy(() => import('@/pages/SignUp/SignUp').then(m => ({ default: m.Signup })));
+
+/** Shown when the user's JWT does not include "pm" in platforms */
+function NoAccessPage() {
+  const { logout } = useAuth();
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-8 text-center bg-muted/30">
+      <div style={{ fontSize: 48 }}>🔒</div>
+      <h1 className="text-2xl font-bold">No PM Access</h1>
+      <p className="text-muted-foreground max-w-sm">
+        Your account does not have access to the Project Management platform.
+        Please contact your administrator to request access.
+      </p>
+      <div className="flex gap-3">
+        <button
+          className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90"
+          onClick={() => { window.location.href = 'mailto:support@dyuksa.com?subject=PM Access Request'; }}
+        >
+          Request Access
+        </button>
+        <button
+          className="px-4 py-2 rounded-md border text-sm font-medium hover:bg-accent"
+          onClick={logout}
+        >
+          Sign out
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // ── Error Boundary
 class ErrorBoundary extends Component<
@@ -90,7 +119,7 @@ function PageLoader() {
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { isAllowed, isLoading, isAuthenticated } = useAuth();
   const ALLOWED_ROLES: AppUser['role'][] = ['admin', 'manager', 'annotator', 'developer'];
-    const isAuthorized = isAllowed(ALLOWED_ROLES);
+  const isAuthorized = isAllowed(ALLOWED_ROLES);
 
   if (isLoading) {
     return (
@@ -180,30 +209,23 @@ function AppRoutes() {
         }
       />
 
-      <Route
-        path="/login"
-        element={
-          isAuthenticated
-            ? <Navigate to="/dashboard" replace />
-            : <Suspense fallback={<PageLoader />}><Login /></Suspense>
-        }
-      />
-
+      <Route path="/login" element={<Suspense fallback={<PageLoader />}><Login /></Suspense>} />
+      <Route path="/no-access" element={<NoAccessPage />} />
       <Route path="/welcome" element={<Suspense fallback={<PageLoader />}><LandingPage /></Suspense>} />
       <Route path="/signup" element={<Suspense fallback={<PageLoader />}><Signup /></Suspense>} />
 
 
       {/* Public — no auth required — invited user has no account yet */}
-<Route
-  path="/setup-account"
-  element={<Suspense fallback={<PageLoader />}><SetupAccount /></Suspense>}
-/>
-{/* Public Calendar View - no auth required */}
-<Route
-  path="/calendar/shared/:token"
-  element={<Suspense fallback={<PageLoader />}><SharedCalendarView /></Suspense>}
-/>
-{/* Routes WITH Sidebar */}
+      <Route
+        path="/setup-account"
+        element={<Suspense fallback={<PageLoader />}><SetupAccount /></Suspense>}
+      />
+      {/* Public Calendar View - no auth required */}
+      <Route
+        path="/calendar/shared/:token"
+        element={<Suspense fallback={<PageLoader />}><SharedCalendarView /></Suspense>}
+      />
+      {/* Routes WITH Sidebar */}
       <Route
         element={
           <ProtectedRoute>
@@ -211,9 +233,9 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       >
-       <Route path="/dashboard" element={<Suspense fallback={<PageLoader />}><Dashboard /></Suspense>} />
-       <Route path="/my-work" element={<MyWork />} />
-       <Route path="/profile" element={<Suspense fallback={<PageLoader />}><Profile /></Suspense>} />
+        <Route path="/dashboard" element={<Suspense fallback={<PageLoader />}><Dashboard /></Suspense>} />
+        <Route path="/my-work" element={<MyWork />} />
+        <Route path="/profile" element={<Suspense fallback={<PageLoader />}><Profile /></Suspense>} />
         <Route path="/resetPassword" element={<Suspense fallback={<PageLoader />}><ResetPassword /></Suspense>} />
         <Route path="/projects" element={<Suspense fallback={<PageLoader />}><Projects /></Suspense>} />
         <Route path="/projects/:id" element={<ProjectDetailWrapper />} />
@@ -234,10 +256,10 @@ function AppRoutes() {
         <Route path="/settings" element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
         <Route path="/quick-notes" element={<Suspense fallback={<PageLoader />}><QuickNotesPage /></Suspense>} />
         <Route path="/tasks/:id" element={<Suspense fallback={<PageLoader />}><TaskDetailPage /></Suspense>} />
-        
+
 
         {/* Taskboard Routes */}
-       <Route path="/taskboard" element={<Suspense fallback={<PageLoader />}><MyTask /></Suspense>}>
+        <Route path="/taskboard" element={<Suspense fallback={<PageLoader />}><MyTask /></Suspense>}>
           <Route index element={null} />
           <Route path="completed" element={null} />
           <Route path="pending" element={null} />

@@ -23,6 +23,7 @@ import type { TaskSelectionProps } from '@/components/layout/DualView/taskConfig
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { useJsonPreview } from '@/hooks/useJsonPreview';
 import { TaskPreviewOverlay } from '@/pages/Project/components/TaskPreviewOverlay';
+import { plainTextToHtml } from '@/lib/utils';
 
 //Date Field Dropdown
 function DateFieldDropdown({
@@ -313,7 +314,24 @@ export function TaskDetails() {
     if (!ctx.id) return;
     setIsBulkUploading(true);
     try {
-      await taskApi.bulkUpload(ctx.id, file);
+      // Convert plain-text descriptions to HTML before storing,
+      // so both view mode and edit mode show properly formatted content.
+      let uploadFile = file;
+      try {
+        const raw = await file.text();
+        const parsed = JSON.parse(raw);
+        if (parsed?.tasks && Array.isArray(parsed.tasks)) {
+          parsed.tasks = parsed.tasks.map((t: any) => ({
+            ...t,
+            description: t.description ? plainTextToHtml(t.description) : t.description,
+          }));
+          const converted = JSON.stringify(parsed);
+          uploadFile = new File([converted], file.name, { type: 'application/json' });
+        }
+      } catch {
+        // If parsing fails, fall through and let the API handle the error
+      }
+      await taskApi.bulkUpload(ctx.id, uploadFile);
       if (ctx.queryClient) {
         ctx.queryClient.invalidateQueries();
       }
@@ -657,10 +675,21 @@ export function TaskDetails() {
                                         {col.key === 'assigned_to' && (
                                           <ListFilter
                                             columnKey="assigned_to"
-                                            options={(ctx.usersData || []).map((u: any) => ({
-                                              value: String(u.id),
-                                              label: `${u.first_name} ${u.last_name}`.trim() || u.username,
-                                            }))}
+                                            options={[
+                                              {
+                                                value: '__empty__',
+                                                label: 'Empty',
+                                                icon: (
+                                                  <span style={{ width: 18, height: 18, borderRadius: '50%', border: '1.5px dashed #94a3b8', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                    <span style={{ fontSize: 9, color: '#94a3b8' }}>–</span>
+                                                  </span>
+                                                ),
+                                              },
+                                              ...(ctx.usersData || []).map((u: any) => ({
+                                                value: String(u.id),
+                                                label: `${u.first_name} ${u.last_name}`.trim() || u.username,
+                                              })),
+                                            ]}
                                             selectedValue={ctx.columnFilters['assigned_to'] || ''}
                                             onSelect={(v) => {
                                               ctx.setColumnFilters((p) => ({ ...p, assigned_to: v }));

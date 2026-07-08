@@ -596,9 +596,9 @@ export function Dashboard() {
             showChartMonthPicker={db.showChartMonthPicker}
             setShowChartMonthPicker={db.setShowChartMonthPicker}
             projectCount={db.totalProjects}
+            navigate={db.navigate}
           />
         )}
-
       </div>
 
       {/* ─── Modals ─── */}

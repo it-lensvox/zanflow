@@ -2,6 +2,7 @@ import { useEffect, useState, } from 'react';
 import { useNavigate, } from 'react-router-dom';
 import { Button, Input, Card, CardHeader, CardTitle, CardContent } from '@/components/common';
 import { authApi, startProactiveRefresh } from '@/services/api';
+import { hasPMAccess } from '@/utils/auth';
 import type { OrganizationSignupPayload } from '@/types';
 import { SocialAuthButtons } from '@/components/auth/SocialAuthButtons';
 import { CompanyNameModal } from '@/components/auth/CompanyNameModal';
@@ -65,6 +66,9 @@ export function Signup() {
     const [otpSending, setOtpSending] = useState(false);
     const [countdown, setCountdown] = useState(0);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const [addPlatformPrompt, setAddPlatformPrompt] = useState<{ email: string; password: string } | null>(null);
+    const [addPlatformPassword, setAddPlatformPassword] = useState('');
+    const [isAddingPlatform, setIsAddingPlatform] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
     const [pendingOAuthToken, setPendingOAuthToken] = useState<{ provider: SocialProvider; token: string } | null>(null);
@@ -117,6 +121,21 @@ export function Signup() {
                 });
             }, 1000);
         } catch (err: any) {
+            const status = err?.response?.status;
+            const responseData = err?.response?.data;
+            // Backend may return 409 OR 400 with an "already exists" message at OTP step
+            const isAlreadyExists =
+                status === 409 ||
+                (status === 400 && (
+                    responseData?.code === 'EMAIL_ALREADY_EXISTS' ||
+                    (responseData?.detail || responseData?.email?.[0] || '').toLowerCase().includes('already exist')
+                ));
+
+            if (isAlreadyExists) {
+                // Show the add-platform dialog; password will be entered in the dialog
+                setAddPlatformPrompt({ email: adminEmail, password: '' });
+                return;
+            }
             setError(err?.response?.data?.detail || err?.response?.data?.email?.[0] || 'Failed to send OTP');
         } finally {
             setOtpSending(false);
@@ -148,6 +167,15 @@ export function Signup() {
             showToast('Account created successfully!', 'success');
             setTimeout(() => { window.location.href = '/dashboard'; }, 1500);
         } catch (err: any) {
+            const status = err?.response?.status;
+            const code = err?.response?.data?.code;
+
+            // 409 EMAIL_ALREADY_EXISTS — offer to add PM to existing account
+            if (status === 409 && code === 'EMAIL_ALREADY_EXISTS') {
+                setAddPlatformPrompt({ email: adminEmail, password });
+                return;
+            }
+
             const msg =
                 err?.response?.data?.otp?.[0] ||
                 err?.response?.data?.detail ||
@@ -160,8 +188,70 @@ export function Signup() {
         }
     };
 
+   const handleAddPlatform = async () => {
+        if (!addPlatformPrompt) return;
+        // Use password from the dialog input (Step 1 flow) or from form state (Step 2 flow)
+        const pwd = addPlatformPassword || addPlatformPrompt.password;
+        if (!pwd) {
+            setError('Please enter your password to continue.');
+            return;
+        }
+        setIsAddingPlatform(true);
+        try {
+            await authApi.addPlatform(addPlatformPrompt.email, pwd, 'pm');
+            startProactiveRefresh();
+            setAddPlatformPrompt(null);
+            setAddPlatformPassword('');
+            showToast('PM access added! Redirecting…', 'success');
+            setTimeout(() => { window.location.href = '/dashboard'; }, 1500);
+        } catch (err: any) {
+            setError(err?.response?.data?.detail || 'Failed to add platform. Please check your password.');
+            setAddPlatformPrompt(null);
+            setAddPlatformPassword('');
+        } finally {
+            setIsAddingPlatform(false);
+        }
+    };
+
     return (
         <div className="min-h-screen flex items-center justify-center bg-muted/50">
+            {/* 409 Add-platform confirmation dialog */}
+           {addPlatformPrompt && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4">
+                        <h2 className="text-lg font-bold mb-2">Account already exists</h2>
+                        <p className="text-sm text-muted-foreground mb-4">
+                            You already have a Dyuksa account with <strong>{addPlatformPrompt.email}</strong>. Would you like to add <strong>Project Management</strong> to your existing account?
+                        </p>
+                        {/* Password field — needed when triggered from Step 1 where password hasn't been entered yet */}
+                        {!addPlatformPrompt.password && (
+                            <input
+                                type="password"
+                                placeholder="Enter your existing account password"
+                                value={addPlatformPassword}
+                                onChange={e => setAddPlatformPassword(e.target.value)}
+                                className="w-full border rounded-lg px-3 py-2 text-sm mb-4 outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                                autoFocus
+                            />
+                        )}
+                        <div className="flex gap-3">
+                            <button
+                                onClick={handleAddPlatform}
+                                disabled={isAddingPlatform || (!addPlatformPrompt.password && !addPlatformPassword)}
+                                className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 disabled:opacity-60"
+                            >
+                                {isAddingPlatform ? 'Adding…' : 'Yes, add PM access'}
+                            </button>
+                            <button
+                                onClick={() => { setAddPlatformPrompt(null); setAddPlatformPassword(''); }}
+                                className="flex-1 py-2 rounded-lg border text-sm font-medium hover:bg-accent"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             {toast && (
                 <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
             )}

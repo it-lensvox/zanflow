@@ -375,24 +375,30 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
             [&_.ProseMirror]:outline-none
             [&_.ProseMirror]:min-h-[150px]
             [&_.ProseMirror]:relative
+            [&_.ProseMirror]:text-[13px]
+            [&_.ProseMirror]:leading-relaxed
+            [&_.ProseMirror]:text-[#07090d]
+            [&_.ProseMirror_p]:text-[13px]
+            [&_.ProseMirror_p]:leading-relaxed
+            [&_.ProseMirror_p]:mb-2
             [&_.ProseMirror_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)]
             [&_.ProseMirror_p.is-editor-empty:first-child::before]:text-gray-400
-            [&_.ProseMirror_p.is-editor-empty:first-child::before]:absolute 
+            [&_.ProseMirror_p.is-editor-empty:first-child::before]:absolute
             [&_.ProseMirror_p.is-editor-empty:first-child::before]:left-0
-            [&_.ProseMirror_p.is-editor-empty:first-child::before]:top-0 
+            [&_.ProseMirror_p.is-editor-empty:first-child::before]:top-0
             [&_.ProseMirror_p.is-editor-empty:first-child::before]:pointer-events-none
-            [&_.ProseMirror_h1]:text-3xl
-            [&_.ProseMirror_h1]:font-bold
-            [&_.ProseMirror_h1]:mt-6
-            [&_.ProseMirror_h1]:mb-3
-            [&_.ProseMirror_h2]:text-2xl
-            [&_.ProseMirror_h2]:font-bold
-            [&_.ProseMirror_h2]:mt-5
-            [&_.ProseMirror_h2]:mb-2
-            [&_.ProseMirror_h3]:text-xl
+            [&_.ProseMirror_h1]:text-lg
+            [&_.ProseMirror_h1]:font-semibold
+            [&_.ProseMirror_h1]:mt-4
+            [&_.ProseMirror_h1]:mb-2
+            [&_.ProseMirror_h2]:text-base
+            [&_.ProseMirror_h2]:font-semibold
+            [&_.ProseMirror_h2]:mt-3
+            [&_.ProseMirror_h2]:mb-1
+            [&_.ProseMirror_h3]:text-[13px]
             [&_.ProseMirror_h3]:font-semibold
-            [&_.ProseMirror_h3]:mt-4
-            [&_.ProseMirror_h3]:mb-2
+            [&_.ProseMirror_h3]:mt-2
+            [&_.ProseMirror_h3]:mb-1
             [&_.ProseMirror_ul]:list-disc
             [&_.ProseMirror_ul]:pl-6
             [&_.ProseMirror_ul]:my-2
