@@ -23,6 +23,7 @@ import type { TaskSelectionProps } from '@/components/layout/DualView/taskConfig
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { useJsonPreview } from '@/hooks/useJsonPreview';
 import { TaskPreviewOverlay } from '@/pages/Project/components/TaskPreviewOverlay';
+import { plainTextToHtml } from '@/lib/utils';
 
 //Date Field Dropdown
 function DateFieldDropdown({
@@ -313,7 +314,24 @@ export function TaskDetails() {
     if (!ctx.id) return;
     setIsBulkUploading(true);
     try {
-      await taskApi.bulkUpload(ctx.id, file);
+      // Convert plain-text descriptions to HTML before storing,
+      // so both view mode and edit mode show properly formatted content.
+      let uploadFile = file;
+      try {
+        const raw = await file.text();
+        const parsed = JSON.parse(raw);
+        if (parsed?.tasks && Array.isArray(parsed.tasks)) {
+          parsed.tasks = parsed.tasks.map((t: any) => ({
+            ...t,
+            description: t.description ? plainTextToHtml(t.description) : t.description,
+          }));
+          const converted = JSON.stringify(parsed);
+          uploadFile = new File([converted], file.name, { type: 'application/json' });
+        }
+      } catch {
+        // If parsing fails, fall through and let the API handle the error
+      }
+      await taskApi.bulkUpload(ctx.id, uploadFile);
       if (ctx.queryClient) {
         ctx.queryClient.invalidateQueries();
       }

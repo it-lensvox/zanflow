@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import {
-    X, Loader2, ChevronDown, Send,
-    Clock, CheckCircle, Plus,
-    Link, Sparkles, ChevronRight, Calendar, Edit3, Trash2,
+    X, Loader2, ChevronDown, Send, Clock, CheckCircle, Plus, Link, Sparkles, ChevronRight, Calendar, Edit3, Trash2,
 } from 'lucide-react';
 import { getStatusConfig } from '@/components/layout/DualView/taskConfig';
 import { TASK_STATUS_OPTIONS } from '@/config/statusColors';
@@ -12,6 +10,7 @@ import { DocumentThumbnail, DocumentPreview } from '@/components/common/Document
 import { AISuggestionPanel } from './AISuggestionPanel';
 import { useTaskDetail } from '../hooks/useTaskDetail';
 import { TaskDetailModal } from './TaskDetailModal';
+import { plainTextToHtml } from '@/lib/utils';
 
 // ── Design tokens 
 export const T = {
@@ -55,7 +54,7 @@ export const DescriptionContent = ({ html }: { html: string }) => (
             '[&_td]:border [&_td]:border-gray-200 [&_td]:p-1.5 [&_th]:border [&_th]:border-gray-200 [&_th]:p-1.5 [&_th]:bg-gray-50 [&_th]:font-semibold',
         ].join(' ')}
         style={{ fontSize: 13, color: T.muted }}
-        dangerouslySetInnerHTML={{ __html: html }}
+        dangerouslySetInnerHTML={{ __html: plainTextToHtml(html) }}
     />
 );
 

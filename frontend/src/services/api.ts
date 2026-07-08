@@ -308,6 +308,27 @@ export const authApi = {
     return response.data;
   },
 
+  /**
+   * Add a platform (e.g. "pm") to an existing Dyuksa account.
+   * Called when signup returns 409 EMAIL_ALREADY_EXISTS and the
+   * user confirms they want to add PM to their existing account.
+   */
+  addPlatform: async (email: string, password: string, platform: string) => {
+    const response = await api.post('/organizations/add-platform/', {
+      email,
+      password,
+      platform,
+    });
+    // Response contains new tokens with updated platforms array
+    if (response.data.access) {
+      setTokens({ access: response.data.access, refresh: response.data.refresh });
+      localStorage.setItem('access_token', response.data.access);
+      localStorage.setItem('refresh_token', response.data.refresh);
+      api.defaults.headers.common['Authorization'] = `Bearer ${response.data.access}`;
+    }
+    return response.data;
+  },
+
   // Skills API
   updateSkills: async (skills: string[]) => {
     const response = await api.patch('/auth/me/', { skills });

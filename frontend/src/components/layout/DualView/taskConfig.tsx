@@ -786,6 +786,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
   const avatarCol: TableColumn<Task> | null = selectionProps ? {
     key: '__select__',
     width: '5%',
+    hideControls: true,
     label: (() => {
       const allSelected = selectionProps.visibleTasks.length > 0 &&
         selectionProps.visibleTasks.every(t => selectionProps.selectedIds.has(t.id));

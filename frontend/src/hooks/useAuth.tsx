@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { authApi, getTokens, setTokens, API_URL } from '@/services/api';
 import { saveCredentials, clearCredentials } from '@/services/authStorage';
+import { hasPMAccess } from '@/utils/auth';
 
 import type { User, AuthTokens } from '@/types';
 
@@ -29,6 +30,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const tokens = getTokens();
 
       if (tokens?.access) {
+        // Platform guard on every boot — covers direct URL access and page refresh
+        if (!hasPMAccess()) {
+          setIsLoading(false);
+          navigate('/no-access');
+          return;
+        }
         try {
           const userData = await authApi.getMe();
           setUser(userData);
@@ -130,6 +137,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (username: string, password: string) => {
     await authApi.login(username, password);
     saveCredentials(username, password);
+
+    // Platform guard: check JWT before fetching user or navigating
+    if (!hasPMAccess()) {
+      navigate('/no-access');
+      return;
+    }
 
     const userData = await authApi.getMe();
     setUser(userData);
