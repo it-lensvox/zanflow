@@ -259,3 +259,101 @@ class TenantModel(models.Model):
                 self.workspace_id = ws_id
 
         super().save(*args, **kwargs)
+
+
+# ---------------------------------------------------------------------------
+# Platform — master registry of all Dyuksa products
+# ---------------------------------------------------------------------------
+
+class Platform(models.Model):
+    """
+    Master list of every Dyuksa product/platform.
+
+    Adding a new platform (e.g. ERP) in the future requires NO code change —
+    simply insert a new row here via the Django admin or a management command.
+
+    key  : short identifier used inside JWT tokens and permission checks
+           e.g. "pm", "hrms", "crm", "erp"
+    name : human-readable label shown in the Superuser Admin Panel
+    is_active : global kill-switch — if False, no org can be granted this
+                platform and existing grants are ignored in JWT generation
+    """
+
+    key = models.CharField(
+        max_length=20,
+        unique=True,
+        help_text='Short identifier used in JWT e.g. "pm", "hrms", "crm", "erp"',
+    )
+    name = models.CharField(
+        max_length=100,
+        help_text='Human-readable name e.g. "Project Management"',
+    )
+    description = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Optional short description shown in the Admin Panel.",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Global switch — disable to hide this platform from all orgs.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["key"]
+        verbose_name = "Platform"
+        verbose_name_plural = "Platforms"
+
+    def __str__(self) -> str:
+        status = "" if self.is_active else " [disabled]"
+        return f"{self.name} ({self.key}){status}"
+
+
+# ---------------------------------------------------------------------------
+# PlatformAccess — links an Organisation to the platforms it can use
+# ---------------------------------------------------------------------------
+
+class PlatformAccess(models.Model):
+    """
+    Records which Dyuksa platforms an Organisation is permitted to access.
+
+    One row per platform per org.  The Dyuksa superuser manages these rows
+    via the Admin Panel.  The custom JWT serializer reads this table to
+    build the 'platforms' list that goes into every issued token.
+
+    Because Platform is now a proper DB table, adding "erp" or any future
+    product requires only a new Platform row — no model change, no migration,
+    no redeployment.
+
+    NOTE: Intentionally NOT a TenantModel — must be readable at login time
+    before any workspace context is set.
+    """
+
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="platform_access",
+    )
+    platform = models.ForeignKey(
+        Platform,
+        on_delete=models.CASCADE,
+        related_name="org_access",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Per-org switch — disable to revoke this org's access without deleting the row.",
+    )
+    granted_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("organization", "platform")
+        verbose_name = "Platform Access"
+        verbose_name_plural = "Platform Access"
+        ordering = ["organization", "platform__key"]
+
+    def __str__(self) -> str:
+        status = "active" if self.is_active else "inactive"
+        return f"{self.organization.name} → {self.platform.key} ({status})"

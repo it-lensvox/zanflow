@@ -185,3 +185,77 @@ class ContactMessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ContactMessage
         fields = ['name', 'email', 'company', 'problem','source']
+
+# ---------------------------------------------------------------------------
+# DyuksaTokenObtainPairSerializer — custom JWT serializer for SSO
+# ---------------------------------------------------------------------------
+
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
+
+class DyuksaTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """
+    Extends the default simplejwt serializer to inject SSO claims into
+    every JWT issued by the PM backend (Central Auth).
+
+    Extra claims added to the token payload:
+        email       — user's email address
+        role        — user's role within their organisation
+        org_id      — organisation primary key
+        org_slug    — organisation slug (used for URL routing on frontends)
+        org_name    — organisation display name
+        platforms   — list of platform keys the org is currently allowed to
+                      access e.g. ["pm", "hrms"]
+
+    These claims are read by:
+        - HRMS / CRM Django backends  → to verify platform access on every request
+        - React frontends             → to show/hide platform navigation
+        - Superuser Panel             → not used (superuser has direct DB access)
+
+    IMPORTANT: This serializer does NOT change the login endpoint URL or
+    request/response shape.  The only difference is the token payload is
+    now richer.  All existing login flows (email/password, OAuth, invitation
+    accept) continue to work exactly as before.
+    """
+
+    @classmethod
+    def get_token(cls, user):
+        # Get the base token from simplejwt (contains user_id, exp, jti, etc.)
+        token = super().get_token(user)
+
+        # ── Basic user claims ─────────────────────────────────────────────
+        token["email"] = user.email
+        token["role"]  = user.role
+
+        # ── Organisation claims ───────────────────────────────────────────
+        # Guard against users with no organisation (e.g. superuser created
+        # directly in Django admin without going through TenantSignupView)
+        if user.organization_id is not None:
+            token["org_id"]   = user.organization_id
+            token["org_slug"] = user.organization.slug
+            token["org_name"] = user.organization.name
+
+            # ── Platform access claims ────────────────────────────────────
+            # Query PlatformAccess for this org — only include platforms
+            # that are active both at the org level AND the global level.
+            # This query is intentionally kept outside TenantManager scope
+            # because PlatformAccess is not a TenantModel.
+            from apps.organizations.models import PlatformAccess
+
+            platforms = list(
+                PlatformAccess.objects.filter(
+                    organization_id=user.organization_id,
+                    is_active=True,                  # org-level switch
+                    platform__is_active=True,        # global platform switch
+                ).values_list("platform__key", flat=True)
+            )
+            token["platforms"] = platforms
+        else:
+            # Superuser or admin account with no org — grant no platform access
+            # via JWT (they use the Django admin panel directly instead)
+            token["org_id"]   = None
+            token["org_slug"] = None
+            token["org_name"] = None
+            token["platforms"] = []
+
+        return token
