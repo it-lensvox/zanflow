@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useSearchParams, useOutletContext } from 'react-router-dom';
-import { FileText, Search, X, Upload, Plus, Folder, ChevronDown, Check } from 'lucide-react';
+import { FileText, Search, Upload, ChevronDown, Check, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { useTableFilters } from '@/hooks/useTableFilters';
+import { SearchFilter, ListFilter } from '@/components/layout/DualView/FilterComponents';
 import { TreePanel } from './components/TreePanel';
 import { getTypeHex } from '@/pages/Project/projectConstants';
 import type { TreeFolder } from './components/TreePanel';
@@ -55,7 +57,7 @@ export function Documents() {
   const sharedParam = searchParams.get('shared') === 'true';
   const [activeHighlightId, setActiveHighlightId] = React.useState(highlightDocId);
 
-  // ── UI state ─────────────────────────────────────────────────────────────
+  // ── UI state
   const [searchTerm, setSearchTerm] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
@@ -73,19 +75,15 @@ export function Documents() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [sidebarDoc, setSidebarDoc] = useState<Document | null>(null);
   const [sidebarPreviewUrl, setSidebarPreviewUrl] = useState<string | null>(null);
-  const [showNewDocModal, setShowNewDocModal] = useState(false);
-  const [newDocName, setNewDocName] = useState('');
-  const [newDocContent, setNewDocContent] = useState('');
-  const [newDocFormat, setNewDocFormat] = useState('txt');
-  const [customFormat, setCustomFormat] = useState('');
   const [moveConfirmModal, setMoveConfirmModal] = useState<{ isOpen: boolean; documentIds: string[]; targetName: string; targetProjectId: number; targetFolderId: string | null } | null>(null);
   const [toast, setToast] = useState<{ isOpen: boolean; type: 'success' | 'error'; message: string } | null>(null);
   const [currentPage,        setCurrentPage]        = useState(1);
   const [sortBy,             setSortBy]             = useState<'updated_at' | 'created_at'>('updated_at');
-  const [rowsPerPage,        setRowsPerPage]        = useState(25);
+  const [rowsPerPage,        setRowsPerPage]        = useState(20);
   const [showProjectDrop,    setShowProjectDrop]    = useState(false);
   const [showTypeDrop,       setShowTypeDrop]       = useState(false);
   const { viewMode, setViewMode } = useViewMode({ defaultMode: 'table' });
+ const [gridSelectionMode, setGridSelectionMode] = useState(false);
 
   React.useEffect(() => { setCurrentPage(1); }, [projectFilter, fileTypeFilter, searchTerm]);
   React.useEffect(() => { queryClient.invalidateQueries({ queryKey: ['documents'] }); }, []);
@@ -178,6 +176,30 @@ export function Documents() {
     }).sort((a: Document, b: Document) => new Date(b[sortBy]).getTime() - new Date(a[sortBy]).getTime());
   })();
 
+  // ── Column sort/filter (reuses useTableFilters, same as Projects) ──────────
+  const docFilterConfig = [
+    { key: 'name',         type: 'search' as const },
+    { key: 'project_name', type: 'search' as const },
+    { key: 'status',       type: 'list'   as const },
+    { key: 'updated_at',   type: 'date'   as const },
+  ];
+  const {
+    filteredData: columnFilteredDocuments,
+    sortConfig,
+    handleSort: handleTableSort,
+    columnFilters,
+    setColumnFilters,
+    clearFilter,
+    activeFilterKey,
+    setActiveFilterKey,
+    filterContainerRef,
+  } = useTableFilters<Document>({ data: displayedDocuments, columns: docFilterConfig });
+
+  const handleFilter = useCallback(
+    (key: string) => setActiveFilterKey(prev => (prev === key ? null : key)),
+    [setActiveFilterKey],
+  );
+
   // ── Tree folder structure 
   const backendFolders = (foldersData || []) as { id: string; project: number; parent: string | null; name: string; is_system_generated?: boolean; document_count?: number; created_at: string }[];
   const treeFolders: TreeFolder[] = (() => {
@@ -198,7 +220,7 @@ export function Documents() {
   const removeFilter = (k: string) => { if (k === 'search') setSearchTerm(''); else updateFilter(k, ''); };
   const handleDeleteClick = (e: React.MouseEvent, doc: Document) => { e.stopPropagation(); setDeleteConfirm({ id: doc.id, name: doc.name }); };
   const toggleSelect = (id: string) => setSelectedDocs(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  const toggleSelectAll = () => { if (selectedDocs.size === displayedDocuments.length) setSelectedDocs(new Set()); else setSelectedDocs(new Set(displayedDocuments.map((d: Document) => d.id))); };
+  const toggleSelectAll = () => { if (selectedDocs.size === displayedDocuments.length) { setSelectedDocs(new Set()); setGridSelectionMode(false); } else setSelectedDocs(new Set(displayedDocuments.map((d: Document) => d.id))); };
 
   const handleBulkDelete = async () => { for (const id of Array.from(selectedDocs)) { try { await documentsApi.delete(id); } catch (e) { console.error(e); } } setSelectedDocs(new Set()); setBulkDeleteConfirm(false); queryClient.invalidateQueries({ queryKey: ['documents'] }); };
   const handleBulkChangeStatus = async (newStatus: DocumentStatus) => { for (const id of Array.from(selectedDocs)) { try { await documentsApi.updateStatus(id, newStatus); } catch (e) { console.error(e); } } setSelectedDocs(new Set()); queryClient.invalidateQueries({ queryKey: ['documents'] }); };
@@ -229,15 +251,116 @@ export function Documents() {
     catch (e: any) { alert(e.response?.data?.detail || 'Failed to rename folder'); }
   };
 
-  // ── Table columns 
+  // ── Table columns
   const baseColumns = createDocumentsTableColumns({ onDeleteClick: handleDeleteClick, onInfoClick: (d: Document) => setInfoDoc(d), onShareClick: (d: Document) => setShareDoc(d) });
-  const checkboxColumn: TableColumn<Document> = {
+
+  // Avatar-as-checkbox column — same pattern as Project table
+  const avatarSelectColumn: TableColumn<Document> = {
     key: '_select' as any,
-    label: <input type="checkbox" checked={selectedDocs.size === displayedDocuments.length && displayedDocuments.length > 0} onChange={toggleSelectAll} style={{ accentColor: BLUE, width: 18, height: 18, cursor: 'pointer' }} />,
-    render: (doc: Document) => <input type="checkbox" checked={selectedDocs.has(doc.id)} onChange={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); toggleSelect(doc.id); }} style={{ accentColor: BLUE, width: 18, height: 18, cursor: 'pointer' }} />,
-    width: '40px',
+    width: '44px',
+    label: (
+      <input
+        type="checkbox"
+        checked={selectedDocs.size === columnFilteredDocuments.length && columnFilteredDocuments.length > 0}
+        onChange={toggleSelectAll}
+        style={{ accentColor: BLUE, width: 15, height: 15, cursor: 'pointer' }}
+      />
+    ),
+    render: (doc: Document) => {
+      const isSel = selectedDocs.has(doc.id);
+      const pType = (doc as any).project_task_type || '';
+      const color = getTypeHex(pType);
+      const extLabel = (doc.name || '').split('.').pop()?.toUpperCase()?.slice(0, 4) || 'FILE';
+      return (
+        <div
+          onClick={e => { e.stopPropagation(); toggleSelect(doc.id); }}
+          title={isSel ? 'Deselect' : 'Select'}
+          style={{ position: 'relative', width: 32, height: 32, borderRadius: 6, cursor: 'pointer', margin: '0 auto', flexShrink: 0 }}
+        >
+          <div style={{
+            width: 32, height: 32, borderRadius: 6,
+            background: isSel ? color : `${color}18`,
+            border: isSel ? `1.5px solid ${color}` : `1px solid ${color}30`,
+            display: 'grid', placeItems: 'center',
+            color: isSel ? '#fff' : color,
+            fontWeight: 700, fontSize: 9, letterSpacing: '.04em', lineHeight: 1,
+            transition: 'background 0.15s, color 0.15s',
+          }}>
+            {isSel ? <Check size={13} strokeWidth={3} /> : extLabel}
+          </div>
+          {!isSel && (
+            <div
+              style={{ position: 'absolute', inset: 0, borderRadius: 6, background: `${color}cc`, display: 'grid', placeItems: 'center', opacity: 0, transition: 'opacity 0.15s' }}
+              onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+              onMouseLeave={e => e.currentTarget.style.opacity = '0'}
+            >
+              <Check size={13} color="#fff" strokeWidth={3} />
+            </div>
+          )}
+        </div>
+      );
+    },
   };
-  const columnsWithCheckbox = [checkboxColumn, ...baseColumns];
+
+  // Sortable/filterable column header — same as ProjectThHeader in Projects.tsx
+  const DocThHeader = ({ label, columnKey, onSort, onFilter: onFilterProp, filterContent }: {
+    label: string; columnKey: string;
+    onSort?: (k: string) => void; onFilter?: (k: string) => void;
+    filterContent?: React.ReactNode;
+  }) => {
+    const isSorted = sortConfig.key === columnKey;
+    const isActive = activeFilterKey === columnKey;
+    const SortIcon = isSorted ? (sortConfig.direction === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown;
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <span style={{ flex: 1, fontSize: 12, fontWeight: 800, color: '#172033' }}>{label}</span>
+        {onSort && (
+          <button onClick={e => { e.stopPropagation(); onSort(columnKey); }} style={{ background: isSorted ? '#EEF4FF' : 'none', border: 'none', cursor: 'pointer', padding: '2px 3px', borderRadius: 4, display: 'flex', alignItems: 'center', color: isSorted ? BLUE : '#9CA3AF' }}>
+            <SortIcon size={11} />
+          </button>
+        )}
+        {onFilterProp && (
+          <button onClick={e => { e.stopPropagation(); onFilterProp(columnKey); }} style={{ background: isActive ? '#EEF4FF' : 'none', border: 'none', cursor: 'pointer', padding: '2px 3px', borderRadius: 4, display: 'flex', alignItems: 'center', color: isActive ? BLUE : '#9CA3AF' }}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+          </button>
+        )}
+        {isActive && filterContent}
+      </div>
+    );
+  };
+
+  // Build the full column set: avatar selector + sortable/filterable data columns
+  const columnsWithCheckbox = [
+    avatarSelectColumn,
+    ...baseColumns.map(col => {
+      if (col.key === 'name') return {
+        ...col, width: '220px',
+        label: <DocThHeader label="Document" columnKey="name" onSort={handleTableSort} onFilter={handleFilter}
+          filterContent={<SearchFilter columnKey="name" placeholder="Search name…" value={columnFilters['name'] || ''} onChange={v => setColumnFilters(p => ({ ...p, name: v }))} isActive={activeFilterKey === 'name'} />}
+        />,
+      };
+      if (col.key === 'project') return {
+        ...col, width: '220px',
+        label: <DocThHeader label="Project" columnKey="project_name" onSort={handleTableSort} onFilter={handleFilter}
+          filterContent={<SearchFilter columnKey="project_name" placeholder="Search project…" value={columnFilters['project_name'] || ''} onChange={v => setColumnFilters(p => ({ ...p, project_name: v }))} isActive={activeFilterKey === 'project_name'} />}
+        />,
+      };
+      if (col.key === 'status') return {
+        ...col, width: '130px',
+        label: <DocThHeader label="Status" columnKey="status" onSort={handleTableSort} onFilter={handleFilter}
+          filterContent={<ListFilter columnKey="status" options={[{value:'draft',label:'Draft'},{value:'in_review',label:'In Review'},{value:'approved',label:'Approved'},{value:'archived',label:'Archived'}]} selectedValue={columnFilters['status'] || ''} onSelect={v => { setColumnFilters(p => ({ ...p, status: v })); setActiveFilterKey(null); }} onClear={() => { clearFilter('status'); setActiveFilterKey(null); }} isActive={activeFilterKey === 'status'} containerRef={filterContainerRef} />}
+        />,
+      };
+      if (col.key === 'updated_at') return {
+        ...col, width: '120px',
+        label: <DocThHeader label="Updated" columnKey="updated_at" onSort={handleTableSort} />,
+      };
+      if (col.key === 'labels') return { ...col, width: '160px' };
+      if (col.key === 'shared_with') return { ...col, width: '140px' };
+      if (col.key === 'created_by') return { ...col, width: '80px' };
+      return col;
+    }),
+  ];
 
   const emptyState = (
     <div className="flex flex-col items-center justify-center py-12">
@@ -264,9 +387,6 @@ export function Documents() {
             <div className="flex items-center gap-2 flex-wrap" style={{ paddingTop: 4 }}>
               <button onClick={() => setShowUploadModal(true)} style={{ height: 40, display: 'flex', alignItems: 'center', gap: 8, padding: '0 18px', border: `1px solid ${LINE}`, borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 16, fontWeight: 600, color: TEXT, whiteSpace: 'nowrap' }}>
                 <Upload size={15} /> Upload
-              </button>
-              <button onClick={() => setShowNewDocModal(true)} style={{ height: 40, display: 'flex', alignItems: 'center', gap: 8, padding: '0 20px', border: 'none', borderRadius: 8, background: BLUE, cursor: 'pointer', fontSize: 16, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap' }}>
-                <Plus size={15} /> New Document
               </button>
               <ViewToggle viewMode={viewMode} onViewModeChange={v => setViewMode(v as any)} modes={['table', 'grid', 'tree']} showLabels={false} />
             </div>
@@ -407,7 +527,7 @@ export function Documents() {
 
             {/* Bulk toolbar */}
             <DocumentsBulkToolbar
-              selectedCount={selectedDocs.size} onClear={() => setSelectedDocs(new Set())}
+              selectedCount={selectedDocs.size} onClear={() => { setSelectedDocs(new Set()); setGridSelectionMode(false); }}
               onDeleteSelected={() => setBulkDeleteConfirm(true)} onChangeStatus={handleBulkChangeStatus}
               onShare={handleBulkShare} onMove={handleBulkMove}
               onAddTags={() => setShowTagSelector(true)} projects={projects}
@@ -425,23 +545,32 @@ export function Documents() {
                 <DualView
                   viewMode={viewMode} isLoading={isLoading}
                   gridProps={{
-                    data: displayedDocuments,
+                    data: columnFilteredDocuments,
                     gridClassName: 'document-grid',
-                    renderCard: (doc) => (
-                      <div onClick={() => handleDocumentClick(doc)} className="cursor-pointer">
-                        <DocumentGridCard
-                          key={doc.id}
-                          document={doc}
-                          projectTaskType={(doc as any).project_task_type || ''}
-                          onDeleteClick={(e) => { e.stopPropagation(); handleDeleteClick(e, doc); }}
-                          onShareClick={(d: Document) => setShareDoc(d)}
-                        />
-                      </div>
-                    ),
+                    renderCard: (doc) => {
+                      const isSel = selectedDocs.has(doc.id);
+                      return (
+                        <div
+                          onClick={() => gridSelectionMode ? toggleSelect(doc.id) : handleDocumentClick(doc)}
+                          onDoubleClick={() => { setGridSelectionMode(true); toggleSelect(doc.id); }}
+                          className="cursor-pointer"
+                        >
+                          <DocumentGridCard
+                            key={doc.id}
+                            document={doc}
+                            projectTaskType={(doc as any).project_task_type || ''}
+                            onDeleteClick={(e) => { e.stopPropagation(); handleDeleteClick(e, doc); }}
+                            onShareClick={(d: Document) => setShareDoc(d)}
+                            isSelected={isSel}
+                            onSelect={gridSelectionMode ? e => { e.stopPropagation(); toggleSelect(doc.id); } : undefined}
+                          />
+                        </div>
+                      );
+                    },
                     emptyState,
                   }}
                   tableProps={{
-                    data: displayedDocuments, columns: columnsWithCheckbox,
+                    data: columnFilteredDocuments, columns: columnsWithCheckbox,
                     rowKey: (d: Document) => d.id, onRowClick: (d: Document) => handleDocumentClick(d),
                     emptyState,
                     rowProps: (doc: Document) => ({
@@ -474,14 +603,15 @@ export function Documents() {
 
       {/* ── Grid responsive CSS ── */}
       <style>{`
-        .document-grid { display: grid; gap: 16px; padding: 20px; grid-template-columns: repeat(1, 1fr); }
+       .document-grid { display: grid; gap: 16px; padding: 20px; grid-template-columns: repeat(1, 1fr); }
         @media (min-width: 480px)  { .document-grid { grid-template-columns: repeat(2, 1fr); } }
         @media (min-width: 860px)  { .document-grid { grid-template-columns: repeat(3, 1fr); } }
         @media (min-width: 1200px) { .document-grid { grid-template-columns: repeat(4, 1fr); } }
+        @media (min-width: 1600px) { .document-grid { grid-template-columns: repeat(5, 1fr); } }
       `}</style>
 
       {/* ── MODALS ── */}
-      <UploadDocumentModal isOpen={showUploadModal} onClose={() => setShowUploadModal(false)} projectId={projectFilter ? Number(projectFilter) : null} projectName={currentProjectName || 'No project selected'} folderId={selectedTreeFolderId} folderName={selectedTreeFolderName} onSuccess={() => { queryClient.invalidateQueries({ queryKey: ['documents'] }); queryClient.invalidateQueries({ queryKey: ['document-folders'] }); }} />
+      <UploadDocumentModal isOpen={showUploadModal} onClose={() => setShowUploadModal(false)} projects={projects} folderId={selectedTreeFolderId} folderName={selectedTreeFolderName} onSuccess={() => { queryClient.invalidateQueries({ queryKey: ['documents'] }); queryClient.invalidateQueries({ queryKey: ['document-folders'] }); }} />
       <ConfirmationModal isOpen={!!deleteConfirm} title={`Are you sure you want to delete "${deleteConfirm?.name}"?`} onClose={() => setDeleteConfirm(null)} onConfirm={async () => { if (deleteConfirm) { try { await documentsApi.delete(deleteConfirm.id); setDeleteConfirm(null); queryClient.invalidateQueries({ queryKey: ['documents'] }); } catch (e) { console.error(e); } } }} />
       <ConfirmationModal isOpen={bulkDeleteConfirm} title={`Are you sure you want to delete ${selectedDocs.size} selected document(s)?`} onClose={() => setBulkDeleteConfirm(false)} onConfirm={handleBulkDelete} />
       {isActivityOpen && <NotificationsPage onClose={() => setIsActivityOpen(false)} defaultFilter="unread" />}
@@ -519,82 +649,6 @@ export function Documents() {
       )}
 
       <TagSelectorModal isOpen={showTagSelector} onClose={() => setShowTagSelector(false)} availableTags={availableTags} selectedCount={selectedDocs.size} onConfirm={handleBulkAddTags} projects={projects} />
-
-      {/* New Document Modal */}
-      {showNewDocModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }} onClick={() => setShowNewDocModal(false)} />
-          <div className="relative w-full max-w-[700px] rounded-xl shadow-2xl" style={{ background: '#fff', border: '1px solid #e5e7eb', maxHeight: '90vh', overflow: 'hidden' }}>
-            <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid #e5e7eb' }}>
-              <div className="flex items-center gap-2"><FileText className="w-5 h-5" style={{ color: BLUE }} /><span style={{ fontSize: 16, fontWeight: 600, color: TEXT }}>Create New Document</span></div>
-              <button onClick={() => setShowNewDocModal(false)} style={{ color: MUTED, background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}><X className="w-5 h-5" /></button>
-            </div>
-            <div className="px-6 py-5 space-y-4 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 140px)' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: 14, fontWeight: 600, color: TEXT, marginBottom: 8 }}>Project (Optional)</label>
-                <select value={projectFilter} onChange={e => updateFilter('project', e.target.value)} style={{ width: '100%', padding: '10px 32px 10px 12px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 14, background: '#fff', cursor: 'pointer', appearance: 'none' as const, backgroundImage: `url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M3 5L6 8L9 5' stroke='%236B7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center', outline: 'none' }}>
-                  <option value="">All Documents (No specific project)</option>
-                  {projects.map((p: Project) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-                <p style={{ fontSize: 12, color: MUTED, marginTop: 6 }}>Leave as "All Documents" to create without a project, or select a project to organize your document.</p>
-              </div>
-              {projectFilter && (
-                <div className="flex items-center gap-3 rounded-lg" style={{ padding: '12px 16px', background: '#EEF2FF', border: '1px solid #c7d2fe' }}>
-                  <Folder className="w-5 h-5 flex-shrink-0" style={{ color: BLUE }} />
-                  <div><p style={{ fontSize: 11, fontWeight: 600, color: MUTED, textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>Saving to</p><p style={{ fontSize: 14, fontWeight: 600, color: BLUE }}>{selectedTreeFolderId && selectedTreeFolderName ? `${currentProjectName} / ${selectedTreeFolderName}` : currentProjectName}</p></div>
-                </div>
-              )}
-              <div>
-                <label style={{ display: 'block', fontSize: 14, fontWeight: 600, color: TEXT, marginBottom: 8 }}>Document Name *</label>
-                <input type="text" value={newDocName} onChange={e => setNewDocName(e.target.value)} placeholder="Enter document name" style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 14, outline: 'none' }} onFocus={e => e.currentTarget.style.borderColor = BLUE} onBlur={e => e.currentTarget.style.borderColor = '#e5e7eb'} />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 14, fontWeight: 600, color: TEXT, marginBottom: 8 }}>Content</label>
-                <textarea value={newDocContent} onChange={e => setNewDocContent(e.target.value)} placeholder="Type or paste your content here..." style={{ width: '100%', minHeight: 200, padding: '12px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 14, fontFamily: 'Monaco, Courier New, monospace', resize: 'vertical', outline: 'none' }} onFocus={e => e.currentTarget.style.borderColor = BLUE} onBlur={e => e.currentTarget.style.borderColor = '#e5e7eb'} />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 14, fontWeight: 600, color: TEXT, marginBottom: 8 }}>Select Format</label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 12 }}>
-                  {['txt', 'pdf', 'docx', 'xlsx', 'md', 'json'].map(format => (
-                    <div key={format} onClick={() => setNewDocFormat(format)} style={{ padding: 16, border: `2px solid ${newDocFormat === format ? BLUE : '#e5e7eb'}`, borderRadius: 8, textAlign: 'center' as const, cursor: 'pointer', background: newDocFormat === format ? '#EEF2FF' : 'transparent', transition: 'all 0.2s' }}>
-                      <div style={{ fontSize: 24, marginBottom: 8 }}>{format === 'txt' ? '📄' : format === 'pdf' ? '📕' : format === 'docx' ? '📘' : format === 'xlsx' ? '📊' : format === 'md' ? '📝' : '🔧'}</div>
-                      <div style={{ fontSize: 12, fontWeight: 500, color: '#666' }}>.{format}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 14, fontWeight: 600, color: TEXT, marginBottom: 8 }}>Or Type Custom Format</label>
-                <input type="text" value={customFormat} onChange={e => setCustomFormat(e.target.value)} placeholder="e.g., csv, html, xml" style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 14, outline: 'none' }} onFocus={e => e.currentTarget.style.borderColor = BLUE} onBlur={e => e.currentTarget.style.borderColor = '#e5e7eb'} />
-              </div>
-            </div>
-            <div className="flex items-center justify-end gap-3 px-6 py-4" style={{ borderTop: '1px solid #e5e7eb' }}>
-              <button onClick={() => { setShowNewDocModal(false); setNewDocName(''); setNewDocContent(''); setNewDocFormat('txt'); setCustomFormat(''); }} className="rounded-lg" style={{ padding: '8px 20px', border: '1px solid #e5e7eb', background: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer', color: TEXT }}>Cancel</button>
-              <button disabled={!newDocName} className="rounded-lg flex items-center gap-2" style={{ padding: '8px 20px', background: !newDocName ? '#a5b4fc' : BLUE, color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: !newDocName ? 'not-allowed' : 'pointer' }}
-                onClick={async () => {
-                  if (!newDocName) { alert('Please enter a document name'); return; }
-                  try {
-                    const format = customFormat || newDocFormat;
-                    const fullName = newDocName.includes('.') ? newDocName : `${newDocName}.${format}`;
-                    const file = new File([new Blob([newDocContent], { type: 'text/plain' })], fullName, { type: 'text/plain' });
-                    let targetProjectId = projectFilter ? Number(projectFilter) : null;
-                    if (!targetProjectId && projects.length > 0) targetProjectId = projects[0].id;
-                    if (!targetProjectId) { alert('No projects available. Please create a project first.'); return; }
-                    const { url: s3Url, fields: s3Fields, file_key } = await documentsApi.getUploadUrl(targetProjectId, { file_name: fullName, file_type: file.type || 'application/octet-stream' });
-                    await documentsApi.uploadFileToS3(s3Url, s3Fields, file);
-                    const getFileTypeFromExt = (name: string) => { const ext = name.split('.').pop()?.toLowerCase() || ''; if (ext === 'pdf') return 'pdf'; if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)) return 'image'; if (['mp4', 'mov', 'avi'].includes(ext)) return 'video'; if (ext === 'json') return 'json'; if (['txt', 'md', 'csv'].includes(ext)) return 'text'; return 'other'; };
-                    await documentsApi.confirmUpload(targetProjectId, { file_key, file_name: fullName, file_type: getFileTypeFromExt(fullName), ...(selectedTreeFolderId ? { folder: selectedTreeFolderId } : {}) } as any);
-                    queryClient.invalidateQueries({ queryKey: ['documents'] }); queryClient.invalidateQueries({ queryKey: ['document-folders'] });
-                    setShowNewDocModal(false); setNewDocName(''); setNewDocContent(''); setNewDocFormat('txt'); setCustomFormat('');
-                  } catch (error: any) { alert(error.response?.data?.detail || error.message || 'Failed to create document.'); }
-                }}
-              >
-                <Plus className="w-4 h-4" /> Create Document
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {toast && <Toast isOpen={toast.isOpen} type={toast.type} message={toast.message} onClose={() => setToast(null)} />}
     </div>

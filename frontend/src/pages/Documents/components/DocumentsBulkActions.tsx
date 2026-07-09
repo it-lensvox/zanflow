@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Move, Tag, SortDesc, Share, Trash2, Folder } from 'lucide-react';
 import { BulkToolbar } from '@/components/ui/BulkToolbar';
+import { getTypeHex } from '@/config/projectTypeConfig';
 import type { Project, DocumentStatus } from '@/types';
 
 // ─── Reusable toolbar button ──────────────────────────────────────────────────
@@ -45,21 +46,25 @@ function BulkStatusDropdown({ onSelect, onClose }: { onSelect: (s: DocumentStatu
   );
 }
 
-// ─── Project picker dropdown ──────────────────────────────────────────────────
+// ─── Project picker dropdown
 function BulkMoveDropdown({ projects, onSelect, onClose }: { projects: Project[]; onSelect: (id: number) => void; onClose: () => void }) {
   return (
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
       <div className="absolute top-full mt-1 left-0 z-50 rounded-lg shadow-lg py-1 max-h-[250px] overflow-y-auto" style={{ background: '#fff', border: '1px solid #e5e7eb', minWidth: 200 }}>
         <div style={{ padding: '6px 12px', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Move to Project</div>
-        {projects.map(p => (
-          <div key={p.id} className="flex items-center gap-2 cursor-pointer" style={{ padding: '8px 12px', fontSize: 13, color: '#1a1a1a' }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#f9fafb'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-            onClick={() => { onSelect(p.id); onClose(); }}>
-            <Folder className="w-3.5 h-3.5" style={{ color: '#4F46E5' }} />{p.name}
-          </div>
-        ))}
+        {projects.map(p => {
+          const typeHex = getTypeHex((p as any).task_type);
+          return (
+            <div key={p.id} className="flex items-center gap-2 cursor-pointer" style={{ padding: '8px 12px', fontSize: 13, color: '#1a1a1a' }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#f9fafb'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+              onClick={() => { onSelect(p.id); onClose(); }}>
+              <Folder className="w-3.5 h-3.5" style={{ color: typeHex }} />
+              {p.name}
+            </div>
+          );
+        })}
         {projects.length === 0 && <div style={{ padding: '8px 12px', fontSize: 13, color: '#6b7280' }}>No projects found</div>}
       </div>
     </>

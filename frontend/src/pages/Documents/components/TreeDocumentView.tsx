@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import type { Document, Project } from '@/types';
 import { getTypeHex, getTypeBg } from '@/config/projectTypeConfig';
-import { getDocStatusConfig, getFileExtColor, getFileExtLabel } from '@/config/documentConfig';
+import { getDocStatusConfig, getFileExtLabel } from '@/config/documentConfig';
 
 interface TreeDocumentViewProps {
   documents: Document[];
@@ -10,12 +10,11 @@ interface TreeDocumentViewProps {
   onDocumentClick: (doc: Document) => void;
 }
 
-function ExtBadge({ fileName }: { fileName: string }) {
-  const color = getFileExtColor(fileName);
+function ExtBadge({ fileName, typeHex }: { fileName: string; typeHex: string }) {
   const label = getFileExtLabel(fileName);
   return (
-    <div style={{ width: 36, height: 36, borderRadius: 8, flexShrink: 0, background: `${color}18`, border: `1px solid ${color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <span style={{ fontSize: 9, fontWeight: 700, color, letterSpacing: '.04em', lineHeight: 1 }}>{label}</span>
+    <div style={{ width: 36, height: 36, borderRadius: 8, flexShrink: 0, background: `${typeHex}18`, border: `1px solid ${typeHex}30`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <span style={{ fontSize: 9, fontWeight: 700, color: typeHex, letterSpacing: '.04em', lineHeight: 1 }}>{label}</span>
     </div>
   );
 }
@@ -77,7 +76,7 @@ export function TreeDocumentView({ documents, projects, onDocumentClick }: TreeD
                         onMouseLeave={e => e.currentTarget.style.background = '#fff'}
                       >
                         {/* Ext badge */}
-                        <ExtBadge fileName={fileName} />
+                        <ExtBadge fileName={fileName} typeHex={typeHex} />
 
                         {/* File info */}
                         <div style={{ flex: 1, minWidth: 0 }}>

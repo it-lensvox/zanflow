@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  FileText, Folder, Info, Share2,Trash2, File, Clock, CheckCircle
+  FileText, Info, Share2,Trash2, File, Clock, CheckCircle
 } from 'lucide-react';
 import { TablePopover } from '@/components/common';
 import { formatRelativeTime } from '@/lib/utils';
@@ -23,7 +23,7 @@ const getDocIconColor = (name: string): string => {
   return map[ext] || '#6B7280';
 };
 
-const getExtBadgeColor = (name: string): string => {
+export const getExtBadgeColor = (name: string): string => {
   const ext = name?.split('.').pop()?.toLowerCase() || '';
   const map: Record<string, string> = { pdf: '#EF4444', doc: '#2563EB', docx: '#2563EB', xls: '#16A34A', xlsx: '#16A34A', csv: '#16A34A', ppt: '#EA580C', pptx: '#EA580C', png: '#7C3AED', jpg: '#7C3AED', jpeg: '#7C3AED', gif: '#7C3AED', svg: '#7C3AED', mp4: '#EC4899', mov: '#EC4899', avi: '#EC4899', js: '#F59E0B', ts: '#2563EB', jsx: '#0891B2', tsx: '#0891B2', py: '#3B82F6', json: '#F59E0B', zip: '#F59E0B', rar: '#F59E0B' };
   return map[ext] || '#6B7280';
@@ -328,16 +328,6 @@ export const createDocumentsTableColumns = (
         return (
           <div className="flex items-center justify-between w-full group/cell">
             <div className="flex items-center gap-2.5 min-w-0 pr-2">
-              {/* Colored doc icon matching HTML exactly */}
-              {(() => {
-                const color = getExtBadgeColor(doc.name || doc.original_file_name || '');
-                const label = (doc.name || doc.original_file_name || '').split('.').pop()?.toUpperCase()?.slice(0, 4) || 'FILE';
-                return (
-                  <div style={{ width: 32, height: 32, borderRadius: 6, background: `${color}18`, border: `1px solid ${color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <span style={{ fontSize: 9, fontWeight: 700, color, letterSpacing: '.04em', lineHeight: 1 }}>{label}</span>
-                  </div>
-                );
-              })()}
               <div className="flex flex-col min-w-0">
                 <span className="truncate" style={{ fontWeight: 500, fontSize: 14, color: '#1a1a1a' }} title={doc.name}>{doc.name}</span>
                 <span style={{ fontSize: 12, color: '#6b7280' }}>{doc.file_size ? `${(doc.file_size / (1024 * 1024)).toFixed(1)} MB` : ''}</span>
@@ -375,7 +365,6 @@ export const createDocumentsTableColumns = (
               overflow: 'hidden', whiteSpace: 'nowrap', display: 'inline-flex',
             }}
           >
-            <Folder className="w-3 h-3 flex-shrink-0" style={{ color: pHex }} />
             {display}
           </span>
         );
@@ -537,14 +526,16 @@ interface DocumentGridCardProps {
   onDeleteClick: (e: React.MouseEvent, doc: Document) => void;
   onCardClick?: (doc: Document) => void;
   onShareClick?: (doc: Document) => void;
+  isSelected?: boolean;
+  onSelect?: (e: React.MouseEvent) => void;
 }
 
-export function DocumentGridCard({ document: doc, projectTaskType, onDeleteClick, onCardClick, onShareClick }: DocumentGridCardProps) {
-  const sc = getDocumentStatusConfig(doc.status);
- const accentHex  = getTypeHex(projectTaskType);
-  const fileName   = doc.name || doc.original_file_name || '';
-  const extColor   = getExtBadgeColor(fileName);
-  const extLabel   = fileName.split('.').pop()?.toUpperCase()?.slice(0, 4) || 'FILE';
+export function DocumentGridCard({ document: doc, projectTaskType, onDeleteClick, onCardClick, onShareClick, isSelected = false, onSelect }: DocumentGridCardProps) {
+  const sc        = getDocumentStatusConfig(doc.status);
+  const accentHex = getTypeHex(projectTaskType);
+  const fileName  = doc.name || doc.original_file_name || '';
+  const extLabel  = fileName.split('.').pop()?.toUpperCase()?.slice(0, 4) || 'FILE';
+  const fileSize  = doc.file_size ? `${(doc.file_size / (1024 * 1024)).toFixed(1)} MB` : null;
 
   return (
     <div
@@ -553,79 +544,106 @@ export function DocumentGridCard({ document: doc, projectTaskType, onDeleteClick
       style={{
         background: '#fff',
         border: '1px solid #E6EBF2',
-        borderRadius: 12,
+        borderRadius: 14,
         overflow: 'hidden',
         minWidth: 0,
         width: '100%',
-        position: 'relative',
         boxShadow: '0 1px 4px rgba(16,24,40,.06)',
-        transition: 'box-shadow .2s',
+        transition: 'box-shadow .2s, border-color .2s',
       }}
       onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 20px rgba(16,24,40,.12)'}
       onMouseLeave={e => e.currentTarget.style.boxShadow = '0 1px 4px rgba(16,24,40,.06)'}
     >
-      {/* ── Top accent bar  */}
+      {/* ── Top accent bar — matches ProjectGridCard */}
       <div style={{ height: 4, background: accentHex, width: '100%', flexShrink: 0 }} />
 
-      <div style={{ padding: '14px 16px 50px' }}>
-        {/* ── Row 1: Ext badge + file name + timestamp ── */}
+      <div style={{ padding: '14px 16px 16px' }}>
+
+        {/* ── Row 1: ext badge (selection toggle) + file name + status pill ── */}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, background: `${extColor}18`, border: `1px solid ${extColor}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: extColor, letterSpacing: '.04em', lineHeight: 1 }}>{extLabel}</span>
+          <div
+            onClick={onSelect ? e => { e.stopPropagation(); onSelect(e); } : undefined}
+            style={{
+              width: 32, height: 32, borderRadius: 7, flexShrink: 0,
+              background: isSelected ? accentHex : `${accentHex}18`,
+              border: isSelected ? `1.5px solid ${accentHex}` : `1px solid ${accentHex}30`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: onSelect ? 'pointer' : 'default',
+              transition: 'background 0.15s, border-color 0.15s',
+            }}
+          >
+            {isSelected
+              ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+              : <span style={{ fontSize: 9, fontWeight: 700, color: accentHex, letterSpacing: '.04em', lineHeight: 1 }}>{extLabel}</span>
+            }
           </div>
 
           <div style={{ flex: 1, minWidth: 0 }}>
-            {/* File name */}
-            <p style={{ margin: '0 0 2px', fontWeight: 700, fontSize: 14, color: '#172033', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <p style={{ margin: '0 0 5px', fontWeight: 700, fontSize: 16, color: '#172033', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {fileName || 'Untitled'}
             </p>
+            {/* Status pill — mirrors ProjectGridCard's StatusPill position */}
+            <span className="inline-flex items-center rounded-full"
+              style={{ padding: '3px 10px', fontSize: 11, fontWeight: 600, background: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
+              {sc.label}
+            </span>
           </div>
-
-          <span style={{ fontSize: 11, color: '#667085', whiteSpace: 'nowrap', flexShrink: 0, paddingTop: 2 }}>
-            {formatRelativeTime(doc.updated_at)}
-          </span>
         </div>
 
-        {/* ── Description / tags */}
+        {/* ── Description area  */}
         {doc.labels && doc.labels.length > 0 ? (
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' as const, marginBottom: 8 }}>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' as const, marginBottom: 14 }}>
             {doc.labels.slice(0, 2).map(l => (
-              <span key={l.id} style={{ fontSize: 10, fontWeight: 500, padding: '2px 8px', borderRadius: 99, background: l.color ? `${l.color}18` : '#F3E8FF', color: l.color || '#7C3AED', border: `1px solid ${l.color ? `${l.color}30` : '#D8B4FE'}` }}>
+              <span key={l.id} style={{ fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 99, background: l.color ? `${l.color}18` : '#F3E8FF', color: l.color || '#7C3AED', border: `1px solid ${l.color ? `${l.color}30` : '#D8B4FE'}` }}>
                 {l.name}
               </span>
             ))}
-            {doc.labels.length > 2 && <span style={{ fontSize: 10, color: '#667085', padding: '2px 4px' }}>+{doc.labels.length - 2}</span>}
+            {doc.labels.length > 2 && <span style={{ fontSize: 11, color: '#667085', padding: '2px 4px' }}>+{doc.labels.length - 2}</span>}
           </div>
+        ) : fileSize ? (
+          <p style={{ margin: '0 0 14px', fontSize: 13, color: '#667085', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as React.CSSProperties}>
+            {fileSize}
+          </p>
         ) : (
-          <div style={{ height: 26 }} />
+          <div style={{ height: 8 }} />
         )}
-      </div>
 
-      {/* ── Bottom bar: Share + Trash (left) · Status badge (right) ── */}
-      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px 10px' }}>
-        {/* Action buttons — visible on hover */}
-        <div className="opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center gap-0.5">
-          {onShareClick && (
-            <button onClick={e => { e.stopPropagation(); onShareClick(doc); }}
-              style={{ padding: 5, color: '#667085', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 6, display: 'flex' }}
-              onMouseEnter={e => e.currentTarget.style.background = '#F7F8FB'}
-              onMouseLeave={e => e.currentTarget.style.background = 'none'}>
-              <Share2 style={{ width: 14, height: 14 }} />
-            </button>
-          )}
-          <button onClick={e => { e.stopPropagation(); onDeleteClick(e, doc); }}
-            style={{ padding: 5, color: '#667085', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 6, display: 'flex' }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#FEE2E2'; (e.currentTarget as HTMLButtonElement).style.color = '#EF4444'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#667085'; }}>
-            <Trash2 style={{ width: 14, height: 14 }} />
-          </button>
+        {/* ── Progress bar area — mirrors ProjectGridCard's progress section */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <span style={{ fontSize: 12, color: '#667085', fontWeight: 500 }}>Project</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: accentHex, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 140 }}>
+              {(doc as any).project_name || 'General'}
+            </span>
+          </div>
+          <div style={{ height: 6, background: '#F3F4F6', borderRadius: 99, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: '100%', background: `${accentHex}40`, borderRadius: 99 }} />
+          </div>
         </div>
 
-        {/* Status badge — always visible, bottom-right */}
-        <span className="inline-flex items-center rounded-full"
-          style={{ padding: '3px 10px', fontSize: 10, fontWeight: 600, background: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
-          {sc.label}
-        </span>
+        {/* ── Footer row — mirrors ProjectGridCard footer: left actions + right time */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all duration-200">
+            {onShareClick && (
+              <button onClick={e => { e.stopPropagation(); onShareClick(doc); }}
+                style={{ padding: 5, color: '#667085', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 6, display: 'flex' }}
+                onMouseEnter={e => e.currentTarget.style.background = '#F7F8FB'}
+                onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                <Share2 style={{ width: 13, height: 13 }} />
+              </button>
+            )}
+            <button onClick={e => { e.stopPropagation(); onDeleteClick(e, doc); }}
+              style={{ padding: 5, color: '#667085', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 6, display: 'flex' }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#FEE2E2'; (e.currentTarget as HTMLButtonElement).style.color = '#EF4444'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#667085'; }}>
+              <Trash2 style={{ width: 13, height: 13 }} />
+            </button>
+          </div>
+
+          <span style={{ fontSize: 12, color: '#667085', whiteSpace: 'nowrap' }}>
+            {formatRelativeTime(doc.updated_at)}
+          </span>
+        </div>
       </div>
     </div>
   );
