@@ -189,7 +189,7 @@ export function CreateProjectModal({ isOpen, onClose, navigateOnSuccess = false 
             <form
                 id="create-project-form"
                 onSubmit={handleSubmit}
-                style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20, background: BG, fontFamily: '-apple-system,BlinkMacSystemFont,"Inter",system-ui,sans-serif' }}
+                style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20, background: 'hsl(var(--background))', fontFamily: '-apple-system,BlinkMacSystemFont,"Inter",system-ui,sans-serif' }}
             >
                 {/* Error banner */}
                 {error && (
@@ -324,7 +324,7 @@ export function CreateProjectModal({ isOpen, onClose, navigateOnSuccess = false 
                                 type="button"
                                 onClick={handleAddMember}
                                 disabled={!tempUser || !tempRole}
-                                style={{ height: 38, width: 44, borderRadius: 8, border: `1px solid ${LINE}`, background: (!tempUser || !tempRole) ? '#f3f4f6' : BLUE, color: (!tempUser || !tempRole) ? MUTED : '#fff', cursor: (!tempUser || !tempRole) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .15s' }}
+                                style={{ height: 38, width: 44, borderRadius: 8, border: `1px solid hsl(var(--border))`, background: (!tempUser || !tempRole) ? 'hsl(var(--muted))' : BLUE, color: (!tempUser || !tempRole) ? 'hsl(var(--muted-foreground))' : '#fff', cursor: (!tempUser || !tempRole) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .15s' }}
                             >
                                 <Plus size={16} />
                             </button>
@@ -339,9 +339,9 @@ export function CreateProjectModal({ isOpen, onClose, navigateOnSuccess = false 
                                 const roleLabel = PROJECT_ROLES.find(r => r.value === assignment.role)?.label;
                                 if (!user) return null;
                                 return (
-                                    <div key={assignment.userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, border: `1px solid ${LINE}`, background: '#fff' }}>
+                                    <div key={assignment.userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, border: `1px solid hsl(var(--border))`, background: 'hsl(var(--muted))' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                            <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#EEF4FF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: BLUE }}>{user.label.charAt(0)}</div>
+                                            <div style={{ width: 30, height: 30, borderRadius: '50%', background: `${BLUE}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: BLUE }}>{user.label.charAt(0)}</div>
                                             <div>
                                                 <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: TEXT }}>{user.label}</p>
                                                 <p style={{ margin: 0, fontSize: 11, color: MUTED }}>{roleLabel}</p>

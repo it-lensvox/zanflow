@@ -16,8 +16,8 @@ interface ChatHeaderProps {
 function IconBtn({ icon, onClick, title, accent }: { icon: React.ReactNode; onClick: () => void; title: string; accent?: boolean }) {
   return (
     <button onClick={onClick} title={title}
-      style={{ width: 30, height: 30, borderRadius: 7, border: 'none', background: accent ? 'rgba(22,99,246,.1)' : 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: accent ? '#1663f6' : '#64748b', transition: 'all .15s' }}
-      onMouseEnter={e => { e.currentTarget.style.background = accent ? 'rgba(22,99,246,.18)' : '#f1f5f9'; }}
+      style={{ width: 30, height: 30, borderRadius: 7, border: 'none', background: accent ? 'rgba(22,99,246,.1)' : 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: accent ? '#1663f6' : 'hsl(var(--muted-foreground))', transition: 'all .15s' }}
+      onMouseEnter={e => { e.currentTarget.style.background = accent ? 'rgba(22,99,246,.18)' : 'hsl(var(--accent))'; }}
       onMouseLeave={e => { e.currentTarget.style.background = accent ? 'rgba(22,99,246,.1)' : 'none'; }}>
       {icon}
     </button>
@@ -55,8 +55,8 @@ export function ChatHeader({ isHistoryOpen, activeSessionId, sessionTitle, onTog
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       padding: '11px 18px',
-      borderBottom: '1px solid #e6ebf2',
-      background: '#fff',
+      borderBottom: '1px solid hsl(var(--border))',
+      background: 'hsl(var(--card))',
       flexShrink: 0, gap: 8,
     }}>
       {/* Left */}
@@ -79,7 +79,7 @@ export function ChatHeader({ isHistoryOpen, activeSessionId, sessionTitle, onTog
               onBlur={commitRename}
               style={{ flex: 1, fontSize: 13, fontWeight: 600, color: '#172033', border: 'none', borderBottom: '1.5px solid #1663f6', outline: 'none', background: 'transparent', padding: '1px 0', minWidth: 0 }} />
           ) : (
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#172033', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'hsl(var(--foreground))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
               {sessionTitle}
             </span>
           )}
@@ -94,11 +94,11 @@ export function ChatHeader({ isHistoryOpen, activeSessionId, sessionTitle, onTog
           <div style={{ position: 'relative' }} ref={menuRef}>
             <IconBtn icon={<MoreHorizontal style={{ width: 14, height: 14 }} />} onClick={() => setMenuOpen(v => !v)} title="More options" />
             {menuOpen && (
-              <div style={{ position: 'absolute', right: 0, top: 36, zIndex: 200, minWidth: 164, background: '#fff', border: '1px solid #e6ebf2', borderRadius: 10, boxShadow: '0 8px 32px rgba(16,24,40,.14)', padding: '4px 0' }}>
+              <div style={{ position: 'absolute', right: 0, top: 36, zIndex: 200, minWidth: 164, background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,.2)', padding: '4px 0' }}>
                 {menuItems.map(item => (
                   <button key={item.label} onClick={item.action}
-                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, color: item.color, textAlign: 'left', fontFamily: 'inherit' }}
-                    onMouseEnter={e => e.currentTarget.style.background = item.color === '#ef4444' ? '#fef2f2' : '#f8fafc'}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 13, color: item.color === '#374151' ? 'hsl(var(--foreground))' : item.color, textAlign: 'left', fontFamily: 'inherit' }}
+                    onMouseEnter={e => e.currentTarget.style.background = item.color === '#ef4444' ? '#fef2f222' : 'hsl(var(--accent))'}
                     onMouseLeave={e => e.currentTarget.style.background = 'none'}>
                     {item.icon}{item.label}
                   </button>

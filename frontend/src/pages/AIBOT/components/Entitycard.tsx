@@ -22,7 +22,7 @@ function TaskCard({ id, title, project, status, priority, due, assignee }: TaskC
 
   return (
     <div onClick={() => navigate(`/tasks/${id}`)} style={{
-      background: '#fff', border: `1px solid #e6ebf2`,
+      background: 'hsl(var(--card))', border: `1px solid hsl(var(--border))`,
       borderLeft: `3px solid ${pc.border}`,
       borderRadius: 10, padding: '11px 14px',
       cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 7,
@@ -34,17 +34,17 @@ function TaskCard({ id, title, project, status, priority, due, assignee }: TaskC
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, flex: 1, minWidth: 0 }}>
           <CheckSquare style={{ width: 13, height: 13, color: pc.color, flexShrink: 0 }} />
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#172033', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'hsl(var(--foreground))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
         </div>
-        <ArrowUpRight style={{ width: 12, height: 12, color: '#94a3b8', flexShrink: 0 }} />
+        <ArrowUpRight style={{ width: 12, height: 12, color: 'hsl(var(--muted-foreground))', flexShrink: 0 }} />
       </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 5, alignItems: 'center' }}>
-        {project && <span style={{ fontSize: 10, fontWeight: 500, padding: '2px 7px', borderRadius: 99, background: '#eff6ff', color: '#2563eb' }}>{project}</span>}
+        {project && <span style={{ fontSize: 10, fontWeight: 500, padding: '2px 7px', borderRadius: 99, background: 'rgba(37,99,235,0.1)', color: '#2563eb' }}>{project}</span>}
         {status  && <span style={{ fontSize: 10, fontWeight: 500, padding: '2px 7px', borderRadius: 99, background: sc.bg, color: sc.text, textTransform: 'capitalize' as const }}>{status.replace(/_/g, ' ')}</span>}
         {priority && <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 99, background: pc.bg, color: pc.color, textTransform: 'capitalize' as const }}>{priority}</span>}
-        {due && <span style={{ fontSize: 10, color: '#667085', display: 'flex', alignItems: 'center', gap: 3 }}><Clock style={{ width: 9, height: 9 }} />{due}</span>}
-        {assignee && <span style={{ fontSize: 10, color: '#667085', display: 'flex', alignItems: 'center', gap: 3 }}><User style={{ width: 9, height: 9 }} />{assignee}</span>}
+        {due && <span style={{ fontSize: 10, color: 'hsl(var(--muted-foreground))', display: 'flex', alignItems: 'center', gap: 3 }}><Clock style={{ width: 9, height: 9 }} />{due}</span>}
+        {assignee && <span style={{ fontSize: 10, color: 'hsl(var(--muted-foreground))', display: 'flex', alignItems: 'center', gap: 3 }}><User style={{ width: 9, height: 9 }} />{assignee}</span>}
       </div>
     </div>
   );
@@ -67,7 +67,7 @@ function ProjectCard({ id, name, type, tasks, status }: ProjectCardProps) {
 
   return (
     <div onClick={() => navigate(`/projects/${id}`)} style={{
-      background: '#fff', border: '1px solid #e6ebf2', borderRadius: 10,
+      background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 10,
       padding: '11px 14px', cursor: 'pointer',
       display: 'flex', alignItems: 'center', gap: 10,
       transition: 'all .15s',
@@ -79,14 +79,14 @@ function ProjectCard({ id, name, type, tasks, status }: ProjectCardProps) {
         <span style={{ fontSize: 14, fontWeight: 800, color }}>{initial}</span>
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontSize: 13, fontWeight: 600, color: '#172033', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</p>
-        <p style={{ fontSize: 10, color: '#667085', marginTop: 2 }}>
+        <p style={{ fontSize: 13, fontWeight: 600, color: 'hsl(var(--foreground))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</p>
+        <p style={{ fontSize: 10, color: 'hsl(var(--muted-foreground))', marginTop: 2 }}>
           {type && <span style={{ textTransform: 'capitalize' as const }}>{type.replace(/_/g, ' ')}</span>}
           {tasks !== undefined && ` · ${tasks} tasks`}
           {status && ` · ${status}`}
         </p>
       </div>
-      <ArrowUpRight style={{ width: 12, height: 12, color: '#94a3b8', flexShrink: 0 }} />
+      <ArrowUpRight style={{ width: 12, height: 12, color: 'hsl(var(--muted-foreground))', flexShrink: 0 }} />
     </div>
   );
 }
@@ -110,7 +110,7 @@ function NoteCard({ id, title, preview, folder }: NoteCardProps) {
         {preview && <p style={{ fontSize: 11, color: '#667085', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{preview}</p>}
         {folder && <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: '#fef9c3', color: '#a16207', marginTop: 4, display: 'inline-block' }}>{folder}</span>}
       </div>
-      <ArrowUpRight style={{ width: 12, height: 12, color: '#94a3b8', flexShrink: 0 }} />
+      <ArrowUpRight style={{ width: 12, height: 12, color: 'hsl(var(--muted-foreground))', flexShrink: 0 }} />
     </div>
   );
 }
@@ -126,13 +126,13 @@ export function EntityCardGrid({ children, label, viewAllUrl, viewAllLabel, onSh
   return (
     <div style={{ marginTop: 10 }}>
       {label && (
-        <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.08em', color: '#94a3b8', margin: '0 0 6px' }}>{label}</p>
+        <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.08em', color: 'hsl(var(--muted-foreground))', margin: '0 0 6px' }}>{label}</p>
       )}
       <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 6 }}>{children}</div>
       {(onShowMore || viewAllUrl) && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
           {onShowMore ? (
-            <button onClick={onShowMore} style={{ fontSize: 10, fontWeight: 700, color: '#64748b', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
+            <button onClick={onShowMore} style={{ fontSize: 10, fontWeight: 700, color: 'hsl(var(--muted-foreground))', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
               Show more
             </button>
           ) : <span />}
@@ -400,13 +400,13 @@ function OpenChatCard({ result, onCloseChat }: { result: OpenChatResult; onClose
     : `/team-chat/chat/${result.room_id}`;
 
   return (
-    <div style={{ background: '#fff', border: '1px solid #e6ebf2', borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
-      <div style={{ width: 36, height: 36, borderRadius: 9, background: '#EEF4FF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+    <div style={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ width: 36, height: 36, borderRadius: 9, background: 'rgba(22,99,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
         <MessageSquare style={{ width: 16, height: 16, color: '#1663f6' }} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#172033' }}>{label}</div>
-        <div style={{ fontSize: 11, color: '#667085', marginTop: 2 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'hsl(var(--foreground))' }}>{label}</div>
+        <div style={{ fontSize: 11, color: 'hsl(var(--muted-foreground))', marginTop: 2 }}>
           {result.room_type === 'private' ? 'Private message' : 'Project channel'}
         </div>
       </div>
@@ -448,12 +448,12 @@ function MemberCard({ member, onCloseChat }: { member: WorkspaceMember; onCloseC
   };
 
   return (
-    <div style={{ background: '#fff', border: '1px solid #e6ebf2', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-      <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#EEF4FF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+    <div style={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(22,99,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
         <span style={{ fontSize: 11, fontWeight: 700, color: '#1663f6' }}>{initials}</span>
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#172033', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.name}</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'hsl(var(--foreground))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.name}</div>
         <div style={{ fontSize: 11, color: '#667085', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.email}</div>
       </div>
       <button

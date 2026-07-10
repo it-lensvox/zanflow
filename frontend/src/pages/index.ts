@@ -4,9 +4,9 @@ export { Projects } from './Project/Projects';
 export { DocumentCreate } from './Documents/DocumentCreate';
 export { MyTask } from './MyTask/MyTask';
 export { CreateTask } from './MyTask/pages/CreateTask/CreateTask'
-export { Teams } from './TeamManagement/Teams';
+export { Teams } from './TeamManagement/Teams/Teams';
 export { UserManagement } from './TeamManagement/UserManagement'
-export { TeamPerformance } from './TeamManagement/TeamPerformance';
+export { TeamPerformance } from './TeamManagement/TeamPerformance/TeamPerformance';
 export { TaskDetails } from './TaskType/TaskDetails'
 export { Documents } from './Documents/Documents';
 export { ProjectSettings } from './Project/ProjectSettings';

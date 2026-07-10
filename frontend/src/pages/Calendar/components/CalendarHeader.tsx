@@ -1,7 +1,7 @@
 import React from 'react';
 import {
     ChevronLeft, ChevronRight, Calendar as CalendarIcon, Grid3X3, List,
-    CalendarPlus, Settings, ChevronDown, Share2, Users, Check,
+    CalendarPlus, Settings, ChevronDown, Share2, Users, Check, ClipboardList,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { ViewMode } from '../calendarConstants';
@@ -25,6 +25,7 @@ interface CalendarHeaderProps {
     onShareCalendar: () => void;
     onToggleUser: (userId: number) => void;
     onSelectAllUsers: () => void;
+    onViewAllEvents: () => void;
 }
 
 // Stat card — clickable, navigates to filtered taskboard view
@@ -37,7 +38,7 @@ function StatCard({
             onClick={() => navigate(route)}
             style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center',
-                padding: '10px 20px', background: '#fff',
+                padding: '10px 20px', background: 'hsl(var(--card))',
                 border: `1px solid ${LINE}`, borderRadius: 10, minWidth: 72,
                 cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s',
                 fontFamily: 'inherit',
@@ -72,7 +73,7 @@ const VIEW_LABELS: Record<ViewMode, string> = {
 export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
     currentDate, viewMode, taskStats,
     isSettingsOpen, includeSharedEvents, selectedUserIds, sharedWithMeUsers,
-    settingsDropdownRef,
+    settingsDropdownRef, onViewAllEvents,
     onToday, onNavigate, onViewMode, onNewEvent,
     onToggleSettings, onToggleSharedEvents, onShareCalendar,
     onToggleUser, onSelectAllUsers,
@@ -82,7 +83,7 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
     return (
         <div
             className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40"
-            style={{ flexShrink: 0, background: '#fff', borderBottom: `1px solid ${LINE}`, paddingTop: 16, paddingBottom: 16 }}
+            style={{ flexShrink: 0, background: 'hsl(var(--card))', borderBottom: `1px solid ${LINE}`, paddingTop: 16, paddingBottom: 16 }}
         >
             {/* Row 1 — Title + Stat Cards */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
@@ -125,7 +126,7 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
                         Today
                     </button>
 
-                    <div style={{ display: 'flex', background: '#f5f7fb', border: `1px solid ${LINE}`, borderRadius: 8, padding: 2 }}>
+                    <div style={{ display: 'flex', background: 'hsl(var(--muted))', border: `1px solid ${LINE}`, borderRadius: 8, padding: 2 }}>
                         <button
                             onClick={() => onNavigate('prev')}
                             style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', borderRadius: 6, cursor: 'pointer', color: MUTED }}
@@ -153,7 +154,7 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
 
                     {/* View toggle */}
-                    <div style={{ display: 'flex', background: '#f5f7fb', border: `1px solid ${LINE}`, borderRadius: 8, padding: 3 }}>
+                    <div style={{ display: 'flex', background: 'hsl(var(--muted))', border: `1px solid ${LINE}`, borderRadius: 8, padding: 3 }}>
                         {(['day', 'work_week', 'week', 'month'] as ViewMode[]).map(mode => (
                             <button
                                 key={mode}
@@ -162,7 +163,7 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
                                     display: 'flex', alignItems: 'center', gap: 5,
                                     padding: '5px 12px', border: 'none', borderRadius: 6, cursor: 'pointer',
                                     fontSize: 13, fontWeight: viewMode === mode ? 700 : 500,
-                                    background: viewMode === mode ? '#fff' : 'transparent',
+                                    background: viewMode === mode ? 'hsl(var(--card))' : 'transparent',
                                     color: viewMode === mode ? BLUE : MUTED,
                                     boxShadow: viewMode === mode ? '0 1px 3px rgba(16,24,40,.06)' : 'none',
                                     transition: 'all 0.12s',
@@ -196,7 +197,7 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
                             style={{
                                 height: 36, display: 'flex', alignItems: 'center', gap: 7,
                                 padding: '0 14px',
-                                background: isSettingsOpen || includeSharedEvents ? '#f5f7fb' : '#fff',
+                                background: isSettingsOpen || includeSharedEvents ? 'hsl(var(--muted))' : 'hsl(var(--card))',
                                 border: `1px solid ${isSettingsOpen ? BLUE : LINE}`,
                                 borderRadius: 8, fontSize: 13, fontWeight: 600,
                                 color: TEXT, cursor: 'pointer',
@@ -210,12 +211,12 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
                         {isSettingsOpen && (
                             <div style={{
                                 position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 50,
-                                background: '#fff', border: `1px solid ${LINE}`,
+                                background: 'hsl(var(--popover))', border: `1px solid ${LINE}`,
                                 borderRadius: 12, boxShadow: '0 8px 24px rgba(16,24,40,.12)',
                                 minWidth: 272, overflow: 'hidden',
                             }}>
                                 {/* Header */}
-                                <div style={{ padding: '12px 16px', background: '#f9fafb', borderBottom: `1px solid ${LINE}` }}>
+                                <div style={{ padding: '12px 16px', background: 'hsl(var(--muted))', borderBottom: `1px solid ${LINE}` }}>
                                     <span style={{ fontSize: 13, fontWeight: 700, color: TEXT, display: 'flex', alignItems: 'center', gap: 6 }}>
                                         <Settings size={14} color={MUTED} /> Calendar Settings
                                     </span>
@@ -240,6 +241,21 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
                                     </button>
                                 </div>
 
+                                {/* View All My Events */}
+                                <button
+                                    onClick={() => { onViewAllEvents(); onToggleSettings(); }}
+                                    style={{
+                                        width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                                        padding: '12px 16px', border: 'none', background: 'transparent',
+                                        borderBottom: `1px solid ${LINE}`, cursor: 'pointer', fontSize: 13,
+                                        fontWeight: 500, color: TEXT, textAlign: 'left',
+                                    }}
+                                    onMouseEnter={e => (e.currentTarget.style.background = 'hsl(var(--accent))')}
+                                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                                >
+                                    <ClipboardList size={16} color="#1663f6" /> My Events List
+                                </button>
+
                                 {/* Share My Calendar */}
                                 <button
                                     onClick={() => { onShareCalendar(); onToggleSettings(); }}
@@ -249,7 +265,7 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
                                         borderBottom: `1px solid ${LINE}`, cursor: 'pointer', fontSize: 13,
                                         fontWeight: 500, color: TEXT, textAlign: 'left',
                                     }}
-                                    onMouseEnter={e => (e.currentTarget.style.background = '#f9fafb')}
+                                    onMouseEnter={e => (e.currentTarget.style.background = 'hsl(var(--accent))')}
                                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                                 >
                                     <Share2 size={16} color="#16a34a" /> Share My Calendar

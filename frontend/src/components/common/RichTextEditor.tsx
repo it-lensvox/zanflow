@@ -115,7 +115,7 @@ const MenuBar: React.FC<MenuBarProps> = ({ editor, features }) => {
         p-2 rounded-lg transition-colors
         ${isActive
           ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
         }
         ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
         flex items-center justify-center
@@ -125,10 +125,10 @@ const MenuBar: React.FC<MenuBarProps> = ({ editor, features }) => {
     </button>
   );
 
-  const Divider = () => <div className="w-px h-6 bg-gray-300 mx-1" />;
+  const Divider = () => <div className="w-px h-6 bg-border mx-1" />;
 
   return (
-    <div className="border-b border-gray-200 bg-gray-50 px-3 py-2 rounded-t-lg flex flex-wrap items-center gap-1">
+    <div className="border-b border-border bg-muted px-3 py-2 rounded-t-lg flex flex-wrap items-center gap-1">
       {/* Undo/Redo */}
       <MenuButton onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} title="Undo">
         <Undo className="w-4 h-4" />
@@ -366,7 +366,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   if (!editor) return null;
 
   return (
-    <div className={`border border-gray-300 rounded-lg bg-white transition-all focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-200 ${readOnly ? 'bg-gray-50' : ''} ${className}`}>
+    <div className={`border border-border rounded-lg bg-card transition-all focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-200 ${readOnly ? 'bg-muted' : ''} ${className}`}>
       {showToolbar && !readOnly && <MenuBar editor={editor} features={features} />}
       <div style={{ minHeight, ...(maxHeight && { maxHeight, overflowY: 'auto' }) }}>
         <EditorContent
@@ -377,12 +377,12 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
             [&_.ProseMirror]:relative
             [&_.ProseMirror]:text-[13px]
             [&_.ProseMirror]:leading-relaxed
-            [&_.ProseMirror]:text-[#07090d]
+            [&_.ProseMirror]:text-foreground
             [&_.ProseMirror_p]:text-[13px]
             [&_.ProseMirror_p]:leading-relaxed
             [&_.ProseMirror_p]:mb-2
             [&_.ProseMirror_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)]
-            [&_.ProseMirror_p.is-editor-empty:first-child::before]:text-gray-400
+            [&_.ProseMirror_p.is-editor-empty:first-child::before]:text-muted-foreground
             [&_.ProseMirror_p.is-editor-empty:first-child::before]:absolute
             [&_.ProseMirror_p.is-editor-empty:first-child::before]:left-0
             [&_.ProseMirror_p.is-editor-empty:first-child::before]:top-0
@@ -407,13 +407,13 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
             [&_.ProseMirror_ol]:my-2
             [&_.ProseMirror_ol_li]:list-decimal 
             [&_.ProseMirror_blockquote]:border-l-4
-            [&_.ProseMirror_blockquote]:border-gray-300
+            [&_.ProseMirror_blockquote]:border-border
             [&_.ProseMirror_blockquote]:pl-4
             [&_.ProseMirror_blockquote]:italic
-            [&_.ProseMirror_blockquote]:text-gray-600
+            [&_.ProseMirror_blockquote]:text-muted-foreground
             [&_.ProseMirror_blockquote]:my-4
-            [&_.ProseMirror_code]:bg-gray-100
-            [&_.ProseMirror_code]:text-red-600
+            [&_.ProseMirror_code]:bg-muted
+            [&_.ProseMirror_code]:text-red-500
             [&_.ProseMirror_code]:px-1
             [&_.ProseMirror_code]:py-0.5
             [&_.ProseMirror_code]:rounded
@@ -429,18 +429,18 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
             [&_.ProseMirror_pre_code]:p-0
             [&_.ProseMirror_hr]:border-0
             [&_.ProseMirror_hr]:border-t-2
-            [&_.ProseMirror_hr]:border-gray-300
+            [&_.ProseMirror_hr]:border-border
             [&_.ProseMirror_hr]:my-6
             [&_.ProseMirror_table]:border-collapse
             [&_.ProseMirror_table]:w-full
             [&_.ProseMirror_table]:my-4
             [&_.ProseMirror_table_td]:border
-            [&_.ProseMirror_table_td]:border-gray-300
+            [&_.ProseMirror_table_td]:border-border
             [&_.ProseMirror_table_td]:px-3
             [&_.ProseMirror_table_td]:py-2
             [&_.ProseMirror_table_th]:border
-            [&_.ProseMirror_table_th]:border-gray-300
-            [&_.ProseMirror_table_th]:bg-gray-50
+            [&_.ProseMirror_table_th]:border-border
+            [&_.ProseMirror_table_th]:bg-muted
             [&_.ProseMirror_table_th]:px-3
             [&_.ProseMirror_table_th]:py-2
             [&_.ProseMirror_table_th]:font-semibold
@@ -757,7 +757,7 @@ export const ChatMessageInput: React.FC<ChatMessageInputProps> = ({
               [&_.ProseMirror_ol]:my-1
               [&_.ProseMirror_li]:my-0.5
               [&_.ProseMirror_blockquote]:border-l-4
-              [&_.ProseMirror_blockquote]:border-gray-300
+              [&_.ProseMirror_blockquote]:border-border
               [&_.ProseMirror_blockquote]:pl-3
               [&_.ProseMirror_blockquote]:text-gray-500
               [&_.ProseMirror_blockquote]:italic

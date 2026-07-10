@@ -17,9 +17,9 @@ const CustomModal: React.FC<{ isOpen: boolean; onClose: () => void; children: Re
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div ref={modalRef} className="relative bg-white rounded-lg shadow-2xl w-full max-w-md m-4 p-6" role="dialog">
-        <div className="flex justify-between items-start pb-4 border-b">
-          <h2 className="text-xl font-semibold">{title}</h2>
+      <div ref={modalRef} className="relative bg-card border border-border rounded-lg shadow-2xl w-full max-w-md m-4 p-6" role="dialog">
+        <div className="flex justify-between items-start pb-4 border-b border-border">
+          <h2 className="text-xl font-semibold text-foreground">{title}</h2>
           <Button variant="ghost" size="icon" onClick={onClose}><X className="h-5 w-5" /></Button>
         </div>
         {children}
@@ -49,26 +49,26 @@ const ChangeRoleModal: React.FC<{ user: AppUser; isOpen: boolean; onClose: () =>
     <CustomModal isOpen={isOpen} onClose={onClose} title={`Change Role: ${user.username}`}>
       <div className="py-4 space-y-4">
         <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+          <label className="text-sm font-medium text-foreground flex items-center gap-2">
             <Crown className="w-4 h-4" /> Select New Role
           </label>
 
           {/* Inline Controlled Dropdown */}
           <div className="relative">
             <div
-              className="w-full p-2.5 rounded border border-gray-300 hover:border-gray-400 cursor-pointer bg-white flex items-center justify-between transition-all"
+              className="w-full p-2.5 rounded border border-border hover:border-muted-foreground/40 cursor-pointer bg-input flex items-center justify-between transition-all"
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             >
-              <span className="text-sm text-gray-700 capitalize">{newRole}</span>
-              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+              <span className="text-sm text-foreground capitalize">{newRole}</span>
+              <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
             </div>
 
             {isDropdownOpen && (
-              <div className="mt-1 border border-gray-200 rounded-lg bg-white shadow-sm overflow-hidden">
+              <div className="mt-1 border border-border rounded-lg bg-popover shadow-sm overflow-hidden">
                 {roles.map((role) => (
                   <div
                     key={role}
-                    className={`px-4 py-2.5 cursor-pointer text-sm transition-colors ${newRole === role ? 'bg-blue-50 text-blue-700 font-medium' : 'hover:bg-gray-50 text-gray-700'}`}
+                    className={`px-4 py-2.5 cursor-pointer text-sm transition-colors ${newRole === role ? 'bg-blue-500/10 text-blue-500 font-medium' : 'hover:bg-accent text-foreground'}`}
                     onClick={() => {
                       setNewRole(role);
                       setIsDropdownOpen(false);
@@ -192,8 +192,8 @@ const AddUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient
     },
   });
 
-  const inputClass = "w-full border rounded-md p-2 pl-3 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all";
-  const labelClass = "flex items-center gap-2 text-sm font-medium text-gray-700 mb-1.5";
+  const inputClass = "w-full border border-border rounded-md p-2 pl-3 bg-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all";
+  const labelClass = "flex items-center gap-2 text-sm font-medium text-foreground mb-1.5";
 
   return (
     <CustomModal isOpen={isOpen} onClose={onClose} title="Add New User">
@@ -242,18 +242,18 @@ const AddUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient
           <label className={labelClass}><Crown className="h-4 w-4" /> Role</label>
           <div className="space-y-1">
             <div
-              className={`${inputClass} cursor-pointer flex justify-between items-center bg-white`}
+              className="w-full p-2 pl-3 border border-border rounded-md bg-input text-foreground cursor-pointer flex justify-between items-center transition-all"
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             >
               <span className="capitalize">{form.role}</span>
-              <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
             </div>
 
             {isDropdownOpen && (
-              <div className="border border-gray-200 rounded-md mt-1 bg-white overflow-hidden shadow-sm">
+              <div className="border border-border rounded-md mt-1 bg-popover overflow-hidden shadow-sm">
                 {['admin', 'manager', 'annotator', 'viewer', 'developer'].map((role) => (<div
                   key={role}
-                  className="px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer capitalize"
+                  className="px-3 py-2 text-sm hover:bg-accent text-foreground cursor-pointer capitalize"
                   onClick={() => {
                     setForm({ ...form, role: role as any });
                     setIsDropdownOpen(false);
@@ -352,11 +352,10 @@ const AddUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient
       </div>
 
       {showSuccess && (
-        <div className="absolute inset-0 flex items-center justify-center z-10 rounded-lg bg-white/80 backdrop-blur-sm">
-          <div className="flex flex-col items-center gap-3 px-8 py-6 rounded-xl shadow-lg bg-white border border-green-100">
+        <div className="absolute inset-0 flex items-center justify-center z-10 rounded-lg bg-card/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3 px-8 py-6 rounded-xl shadow-lg bg-card border border-green-500/20">
             <CheckCircle className="w-10 h-10 text-green-500" />
-            
-            <p className="text-base font-semibold text-gray-800 tracking-wide">User created successfully.</p>
+            <p className="text-base font-semibold text-foreground tracking-wide">User created successfully.</p>
           </div>
         </div>
       )}
@@ -433,18 +432,18 @@ const InviteUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryCli
           <label className={labelClass}><Crown className="h-4 w-4" /> Role</label>
           <div className="space-y-1">
             <div
-              className={`${inputClass} cursor-pointer flex justify-between items-center bg-white`}
+              className="w-full p-2 pl-3 border border-border rounded-md bg-input text-foreground cursor-pointer flex justify-between items-center transition-all"
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             >
               <span className="capitalize">{form.role}</span>
-              <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
             </div>
             {isDropdownOpen && (
-              <div className="border border-gray-200 rounded-md mt-1 bg-white overflow-hidden shadow-sm">
+              <div className="border border-border rounded-md mt-1 bg-popover overflow-hidden shadow-sm">
                 {(['admin', 'manager', 'annotator', 'viewer', 'developer'] as AppUser['role'][]).map((role) => (
                   <div
                     key={role}
-                    className="px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer capitalize"
+                    className="px-3 py-2 text-sm hover:bg-accent text-foreground cursor-pointer capitalize"
                     onClick={() => {
                       setForm({ ...form, role });
                       setIsDropdownOpen(false);
@@ -467,21 +466,21 @@ const InviteUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryCli
           </label>
           <div className="space-y-1">
             <div
-              className={`${inputClass} cursor-pointer flex justify-between items-center bg-white`}
+              className="w-full p-2 pl-3 border border-border rounded-md bg-input text-foreground cursor-pointer flex justify-between items-center transition-all"
               onClick={() => setIsWorkspaceDropdownOpen(!isWorkspaceDropdownOpen)}
             >
-              <span className="text-sm text-gray-700">
+              <span className="text-sm text-foreground">
                 {workspaces.find((w: any) => w.id === form.workspace_id)?.name ?? 'Select Workspace'}
               </span>
               <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isWorkspaceDropdownOpen ? 'rotate-180' : ''}`} />
             </div>
 
             {isWorkspaceDropdownOpen && (
-              <div className="border border-gray-200 rounded-md mt-1 bg-white overflow-hidden shadow-sm">
+              <div className="border border-border rounded-md mt-1 bg-popover overflow-hidden shadow-sm">
                 {workspaces.map((ws: any) => (
                   <div
                     key={ws.id}
-                    className={`px-3 py-2 text-sm cursor-pointer ${form.workspace_id === ws.id ? 'bg-blue-50 text-blue-700 font-medium' : 'hover:bg-gray-50 text-gray-700'}`}
+                    className={`px-3 py-2 text-sm cursor-pointer ${form.workspace_id === ws.id ? 'bg-blue-500/10 text-blue-500 font-medium' : 'hover:bg-accent text-foreground'}`}
                     onClick={() => { setForm({ ...form, workspace_id: ws.id }); setIsWorkspaceDropdownOpen(false); }}
                   >
                     {ws.name}
@@ -516,10 +515,10 @@ const InviteUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryCli
       </div>
 
       {showSuccess && (
-        <div className="absolute inset-0 flex items-center justify-center z-10 rounded-lg bg-white/80 backdrop-blur-sm">
-          <div className="flex flex-col items-center gap-3 px-8 py-6 rounded-xl shadow-lg bg-white border border-green-100">
+        <div className="absolute inset-0 flex items-center justify-center z-10 rounded-lg bg-card/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3 px-8 py-6 rounded-xl shadow-lg bg-card border border-green-500/20">
             <CheckCircle className="w-10 h-10 text-green-500" />
-            <p className="text-base font-semibold text-gray-800 tracking-wide">Invitation sent successfully.</p>
+            <p className="text-base font-semibold text-foreground tracking-wide">Invitation sent successfully.</p>
           </div>
         </div>
       )}
@@ -564,14 +563,14 @@ export function UserManagement() {
   const users = usersData?.results || [];
 
   return (
-    <div className="flex w-full min-h-screen bg-[#F7F8FB] px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 pt-6 pb-8">
+    <div className="flex w-full min-h-screen bg-background px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 pt-6 pb-8">
       {/* Inner Card Container */}
-      <div className="flex flex-col flex-1 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="flex flex-col flex-1 bg-card rounded-xl shadow-sm border border-border overflow-hidden">
         
         {/* Header */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+        <div className="bg-card border-b border-border px-6 py-4 flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
+              <h1 className="text-2xl font-bold text-foreground">User Management</h1>
               <p className="text-muted-foreground text-sm">Manage system users, access levels, and roles</p>
             </div>
             <div className="flex items-center gap-3">

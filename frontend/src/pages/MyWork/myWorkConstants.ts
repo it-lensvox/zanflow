@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react';
 import { BLUE, GREEN, YELLOW, RED, PURPLE, TEXT as INK, MUTED, LINE } from '@/config/tokens';
 export { BLUE, GREEN, YELLOW, RED, PURPLE, INK, MUTED, LINE };
-export const SURFACE = '#FFFFFF';
+export const SURFACE = 'hsl(var(--card))';
 
 export const EVENT_COLORS = [BLUE, PURPLE, YELLOW, GREEN, RED];
 export function eventColor(idx: number) {
@@ -41,8 +41,8 @@ export function isToday(iso: string) {
 
 // ─── Shared card style 
 export const card: CSSProperties = {
-  background: SURFACE,
+  background: 'hsl(var(--card))',
   borderRadius: 12,
   border: `1px solid ${LINE}`,
-  boxShadow: '0 1px 4px rgba(16,24,40,.04)',
+  boxShadow: '0 1px 3px rgba(0,0,0,.07)',
 };

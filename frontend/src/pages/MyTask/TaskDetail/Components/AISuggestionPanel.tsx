@@ -9,9 +9,9 @@ import { PRIORITY_OPTIONS } from '@/config/priorityConfig';
 
 // ── Design tokens 
 const T = {
-  text:  '#172033',
-  muted: '#667085',
-  line:  '#e6ebf2',
+  text:  'hsl(var(--foreground))',
+  muted: 'hsl(var(--muted-foreground))',
+  line:  'hsl(var(--border))',
   blue:  '#1663f6',
 } as const;
 
@@ -59,7 +59,7 @@ function MiniDropdown<T extends string>({
         style={{
           display: 'flex', alignItems: 'center', gap: 3,
           padding: '2px 7px', borderRadius: 6, border: `1px solid ${T.line}`,
-          background: '#fff', fontSize: 11, color: T.text,
+          background: 'hsl(var(--input))', fontSize: 11, color: T.text,
           cursor: 'pointer', fontWeight: 500, whiteSpace: 'nowrap',
         }}
       >
@@ -69,7 +69,7 @@ function MiniDropdown<T extends string>({
       {open && (
         <div style={{
           position: 'absolute', zIndex: 60, top: 'calc(100% + 3px)', left: 0,
-          background: '#fff', border: `1px solid ${T.line}`, borderRadius: 8,
+          background: 'hsl(var(--popover))', border: `1px solid ${T.line}`, borderRadius: 8,
           boxShadow: '0 8px 24px rgba(16,24,40,.12)', overflow: 'hidden', minWidth: 120,
         }}>
           {options.map(opt => (
@@ -78,12 +78,12 @@ function MiniDropdown<T extends string>({
               onClick={() => { onChange(opt); setOpen(false); }}
               style={{
                 width: '100%', padding: '7px 12px', fontSize: 12, color: T.text,
-                background: value === opt ? '#f7f8fb' : 'transparent',
+                background: value === opt ? 'hsl(var(--accent))' : 'transparent',
                 border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center',
                 gap: 7, textAlign: 'left',
               }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#f7f8fb')}
-              onMouseLeave={e => (e.currentTarget.style.background = value === opt ? '#f7f8fb' : 'transparent')}
+              onMouseEnter={e => (e.currentTarget.style.background = 'hsl(var(--accent))')}
+              onMouseLeave={e => (e.currentTarget.style.background = value === opt ? 'hsl(var(--accent))' : 'transparent')}
             >
               {renderOption(opt)}
               {value === opt && (
@@ -180,7 +180,7 @@ function AssigneePicker({
             title="Add assignee"
             style={{
               width: 18, height: 18, borderRadius: '50%',
-              border: `1.5px dashed ${T.line}`, background: '#fff',
+              border: `1.5px dashed ${T.line}`, background: 'hsl(var(--muted))',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', color: T.muted, flexShrink: 0,
             }}
@@ -192,7 +192,7 @@ function AssigneePicker({
           {open && (
             <div style={{
               position: 'absolute', zIndex: 60, top: 'calc(100% + 3px)', left: 0,
-              background: '#fff', border: `1px solid ${T.line}`, borderRadius: 8,
+             background: 'hsl(var(--popover))', border: `1px solid ${T.line}`, borderRadius: 8,
               boxShadow: '0 8px 24px rgba(16,24,40,.12)', overflow: 'hidden',
               minWidth: 150, maxHeight: 160, overflowY: 'auto',
             }}>
@@ -201,10 +201,10 @@ function AssigneePicker({
                   key={u.id}
                   onClick={() => { onAdd(u.id); setOpen(false); }}
                   style={{ width: '100%', padding: '7px 12px', fontSize: 12, color: T.text, background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = '#f7f8fb')}
+                   onMouseEnter={e => (e.currentTarget.style.background = 'hsl(var(--accent))')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
-                  <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: T.muted, flexShrink: 0 }}>
+                 <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'hsl(var(--muted))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: T.muted, flexShrink: 0 }}>
                     {initials(u)}
                   </div>
                   {u.first_name} {u.last_name}
@@ -225,7 +225,7 @@ function AssigneePicker({
   );
 }
 
-// ── Skeleton ─────────────────────────────────────────────────────────────────
+// ── Skeleton
 function SuggestionSkeleton() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '10px 12px 6px' }}>
@@ -234,17 +234,17 @@ function SuggestionSkeleton() {
           key={i}
           style={{
             display: 'flex', alignItems: 'center', gap: 10,
-            background: '#fff', border: `1px solid ${T.line}`,
+            background: 'hsl(var(--card))', border: `1px solid ${T.line}`,
             borderRadius: 8, padding: '9px 12px',
             animation: 'pulse 1.5s ease-in-out infinite',
             animationDelay: `${i * 80}ms`,
           }}
         >
-          <div style={{ width: 14, height: 14, borderRadius: 4, background: '#e6ebf2', flexShrink: 0 }} />
-          <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#e6ebf2', flexShrink: 0 }} />
-          <div style={{ height: 11, background: '#e6ebf2', borderRadius: 4, flex: 1, width: `${55 + i * 8}%` }} />
-          <div style={{ width: 40, height: 18, background: '#f1f5f9', borderRadius: 6, flexShrink: 0 }} />
-          <div style={{ width: 50, height: 18, background: '#f1f5f9', borderRadius: 6, flexShrink: 0 }} />
+         <div style={{ width: 14, height: 14, borderRadius: 4, background: 'hsl(var(--border))', flexShrink: 0 }} />
+          <div style={{ width: 7, height: 7, borderRadius: '50%', background: 'hsl(var(--border))', flexShrink: 0 }} />
+          <div style={{ height: 11, background: 'hsl(var(--border))', borderRadius: 4, flex: 1, width: `${55 + i * 8}%` }} />
+          <div style={{ width: 40, height: 18, background: 'hsl(var(--muted))', borderRadius: 6, flexShrink: 0 }} />
+          <div style={{ width: 50, height: 18, background: 'hsl(var(--muted))', borderRadius: 6, flexShrink: 0 }} />
         </div>
       ))}
       <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }`}</style>
@@ -285,8 +285,8 @@ function SuggestionRow({
   return (
     <div
       style={{
-        background: suggestion.selected ? '#fff' : '#fafafa',
-        border: `1px solid ${suggestion.selected ? T.line : '#f1f5f9'}`,
+        background: suggestion.selected ? 'hsl(var(--card))' : 'hsl(var(--muted)/0.4)',
+        border: `1px solid ${suggestion.selected ? T.line : 'hsl(var(--border))'}`,
         borderRadius: 8,
         opacity: suggestion.selected ? 1 : 0.65,
         transition: 'all .15s',
@@ -300,8 +300,8 @@ function SuggestionRow({
           style={{
             width: 15, height: 15, borderRadius: 4, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            border: suggestion.selected ? `2px solid ${T.blue}` : `2px solid #cbd5e1`,
-            background: suggestion.selected ? T.blue : '#fff',
+            border: suggestion.selected ? `2px solid ${T.blue}` : `2px solid hsl(var(--border))`,
+            background: suggestion.selected ? T.blue : 'hsl(var(--input))',
             cursor: 'pointer', transition: 'all .15s',
           }}
           aria-label={suggestion.selected ? 'Deselect' : 'Select'}
@@ -468,14 +468,14 @@ export function AISuggestionPanel({
 
   return (
     <div style={{
-      marginTop: 10, border: `1px solid #c7d7fe`,
+      marginTop: 10, border: `1px solid rgba(99,130,254,0.35)`,
       borderRadius: 10, overflow: 'hidden',
-      background: '#f8faff', boxShadow: '0 1px 4px rgba(22,99,246,.08)',
+      background: 'hsl(var(--card))', boxShadow: '0 1px 4px rgba(0,0,0,.12)',
     }}>
       {/* ── Header ── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 14px', background: '#fff', borderBottom: `1px solid #e0e7ff` }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 14px', background: 'hsl(var(--card))', borderBottom: `1px solid hsl(var(--border))` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          <div style={{ width: 20, height: 20, borderRadius: 6, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <div style={{ width: 20, height: 20, borderRadius: 6, background: 'rgba(59,90,245,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <Sparkles size={11} style={{ color: T.blue }} />
           </div>
           <span style={{ fontSize: 12, fontWeight: 600, color: '#3b5af5' }}>
@@ -490,7 +490,7 @@ export function AISuggestionPanel({
           {!isLoading && suggestions.length > 0 && (
             <button onClick={onRegenerate}
               style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: T.blue, background: 'none', border: 'none', cursor: 'pointer', padding: '3px 7px', borderRadius: 6 }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#eff6ff')}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(59,90,245,0.10)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'none')}
             >
               <RefreshCw size={11} /> Regenerate
@@ -584,7 +584,7 @@ export function AISuggestionPanel({
 
       {/* ── Footer ── */}
       {suggestions.length > 0 && !isLoading && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px 10px', borderTop: `1px solid #e0e7ff`, background: '#fff' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px 10px', borderTop: `1px solid hsl(var(--border))`, background: 'hsl(var(--muted))' }}>
           <div style={{ fontSize: 11 }}>
             {showSuccess && (
               <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#16a34a' }}>

@@ -536,27 +536,27 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
   const threadHistoryPanelJSX = (
     <div className="flex flex-col h-full">
       {/* Panel Header */}
-      <div className="flex items-center justify-between px-3 py-3 border-b border-gray-200 bg-gray-50">
-        <span className="text-sm font-semibold text-gray-700">Thread History</span>
+      <div className="flex items-center justify-between px-3 py-3 border-b border-border bg-muted">
+        <span className="text-sm font-semibold text-foreground">Thread History</span>
         <button
           onClick={createNewSession}
-          className="p-1 hover:bg-gray-200 rounded transition-colors"
+          className="p-1 hover:bg-accent rounded transition-colors"
           title="New Thread"
         >
-          <Plus className="w-4 h-4 text-gray-600" />
+          <Plus className="w-4 h-4 text-muted-foreground" />
         </button>
       </div>
 
       {/* Search */}
-      <div className="px-2 py-2 border-b border-gray-100">
+      <div className="px-2 py-2 border-b border-border">
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
           <input
             type="text"
             placeholder="Search..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-8 pr-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-8 pr-2 py-1.5 text-xs border border-border rounded-md bg-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
       </div>
@@ -564,7 +564,7 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
       {/* Session List */}
       <div className="overflow-y-auto flex-1">
         {filteredSessions.length === 0 ? (
-          <div className="px-3 py-6 text-center text-xs text-gray-400">
+          <div className="px-3 py-6 text-center text-xs text-muted-foreground">
             {searchQuery ? 'No sessions found' : 'No sessions yet'}
           </div>
         ) : (
@@ -572,14 +572,14 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
             <button
               key={session.id}
               onClick={() => switchSession(session.id)}
-              className={`w-full px-3 py-2.5 text-left hover:bg-gray-50 transition-colors border-l-2 flex items-start justify-between gap-1 group ${session.id === activeSessionId
+              className={`w-full px-3 py-2.5 text-left hover:bg-accent transition-colors border-l-2 flex items-start justify-between gap-1 group ${session.id === activeSessionId
                 ? 'border-blue-500 bg-blue-50'
                 : 'border-transparent'
                 }`}
             >
               <div className="flex-1 min-w-0">
-                <div className="font-medium text-xs text-gray-900 truncate">{session.title}</div>
-                <div className="flex items-center gap-1 mt-0.5 text-[10px] text-gray-400">
+                <div className="font-medium text-xs text-foreground truncate">{session.title}</div>
+                <div className="flex items-center gap-1 mt-0.5 text-[10px] text-muted-foreground">
                   <Clock className="w-2.5 h-2.5" />
                   <span>{new Date(session.updatedAt).toLocaleDateString()}</span>
                   {session.unreadCount > 0 && (
@@ -612,8 +612,8 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
             <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mb-4">
               <MessageCircle className="w-8 h-8 text-blue-500" />
             </div>
-            <h4 className="font-medium text-gray-900 mb-2">No messages yet</h4>
-            <p className="text-sm text-gray-500 mb-4">Start a conversation for this project</p>
+            <h4 className="font-medium text-foreground mb-2">No messages yet</h4>
+            <p className="text-sm text-muted-foreground mb-4">Start a conversation for this project</p>
             {sessions.length === 0 && (
               <button
                 onClick={createNewSession}
@@ -634,15 +634,15 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
                   className={`max-w-[80%] rounded-lg px-4 py-2.5 ${message.sender === 'user'
                     ? 'bg-[#2d6a5f] text-white'
                     : message.sender === 'system'
-                      ? 'bg-gray-100 text-gray-900 border border-gray-300'
-                      : 'bg-white text-gray-900 border border-gray-200'
+                      ? 'bg-muted text-foreground border border-border'
+                      : 'bg-card text-foreground border border-border'
                     }`}
                 >
                   {message.sender === 'other' && message.senderName && (
-                    <p className="text-xs font-semibold text-gray-600 mb-1">{message.senderName}</p>
+                    <p className="text-xs font-semibold text-muted-foreground mb-1">{message.senderName}</p>
                   )}
                   <p className="text-sm whitespace-pre-wrap break-words">{message.text}</p>
-                  <p className={`text-xs mt-1 ${message.sender === 'user' ? 'text-green-100' : 'text-gray-500'}`}>
+                  <p className={`text-xs mt-1 ${message.sender === 'user' ? 'text-green-100' : 'text-muted-foreground'}`}>
                     {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 </div>
@@ -654,7 +654,7 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
       </div>
 
       {/* INPUT SECTION */}
-      <div className="border-t border-gray-200 p-3 bg-white">
+      <div className="border-t border-border p-3 bg-card">
         {activeSession ? (
           <div className="flex items-end gap-2">
             <textarea
@@ -664,7 +664,7 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
               onKeyPress={handleKeyPress}
               placeholder="Type a message..."
               rows={2}
-              className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              className="flex-1 px-3 py-2 text-sm border border-border rounded-md bg-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
             />
             <button
               onClick={sendMessage}
@@ -709,7 +709,7 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
           <div className="shrink-0" style={{ width: 'var(--sidebar-width, 240px)' }} />
           <div
-            className="relative z-10 flex bg-white rounded-xl shadow-2xl overflow-hidden"
+            className="relative z-10 flex bg-card rounded-xl shadow-2xl overflow-hidden border border-border"
             style={{
               width: isHistoryPanelOpen ? 'min(900px, calc(100% - 64px))' : 'min(680px, calc(100% - 64px))',
               height: 'calc(100vh - 80px)',
@@ -718,43 +718,43 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
           >
             {/* Left: History Panel */}
             <div
-              className={`flex flex-col bg-white border-r border-gray-200 transition-all duration-300 overflow-hidden shrink-0 ${isHistoryPanelOpen ? 'w-64' : 'w-0'
+              className={`flex flex-col bg-card border-r border-border transition-all duration-300 overflow-hidden shrink-0 ${isHistoryPanelOpen ? 'w-64' : 'w-0'
                 }`}
             >
               {isHistoryPanelOpen && threadHistoryPanelJSX}
             </div>
 
             {/* Right: Chat Area */}
-            <div className="flex-1 flex flex-col bg-white overflow-hidden min-w-0">
+            <div className="flex-1 flex flex-col bg-card overflow-hidden min-w-0">
               {/* Header */}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white shrink-0">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card shrink-0">
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setIsHistoryPanelOpen(!isHistoryPanelOpen)}
-                    className="p-1.5 hover:bg-gray-100 rounded transition-colors"
+                    className="p-1.5 hover:bg-accent rounded transition-colors"
                     title={isHistoryPanelOpen ? 'Collapse history' : 'Expand history'}
                   >
                     {isHistoryPanelOpen
-                      ? <PanelLeftClose className="w-5 h-5 text-gray-600" />
-                      : <PanelLeftOpen className="w-5 h-5 text-gray-600" />
+                      ? <PanelLeftClose className="w-5 h-5 text-muted-foreground" />
+                      : <PanelLeftOpen className="w-5 h-5 text-muted-foreground" />
                     }
                   </button>
                   <div>
-                    <h3 className="font-semibold text-gray-900">Thread</h3>
-                    <p className="text-xs text-gray-500">{projectName}</p>
+                    <h3 className="font-semibold text-foreground">Thread</h3>
+                    <p className="text-xs text-muted-foreground">{projectName}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={createNewSession}
-                    className="p-1.5 hover:bg-gray-100 rounded transition-colors"
+                    className="p-1.5 hover:bg-accent rounded transition-colors"
                     title="New Session"
                   >
-                    <Plus className="w-4 h-4 text-gray-600" />
+                    <Plus className="w-4 h-4 text-muted-foreground" />
                   </button>
                   <button
                     onClick={() => { setIsFullScreen(false); setIsHistoryPanelOpen(false); }}
-                    className="p-1.5 hover:bg-gray-100 rounded transition-colors"
+                    className="p-1.5 hover:bg-accent rounded transition-colors"
                     title="Exit full screen"
                   >
                     <ChevronDown className="w-4 h-4 text-gray-600" />
@@ -788,7 +788,7 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => setIsHistoryPanelOpen(!isHistoryPanelOpen)}
-                    className="p-1 hover:bg-gray-200 rounded transition-colors"
+                    className="p-1 hover:bg-accent rounded transition-colors"
                     title={isHistoryPanelOpen ? 'Collapse history' : 'Show history'}
                   >
                     {isHistoryPanelOpen
@@ -797,8 +797,8 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
                     }
                   </button>
                   <div className="min-w-0">
-                    <h3 className="font-semibold text-gray-900 text-sm truncate">Thread</h3>
-                    <p className="text-xs text-gray-500 truncate">{projectName}</p>
+                    <h3 className="font-semibold text-foreground">Thread</h3>
+                    <p className="text-xs text-muted-foreground">{projectName}</p>
                   </div>
                 </div>
 
@@ -808,7 +808,7 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
                     className="p-1.5 hover:bg-gray-200 rounded transition-colors"
                     title="New Session"
                   >
-                    <Plus className="w-4 h-4 text-gray-600" />
+                    <Plus className="w-4 h-4 text-muted-foreground" />
                   </button>
                   <button
                     onClick={() => { setIsFullScreen(true); setIsHistoryPanelOpen(false); }}

@@ -26,7 +26,7 @@ export const Calendar: React.FC = () => {
     const c = useCalendar();
     const settingsDropdownRef = React.useRef<HTMLDivElement>(null);
 
-    // ─── renderStatusDot lives here because it returns JSX (.tsx file only)
+    // ─── renderStatusDot lives here because it returns JSX 
     const renderStatusDot = (event: CalendarEventType) => {
         if (c.seenEventIds.includes(event.id)) return null;
         if (event.my_invitation_status !== 'ORGANIZER') return null;
@@ -62,7 +62,7 @@ export const Calendar: React.FC = () => {
     }
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#fff', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'hsl(var(--background))', overflow: 'hidden' }}>
 
             {/* Top Bar */}
             <CalendarHeader
@@ -79,6 +79,7 @@ export const Calendar: React.FC = () => {
                 onViewMode={v => c.setViewMode(v)}
                 onNewEvent={() => { c.setSelectedDate(null); c.setIsEventModalOpen(true); }}
                 onToggleSettings={() => c.setIsSettingsOpen(v => !v)}
+                onViewAllEvents={() => { c.setSelectedDate(null); c.setIsEventListOpen(true); }}
                 onToggleSharedEvents={val => { c.setIncludeSharedEvents(val); if (!val) c.setSelectedUserIds([]); }}
                 onShareCalendar={() => c.setIsShareModalOpen(true)}
                 onToggleUser={c.toggleSharedUser}
@@ -89,7 +90,7 @@ export const Calendar: React.FC = () => {
             />
 
             {/* Dyuksa AI Bar */}
-            <div className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 py-3 border-b border-gray-100 bg-white flex-shrink-0">
+            <div className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 py-3 border-b border-border bg-card flex-shrink-0">
                 <div className="flex items-center gap-3">
                     <div className="relative flex-1">
                         <input
@@ -146,12 +147,12 @@ export const Calendar: React.FC = () => {
                 </div>
 
                 {/* Calendar grid */}
-                <div className={`flex-1 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col ${c.selectedDate ? 'hidden md:flex' : 'flex'}`}>
+                <div className={`flex-1 bg-card rounded-xl border border-border shadow-sm overflow-hidden flex flex-col ${c.selectedDate ? 'hidden md:flex' : 'flex'}`}>
                     {c.viewMode === 'month' ? (
                         <>
-                            <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
+                            <div className="grid grid-cols-7 border-b border-border bg-muted">
                                 {DAYS_OF_WEEK.map(day => (
-                                    <div key={day} className="py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">{day}</div>
+                                    <div key={day} className="py-3 text-center text-xs font-semibold text-muted-foreground uppercase tracking-wider">{day}</div>
                                 ))}
                             </div>
                             <div className="grid grid-cols-7 auto-rows-fr flex-1">
@@ -220,8 +221,8 @@ export const Calendar: React.FC = () => {
 
             {/* Status Legend */}
             <div className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 flex-shrink-0">
-                <div className="flex flex-wrap items-center gap-4 px-6 py-3 mb-3 bg-white rounded-xl border border-gray-200 shadow-sm">
-                    <span className="text-sm font-semibold text-gray-500">Status:</span>
+                <div className="flex flex-wrap items-center gap-4 px-6 py-3 mb-3 bg-card rounded-xl border border-border shadow-sm">
+                    <span className="text-sm font-semibold text-muted-foreground">Status:</span>
                     <div className="flex flex-wrap gap-4">
                         {['pending','in_progress','completed','deployed','deferred','review'].map(status => {
                             const config = getStatusConfig(status);
@@ -237,6 +238,73 @@ export const Calendar: React.FC = () => {
             </div>
 
             {/* Modals */}
+            {/* ── My Events List Panel ── */}
+            {c.isEventListOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => c.setIsEventListOpen(false)}>
+                    <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden" style={{ maxHeight: '85vh' }} onClick={e => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+                            <div>
+                                <h2 className="text-base font-semibold text-foreground">My Events</h2>
+                                <p className="text-xs text-muted-foreground mt-0.5">All your upcoming & past events</p>
+                            </div>
+                            <button onClick={() => c.setIsEventListOpen(false)} className="p-2 hover:bg-accent rounded-lg transition-colors">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                            </button>
+                        </div>
+                        {/* Events list */}
+                        <div className="overflow-y-auto" style={{ maxHeight: 'calc(85vh - 80px)' }}>
+                            {c.events.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mb-3 opacity-40"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                                    <p className="text-sm">No events found</p>
+                                </div>
+                            ) : (
+                                [...c.events]
+                                    .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+                                    .map(event => {
+                                        const start = new Date(event.start_time);
+                                        const end = new Date(event.end_time);
+                                        const isPast = end < new Date();
+                                        return (
+                                            <button
+                                                key={event.id}
+                                                onClick={() => { c.setSelectedEvent(event); c.setIsEventModalOpen(true); c.setIsEventListOpen(false); }}
+                                                className="w-full flex items-start gap-4 px-6 py-4 border-b border-border hover:bg-accent transition-colors text-left"
+                                                style={{ opacity: isPast ? 0.6 : 1 }}
+                                            >
+                                                {/* Date badge */}
+                                                <div className="flex-shrink-0 w-12 text-center">
+                                                    <div className="text-xs font-semibold text-muted-foreground uppercase">{start.toLocaleDateString('en', { month: 'short' })}</div>
+                                                    <div className="text-xl font-bold text-foreground leading-none">{start.getDate()}</div>
+                                                </div>
+                                                {/* Event info */}
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-semibold text-foreground truncate">{event.title}</p>
+                                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                                        {start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} – {end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </p>
+                                                    {event.location && <p className="text-xs text-muted-foreground truncate mt-0.5">📍 {event.location}</p>}
+                                                </div>
+                                                {/* Status badge */}
+                                                {event.my_invitation_status && (
+                                                    <span className={`flex-shrink-0 text-[10px] font-bold px-2 py-1 rounded-full ${
+                                                        event.my_invitation_status === 'ACCEPTED' ? 'bg-green-500/15 text-green-500' :
+                                                        event.my_invitation_status === 'DECLINED' ? 'bg-red-500/15 text-red-500' :
+                                                        'bg-amber-500/15 text-amber-500'
+                                                    }`}>
+                                                        {event.my_invitation_status}
+                                                    </span>
+                                                )}
+                                            </button>
+                                        );
+                                    })
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <EventModal
                 isOpen={c.isEventModalOpen}
                 onClose={() => { c.setIsEventModalOpen(false); c.setSelectedEvent(null); c.setSelectedDate(null); c.setSelectedHour(null); c.setDyuksaEventData(null); }}
@@ -287,17 +355,17 @@ export const Calendar: React.FC = () => {
             {/* Context Menu */}
             {c.contextMenu && (
                 <div
-                    className="fixed z-[100] bg-white rounded-xl shadow-2xl border border-gray-200 py-2 min-w-[200px]"
+                    className="fixed z-[100] bg-popover rounded-xl shadow-2xl border border-border py-2 min-w-[200px]"
                     style={{ top: Math.min(c.contextMenu.y, window.innerHeight - 250), left: Math.min(c.contextMenu.x, window.innerWidth - 220) }}
                     onClick={e => e.stopPropagation()}
                 >
                     <div className="relative" onMouseEnter={() => c.setShowRepeatSubmenu(true)} onMouseLeave={() => c.setShowRepeatSubmenu(false)}>
-                        <button className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center justify-between">
-                            <span className="flex items-center gap-3"><RefreshCw size={16} className="text-gray-400" />Repeat event</span>
-                            <ChevronRight size={14} className="text-gray-400" />
+                       <button className="w-full px-4 py-2.5 text-left text-sm text-foreground hover:bg-accent flex items-center justify-between">
+                            <span className="flex items-center gap-3"><RefreshCw size={16} className="text-muted-foreground" />Repeat event</span>
+                            <ChevronRight size={14} className="text-muted-foreground" />
                         </button>
                         {c.showRepeatSubmenu && (
-                            <div className="absolute top-0 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 min-w-[180px]"
+                            <div className="absolute top-0 bg-popover rounded-xl shadow-2xl border border-border py-2 min-w-[180px]"
                                 style={c.contextMenu.x + 400 > window.innerWidth ? { right: '100%', marginRight: '4px' } : { left: '100%', marginLeft: '4px' }}>
                                 <button onClick={async () => {
                                     if (c.contextMenu?.event) {

@@ -44,30 +44,30 @@ const DeclineModal: React.FC<DeclineModalProps> = ({
             }}
         >
             <div 
-                className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 mx-4"
+                className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-md p-6 mx-4"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
                 <div className="flex items-center gap-3 mb-4">
-                    <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                        <X className="text-red-600" size={24} />
+                    <div className="w-9 h-9 bg-red-100 rounded-full flex items-center justify-center">
+                        <X className="text-red-500" size={15} />
                     </div>
                     <div className="flex-1">
                         <h3 className="font-semibold text-gray-900 text-lg">Decline invitation</h3>
                         {eventTitle && (
-                            <p className="text-sm text-gray-500 truncate">{eventTitle}</p>
+                            <p className="text-sm text-blue-foreground truncate">{eventTitle}</p>
                         )}
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                        className="p-2 hover:bg-accent rounded-lg transition-colors flex-shrink-0"
                     >
-                        <X size={20} className="text-gray-400" />
+                        <X size={15} className="text-muted-foreground" />
                     </button>
                 </div>
 
                 {/* Description */}
-                <p className="text-sm text-gray-600 mb-4">
+                <p className="text-xs text-muted-foreground mb-6">
                     Let the organizer know why you can't attend. This helps them understand your availability.
                 </p>
 
@@ -80,8 +80,8 @@ const DeclineModal: React.FC<DeclineModalProps> = ({
                             onClick={() => setReason(qr)}
                             className={`px-3 py-1.5 text-xs rounded-full border transition-all ${
                                 reason === qr
-                                    ? 'bg-red-100 border-red-300 text-red-700 font-medium'
-                                    : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                                    ? 'bg-red-500/15 border-red-400/60 text-red-500 font-medium'
+                                    : 'bg-muted border-border text-muted-foreground hover:bg-accent'
                             }`}
                         >
                             {qr}
@@ -91,7 +91,7 @@ const DeclineModal: React.FC<DeclineModalProps> = ({
 
                 {/* Custom reason input */}
                 <div className="mb-5">
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                         Reason for declining
                     </label>
                     <textarea
@@ -99,7 +99,7 @@ const DeclineModal: React.FC<DeclineModalProps> = ({
                         value={reason}
                         onChange={(e) => setReason(e.target.value)}
                         rows={3}
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
+                        className="w-full px-4 py-3 bg-input border border-border rounded-xl text-sm text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
                     />
                 </div>
 
@@ -108,7 +108,7 @@ const DeclineModal: React.FC<DeclineModalProps> = ({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-xl transition-colors"
+                        className="flex-1 px-4 py-3 bg-muted hover:bg-accent text-foreground text-sm font-medium rounded-xl transition-colors"
                     >
                         Cancel
                     </button>

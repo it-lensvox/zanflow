@@ -71,11 +71,11 @@ export function MessageBubble({ message, isStreaming = false, onCloseChat }: Mes
 
         {isStreaming ? (
           <div style={{
-            background: '#fff', border: '1px solid #e6ebf2',
+            background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))',
             borderRadius: '4px 20px 20px 20px',
             padding: '12px 18px',
             fontSize: 14, color: TEXT, lineHeight: 1.7,
-            boxShadow: '0 2px 12px rgba(16,24,40,.06)',
+            boxShadow: '0 2px 12px rgba(0,0,0,.08)',
             minWidth: 40, minHeight: 20,
           }}>
             <span style={{ whiteSpace: 'pre-wrap' }}>
@@ -85,11 +85,11 @@ export function MessageBubble({ message, isStreaming = false, onCloseChat }: Mes
           </div>
         ) : (
           <div style={{
-            background: '#fff', border: '1px solid #e6ebf2',
+            background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))',
             borderRadius: '4px 20px 20px 20px',
             padding: '12px 18px',
             fontSize: 14, color: TEXT, lineHeight: 1.7,
-            boxShadow: '0 2px 12px rgba(16,24,40,.06)',
+            boxShadow: '0 2px 12px rgba(0,0,0,.08)',
             minWidth: 40, minHeight: 20,
           }}>
            {/* Always show AI text response */}

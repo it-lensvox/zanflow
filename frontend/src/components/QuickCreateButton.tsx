@@ -1,10 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, X, CheckSquare, FolderKanban, FileText, Building2, CalendarPlus, Users } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Plus, X, CheckSquare, FolderKanban, Upload, Building2, CalendarPlus, Users } from 'lucide-react';
 import { CreateProjectModal } from '@/pages/Project/CreateProjectModal';
 import { CreateWorkspaceModal } from '@/components/Modals/CreateWorkspaceModal';
-import { CreateDocumentModal } from '@/components/Modals/CreateDocumentModal';
-// ── Types ──────────────────────────────────────────────────────────────────────
+import { UploadDocumentModal } from '@/pages/Documents/components/UploadDocumentModal';
+import { EventModal } from '@/pages/Calendar/components/EventModal';
+import { projectsApi } from '@/services/api';
+import { useAuth } from '@/hooks/useAuth';
+
+// ── Types 
 type CreateItem = {
   id: string;
   label: string;
@@ -16,12 +21,24 @@ type CreateItem = {
   target?: string;
 };
 
-// ── Main Component ─────────────────────────────────────────────────────────────
+// ── Main Component 
 export function QuickCreateButton() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+
+  // Fetch projects for UploadDocumentModal
+  const { data: projectsData } = useQuery({
+    queryKey: ['projects'],
+    queryFn: () => projectsApi.list(),
+    enabled: activeModal === 'document',
+  });
+  const projects = Array.isArray(projectsData)
+    ? projectsData
+    : (projectsData as any)?.results ?? [];
 
   // ESC to close
   useEffect(() => {
@@ -52,9 +69,9 @@ export function QuickCreateButton() {
     },
     {
       id: 'document',
-      label: 'New Document',
-      description: 'Write or upload a doc',
-      icon: <FileText size={20} />,
+      label: 'Uplaod Document',
+      description: 'Upload Document',
+      icon: <Upload size={20} />,
       accent: '#22C55E',
       bg: '#F0FDF4',
       action: 'modal',
@@ -75,8 +92,7 @@ export function QuickCreateButton() {
       icon: <CalendarPlus size={20} />,
       accent: '#EC4899',
       bg: '#FDF2F8',
-      action: 'navigate',
-      target: '/calendar',
+      action: 'modal',
     },
     {
       id: 'meeting',
@@ -149,9 +165,9 @@ export function QuickCreateButton() {
           <div
             style={{
               width: 520,
-              background: '#fff',
+              background: 'hsl(var(--card))',
               borderRadius: 20,
-              boxShadow: '0 24px 80px rgba(0,0,0,0.2)',
+              boxShadow: '0 24px 80px rgba(0,0,0,0.35)',
               overflow: 'hidden',
               userSelect: 'none',
               WebkitUserSelect: 'none',
@@ -159,18 +175,18 @@ export function QuickCreateButton() {
             onClick={e => e.stopPropagation()}
           >
             {/* Header */}
-            <div style={{
+           <div style={{
               padding: '20px 24px 16px',
-              borderBottom: '1px solid #F0F2F7',
+              borderBottom: '1px solid hsl(var(--border))',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
             }}>
               <div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: '#0F172A', letterSpacing: '-0.01em' }}>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'hsl(var(--foreground))', letterSpacing: '-0.01em' }}>
                   Create new
                 </div>
-                <div style={{ fontSize: 12, color: '#9CA3AF', marginTop: 2 }}>
+                <div style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))', marginTop: 2 }}>
                   What would you like to create?
                 </div>
               </div>
@@ -178,12 +194,12 @@ export function QuickCreateButton() {
                 onClick={() => setOpen(false)}
                 style={{
                   width: 28, height: 28, borderRadius: '50%',
-                  background: '#F3F4F6', border: 'none',
+                  background: 'hsl(var(--muted))', border: 'none',
                   cursor: 'pointer', display: 'flex',
                   alignItems: 'center', justifyContent: 'center',
                 }}
               >
-                <X size={14} color="#6B7280" />
+                <X size={14} color="hsl(var(--muted-foreground))" />
               </button>
             </div>
 
@@ -194,7 +210,7 @@ export function QuickCreateButton() {
               gap: 10,
               padding: 16,
             }}>
-              {items.map(item => (
+             {items.map(item => (
                 <button
                   key={item.id}
                   onClick={() => handleItemClick(item)}
@@ -203,23 +219,23 @@ export function QuickCreateButton() {
                     alignItems: 'center',
                     gap: 14,
                     padding: '14px 16px',
-                    background: '#FAFAFA',
-                    border: '1.5px solid #F0F2F7',
+                    background: 'hsl(var(--muted))',
+                    border: '1.5px solid hsl(var(--border))',
                     borderRadius: 14,
                     cursor: 'pointer',
                     textAlign: 'left',
                     fontFamily: 'inherit',
                     transition: 'all 0.15s',
                   }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.background = item.bg;
-                    e.currentTarget.style.borderColor = item.accent + '40';
+                 onMouseEnter={e => {
+                    e.currentTarget.style.background = `${item.accent}18`;
+                    e.currentTarget.style.borderColor = item.accent + '60';
                     e.currentTarget.style.transform = 'translateY(-1px)';
-                    e.currentTarget.style.boxShadow = `0 4px 16px ${item.accent}18`;
+                    e.currentTarget.style.boxShadow = `0 4px 16px ${item.accent}20`;
                   }}
                   onMouseLeave={e => {
-                    e.currentTarget.style.background = '#FAFAFA';
-                    e.currentTarget.style.borderColor = '#F0F2F7';
+                    e.currentTarget.style.background = 'hsl(var(--muted))';
+                    e.currentTarget.style.borderColor = 'hsl(var(--border))';
                     e.currentTarget.style.transform = 'translateY(0)';
                     e.currentTarget.style.boxShadow = 'none';
                   }}
@@ -241,10 +257,10 @@ export function QuickCreateButton() {
 
                   {/* Text */}
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#0F172A', marginBottom: 2 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'hsl(var(--foreground))', marginBottom: 2 }}>
                       {item.label}
                     </div>
-                    <div style={{ fontSize: 11, color: '#9CA3AF', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <div style={{ fontSize: 11, color: 'hsl(var(--muted-foreground))', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {item.description}
                     </div>
                   </div>
@@ -253,7 +269,7 @@ export function QuickCreateButton() {
             </div>
 
             {/* Footer */}
-            <div style={{
+           <div style={{
               padding: '10px 20px 14px',
               display: 'flex',
               alignItems: 'center',
@@ -261,11 +277,11 @@ export function QuickCreateButton() {
               gap: 6,
             }}>
               <kbd style={{
-                background: '#F3F4F6', border: '1px solid #E5E7EB',
+                background: 'hsl(var(--muted))', border: '1px solid hsl(var(--border))',
                 borderRadius: 5, padding: '2px 7px',
-                fontSize: 10, fontWeight: 700, color: '#6B7280',
+                fontSize: 10, fontWeight: 700, color: 'hsl(var(--muted-foreground))',
               }}>esc</kbd>
-              <span style={{ fontSize: 11, color: '#9CA3AF' }}>to close</span>
+              <span style={{ fontSize: 11, color: 'hsl(var(--muted-foreground))' }}>to close</span>
             </div>
           </div>
         </div>
@@ -277,16 +293,43 @@ export function QuickCreateButton() {
         onClose={() => setActiveModal(null)}
       />
 
-      {/* ── Create Document Modal ── */}
-      <CreateDocumentModal
+      {/* ── Upload Document Modal ── */}
+      <UploadDocumentModal
         isOpen={activeModal === 'document'}
         onClose={() => setActiveModal(null)}
+        projects={projects}
+        folderId={null}
+        folderName={null}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['documents'] });
+          setActiveModal(null);
+        }}
       />
 
-      {/* ── Create Workspace Modal ── */}
+     {/* ── Create Workspace Modal ── */}
       <CreateWorkspaceModal
         isOpen={activeModal === 'workspace'}
         onClose={() => setActiveModal(null)}
+      />
+
+      {/* ── Event Modal (New Event + New Meeting) ── */}
+      <EventModal
+        isOpen={activeModal === 'event' || activeModal === 'meeting'}
+        onClose={() => setActiveModal(null)}
+        selectedDate={new Date()}
+        selectedHour={null}
+        event={null}
+        currentUser={user ? { id: user.id, role: user.role } : null}
+        allEvents={[]}
+        dyuksaEventData={activeModal === 'meeting' ? {
+          eventType: 'Meeting',
+          title: '',
+          attendeeIds: [],
+          attendeeNames: [],
+          targetDate: new Date().toISOString(),
+          suggestedSlots: [],
+          duration: 30,
+        } : null}
       />
     </>
   );

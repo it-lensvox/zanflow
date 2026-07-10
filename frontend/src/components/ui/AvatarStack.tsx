@@ -44,7 +44,7 @@ export function AvatarStack({ users, members, max = 3, size = 24, emptyLabel = '
           key={i}
           title={u.name}
           style={{
-            width: size, height: size, borderRadius: '50%', border: '2px solid #fff',
+            width: size, height: size, borderRadius: '50%', border: '2px solid hsl(var(--card))',
             marginLeft: i === 0 ? 0 : -overlap,
             background: u.avatar ? 'transparent' : AVATAR_COLORS[i % AVATAR_COLORS.length],
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -59,7 +59,7 @@ export function AvatarStack({ users, members, max = 3, size = 24, emptyLabel = '
         </div>
       ))}
       {extra > 0 && (
-        <div style={{ width: size, height: size, borderRadius: '50%', border: '2px solid #fff', marginLeft: -overlap, background: '#98a2b3', fontSize: Math.round(size * 0.37), fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <div style={{ width: size, height: size, borderRadius: '50%', border: '2px solid hsl(var(--card))', marginLeft: -overlap, background: '#98a2b3', fontSize: Math.round(size * 0.37), fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           +{extra}
         </div>
       )}

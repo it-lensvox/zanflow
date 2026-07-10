@@ -62,7 +62,7 @@ export function TasksLineChartCard({
                   <button
                     key={`${opt.year}-${opt.month}`}
                     onClick={() => { setSelectedMonth({ year: opt.year, month: opt.month }); setShowChartMonthPicker(() => false); }}
-                    style={{ width: '100%', padding: '9px 14px', border: 'none', background: active ? '#EEF4FF' : '#fff', color: active ? BLUE : TEXT, fontSize: 14, fontWeight: active ? 700 : 500, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
+                    style={{ width: '100%', padding: '9px 14px', border: 'none', background: active ? `${BLUE}18` : 'transparent', color: active ? BLUE : TEXT, fontSize: 14, fontWeight: active ? 700 : 500, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
                   >
                     {opt.label}
                   </button>

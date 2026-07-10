@@ -94,7 +94,7 @@ export function WidgetRenderer({ widget, isEditMode, isDragging, db, onRemove, o
               onClick={() => setShowSizeMenu(v => !v)}
               style={{
                 height: 26, padding: '0 8px', borderRadius: 6,
-                border: `1px solid ${LINE}`, background: '#fff',
+                border: `1px solid ${LINE}`, background: 'hsl(var(--card))',
                 fontSize: 11, fontWeight: 600, color: TEXT,
                 cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
                 fontFamily: 'inherit',
@@ -108,7 +108,7 @@ export function WidgetRenderer({ widget, isEditMode, isDragging, db, onRemove, o
                 <div style={{ position: 'fixed', inset: 0, zIndex: 1 }} onClick={() => setShowSizeMenu(false)} />
                 <div style={{
                   position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 2,
-                  background: '#fff', border: `1px solid ${LINE}`, borderRadius: 8,
+                  background: 'hsl(var(--popover))', border: `1px solid ${LINE}`, borderRadius: 8,
                   boxShadow: '0 8px 24px rgba(16,24,40,.10)', overflow: 'hidden', minWidth: 100,
                 }}>
                   {SIZE_OPTIONS.map(s => (
@@ -117,7 +117,7 @@ export function WidgetRenderer({ widget, isEditMode, isDragging, db, onRemove, o
                       onClick={() => { onResize(widget.id, s); setShowSizeMenu(false); }}
                       style={{
                         width: '100%', padding: '8px 12px', border: 'none',
-                        background: widget.size === s ? '#EEF4FF' : '#fff',
+                        background: widget.size === s ? `${BLUE}18` : 'transparent',
                         color: widget.size === s ? BLUE : TEXT,
                         fontSize: 13, fontWeight: widget.size === s ? 600 : 400,
                         cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',

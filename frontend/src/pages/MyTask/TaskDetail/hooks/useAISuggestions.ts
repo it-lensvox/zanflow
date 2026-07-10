@@ -57,8 +57,12 @@ export function useAISuggestions({
     return valid.includes(s as SuggestionStatus) ? (s as SuggestionStatus) : 'pending';
   };
 
-  // ── Fetch ────────────────────────────────────────────────────────────────
+  // ── Fetch 
   const fetchSuggestions = useCallback(async (count = 6, append = false) => {
+    if (!taskId || taskId <= 0) {
+      setError('Task not ready. Please try again.');
+      return;
+    }
     setIsLoading(true);
     setError(null);
     if (!append) setSuggestions([]);
@@ -100,11 +104,15 @@ export function useAISuggestions({
 
   // ── Panel open / close ──
   const open = useCallback(() => {
+    if (!taskId || taskId <= 0) {
+      console.warn('[useAISuggestions] skipping open — invalid taskId:', taskId);
+      return;
+    }
     setIsOpen(true);
     setCreatedCount(0);
     setCreateError(null);
     fetchSuggestions(3, false);
-  }, [fetchSuggestions]);
+  }, [taskId, fetchSuggestions]);
 
   const close = useCallback(() => {
     setIsOpen(false);

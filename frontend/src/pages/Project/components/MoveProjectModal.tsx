@@ -38,7 +38,7 @@ export function MoveProjectModal({ selectedIds, projects, onClose, onSuccess }: 
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       {/* Modal */}
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+      <div className="relative bg-card border border-border rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
 
         {/* Header */}
         <div style={{ padding: '20px 24px', borderBottom: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -52,7 +52,7 @@ export function MoveProjectModal({ selectedIds, projects, onClose, onSuccess }: 
         </div>
 
         {/* Selected projects preview */}
-        <div style={{ padding: '12px 24px', background: '#f9fafb', borderBottom: `1px solid ${LINE}` }}>
+        <div style={{ padding: '12px 24px', background: 'hsl(var(--muted))', borderBottom: `1px solid ${LINE}` }}>
           <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 700, color: MUTED, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Selected Projects</p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {selectedProjects.map(p => (
@@ -77,7 +77,7 @@ export function MoveProjectModal({ selectedIds, projects, onClose, onSuccess }: 
                   display: 'flex', alignItems: 'center', gap: 12,
                   padding: '12px 14px', borderRadius: 10, cursor: isCurrent ? 'not-allowed' : 'pointer',
                   border: `2px solid ${isSelected ? type.hex : LINE}`,
-                  background: isSelected ? `${type.hex}10` : isCurrent ? '#f9fafb' : '#fff',
+                  background: isSelected ? `${type.hex}10` : isCurrent ? 'hsl(var(--muted))' : 'hsl(var(--card))',
                   opacity: isCurrent ? 0.5 : 1,
                   transition: 'all 0.15s',
                 }}

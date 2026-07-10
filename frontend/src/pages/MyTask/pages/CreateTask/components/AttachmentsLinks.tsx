@@ -40,12 +40,12 @@ export function AttachmentsLinks({
               style={{
                 width: 38, height: 38, flexShrink: 0,
                 border: `1px solid ${LINE}`, borderRadius: 8,
-                background: '#fff', cursor: 'pointer',
+                background: 'hsl(var(--muted))', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: BLUE, transition: 'background .15s',
               }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#eef3ff')}
-              onMouseLeave={e => (e.currentTarget.style.background = '#fff')}
+              onMouseEnter={e => (e.currentTarget.style.background = 'hsl(var(--accent))')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'hsl(var(--muted))')}
             >
               <Plus size={15} />
             </button>
@@ -58,7 +58,7 @@ export function AttachmentsLinks({
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     padding: '6px 10px', borderRadius: 7,
-                    background: '#f7f8fb', border: `1px solid ${LINE}`,
+                    background: 'hsl(var(--muted))', border: `1px solid hsl(var(--border))`,
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
@@ -90,11 +90,11 @@ export function AttachmentsLinks({
       {/* Attachments */}
       <div>
         <FormField label="Attachments" icon={<Paperclip size={13} />}>
-          <div
+         <div
             style={{
               border: `1.5px dashed ${LINE}`, borderRadius: 8,
               padding: '16px 12px', textAlign: 'center',
-              background: '#fafbfc', cursor: 'pointer', position: 'relative',
+              background: 'hsl(var(--muted))', cursor: 'pointer', position: 'relative',
               transition: 'border-color .15s',
             }}
             onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = '#1663f6'; }}
@@ -130,7 +130,7 @@ export function AttachmentsLinks({
                   style={{
                     display: 'flex', alignItems: 'center', gap: 8,
                     padding: '6px 10px', borderRadius: 7,
-                    background: '#f7f8fb', border: `1px solid ${LINE}`,
+                    background: 'hsl(var(--muted))', border: `1px solid hsl(var(--border))`,
                   }}
                 >
                   <Paperclip size={12} color={MUTED} />

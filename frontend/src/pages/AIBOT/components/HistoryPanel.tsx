@@ -40,23 +40,23 @@ function SessionMenu({ sessionId, title, isPinned, onRename, onPin, onDelete, on
   const commitRename = () => { const t = renameVal.trim(); if (t && t !== title) onRename(sessionId, t); onClose(); };
 
   if (renaming) return (
-     <div ref={menuRef} style={{ position: 'absolute', right: 0, top: 32, zIndex: 300, background: '#fff', border: '1px solid #dde3f0', borderRadius: 10, padding: 8, minWidth: 200, boxShadow: '0 8px 24px rgba(0,0,0,.1)' }}>
+     <div ref={menuRef} style={{ position: 'absolute', right: 0, top: 32, zIndex: 300, background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 10, padding: 8, minWidth: 200, boxShadow: '0 8px 24px rgba(0,0,0,.18)' }}>
       <input ref={inputRef} value={renameVal} onChange={e => setRenameVal(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') onClose(); }} onBlur={commitRename}
-        style={{ width: '100%', background: '#f0f4ff', border: '1px solid #dde3f0', borderRadius: 6, padding: '6px 10px', fontSize: 12, color: '#172033', outline: 'none', fontFamily: 'inherit' }} />
+        style={{ width: '100%', background: 'hsl(var(--input))', border: '1px solid hsl(var(--border))', borderRadius: 6, padding: '6px 10px', fontSize: 12, color: 'hsl(var(--foreground))', outline: 'none', fontFamily: 'inherit' }} />
     </div>
   );
 
   if (confirmDelete) return (
-    <div ref={menuRef} style={{ position: 'absolute', right: 0, top: 32, zIndex: 300, background: '#fff', border: '1px solid #dde3f0', borderRadius: 10, padding: 12, minWidth: 200, boxShadow: '0 8px 24px rgba(0,0,0,.1)' }}>
-      <p style={{ fontSize: 12, color: '#374151', marginBottom: 10 }}>Delete this conversation?</p>
+    <div ref={menuRef} style={{ position: 'absolute', right: 0, top: 32, zIndex: 300, background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 10, padding: 12, minWidth: 200, boxShadow: '0 8px 24px rgba(0,0,0,.18)' }}>
+      <p style={{ fontSize: 12, color: 'hsl(var(--foreground))', marginBottom: 10 }}>Delete this conversation?</p>
       <div style={{ display: 'flex', gap: 6 }}>
         <button onClick={() => { onDelete(sessionId); onClose(); }}
           style={{ flex: 1, padding: '6px 0', borderRadius: 6, border: 'none', background: '#ef4444', color: '#fff', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
           Delete
         </button>
         <button onClick={() => setConfirmDelete(false)}
-          style={{ flex: 1, padding: '6px 0', borderRadius: 6, border: '1px solid #dde3f0', background: 'none', color: '#64748b', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+          style={{ flex: 1, padding: '6px 0', borderRadius: 6, border: '1px solid hsl(var(--border))', background: 'none', color: 'hsl(var(--muted-foreground))', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
           Cancel
         </button>
       </div>
@@ -70,11 +70,11 @@ function SessionMenu({ sessionId, title, isPinned, onRename, onPin, onDelete, on
   ];
 
   return (
-   <div ref={menuRef} style={{ position: 'absolute', right: 0, top: 32, zIndex: 300, background: '#fff', border: '1px solid #dde3f0', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.1)', padding: '4px 0', minWidth: 144 }}>
+   <div ref={menuRef} style={{ position: 'absolute', right: 0, top: 32, zIndex: 300, background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.18)', padding: '4px 0', minWidth: 144 }}>
       {items.map(item => (
         <button key={item.label} onClick={item.action}
-          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 12, color: item.danger ? '#ef4444' : '#374151', textAlign: 'left', fontFamily: 'inherit' }}
-          onMouseEnter={e => e.currentTarget.style.background = item.danger ? '#fef2f2' : '#f0f4ff'}
+          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', border: 'none', background: 'none', cursor: 'pointer', fontSize: 12, color: item.danger ? '#ef4444' : 'hsl(var(--foreground))', textAlign: 'left', fontFamily: 'inherit' }}
+          onMouseEnter={e => e.currentTarget.style.background = item.danger ? 'rgba(239,68,68,.1)' : 'hsl(var(--accent))'}
           onMouseLeave={e => e.currentTarget.style.background = 'none'}>
           {item.icon}{item.label}
         </button>
@@ -151,7 +151,7 @@ export function HistoryPanel({ sessions, activeSessionId, searchQuery, setSearch
               ? '2px solid #ef4444'
               : isActive ? '2px solid #1663f6' : '2px solid transparent',
           }}
-          onMouseEnter={e => { if (!isActive && !isSelected) e.currentTarget.style.background = '#eef1fb'; }}
+          onMouseEnter={e => { if (!isActive && !isSelected) e.currentTarget.style.background = 'hsl(var(--accent))'; }}
           onMouseLeave={e => { if (!isActive && !isSelected) e.currentTarget.style.background = 'transparent'; }}>
 
           {/* Checkbox in select mode */}
@@ -169,15 +169,15 @@ export function HistoryPanel({ sessions, activeSessionId, searchQuery, setSearch
               {session.is_pinned && !selectMode && (
                 <Pin style={{ width: 9, height: 9, color: '#60a5fa', flexShrink: 0 }} />
               )}
-              <p style={{ fontSize: 12, fontWeight: isActive ? 600 : 400, color: isSelected ? '#ef4444' : isActive ? '#1663f6' : '#4a5568', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              <p style={{ fontSize: 12, fontWeight: isActive ? 600 : 400, color: isSelected ? '#ef4444' : isActive ? '#1663f6' : 'hsl(var(--foreground))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                 title={session.title || `Session ${session.id}`}>
                 {getTitle(session)}
               </p>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <Clock style={{ width: 9, height: 9, color: '#334155' }} />
-              <span style={{ fontSize: 9, color: '#475569' }}>{formatDate(session.updated_at)}</span>
-              <span style={{ fontSize: 9, color: '#334155' }}>· {session.message_count} msg</span>
+              <Clock style={{ width: 9, height: 9, color: 'hsl(var(--muted-foreground))' }} />
+              <span style={{ fontSize: 9, color: 'hsl(var(--muted-foreground))' }}>{formatDate(session.updated_at)}</span>
+              <span style={{ fontSize: 9, color: 'hsl(var(--muted-foreground))' }}>· {session.message_count} msg</span>
             </div>
           </div>
         </button>
@@ -185,8 +185,8 @@ export function HistoryPanel({ sessions, activeSessionId, searchQuery, setSearch
         {!selectMode && (
           <button
             onClick={e => { e.stopPropagation(); setOpenMenuId(isMenuOpen ? null : session.id); }}
-            style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', width: 20, height: 20, borderRadius: 5, border: 'none', background: isMenuOpen ? '#1e293b' : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569', transition: 'all .15s' }}
-            onMouseEnter={e => e.currentTarget.style.background = '#eef1fb'}
+            style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', width: 20, height: 20, borderRadius: 5, border: 'none', background: isMenuOpen ? 'hsl(var(--accent))' : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'hsl(var(--muted-foreground))', transition: 'all .15s' }}
+            onMouseEnter={e => e.currentTarget.style.background = 'hsl(var(--accent))'}
             onMouseLeave={e => { if (!isMenuOpen) e.currentTarget.style.background = 'transparent'; }}>
             <MoreHorizontal style={{ width: 11, height: 11 }} />
           </button>
@@ -206,7 +206,7 @@ export function HistoryPanel({ sessions, activeSessionId, searchQuery, setSearch
   };
 
   return (
-     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#f0f4ff' }}>
+     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'hsl(var(--muted))' }}>
 
       {/* Header */}
       <div style={{ padding: '18px 14px 14px', flexShrink: 0 }}>
@@ -216,23 +216,23 @@ export function HistoryPanel({ sessions, activeSessionId, searchQuery, setSearch
             <Sparkles style={{ width: 14, height: 14, color: '#93c5fd' }} />
           </div>
           <div>
-            <p style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9', letterSpacing: '-.01em' }}>Dyuksa AI</p>
-            <p style={{ fontSize: 9, color: '#475569', fontWeight: 500, letterSpacing: '.04em', textTransform: 'uppercase' as const }}>Workspace assistant</p>
+           <p style={{ fontSize: 13, fontWeight: 700, color: 'hsl(var(--foreground))', letterSpacing: '-.01em' }}>Dyuksa AI</p>
+            <p style={{ fontSize: 9, color: 'hsl(var(--muted-foreground))', fontWeight: 500, letterSpacing: '.04em', textTransform: 'uppercase' as const }}>Workspace assistant</p>
           </div>
         </div>
 
         {/* New conversation + Select toggle */}
         <div style={{ display: 'flex', gap: 6 }}>
           <button onClick={onNewConversation}
-            style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderRadius: 10, border: '1px solid #dde3f0', background: '#fff', cursor: 'pointer', color: '#4a5568', fontSize: 12, fontWeight: 500, transition: 'all .2s' }}
+            style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderRadius: 10, border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))', cursor: 'pointer', color: 'hsl(var(--foreground))', fontSize: 12, fontWeight: 500, transition: 'all .2s' }}
             onMouseEnter={e => { e.currentTarget.style.borderColor = '#1663f6'; e.currentTarget.style.color = '#1663f6'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(22,99,246,.12)'; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = '#dde3f0'; e.currentTarget.style.color = '#4a5568'; e.currentTarget.style.boxShadow = 'none'; }}>
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'hsl(var(--border))'; e.currentTarget.style.color = 'hsl(var(--foreground))'; e.currentTarget.style.boxShadow = 'none'; }}>
             <Plus style={{ width: 13, height: 13 }} />
             New conversation
           </button>
           <button onClick={() => selectMode ? exitSelectMode() : setSelectMode(true)}
             title={selectMode ? 'Cancel selection' : 'Select chats to delete'}
-            style={{ width: 34, height: 34, borderRadius: 10, border: `1px solid ${selectMode ? '#ef4444' : '#dde3f0'}`, background: selectMode ? 'rgba(239,68,68,.08)' : '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: selectMode ? '#ef4444' : '#64748b', flexShrink: 0, transition: 'all .2s' }}>
+            style={{ width: 34, height: 34, borderRadius: 10, border: `1px solid ${selectMode ? '#ef4444' : 'hsl(var(--border))'}`, background: selectMode ? 'rgba(239,68,68,.08)' : 'hsl(var(--card))', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: selectMode ? '#ef4444' : 'hsl(var(--muted-foreground))', flexShrink: 0, transition: 'all .2s' }}>
             {selectMode ? <X style={{ width: 13, height: 13 }} /> : <CheckSquare style={{ width: 13, height: 13 }} />}
           </button>
         </div>
@@ -240,25 +240,25 @@ export function HistoryPanel({ sessions, activeSessionId, searchQuery, setSearch
 
       {/* Search */}
       <div style={{ padding: '0 12px 10px', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#fff', borderRadius: 8, padding: '0 11px', height: 33, border: '1px solid #dde3f0', transition: 'border-color .2s' }}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'hsl(var(--input))', borderRadius: 8, padding: '0 11px', height: 33, border: '1px solid hsl(var(--border))', transition: 'border-color .2s' }}
           onFocusCapture={e => e.currentTarget.style.borderColor = '#1663f6'}
-          onBlurCapture={e => e.currentTarget.style.borderColor = '#dde3f0'}>
-          <Search style={{ width: 11, height: 11, color: '#94a3b8', flexShrink: 0 }} />
+          onBlurCapture={e => e.currentTarget.style.borderColor = 'hsl(var(--border))'}>
+          <Search style={{ width: 11, height: 11, color: 'hsl(var(--muted-foreground))', flexShrink: 0 }} />
           <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search…"
-            style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 12, color: '#374151', fontFamily: 'inherit' }} />
+            style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 12, color: 'hsl(var(--foreground))', fontFamily: 'inherit' }} />
         </div>
       </div>
 
       {/* Divider */}
-      <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, #dde3f0, transparent)', margin: '0 12px 8px' }} />
+      <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, hsl(var(--border)), transparent)', margin: '0 12px 8px' }} />
 
       {/* Bulk action toolbar */}
       {selectMode && (
         <div style={{ padding: '0 12px 10px', flexShrink: 0 }}>
           {bulkConfirm ? (
             <div style={{ background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 10, padding: '10px 12px' }}>
-              <p style={{ fontSize: 11, color: '#fca5a5', marginBottom: 8 }}>
+                <p style={{ fontSize: 11, color: '#f87171', marginBottom: 8 }}>
                 Delete {selectedIds.size} conversation{selectedIds.size > 1 ? 's' : ''}? This cannot be undone.
               </p>
               <div style={{ display: 'flex', gap: 6 }}>
@@ -267,7 +267,7 @@ export function HistoryPanel({ sessions, activeSessionId, searchQuery, setSearch
                   Delete
                 </button>
                <button onClick={() => setBulkConfirm(false)}
-                  style={{ flex: 1, padding: '6px 0', borderRadius: 6, border: '1px solid #dde3f0', background: 'none', color: '#64748b', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  style={{ flex: 1, padding: '6px 0', borderRadius: 6, border: '1px solid hsl(var(--border))', background: 'none', color: 'hsl(var(--muted-foreground))', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
                   Cancel
                 </button>
               </div>
@@ -275,8 +275,8 @@ export function HistoryPanel({ sessions, activeSessionId, searchQuery, setSearch
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               {/* Select all checkbox */}
-              <button onClick={toggleSelectAll}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, padding: '7px 10px', borderRadius: 8, border: '1px solid #dde3f0', background: '#fff', cursor: 'pointer', color: '#64748b', fontSize: 11, fontFamily: 'inherit' }}>
+             <button onClick={toggleSelectAll}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, padding: '7px 10px', borderRadius: 8, border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))', cursor: 'pointer', color: 'hsl(var(--muted-foreground))', fontSize: 11, fontFamily: 'inherit' }}>
                 {allSelected
                   ? <CheckSquare style={{ width: 12, height: 12, color: '#ef4444' }} />
                   : <Square      style={{ width: 12, height: 12 }} />
@@ -299,11 +299,11 @@ export function HistoryPanel({ sessions, activeSessionId, searchQuery, setSearch
       {/* Session list */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px 8px' }}>
         {isLoading ? (
-          <p style={{ fontSize: 12, color: '#475569', padding: '10px 8px' }}>Loading…</p>
+          <p style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))', padding: '10px 8px' }}>Loading…</p>
         ) : filtered.length === 0 ? (
           <div style={{ padding: '28px 12px', textAlign: 'center' }}>
-            <p style={{ fontSize: 12, color: '#475569' }}>{searchQuery ? 'No results' : 'No conversations yet'}</p>
-            <p style={{ fontSize: 11, color: '#334155', marginTop: 4 }}>Start a new conversation above</p>
+            <p style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))' }}>{searchQuery ? 'No results' : 'No conversations yet'}</p>
+            <p style={{ fontSize: 11, color: 'hsl(var(--muted-foreground))', marginTop: 4 }}>Start a new conversation above</p>
           </div>
         ) : (
           <>
@@ -312,14 +312,14 @@ export function HistoryPanel({ sessions, activeSessionId, searchQuery, setSearch
               <>
                 <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.1em', color: '#60a5fa', padding: '4px 8px 6px' }}>Pinned</p>
                 {filtered.filter(s => s.is_pinned).map(session => renderSession(session))}
-                <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, #1e293b, transparent)', margin: '6px 4px 8px' }} />
+                <div style={{ height: 1, background: 'linear-gradient(90deg, transparent, hsl(var(--border)), transparent)', margin: '6px 4px 8px' }} />
               </>
             )}
 
             {/* ── Recents section */}
             {filtered.some(s => !s.is_pinned) && (
               <>
-                <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.1em', color: '#94a3b8', padding: '4px 8px 6px' }}>Recents</p>
+                <p style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.1em', color: 'hsl(var(--muted-foreground))', padding: '4px 8px 6px' }}>Recents</p>
                 {filtered.filter(s => !s.is_pinned).map(session => renderSession(session))}
               </>
             )}

@@ -123,7 +123,7 @@ export function CustomDashboardView({
             onClick={() => setShowPicker(true)}
             style={{
               height: 30, padding: '0 12px', borderRadius: 7,
-              border: `1px solid ${BLUE}`, background: '#fff',
+              border: `1px solid ${BLUE}`, background: 'hsl(var(--card))',
               fontSize: 12, fontWeight: 600, color: BLUE,
               cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
               fontFamily: 'inherit',
@@ -167,7 +167,7 @@ export function CustomDashboardView({
               onClick={handleEnterEditMode}
               style={{
                 height: 34, padding: '0 14px', borderRadius: 8,
-                border: `1px solid ${LINE}`, background: '#fff',
+                border: `1px solid ${LINE}`, background: 'hsl(var(--card))',
                 fontSize: 13, fontWeight: 600, color: TEXT,
                 cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
                 fontFamily: 'inherit', flexShrink: 0,

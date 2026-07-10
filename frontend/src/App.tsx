@@ -2,6 +2,7 @@ import { useEffect, lazy, Suspense, Component } from 'react';
 import type { ReactNode, ErrorInfo } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
+import { ThemeProvider } from '@/hooks/useTheme';
 import { Layout } from '@/components/layout';
 import type { User as AppUser } from '@/types';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -20,9 +21,9 @@ const Documents = lazy(() => import('@/pages/Documents/Documents').then(m => ({ 
 const SharedWithMe = lazy(() => import('@/pages/Documents/SharedWithMe').then(m => ({ default: m.SharedWithMe }))); const MyTask = lazy(() => import('@/pages/MyTask/MyTask').then(m => ({ default: m.MyTask })));
 const CreateTask = lazy(() => import('@/pages/MyTask/pages/CreateTask/CreateTask').then(m => ({ default: m.CreateTask })));
 const TaskDetailPage = lazy(() => import('@/pages/MyTask/TaskDetail/TaskDetailPage').then(m => ({ default: m.TaskDetailPage })));
-const Teams = lazy(() => import('@/pages/TeamManagement/Teams').then(m => ({ default: m.Teams })));
+const Teams = lazy(() => import('@/pages/TeamManagement/Teams/Teams').then(m => ({ default: m.Teams })));
 const UserManagement = lazy(() => import('@/pages/TeamManagement/UserManagement').then(m => ({ default: m.UserManagement })));
-const TeamPerformance = lazy(() => import('@/pages/TeamManagement/TeamPerformance').then(m => ({ default: m.TeamPerformance })));
+const TeamPerformance = lazy(() => import('@/pages/TeamManagement/TeamPerformance/TeamPerformance').then(m => ({ default: m.TeamPerformance })));
 const TaskDetails = lazy(() => import('@/pages/TaskType/TaskDetails').then(m => ({ default: m.TaskDetails })));
 const Calendar = lazy(() => import('@/pages/Calendar/Calendar').then(m => ({ default: m.Calendar })));
 const SharedCalendarView = lazy(() => import('@/pages/Calendar/SharedCalendarView').then(m => ({ default: m.SharedCalendarView })));
@@ -315,15 +316,17 @@ function WebSocketProvider({ children }: { children: React.ReactNode }) {
 
 function App() {
   return (
-    <AuthProvider>
-      <TaskDraftsProvider>
-        <WebSocketProvider>
-          <ErrorBoundary>
-            <AppRoutes />
-          </ErrorBoundary>
-        </WebSocketProvider>
-      </TaskDraftsProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <TaskDraftsProvider>
+          <WebSocketProvider>
+            <ErrorBoundary>
+              <AppRoutes />
+            </ErrorBoundary>
+          </WebSocketProvider>
+        </TaskDraftsProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

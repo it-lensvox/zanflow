@@ -4,8 +4,8 @@ export { BLUE, LINE, TEXT, MUTED, BG };
 
 // ─── Reusable inline style objects
 export const CARD: CSSProperties = {
-  background: '#fff',
-  border: `1px solid ${LINE}`,
+  background: 'hsl(var(--card))',
+  border: `1px solid hsl(var(--border))`,
   borderRadius: 12,
   boxShadow: '0 1px 3px rgba(16,24,40,.05)',
 };
@@ -13,9 +13,9 @@ export const CARD: CSSProperties = {
 export const MONTH_BTN: CSSProperties = {
   fontSize: 14,
   fontWeight: 500,
-  color: TEXT,
-  background: '#fff',
-  border: `1px solid ${LINE}`,
+  color: 'hsl(var(--foreground))',
+  background: 'hsl(var(--card))',
+  border: `1px solid hsl(var(--border))`,
   borderRadius: 6,
   padding: '5px 12px',
   cursor: 'pointer',
@@ -73,7 +73,7 @@ export function SkeletonBlock({ width = '100%', height = 16, borderRadius = 6, s
     width,
     height,
     borderRadius,
-    background: 'linear-gradient(90deg, #f0f2f5 25%, #e4e7ec 50%, #f0f2f5 75%)',
+    background: 'hsl(var(--muted))',
     backgroundSize: '200% 100%',
     animation: 'shimmer 1.4s infinite',
     flexShrink: 0,

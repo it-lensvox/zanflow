@@ -108,7 +108,7 @@ export function TodaysSchedule({
                 key={`task-${item.id}`}
                 onClick={() => navigate('/taskboard')}
                 style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '13px 0', borderBottom: isLast ? 'none' : `1px solid ${LINE}`, cursor: 'pointer' }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#F7F8FB')}
+                onMouseEnter={e => (e.currentTarget.style.background = 'hsl(var(--accent))')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
                 <div style={{ fontSize: 11, color: MUTED, width: 68, flexShrink: 0, paddingTop: 2, fontWeight: 600 }}>

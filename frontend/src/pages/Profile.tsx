@@ -164,21 +164,21 @@ export function Profile() {
   const getInitials = (name?: string) => name?.charAt(0)?.toUpperCase() || '?';
 
   return (
-    <div className="min-h-screen bg-[#F7F8FB] px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 pt-6 pb-8">
+    <div className="min-h-screen bg-background px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 pt-6 pb-8">
       {/* ── Inner Card Container ── */}
       <div className="flex flex-col flex-1 space-y-6">
 
         {/* Header Card */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+        <div className="bg-card rounded-xl shadow-sm border border-border p-8">
           <div className="flex items-start space-x-6">
             {/* Profile Picture */}
             <div className="relative flex-shrink-0">
               <label htmlFor="profile-upload" className="cursor-pointer group">
-                <div className="w-32 h-32 rounded-2xl bg-white shadow-md overflow-hidden flex items-center justify-center border-2 border-gray-100">
+                <div className="w-32 h-32 rounded-2xl bg-card shadow-md overflow-hidden flex items-center justify-center border-2 border-border">
                   {profileImage ? (
                     <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-r from-indigo-300 to-purple-50 flex items-center justify-center text-gray-800 text-4xl font-bold">
+                    <div className="w-full h-full bg-gradient-to-r from-indigo-300 to-purple-50 flex items-center justify-center text-foreground text-4xl font-bold">
                       {getInitials(user?.first_name)}
                     </div>
                   )}
@@ -202,14 +202,14 @@ export function Profile() {
                     onChange={(e) => setEditFirstName(e.target.value)}
                     placeholder="First name"
                     autoFocus
-                    className="text-2xl font-bold text-gray-900 border-b-2 border-indigo-400 bg-transparent focus:outline-none w-36"
+                    className="text-2xl font-bold text-foreground border-b-2 border-indigo-400 bg-transparent focus:outline-none w-36"
                   />
                   <input
                     type="text"
                     value={editLastName}
                     onChange={(e) => setEditLastName(e.target.value)}
                     placeholder="Last name"
-                    className="text-2xl font-bold text-gray-900 border-b-2 border-indigo-400 bg-transparent focus:outline-none w-36"
+                    className="text-2xl font-bold text-foreground border-b-2 border-indigo-400 bg-transparent focus:outline-none w-36"
                   />
                   <button
                     onClick={handleSaveName}
@@ -246,15 +246,15 @@ export function Profile() {
 
               {/* Info Row */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="flex items-center space-x-3 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
+                <div className="flex items-center space-x-3 bg-muted rounded-xl px-4 py-3 border border-border">
                   <BadgeCheck className="w-5 h-5 text-indigo-600 shrink-0" />
                   <div>
-                    <p className="text-xs text-gray-500 font-medium">Designation</p>
-                    <p className="text-sm text-gray-900 font-semibold capitalize">{user?.role || '—'}</p>
+                    <p className="text-xs text-muted-foreground font-medium">Designation</p>
+                    <p className="text-sm text-foreground font-semibold capitalize">{user?.role || '—'}</p>
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-3 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
+                <div className="flex items-center space-x-3 bg-muted rounded-xl px-4 py-3 border border-border">
                   <Mail className="w-5 h-5 text-indigo-600 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-gray-500 font-medium">Email</p>
@@ -278,10 +278,10 @@ export function Profile() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
           {/* Enrolled Projects */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 flex flex-col max-h-[520px]">
+         <div className="bg-card rounded-2xl shadow-sm border border-border p-6 flex flex-col max-h-[520px]">
             <div className="flex items-center space-x-2 mb-5 shrink-0">
               <Briefcase className="w-5 h-5 text-indigo-600" />
-              <h2 className="text-lg font-semibold text-gray-900">Enrolled Projects</h2>
+              <h2 className="text-lg font-semibold text-foreground">Enrolled Projects</h2>
               {!loading && projects.length > 0 && (
                 <span className="ml-auto text-xs font-semibold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
                   {projects.length}

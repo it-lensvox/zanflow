@@ -33,7 +33,7 @@ export function DropdownTrigger({ label, placeholder, onClick, open, dotColor, t
     width: '100%', height: 38,
     padding: '0 10px 0 12px',
     fontSize: 13, color: TEXT,
-    background: '#fff',
+    background: 'hsl(var(--input))',
     border: `1px solid ${open ? BLUE : LINE}`,
     borderRadius: 8, outline: 'none',
     transition: 'border-color .15s, box-shadow .15s',
@@ -91,10 +91,10 @@ export function DropdownList({ children, triggerRef }: { children: React.ReactNo
         left: rect.left,
         width: rect.width,
         zIndex: 99999,
-        background: '#fff',
-        border: `1px solid ${LINE}`,
+        background: 'hsl(var(--popover))',
+        border: `1px solid hsl(var(--border))`,
         borderRadius: 10,
-        boxShadow: '0 8px 24px rgba(16,24,40,.15)',
+        boxShadow: '0 8px 24px rgba(0,0,0,.20)',
         maxHeight: 220,
         overflowY: 'auto',
         padding: '4px 0',
@@ -113,8 +113,8 @@ export function DropdownItem({
   return (
     <div
       onClick={e => { e.stopPropagation(); onClick(); }}
-      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', cursor: 'pointer', fontSize: 13, fontWeight: selected ? 600 : 400, color: selected ? BLUE : TEXT, background: selected ? '#EEF4FF' : 'transparent', transition: 'background 0.1s' }}
-      onMouseEnter={e => { if (!selected) e.currentTarget.style.background = '#F7F8FB'; }}
+      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', cursor: 'pointer', fontSize: 13, fontWeight: selected ? 600 : 400, color: selected ? BLUE : TEXT, background: selected ? `${BLUE}18` : 'transparent', transition: 'background 0.1s' }}
+      onMouseEnter={e => { if (!selected) e.currentTarget.style.background = 'hsl(var(--accent))'; }}
       onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent'; }}
     >
       {icon}

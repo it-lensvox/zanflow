@@ -30,10 +30,10 @@ import { DocumentPreview } from '@/components/common/DocumentPreview';
 import { DocumentShareModal } from '@/pages/Documents/DocumentShareModal';
 
 // ─── Design tokens 
-const TEXT = '#172033';
-const MUTED = '#667085';
-const LINE = '#e6ebf2';
-const BLUE = '#4169FF';
+const TEXT  = 'hsl(var(--foreground))';
+const MUTED = 'hsl(var(--muted-foreground))';
+const LINE  = 'hsl(var(--border))';
+const BLUE  = '#4169FF';
 
 // ─── Static config 
 const FILE_TYPE_OPTIONS = [
@@ -313,14 +313,14 @@ export function Documents() {
     const SortIcon = isSorted ? (sortConfig.direction === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown;
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        <span style={{ flex: 1, fontSize: 12, fontWeight: 800, color: '#172033' }}>{label}</span>
+        <span style={{ flex: 1, fontSize: 12, fontWeight: 800, color: TEXT }}>{label}</span>
         {onSort && (
-          <button onClick={e => { e.stopPropagation(); onSort(columnKey); }} style={{ background: isSorted ? '#EEF4FF' : 'none', border: 'none', cursor: 'pointer', padding: '2px 3px', borderRadius: 4, display: 'flex', alignItems: 'center', color: isSorted ? BLUE : '#9CA3AF' }}>
+         <button onClick={e => { e.stopPropagation(); onSort(columnKey); }} style={{ background: isSorted ? `${BLUE}18` : 'none', border: 'none', cursor: 'pointer', padding: '2px 3px', borderRadius: 4, display: 'flex', alignItems: 'center', color: isSorted ? BLUE : MUTED }}>
             <SortIcon size={11} />
           </button>
         )}
         {onFilterProp && (
-          <button onClick={e => { e.stopPropagation(); onFilterProp(columnKey); }} style={{ background: isActive ? '#EEF4FF' : 'none', border: 'none', cursor: 'pointer', padding: '2px 3px', borderRadius: 4, display: 'flex', alignItems: 'center', color: isActive ? BLUE : '#9CA3AF' }}>
+          <button onClick={e => { e.stopPropagation(); onFilterProp(columnKey); }} style={{ background: isActive ? `${BLUE}18` : 'none', border: 'none', cursor: 'pointer', padding: '2px 3px', borderRadius: 4, display: 'flex', alignItems: 'center', color: isActive ? BLUE : MUTED }}>
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
           </button>
         )}
@@ -373,10 +373,10 @@ export function Documents() {
 
   return (
     <div className="flex w-full h-full min-h-0">
-      <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden" style={{ background: '#fff' }}>
+      <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden" style={{ background: 'hsl(var(--background))' }}>
 
        {/* ── TOPBAR ── */}
-        <div className="flex-shrink-0 px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40" style={{ background: '#fff', borderBottom: `1px solid ${LINE}`, paddingTop: 16, paddingBottom: 16 }}>
+        <div className="flex-shrink-0 px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40" style={{ background: 'hsl(var(--card))', borderBottom: `1px solid ${LINE}`, paddingTop: 16, paddingBottom: 16 }}>
 
           {/* Title row */}
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
@@ -385,7 +385,7 @@ export function Documents() {
               <p style={{ margin: '4px 0 0', fontSize: 16, color: MUTED }}>Manage all your documents across projects</p>
             </div>
             <div className="flex items-center gap-2 flex-wrap" style={{ paddingTop: 4 }}>
-              <button onClick={() => setShowUploadModal(true)} style={{ height: 40, display: 'flex', alignItems: 'center', gap: 8, padding: '0 18px', border: `1px solid ${LINE}`, borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 16, fontWeight: 600, color: TEXT, whiteSpace: 'nowrap' }}>
+              <button onClick={() => setShowUploadModal(true)} style={{ height: 40, display: 'flex', alignItems: 'center', gap: 8, padding: '0 18px', border: `1px solid ${LINE}`, borderRadius: 8, background: 'hsl(var(--card))', cursor: 'pointer', fontSize: 16, fontWeight: 600, color: TEXT, whiteSpace: 'nowrap' }}>
                 <Upload size={15} /> Upload
               </button>
               <ViewToggle viewMode={viewMode} onViewModeChange={v => setViewMode(v as any)} modes={['table', 'grid', 'tree']} showLabels={false} />
@@ -395,7 +395,7 @@ export function Documents() {
           {/* Controls row */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             {/* Search */}
-            <div style={{ flex: '0 0 65%', height: 40, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 8, display: 'flex', alignItems: 'center', padding: '0 12px', gap: 10, position: 'relative' }}>
+            <div style={{ flex: '0 0 65%', height: 40, background: 'hsl(var(--input))', border: `1px solid ${LINE}`, borderRadius: 8, display: 'flex', alignItems: 'center', padding: '0 12px', gap: 10, position: 'relative' }}>
               <Search size={16} color={MUTED} style={{ flexShrink: 0 }} />
               <input
                 type="text"
@@ -404,7 +404,7 @@ export function Documents() {
                 onChange={e => setSearchTerm(e.target.value)}
                 style={{ flex: 1, border: 'none', outline: 'none', fontSize: 16, color: TEXT, background: 'transparent', fontFamily: 'inherit', minWidth: 0 }}
               />
-              <span style={{ background: '#f5f7fb', border: `1px solid ${LINE}`, borderRadius: 5, padding: '2px 8px', fontSize: 12, fontWeight: 700, color: MUTED, flexShrink: 0 }}>⌘ K</span>
+              <span style={{ background: 'hsl(var(--muted))', border: `1px solid ${LINE}`, borderRadius: 5, padding: '2px 8px', fontSize: 12, fontWeight: 700, color: MUTED, flexShrink: 0 }}>⌘ K</span>
             </div>
 
             {/* Project filter — custom dropdown matching Projects page */}
@@ -412,7 +412,7 @@ export function Documents() {
               {showProjectDrop && <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={() => setShowProjectDrop(false)} />}
               <button
                 onClick={() => { setShowProjectDrop(v => !v); setShowTypeDrop(false); }}
-                style={{ height: 40, width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', border: `1px solid ${showProjectDrop ? BLUE : LINE}`, borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 16, fontWeight: 500, color: projectFilter ? TEXT : MUTED, whiteSpace: 'nowrap', fontFamily: 'inherit' }}
+                style={{ height: 40, width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', border: `1px solid ${showProjectDrop ? BLUE : LINE}`, borderRadius: 8, background: 'hsl(var(--card))', cursor: 'pointer', fontSize: 16, fontWeight: 500, color: projectFilter ? TEXT : MUTED, whiteSpace: 'nowrap', fontFamily: 'inherit' }}
               >
                 <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {projectFilter ? projects.find(p => String(p.id) === projectFilter)?.name || 'All Projects' : 'All Projects'}
@@ -420,10 +420,10 @@ export function Documents() {
                 <ChevronDown size={14} color={MUTED} style={{ flexShrink: 0, transition: 'transform 0.2s', transform: showProjectDrop ? 'rotate(180deg)' : 'none' }} />
               </button>
               {showProjectDrop && (
-                <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 50, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(16,24,40,.12)', overflow: 'hidden', padding: '4px 0', maxHeight: 260, overflowY: 'auto' }}>
+                <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 50, background: 'hsl(var(--popover))', border: `1px solid ${LINE}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.18)', overflow: 'hidden', padding: '4px 0', maxHeight: 260, overflowY: 'auto' }}>
                   <button onClick={() => { updateFilter('project', ''); setShowProjectDrop(false); }}
-                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', border: 'none', background: !projectFilter ? '#EEF4FF' : 'transparent', cursor: 'pointer', fontSize: 16, fontWeight: !projectFilter ? 700 : 500, color: !projectFilter ? BLUE : TEXT, textAlign: 'left', fontFamily: 'inherit' }}
-                    onMouseEnter={e => { if (projectFilter) e.currentTarget.style.background = '#F7F8FB'; }}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', border: 'none', background: !projectFilter ? `${BLUE}18` : 'transparent', cursor: 'pointer', fontSize: 16, fontWeight: !projectFilter ? 700 : 500, color: !projectFilter ? BLUE : TEXT, textAlign: 'left', fontFamily: 'inherit' }}
+                    onMouseEnter={e => { if (projectFilter) e.currentTarget.style.background = 'hsl(var(--accent))'; }}
                     onMouseLeave={e => { if (projectFilter) e.currentTarget.style.background = 'transparent'; }}>
                     <span style={{ flex: 1 }}>All Projects</span>
                     {!projectFilter && <Check size={14} color={BLUE} />}
@@ -433,8 +433,8 @@ export function Documents() {
                     const isActive = projectFilter === String(p.id);
                     return (
                       <button key={p.id} onClick={() => { updateFilter('project', String(p.id)); setShowProjectDrop(false); }}
-                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', border: 'none', background: isActive ? '#EEF4FF' : 'transparent', cursor: 'pointer', fontSize: 16, fontWeight: isActive ? 700 : 500, color: isActive ? BLUE : TEXT, textAlign: 'left', fontFamily: 'inherit' }}
-                        onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = '#F7F8FB'; }}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', border: 'none', background: isActive ? `${BLUE}18` : 'transparent', cursor: 'pointer', fontSize: 16, fontWeight: isActive ? 700 : 500, color: isActive ? BLUE : TEXT, textAlign: 'left', fontFamily: 'inherit' }}
+                        onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'hsl(var(--accent))'; }}
                         onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}>
                         <span style={{ width: 10, height: 10, borderRadius: '50%', background: typeHex, flexShrink: 0 }} />
                         <span style={{ flex: 1 }}>{p.name}</span>
@@ -451,7 +451,7 @@ export function Documents() {
               {showTypeDrop && <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={() => setShowTypeDrop(false)} />}
               <button
                 onClick={() => { setShowTypeDrop(v => !v); setShowProjectDrop(false); }}
-                style={{ height: 40, width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', border: `1px solid ${showTypeDrop ? BLUE : LINE}`, borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 16, fontWeight: 500, color: fileTypeFilter ? TEXT : MUTED, whiteSpace: 'nowrap', fontFamily: 'inherit' }}
+                style={{ height: 40, width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', border: `1px solid ${showTypeDrop ? BLUE : LINE}`, borderRadius: 8, background: 'hsl(var(--card))', cursor: 'pointer', fontSize: 16, fontWeight: 500, color: fileTypeFilter ? TEXT : MUTED, whiteSpace: 'nowrap', fontFamily: 'inherit' }}
               >
                 <span style={{ flex: 1, textAlign: 'left' }}>
                   {fileTypeFilter ? FILE_TYPE_OPTIONS.find(o => o.value === fileTypeFilter)?.label || 'All Types' : 'All Types'}
@@ -459,13 +459,13 @@ export function Documents() {
                 <ChevronDown size={14} color={MUTED} style={{ flexShrink: 0, transition: 'transform 0.2s', transform: showTypeDrop ? 'rotate(180deg)' : 'none' }} />
               </button>
               {showTypeDrop && (
-                <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 50, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(16,24,40,.12)', overflow: 'hidden', padding: '4px 0' }}>
+                <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 50, background: 'hsl(var(--popover))', border: `1px solid ${LINE}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.18)', overflow: 'hidden', padding: '4px 0' }}>
                   {FILE_TYPE_OPTIONS.map(o => {
                     const isActive = fileTypeFilter === o.value;
                     return (
                       <button key={o.value} onClick={() => { updateFilter('file_type', o.value); setShowTypeDrop(false); }}
-                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', border: 'none', background: isActive ? '#EEF4FF' : 'transparent', cursor: 'pointer', fontSize: 16, fontWeight: isActive ? 700 : 500, color: isActive ? BLUE : TEXT, textAlign: 'left', fontFamily: 'inherit' }}
-                        onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = '#F7F8FB'; }}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', border: 'none', background: isActive ? `${BLUE}18` : 'transparent', cursor: 'pointer', fontSize: 16, fontWeight: isActive ? 700 : 500, color: isActive ? BLUE : TEXT, textAlign: 'left', fontFamily: 'inherit' }}
+                        onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'hsl(var(--accent))'; }}
                         onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}>
                         {o.color ? (
                           <div style={{ width: 28, height: 20, borderRadius: 4, background: `${o.color}18`, border: `1px solid ${o.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -495,7 +495,7 @@ export function Documents() {
         />
 
         {/* ── Workspace: tree + content ── */}
-        <div className="flex-1 flex overflow-hidden px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40" style={{ background: '#fff' }}>
+        <div className="flex-1 flex overflow-hidden px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40" style={{ background: 'hsl(var(--background))' }}>
 
           {/* ── Tree sidebar ── */}
           <TreePanel

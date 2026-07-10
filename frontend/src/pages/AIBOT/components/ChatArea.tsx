@@ -3,7 +3,7 @@ import { MessageBubble } from './MessageBubble';
 import type { AgentUIMessage } from '@/types';
 import { MUTED } from '@/config/tokens';
 
-const TEXT = '#0f172a';
+const TEXT = 'hsl(var(--foreground))';
 
 interface ChatAreaProps {
   messages:          AgentUIMessage[];
@@ -30,7 +30,7 @@ export function ChatArea({ messages, isTyping, historyLoading, input, setInput, 
   const isEmpty = messages.length === 0;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', background: '#f8faff' }}>
+   <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', background: 'hsl(var(--background))' }}>
 
       {/* Messages */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '28px 28px 12px' }}>
@@ -53,7 +53,7 @@ export function ChatArea({ messages, isTyping, historyLoading, input, setInput, 
                 <Sparkles style={{ width: 30, height: 30, color: '#93c5fd' }} />
               </div>
               {/* Online dot */}
-              <div style={{ position: 'absolute', bottom: -3, right: -3, width: 18, height: 18, borderRadius: '50%', background: '#22c55e', border: '3px solid #f8faff', boxShadow: '0 0 8px rgba(34,197,94,.6)' }} />
+              <div style={{ position: 'absolute', bottom: -3, right: -3, width: 18, height: 18, borderRadius: '50%', background: '#22c55e', border: '3px solid hsl(var(--background))', boxShadow: '0 0 8px rgba(34,197,94,.6)' }} />
             </div>
 
             <h3 style={{ fontSize: 22, fontWeight: 800, color: TEXT, letterSpacing: '-.03em', margin: '0 0 6px', textAlign: 'center' }}>Dyuksa AI</h3>
@@ -65,14 +65,14 @@ export function ChatArea({ messages, isTyping, historyLoading, input, setInput, 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, width: '100%', maxWidth: 420 }}>
               {SUGGESTIONS.map((s, i) => (
                 <button key={i} onClick={() => { setInput(s.text); inputRef.current?.focus(); }}
-                  style={{ textAlign: 'left', padding: '12px 14px', borderRadius: 12, border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', transition: 'all .15s', display: 'flex', flexDirection: 'column', gap: 6 }}
+                  style={{ textAlign: 'left', padding: '12px 14px', borderRadius: 12, border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))', cursor: 'pointer', transition: 'all .15s', display: 'flex', flexDirection: 'column', gap: 6 }}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = s.accent; e.currentTarget.style.boxShadow = `0 4px 16px ${s.accent}20`; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = 'none'; }}>
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'hsl(var(--border))'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.transform = 'none'; }}>
                   <div style={{ width: 28, height: 28, borderRadius: 7, background: `${s.accent}12`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: s.accent }}>
                     {s.icon}
                   </div>
                   <span style={{ fontSize: 11, fontWeight: 700, color: s.accent, textTransform: 'uppercase' as const, letterSpacing: '.05em' }}>{s.label}</span>
-                  <span style={{ fontSize: 12, color: '#64748b', lineHeight: 1.3 }}>{s.text.slice(0, 44)}{s.text.length > 44 ? '…' : ''}</span>
+                  <span style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))', lineHeight: 1.3 }}>{s.text.slice(0, 44)}{s.text.length > 44 ? '…' : ''}</span>
                 </button>
               ))}
             </div>
@@ -92,9 +92,9 @@ export function ChatArea({ messages, isTyping, historyLoading, input, setInput, 
                 <div style={{ width: 32, height: 32, borderRadius: 10, background: 'linear-gradient(135deg, #0f172a, #1e3a5f)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Sparkles style={{ width: 14, height: 14, color: '#93c5fd' }} />
                 </div>
-                <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '6px 18px 18px 18px', padding: '12px 16px', display: 'flex', gap: 5, alignItems: 'center', boxShadow: '0 2px 10px rgba(16,24,40,.06)' }}>
+                <div style={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '6px 18px 18px 18px', padding: '12px 16px', display: 'flex', gap: 5, alignItems: 'center', boxShadow: '0 2px 10px rgba(0,0,0,.1)' }}>
                   {[0, 160, 320].map(delay => (
-                    <span key={delay} style={{ width: 6, height: 6, borderRadius: '50%', background: '#94a3b8', display: 'inline-block', animation: `aiDot 1.4s ease-in-out ${delay}ms infinite` }} />
+                    <span key={delay} style={{ width: 6, height: 6, borderRadius: '50%', background: 'hsl(var(--muted-foreground))', display: 'inline-block', animation: `aiDot 1.4s ease-in-out ${delay}ms infinite` }} />
                   ))}
                 </div>
               </div>
@@ -105,20 +105,20 @@ export function ChatArea({ messages, isTyping, historyLoading, input, setInput, 
       </div>
 
       {/* Input */}
-      <div style={{ padding: '10px 20px 14px', background: '#fff', borderTop: '1px solid #e2e8f0', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#f8faff', borderRadius: 14, padding: '13px 14px', border: '1.5px solid #e2e8f0', transition: 'all .2s' }}
-          onFocusCapture={e => { e.currentTarget.style.borderColor = '#1663f6'; e.currentTarget.style.background = '#fff'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(22,99,246,.08)'; }}
-          onBlurCapture={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#f8faff'; e.currentTarget.style.boxShadow = 'none'; }}>
+      <div style={{ padding: '10px 20px 14px', background: 'hsl(var(--card))', borderTop: '1px solid hsl(var(--border))', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'hsl(var(--input))', borderRadius: 14, padding: '13px 14px', border: '1.5px solid hsl(var(--border))', transition: 'all .2s' }}
+          onFocusCapture={e => { e.currentTarget.style.borderColor = '#1663f6'; e.currentTarget.style.background = 'hsl(var(--card))'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(22,99,246,.08)'; }}
+          onBlurCapture={e => { e.currentTarget.style.borderColor = 'hsl(var(--border))'; e.currentTarget.style.background = 'hsl(var(--input))'; e.currentTarget.style.boxShadow = 'none'; }}>
           <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)} onKeyDown={onKeyDown}
             placeholder="Ask Dyuksa AI anything…" rows={1}
             style={{ flex: 1, resize: 'none', border: 'none', outline: 'none', background: 'transparent', fontSize: 14, color: TEXT, fontFamily: 'inherit', lineHeight: 1.5, maxHeight: 120, overflowY: 'auto', display: 'block', paddingTop: 2 }}
             onInput={e => { const el = e.currentTarget; el.style.height = 'auto'; el.style.height = `${Math.min(el.scrollHeight, 120)}px`; }} />
           <button onClick={onSend} disabled={!input.trim() || isTyping}
-            style={{ width: 34, height: 34, borderRadius: 10, border: 'none', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s', cursor: !input.trim() || isTyping ? 'not-allowed' : 'pointer', background: !input.trim() || isTyping ? '#e2e8f0' : 'linear-gradient(135deg, #1663f6, #0f4bd4)', boxShadow: !input.trim() || isTyping ? 'none' : '0 4px 12px rgba(22,99,246,.35)' }}>
-            <Send style={{ width: 14, height: 14, color: !input.trim() || isTyping ? '#94a3b8' : '#fff' }} />
+            style={{ width: 34, height: 34, borderRadius: 10, border: 'none', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s', cursor: !input.trim() || isTyping ? 'not-allowed' : 'pointer', background: !input.trim() || isTyping ? 'hsl(var(--muted))' : 'linear-gradient(135deg, #1663f6, #0f4bd4)', boxShadow: !input.trim() || isTyping ? 'none' : '0 4px 12px rgba(22,99,246,.35)' }}>
+            <Send style={{ width: 14, height: 14, color: !input.trim() || isTyping ? 'hsl(var(--muted-foreground))' : '#fff' }} />
           </button>
         </div>
-        <p style={{ fontSize: 10, color: '#94a3b8', textAlign: 'center', marginTop: 7, letterSpacing: '.01em' }}>
+        <p style={{ fontSize: 10, color: 'hsl(var(--muted-foreground))', textAlign: 'center', marginTop: 7, letterSpacing: '.01em' }}>
           Dyuksa AI · Workspace assistant · May make mistakes
         </p>
       </div>

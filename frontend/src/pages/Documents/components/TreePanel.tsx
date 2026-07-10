@@ -144,8 +144,8 @@ export function TreePanel({
     const showAccent = depth >= 1; 
 
     const rowBg = isSel
-      ? (f.taskType ? `${typeHex}14` : '#edf4ff')
-      : 'transparent';
+    ? (showAccent ? `${typeHex}15` : `${typeHex}12`)
+    : 'transparent';
     const rowBorder = showAccent ? `3px solid ${typeHex}` : 'none';
 
     return (
@@ -153,8 +153,8 @@ export function TreePanel({
         <div
           className="flex items-center gap-2 cursor-pointer group/folder"
           style={{ background: rowBg, borderLeft: rowBorder, borderRadius: showAccent ? '0 6px 6px 0' : 6, padding: '0 8px', height: 29, marginBottom: 1 }}
-          onMouseEnter={(e) => { if (!isSel) e.currentTarget.style.background = showAccent ? `${typeHex}0a` : '#f3f4f6'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = rowBg; }}
+          onMouseEnter={(e) => { if (!isSel) e.currentTarget.style.background = showAccent ? `${typeHex}0a` : 'hsl(var(--accent))'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = isSel ? '#EEF2FF' : 'transparent'; }}
           onClick={() => { if (hasC) toggleNode(nodeKey); onFolderClick(f.name, f.id, f.projectId); }}
           onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY, folder: f }); }}
           onDragOver={(e) => {
@@ -227,10 +227,10 @@ export function TreePanel({
               onBlur={commitRename}
               onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') { setEditingId(null); setEditName(''); } }}
               onClick={(e) => e.stopPropagation()} className="flex-1 text-sm rounded px-1 py-0.5 min-w-0"
-              style={{ border: `1px solid ${typeHex}`, outline: 'none', background: '#fff', color: '#1a1a1a' }} />
+              style={{ border: `1px solid ${typeHex}`, outline: 'none', background: 'hsl(var(--input))', color: 'hsl(var(--foreground))' }} />
          ) : (
             <span
-              style={{ flex: 1, fontSize: 12, color: isSel ? typeHex : '#27354d', fontWeight: isSel ? 700 : depth === 0 ? 700 : 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              style={{ flex: 1, fontSize: 12, color: isSel ? typeHex : 'hsl(var(--foreground))', fontWeight: isSel ? 700 : depth === 0 ? 700 : 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
               onDoubleClick={(e) => { e.stopPropagation(); if (f.id && !f.isSystemGenerated) startRename(f.id, f.name); }}
             >
               {f.name}
@@ -238,7 +238,7 @@ export function TreePanel({
           )}
           {/* Doc count — plain muted number, same as Project tree */}
           {f.count > 0 && (
-            <span style={{ fontSize: 11, color: '#667085', flexShrink: 0 }}>
+            <span style={{ fontSize: 11, color: 'hsl(var(--muted-foreground))', flexShrink: 0 }}>
               {f.count}
             </span>
           )}
@@ -253,8 +253,8 @@ export function TreePanel({
                   onKeyDown={(e) => { if (e.key === 'Enter') commitCreateFolder(); if (e.key === 'Escape') cancelCreateFolder(); }}
                   onBlur={() => { if (newFolderName.trim()) commitCreateFolder(); else cancelCreateFolder(); }}
                   placeholder="Folder name..." className="flex-1 rounded px-2 py-0.5 min-w-0"
-                  style={{ border: '1px solid #4169FF', outline: 'none', background: '#fff', color: '#1a1a1a', fontSize: 12, height: 26 }} />
-                <button onClick={cancelCreateFolder} style={{ color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: 2, flexShrink: 0 }}>
+                  style={{ border: '1px solid #4169FF', outline: 'none', background: 'hsl(var(--input))', color: 'hsl(var(--foreground))', fontSize: 12, height: 26 }} />
+                <button onClick={cancelCreateFolder} style={{ color: 'hsl(var(--muted-foreground))', background: 'none', border: 'none', cursor: 'pointer', padding: 2, flexShrink: 0 }}>
                   <X className="w-3 h-3" />
                 </button>
               </div>
@@ -269,19 +269,19 @@ export function TreePanel({
   return (
     <div
       className={`flex-shrink-0 overflow-hidden ${isOpen ? 'block' : 'hidden sm:block'}`}
-      style={{ width: isOpen ? 280 : 44, minWidth: isOpen ? 280 : 44, borderRight: '1px solid #e5e7eb', background: '#fff', transition: 'width 0.3s ease, min-width 0.3s ease' }}
+      style={{ width: isOpen ? 280 : 44, minWidth: isOpen ? 280 : 44, borderRight: '1px solid hsl(var(--border))', background: 'hsl(var(--card))', transition: 'width 0.3s ease, min-width 0.3s ease' }}
     >
       {/* ── Collapsed state ── */}
       {!isOpen && (
         <div className="flex flex-col items-center py-4 h-full">
           <button onClick={onToggle} className="p-1.5 rounded-md"
-            style={{ color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer' }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#f3f4f6'; }}
+            style={{ color: 'hsl(var(--muted-foreground))', background: 'none', border: 'none', cursor: 'pointer' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'hsl(var(--accent))'; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             title="Show Tree View">
             <ChevronRight className="w-4 h-4" />
           </button>
-         <div className="mt-3" style={{ writingMode: 'vertical-rl', fontSize: 11, fontWeight: 600, color: '#6b7280', letterSpacing: '0.05em' }}>Folders</div>
+         <div className="mt-3" style={{ writingMode: 'vertical-rl', fontSize: 11, fontWeight: 600, color: 'hsl(var(--muted-foreground))', letterSpacing: '0.05em' }}>Folders</div>
         </div>
       )}
 
@@ -360,7 +360,7 @@ export function TreePanel({
         <>
           <div className="fixed inset-0 z-[998]" onClick={() => setContextMenu(null)} onContextMenu={(e) => { e.preventDefault(); setContextMenu(null); }} />
           <div className="fixed z-[999] rounded-lg shadow-xl py-1 animate-in fade-in duration-100"
-            style={{ left: contextMenu.x, top: contextMenu.y, background: '#fff', border: '1px solid #e5e7eb', minWidth: 180, boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}
+            style={{ left: contextMenu.x, top: contextMenu.y, background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', minWidth: 180, boxShadow: '0 8px 24px rgba(0,0,0,0.18)' }}
             onClick={(e) => e.stopPropagation()}>
             <div style={{ padding: '8px 14px 6px', borderBottom: '1px solid #f3f4f6' }}>
               <p style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>{contextMenu.folder.name}</p>
@@ -413,7 +413,7 @@ export function TreePanel({
               </div>
               <div className="flex w-full gap-3 pt-2">
                 <button className="flex-1 py-2.5 rounded-lg font-semibold"
-                  style={{ background: '#fff', color: '#1a1a1a', border: '1px solid #e5e7eb', cursor: 'pointer', fontSize: 14 }}
+                  style={{ background: 'hsl(var(--popover))', color: 'hsl(var(--foreground))', border: '1px solid hsl(var(--border))', cursor: 'pointer', fontSize: 14 }}
                   onClick={() => setDeleteFolderConfirm(null)}>Cancel</button>
                 <button className="flex-1 py-2.5 rounded-lg font-semibold"
                   style={{ background: '#EF4444', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 14 }}

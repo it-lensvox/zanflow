@@ -6,7 +6,8 @@ import { AIBot } from '@/pages/AIBOT/AIBOT';
 import { useNotifications } from '@/hooks/useNotifications';
 import { TaskDraftBar } from '@/pages/MyTask/components/Taskdrafts';
 import { GlobalSearchTrigger } from '@/components/GlobalSearch';
-import { Bell, Moon, HelpCircle } from 'lucide-react';
+import { Bell, HelpCircle } from 'lucide-react';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import logoImage from '../../public/assets/logo.png';
@@ -143,18 +144,18 @@ export function Layout() {
       {/* Main area */}
       <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
 
-       {/* ── Global Top Bar ── */}
+        {/* ── Global Top Bar ── */}
         {!isDashboard && (
           <div style={{
             height: 52, flexShrink: 0,
             display: 'flex', alignItems: 'center',
             padding: '0 20px', gap: 12,
-            background: '#fff',
-            borderBottom: '1px solid #E6EBF2',
+            background: 'hsl(var(--card))',
+            borderBottom: '1px solid hsl(var(--border))',
             zIndex: 27,
           }}>
             {/* Left: hamburger (mobile) + breadcrumb */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: '#667085' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: 'hsl(var(--muted-foreground))' }}>
               {/* Hamburger — mobile only */}
               <button
                 className="md:hidden flex items-center justify-center w-8 h-8 rounded-md hover:bg-muted transition-colors flex-shrink-0 mr-1"
@@ -162,11 +163,11 @@ export function Layout() {
                 aria-label="Open menu"
               >
                 <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                  <path d="M2 4h14M2 9h14M2 14h14" stroke="#344054" strokeWidth="1.75" strokeLinecap="round" />
+                  <path d="M2 4h14M2 9h14M2 14h14" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
                 </svg>
               </button>
-              <span style={{ color: '#667085', fontWeight: 500 }}>DYUKSA</span>
-              <span style={{ color: '#172033', fontWeight: 700 }}>{pageTitle}</span>
+              <span style={{ color: 'hsl(var(--muted-foreground))', fontWeight: 500 }}>DYUKSA</span>
+              <span style={{ color: 'hsl(var(--foreground))', fontWeight: 700 }}>{pageTitle}</span>
             </div>
 
             {/* search — grows to fill ~40% of the row */}
@@ -176,13 +177,24 @@ export function Layout() {
 
             {/* Right: Moon + QuickCreate + Bell + Help */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-              {/* Theme toggle  */}
-              <button
-                style={{ width: 34, height: 34, border: '1px solid #E6EBF2', borderRadius: 8, background: '#fff', cursor: 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, opacity: 0.5 }}
-                title="Dark mode coming soon"
+              {/* Theme toggle — active styled container */}
+              <div
+                title="Toggle theme"
+                style={{
+                  width: 34, height: 34,
+                  border: '1px solid hsl(var(--border))',
+                  borderRadius: 8,
+                  background: 'hsl(var(--accent))',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0, transition: 'background 0.2s, box-shadow 0.2s',
+                  boxShadow: '0 1px 3px rgba(0,0,0,.08)',
+                  cursor: 'pointer',
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = 'hsl(var(--secondary))'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = 'hsl(var(--accent))'; }}
               >
-                <Moon size={15} color="#172033" />
-              </button>
+                <ThemeToggle />
+              </div>
 
               {/* Quick create */}
               <QuickCreateButton />
@@ -190,9 +202,9 @@ export function Layout() {
               {/* Notification bell */}
               <button
                 onClick={() => setIsActivityOpen(!isActivityOpen)}
-                style={{ position: 'relative', width: 34, height: 34, border: '1px solid #E6EBF2', borderRadius: 8, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                style={{ position: 'relative', width: 34, height: 34, border: '1px solid hsl(var(--border))', borderRadius: 8, background: 'hsl(var(--card))', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
               >
-                <Bell size={15} color="#172033" />
+                <Bell size={15} color="currentColor" />
                 {unreadCount > 0 && (
                   <span style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, background: '#EF4444', borderRadius: '50%', fontSize: 9, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {unreadCount > 9 ? '9+' : unreadCount}
@@ -202,10 +214,10 @@ export function Layout() {
 
               {/* Help */}
               <button
-                style={{ width: 34, height: 34, border: '1px solid #E6EBF2', borderRadius: 8, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                style={{ width: 34, height: 34, border: '1px solid hsl(var(--border))', borderRadius: 8, background: 'hsl(var(--card))', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
                 className="hidden sm:flex"
               >
-                <HelpCircle size={15} color="#667085" />
+                <HelpCircle size={15} color="hsl(var(--muted-foreground))" />
               </button>
             </div>
           </div>

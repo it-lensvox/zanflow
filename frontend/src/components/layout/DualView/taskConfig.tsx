@@ -11,7 +11,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { formatRelativeTime } from '@/lib/utils';
 import { TablePopover } from '@/components/common';
-import { getTypeHex, getTypeBg } from '@/config/projectTypeConfig';
+import { getTypeHex, getTypeBg } from '@/pages/Project/projectConstants';
+import { useTheme } from '@/hooks/useTheme';
 import { Check } from 'lucide-react';
 import { PRIORITY_OPTIONS as _PRIORITY_OPTIONS } from '@/config/priorityConfig';
 
@@ -174,8 +175,8 @@ function AssigneePopover({ task }: { task: Task }) {
             left: pos.left,
             zIndex: 99999,
             minWidth: 180,
-            background: '#fff',
-            border: '1px solid #e5e7eb',
+            background: 'hsl(var(--popover))',
+            border: '1px solid hsl(var(--border))',
             borderRadius: 10,
             boxShadow: '0 8px 24px rgba(0,0,0,0.14)',
             padding: 8,
@@ -185,7 +186,7 @@ function AssigneePopover({ task }: { task: Task }) {
             {(task.assigned_to_user_details || []).length > 0 ? (
               (task.assigned_to_user_details || []).map(u => (
                 <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 6px', borderRadius: 6 }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                  onMouseEnter={e => e.currentTarget.style.background = 'hsl(var(--accent))'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                   <div style={{ width: 22, height: 22, borderRadius: '50%', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: '#fff', background: u.avatar ? 'transparent' : '#3b82f6', flexShrink: 0 }}>
                     {u.avatar ? <img src={u.avatar} alt={u.first_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <>{u.first_name?.[0]}{u.last_name?.[0]}</>}
@@ -260,8 +261,8 @@ export function TaskGridCard({ task, onTaskClick, selectionMode = false, isSelec
       onDoubleClick={handleDoubleClick}
       className="group cursor-pointer"
       style={{
-        background: '#fff',
-        border: isSelected ? `2px solid ${accentHex}` : '1px solid #E6EBF2',
+        background: 'hsl(var(--card))',
+        border: isSelected ? `2px solid ${accentHex}` : '1px solid hsl(var(--border))',
         borderRadius: 14,
         position: 'relative',
         boxShadow: isSelected ? `0 0 0 3px ${accentHex}22` : '0 1px 4px rgba(16,24,40,.06)',
@@ -269,8 +270,8 @@ export function TaskGridCard({ task, onTaskClick, selectionMode = false, isSelec
         minWidth: 0,
         width: '100%',
       }}
-      onMouseEnter={e => { if (!isSelected) { e.currentTarget.style.boxShadow = '0 4px 20px rgba(16,24,40,.12)'; e.currentTarget.style.transform = 'translateY(-2px)'; } }}
-      onMouseLeave={e => { if (!isSelected) { e.currentTarget.style.boxShadow = '0 1px 4px rgba(16,24,40,.06)'; e.currentTarget.style.transform = 'none'; } }}
+      onMouseEnter={e => { if (!isSelected) { e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,.15)'; e.currentTarget.style.transform = 'translateY(-2px)'; } }}
+      onMouseLeave={e => { if (!isSelected) { e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,.06)'; e.currentTarget.style.transform = 'none'; } }}
     >
       {/* ── Top accent bar (project type colour) ── */}
       <div style={{ height: 4, background: accentHex, width: '100%', borderRadius: '14px 14px 0 0' }} />
@@ -313,10 +314,10 @@ export function TaskGridCard({ task, onTaskClick, selectionMode = false, isSelec
           )}
 
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ margin: '0 0 2px', fontWeight: 700, fontSize: 14, color: '#172033', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <p style={{ margin: '0 0 2px', fontWeight: 700, fontSize: 14, color: 'hsl(var(--foreground))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {task.project_details?.name || task.project_name || 'No Project'}
             </p>
-            <p style={{ margin: 0, fontSize: 12, color: '#667085', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <p style={{ margin: 0, fontSize: 12, color: 'hsl(var(--muted-foreground))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {task.heading || 'No Task'}
             </p>
           </div>
@@ -324,7 +325,7 @@ export function TaskGridCard({ task, onTaskClick, selectionMode = false, isSelec
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
             <PinButton isPinned={isPinned} isPending={isPending} handlePin={handlePin} groupHoverClass="group-hover:opacity-100" />
             {task.updated_at && (
-              <span style={{ fontSize: 11, color: '#667085', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: 11, color: 'hsl(var(--muted-foreground))', whiteSpace: 'nowrap' }}>
                 {formatRelativeTime(task.updated_at)}
               </span>
             )}
@@ -332,7 +333,7 @@ export function TaskGridCard({ task, onTaskClick, selectionMode = false, isSelec
         </div>
 
         {/* ── Row 2: Due date + assignee count with hover dropdown ── */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12, color: '#667085' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12, color: 'hsl(var(--muted-foreground))' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <Calendar style={{ width: 12, height: 12 }} />
             <span>{formatDate(task.end_date)}</span>
@@ -347,8 +348,8 @@ export function TaskGridCard({ task, onTaskClick, selectionMode = false, isSelec
             const p = priorityOptions.find(o => o.value === task.priority);
             return (
               <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span className={`w-2 h-2 rounded-full ${p?.dotColor || 'bg-gray-300'}`} />
-                <span style={{ fontSize: 11, fontWeight: 500, color: '#667085', textTransform: 'capitalize' as const }}>{task.priority}</span>
+                <span className={`w-2 h-2 rounded-full ${p?.dotColor || 'bg-muted-foreground/40'}`} />
+                <span style={{ fontSize: 11, fontWeight: 500, color: 'hsl(var(--muted-foreground))', textTransform: 'capitalize' as const }}>{task.priority}</span>
               </div>
             );
           })() :
@@ -452,7 +453,7 @@ function PinButton({
       className={`flex-shrink-0 p-0.5 rounded transition-all duration-150
         ${isPinned
           ? 'opacity-100 text-amber-500 hover:text-amber-600'
-          : `opacity-0 ${groupHoverClass} text-gray-300 hover:text-gray-500`
+          : `opacity-0 ${groupHoverClass} text-muted-foreground/40 hover:text-muted-foreground`
         }
         ${isPending ? 'cursor-wait' : 'cursor-pointer'}
       `}
@@ -479,7 +480,7 @@ function TaskTitleCell({
   return (
     <div className="flex items-center justify-between gap-1 group/title w-full min-w-0">
       <span
-        className="font-medium text-[#172b4d] truncate block"
+        className="font-medium text-foreground truncate block"
         title={task.heading}
       >
         {task.heading}
@@ -618,7 +619,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
             return (
               <div
                 key={option.value}
-                className="px-3 py-2 hover:bg-gray-50 cursor-pointer text-[12px] flex items-center gap-2"
+                className="px-3 py-2 hover:bg-accent cursor-pointer text-[12px] flex items-center gap-2"
                 onClick={() => handleStatusChange(option.value)}
               >
                 {React.createElement(option.icon, { className: `w-3.5 h-3.5 ${textColor}` })}
@@ -683,9 +684,9 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     };
 
     const trigger = (
-      <div className="flex items-center gap-1.5 text-gray-600 cursor-pointer hover:bg-gray-100 px-2 py-1 rounded transition-colors">
-        <div className={`h-1 w-3 rounded-full ${priorityOption?.dotColor || 'bg-gray-400'}`} />
-        <span className="capitalize text-[12px]">{task.priority || 'None'}</span>
+      <div className="flex items-center gap-1.5 text-muted-foreground cursor-pointer hover:bg-accent px-2 py-1 rounded transition-colors">
+        <div className={`h-1 w-3 rounded-full ${priorityOption?.dotColor || 'bg-muted-foreground/40'}`} />
+        <span className="capitalize text-[12px] text-foreground">{task.priority || 'None'}</span>
       </div>
     );
 
@@ -706,7 +707,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
               onClick={() => handlePriorityChange(option.value)}
             >
               <span>{option.icon}</span>
-              <span className={task.priority === option.value ? "font-bold text-blue-600" : ""}>
+              <span className={task.priority === option.value ? "font-bold text-blue-500" : "text-foreground"}>
                 {option.label}
               </span>
             </div>
@@ -761,20 +762,19 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
       });
     };
 
+   const { resolvedTheme } = useTheme();
     return (
-      <div className="border rounded px-1.5 py-1 bg-white hover:border-blue-400 transition-all" onClick={(e) => e.stopPropagation()}>
+      <div className="border border-border rounded px-1.5 py-1 bg-card hover:border-blue-400 transition-all" onClick={(e) => e.stopPropagation()}>
         {user?.role === 'admin' || user?.role === 'manager' ? (
           <input
             type="date"
             value={task[field]?.split('T')[0] || ''}
             onChange={(e) => handleDateChange(e.target.value, e)}
-            className="border-none bg-transparent text-[11px] p-0 cursor-pointer w-full text-[#172b4d] font-medium focus:outline-none"
-            style={{
-              colorScheme: 'light'
-            }}
+            className="border-none bg-transparent text-[11px] p-0 cursor-pointer w-full text-foreground font-medium focus:outline-none"
+            style={{ colorScheme: resolvedTheme === 'dark' ? 'dark' : 'light' }}
           />
         ) : (
-          <span className="text-[11px] text-[#172b4d] font-medium py-0.5">
+          <span className="text-[11px] text-foreground font-medium py-0.5">
             {formatDate(task[field])}
           </span>
         )}
@@ -794,7 +794,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
         <div
           onClick={e => { e.stopPropagation(); selectionProps.toggleAll(selectionProps.visibleTasks); }}
           title={allSelected ? 'Deselect all' : 'Select all'}
-          style={{ width: 26, height: 26, borderRadius: 7, background: '#e5e7eb', display: 'grid', placeItems: 'center', cursor: 'pointer', transition: 'background 0.15s', flexShrink: 0 }}
+          style={{ width: 26, height: 26, borderRadius: 7, background: 'hsl(var(--muted))', display: 'grid', placeItems: 'center', cursor: 'pointer', transition: 'background 0.15s', flexShrink: 0 }}
         >
           {allSelected && <Check size={13} color="#fff" strokeWidth={3} />}
         </div>
@@ -832,13 +832,13 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
   const baseColumns: TableColumn<Task>[] = [
     {
       key: 'project',
-      label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">Project</span>,
+      label: <span className="text-[14px] font-extrabold tracking-wide text-foreground">Project</span>,
       width: '10%',
       render: (task: Task) => (
         <span
           title={task.project_details?.name || task.project_name || ''}
           style={{
-            fontSize: 13, fontWeight: 700, color: '#172033',
+            fontSize: 13, fontWeight: 700, color: 'hsl(var(--foreground))',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             display: 'block', maxWidth: 130,
           }}
@@ -849,25 +849,25 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     },
     {
       key: 'heading',
-      label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">Task Title</span>,
+      label: <span className="text-[14px] font-extrabold tracking-wide text-foreground">Task Title</span>,
       width: '10%',
       render: (task: Task) => <TaskTitleCell task={task} queryClient={queryClient} />,
     },
     {
       key: 'status',
-      label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">Status</span>,
+      label: <span className="text-[14px] font-extrabold tracking-wide text-foreground">Status</span>,
       width: '8%',
       render: (task: Task) => <StatusDropdown task={task} />,
     },
     {
       key: personField,
-      label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">{personField === 'assigned_to' ? 'Assignee' : personField === 'created_by' ? 'Created By' : 'Updated By'}</span>, width: '8%',
+      label: <span className="text-[14px] font-extrabold tracking-wide text-foreground">{personField === 'assigned_to' ? 'Assignee' : personField === 'created_by' ? 'Created By' : 'Updated By'}</span>, width: '8%',
       render: (task: Task) => {
         if (personField === 'created_by') {
           // Show Created By
           const creator = task.assigned_by_user_details;
           if (!creator) {
-            return <span className="text-gray-300 text-[11px]">—</span>;
+            return <span className="text-muted-foreground/40 text-[11px]">—</span>;
           }
           return (
             <div className="flex items-center gap-2">
@@ -881,7 +881,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
                   : <>{creator.first_name?.[0] || ''}{creator.last_name?.[0] || ''}</>
                 }
               </div>
-              <span className="text-[12px] text-gray-700 font-medium truncate max-w-[80px]">
+              <span className="text-[12px] text-foreground font-medium truncate max-w-[80px]">
                 {creator.first_name} {creator.last_name?.[0]}.
               </span>
             </div>
@@ -891,7 +891,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
           // Show Updated By (who last changed the status)
           const updater = task.status_updated_by_details;
           if (!updater) {
-            return <span className="text-gray-300 text-[11px]">—</span>;
+            return <span className="text-muted-foreground/40 text-[11px]">—</span>;
           }
           return (
             <div className="flex items-center gap-2">
@@ -905,7 +905,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
                   : <>{updater.first_name?.[0] || ''}{updater.last_name?.[0] || ''}</>
                 }
               </div>
-              <span className="text-[12px] text-gray-700 font-medium truncate max-w-[80px]">
+              <span className="text-[12px] text-foreground font-medium truncate max-w-[80px]">
                 {updater.first_name} {updater.last_name?.[0]}.
               </span>
             </div>
@@ -932,7 +932,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
                 ))}
                 {(task.assigned_to_user_details || []).length > 3 && (
                   <div
-                    className="w-6 h-6 rounded-full bg-gray-400 text-white flex items-center justify-center text-[10px] font-semibold ring-1 ring-white"
+                    className="w-6 h-6 rounded-full bg-muted-foreground text-white flex items-center justify-center text-[10px] font-semibold ring-1 ring-card"
                     title={`+${(task.assigned_to_user_details || []).length - 3} more`}
                   >
                     +{(task.assigned_to_user_details || []).length - 3}
@@ -940,22 +940,22 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
                 )}
               </>
             ) : (
-              <span className="text-gray-300 text-[11px] pl-1">—</span>
+              <span className="text-muted-foreground/40 text-[11px] pl-1">—</span>
             )}
           </div>
         );
         return (
           <TablePopover trigger={trigger}>
-            <div className="p-2 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-lg">
-              <span className="text-xs font-semibold text-gray-700">Assignees</span>
-              <span className="text-[10px] bg-gray-200 px-1.5 py-0.5 rounded text-gray-600">
+            <div className="p-2 border-b border-border flex justify-between items-center bg-muted rounded-t-lg">
+              <span className="text-xs font-semibold text-foreground">Assignees</span>
+              <span className="text-[10px] bg-accent px-1.5 py-0.5 rounded text-muted-foreground">
                 {(task.assigned_to_user_details || []).length}
               </span>
             </div>
             <div className="max-h-48 overflow-y-auto p-1">
               {(task.assigned_to_user_details || []).length > 0 ? (
                 (task.assigned_to_user_details || []).map((u) => (
-                  <div key={u.id} className="flex items-center gap-2 p-1.5 hover:bg-gray-50 rounded">
+                  <div key={u.id} className="flex items-center gap-2 p-1.5 hover:bg-accent rounded">
                     <div className="w-6 h-6 rounded-full overflow-hidden flex items-center justify-center text-[10px] font-semibold shrink-0 text-white"
                       style={{ background: u.avatar ? 'transparent' : '#8d87b5' }}>
                       {u.avatar
@@ -964,13 +964,13 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
                       }
                     </div>
                     <div className="min-w-0">
-                      <p className="text-[11px] font-medium text-gray-700 truncate">{u.first_name} {u.last_name}</p>
-                      <p className="text-[10px] text-gray-400 truncate capitalize">{u.role}</p>
+                      <p className="text-[11px] font-medium text-foreground truncate">{u.first_name} {u.last_name}</p>
+                      <p className="text-[10px] text-muted-foreground truncate capitalize">{u.role}</p>
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="p-2 text-center text-xs text-gray-400 italic">No assignees</div>
+                <div className="p-2 text-center text-xs text-muted-foreground italic">No assignees</div>
               )}
             </div>
           </TablePopover>
@@ -979,13 +979,13 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     },
     {
       key: 'priority',
-      label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">Priority</span>,
+      label: <span className="text-[14px] font-extrabold tracking-wide text-foreground">Priority</span>,
       width: '8%',
       render: (task: Task) => <PriorityDropdown task={task} />,
     },
     {
       key: 'labels',
-      label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">Labels</span>,
+      label: <span className="text-[14px] font-extrabold tracking-wide text-foreground">Labels</span>,
       width: '8%',
       render: (task: Task) => (
         <div className="flex flex-wrap gap-1.5 items-center h-full min-h-[24px]" onClick={(e) => e.stopPropagation()}>
@@ -1007,21 +1007,21 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     },
     {
       key: dateField,
-      label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">{dateField === 'end_date' ? 'Due Date' : dateField === 'start_date' ? 'Start Date' : 'Created At'}</span>,
+      label: <span className="text-[14px] font-extrabold tracking-wide text-foreground">{dateField === 'end_date' ? 'Due Date' : dateField === 'start_date' ? 'Start Date' : 'Created At'}</span>,
       width: '8%',
       render: (task: Task) =>
         dateField === 'created_at'
-          ? <span className="text-[13px] text-gray-600 pl-1">{formatDate(task.created_at || '')}</span>
+          ? <span className="text-[13px] text-muted-foreground pl-1">{formatDate(task.created_at || '')}</span>
           : <DateInput task={task} field={dateField as 'start_date' | 'end_date'} />,
     },
     {
       key: 'updated_at',
-      label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">Updated</span>,
+      label: <span className="text-[14px] font-extrabold tracking-wide text-foreground">Updated</span>,
       width: '8%',
       render: (task: Task) => {
-        if (!task) return <span className="text-[13px] text-gray-600 pl-1">—</span>;
+        if (!task) return <span className="text-[13px] text-muted-foreground pl-1">—</span>;
         return (
-          <span className="text-[13px] text-gray-600 pl-1" title={formatDate(task.updated_at || '')}>
+          <span className="text-[13px] text-muted-foreground pl-1" title={formatDate(task.updated_at || '')}>
             {task.updated_at ? formatRelativeTime(task.updated_at) : '—'}
           </span>
         );
@@ -1029,7 +1029,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
     },
     {
       key: 'duration',
-      label: <span className="text-[14px] font-extrabold tracking-wide text-[#172033]">Duration</span>,
+      label: <span className="text-[14px] font-extrabold tracking-wide text-foreground">Duration</span>,
       width: '8%',
       render: (task: Task) => (
         <input

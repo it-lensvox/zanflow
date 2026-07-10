@@ -144,41 +144,41 @@ const RescheduleModal: React.FC<RescheduleModalProps> = ({
             }}
         >
             <div 
-                className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 mx-4"
+                className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-md p-6 mx-4"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
                 <div className="flex items-center gap-3 mb-4">
-                    <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center">
-                        <CalendarIcon className="text-amber-600" size={24} />
+                    <div className="w-12 h-12 bg-amber-500/15 rounded-full flex items-center justify-center flex-shrink-0">
+                        <CalendarIcon className="text-amber-500" size={24} />
                     </div>
-                    <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900 text-lg">Propose new time</h3>
+                    <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-foreground text-base">Propose new time</h3>
                         {eventTitle && (
-                            <p className="text-sm text-gray-500 truncate">{eventTitle}</p>
+                            <p className="text-sm text-muted-foreground truncate">{eventTitle}</p>
                         )}
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                        className="p-2 hover:bg-accent rounded-lg transition-colors flex-shrink-0"
                     >
-                        <X size={20} className="text-gray-400" />
+                        <X size={18} className="text-muted-foreground" />
                     </button>
                 </div>
 
                 {/* Current time info */}
                 {formatOriginalTime && (
-                    <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 rounded-xl mb-4">
-                        <Clock size={16} className="text-gray-400" />
-                        <span className="text-sm text-gray-600">
-                            Current: <span className="font-medium text-gray-900">{formatOriginalTime}</span>
+                    <div className="flex items-center gap-2 px-4 py-3 bg-muted rounded-xl mb-4">
+                        <Clock size={15} className="text-muted-foreground flex-shrink-0" />
+                        <span className="text-sm text-muted-foreground">
+                            Current: <span className="font-medium text-foreground">{formatOriginalTime}</span>
                         </span>
                     </div>
                 )}
 
                 {/* Quick suggestions */}
                 <div className="space-y-2 mb-4">
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                         Quick options
                     </label>
                     {suggestions.map((s) => (
@@ -188,8 +188,8 @@ const RescheduleModal: React.FC<RescheduleModalProps> = ({
                             onClick={() => setProposedTime(s.value)}
                             className={`w-full px-4 py-3 text-left rounded-xl border transition-all ${
                                 proposedTime === s.value
-                                    ? 'bg-amber-50 border-amber-300 text-amber-800'
-                                    : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100 hover:border-gray-300'
+                                    ? 'bg-amber-500/10 border-amber-400/60 text-amber-600'
+                                    : 'bg-muted border-border text-foreground hover:bg-accent hover:border-border'
                             }`}
                         >
                             <span className="text-sm font-medium">{s.label}</span>
@@ -200,7 +200,7 @@ const RescheduleModal: React.FC<RescheduleModalProps> = ({
 
                 {/* Custom datetime picker */}
                 <div className="mb-5">
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                    <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                         Or pick a custom time
                     </label>
                     <input
@@ -208,7 +208,8 @@ const RescheduleModal: React.FC<RescheduleModalProps> = ({
                         value={getInputValue()}
                         onChange={(e) => handleDateTimeChange(e.target.value)}
                         min={getMinDateTime()}
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
+                        className="w-full px-4 py-3 bg-input border border-border rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
+                        style={{ colorScheme: 'light dark' }}
                     />
                 </div>
 
@@ -217,7 +218,7 @@ const RescheduleModal: React.FC<RescheduleModalProps> = ({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-xl transition-colors"
+                        className="flex-1 px-4 py-3 bg-muted hover:bg-accent text-foreground text-sm font-medium rounded-xl transition-colors"
                     >
                         Cancel
                     </button>

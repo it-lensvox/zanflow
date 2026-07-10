@@ -24,10 +24,10 @@ export function MyWork() {
   } = useMyWork();
 
  return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: '#fff' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: 'hsl(var(--background))' }}>
 
       {/* ── Header ── */}
-     <div className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40" style={{ position: 'sticky', top: 0, zIndex: 26, flexShrink: 0, background: '#F8FAFC', borderBottom: '1px solid #E6EBF2', paddingTop: 16, paddingBottom: 16 }}>
+     <div className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40" style={{ position: 'sticky', top: 0, zIndex: 26, flexShrink: 0, background: 'hsl(var(--card))', borderBottom: '1px solid hsl(var(--border))', paddingTop: 16, paddingBottom: 16 }}>
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div>
             <h1 style={{ margin: 0, fontSize: 26, fontWeight: 800, color: INK, letterSpacing: '-.03em' }}>My Work</h1>

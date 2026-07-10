@@ -23,7 +23,7 @@ export function ActiveFiltersBar({ projectFilter, projectName, statusFilter, fil
   if (!(projectFilter || statusFilter || fileTypeFilter || searchTerm || ownerFilter)) return null;
 
   return (
-    <div className="flex items-center gap-2 px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 py-3" style={{ background: '#fff', borderBottom: '1px solid #e5e7eb' }}>
+   <div className="flex items-center gap-2 px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 py-3" style={{ background: 'hsl(var(--card))', borderBottom: '1px solid hsl(var(--border))' }}>
       <span style={{ fontWeight: 600, fontSize: 13, color: '#1a1a1a' }}>Active Filters:</span>
 
       {projectFilter && (

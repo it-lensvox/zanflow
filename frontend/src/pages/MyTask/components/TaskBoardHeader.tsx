@@ -23,7 +23,7 @@ export function TaskBoardHeader({
       className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40"
       style={{
         flexShrink: 0,
-        background: '#fff',
+        background: 'hsl(var(--card))',
         borderBottom: `1px solid ${LINE}`,
         paddingTop: 16, paddingBottom: 16,
       }}
@@ -39,7 +39,7 @@ export function TaskBoardHeader({
         </div>
         {canCreate && (
           <div className="flex items-center gap-2 flex-wrap" style={{ paddingTop: 4 }}>
-            <button onClick={onAITask} style={{ height: 40, display: 'flex', alignItems: 'center', gap: 8, padding: '0 18px', border: `1px solid ${LINE}`, borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 16, fontWeight: 600, color: TEXT, whiteSpace: 'nowrap' }}>
+            <button onClick={onAITask} style={{ height: 40, display: 'flex', alignItems: 'center', gap: 8, padding: '0 18px', border: `1px solid ${LINE}`, borderRadius: 8, background: 'hsl(var(--muted))', cursor: 'pointer', fontSize: 16, fontWeight: 600, color: TEXT, whiteSpace: 'nowrap' }}>
               <Sparkles size={15} color="#8B5CF6" />Generate by AI
             </button>
             <button onClick={onCreateTask} style={{ height: 40, display: 'flex', alignItems: 'center', gap: 8, padding: '0 20px', border: 'none', borderRadius: 8, background: BLUE, cursor: 'pointer', fontSize: 16, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap' }}>
@@ -49,7 +49,7 @@ export function TaskBoardHeader({
         )}
       </div>
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-        <div style={{ flex: 1, minWidth: 0, height: 40, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 8, display: 'flex', alignItems: 'center', padding: '0 12px', gap: 10 }}>
+        <div style={{ flex: 1, minWidth: 0, height: 40, background: 'hsl(var(--input))', border: `1px solid ${LINE}`, borderRadius: 8, display: 'flex', alignItems: 'center', padding: '0 12px', gap: 10 }}>
           <Search size={16} color={MUTED} style={{ flexShrink: 0 }} />
           <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search tasks by name, status, priority…"
             style={{ flex: 1, border: 'none', outline: 'none', fontSize: 16, color: TEXT, background: 'transparent', fontFamily: 'inherit', minWidth: 0 }} />

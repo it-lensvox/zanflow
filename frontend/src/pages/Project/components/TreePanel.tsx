@@ -28,12 +28,12 @@ export function TreePanel({ projects, selected, selectedGroup, onSelect, onSelec
     height: 29, display: 'flex', alignItems: 'center', gap: 8,
     color: active ? BLUE : '#27354d', fontSize: 12, cursor: 'pointer',
     borderRadius: 6, padding: '0 8px',
-    background: active ? '#edf4ff' : 'transparent',
+    background: active ? `${BLUE}12` : 'transparent',
     fontWeight: active ? 700 : 500,
   });
 
   if (!isOpen) return (
-    <div style={{ width: 44, minWidth: 44, borderRight: `1px solid ${LINE}`, background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 16, flexShrink: 0 }}>
+    <div style={{ width: 44, minWidth: 44, borderRight: `1px solid ${LINE}`, background: 'hsl(var(--card))', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 16, flexShrink: 0 }}>
       <button onClick={onToggle} style={{ background: 'none', border: 'none', cursor: 'pointer', color: MUTED, padding: 4 }} title="Show Tree">
         <ChevronRight className="w-4 h-4" />
       </button>
@@ -42,7 +42,7 @@ export function TreePanel({ projects, selected, selectedGroup, onSelect, onSelec
   );
 
   return (
-    <div style={{ width: 250, minWidth: 250, borderRight: `1px solid ${LINE}`, background: '#fff', padding: 16, overflowY: 'auto', flexShrink: 0 }}>
+    <div style={{ width: 250, minWidth: 250, borderRight: `1px solid ${LINE}`, background: 'hsl(var(--card))', padding: 16, overflowY: 'auto', flexShrink: 0 }}>
 
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>

@@ -18,12 +18,12 @@ export function ConfirmationModal({ isOpen, onClose, onConfirm, title }: Confirm
           <div className="flex flex-col items-center text-center space-y-4">
             <div className="p-3 rounded-full" style={{ background: '#FEE2E2' }}><FileText className="h-6 w-6" style={{ color: '#EF4444' }} /></div>
             <div className="space-y-2">
-              <h3 style={{ fontSize: 20, fontWeight: 700, color: '#1a1a1a' }}>Confirm Deletion</h3>
-              <p style={{ fontSize: 14, color: '#6b7280' }}>{title}</p>
+             <h3 style={{ fontSize: 20, fontWeight: 700, color: 'hsl(var(--foreground))' }}>Confirm Deletion</h3>
+              <p style={{ fontSize: 14, color: 'hsl(var(--muted-foreground))' }}>{title}</p>
             </div>
             <div className="flex w-full gap-4 pt-4">
               <button className="flex-1 py-2.5 rounded-lg font-semibold" style={{ background: '#EF4444', color: '#fff', border: 'none', cursor: 'pointer' }} onClick={onConfirm}>Yes</button>
-              <button className="flex-1 py-2.5 rounded-lg font-semibold" style={{ background: '#fff', color: '#1a1a1a', border: '1px solid #e5e7eb', cursor: 'pointer' }} onClick={onClose}>No</button>
+              <button className="flex-1 py-2.5 rounded-lg font-semibold" style={{ background: 'hsl(var(--muted))', color: 'hsl(var(--foreground))', border: '1px solid hsl(var(--border))', cursor: 'pointer' }} onClick={onClose}>No</button>
             </div>
           </div>
         </CardContent>

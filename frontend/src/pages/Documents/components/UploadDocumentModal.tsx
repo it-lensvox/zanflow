@@ -4,13 +4,13 @@ import { documentsApi } from '@/services/api';
 import { getTypeHex } from '@/pages/Project/projectConstants';
 import type { Project } from '@/types';
 
-// ─── Design tokens — same as Documents.tsx ────────────────────────────────────
-const TEXT  = '#172033';
-const MUTED = '#667085';
-const LINE  = '#e6ebf2';
+// ─── Design tokens 
+const TEXT  = 'hsl(var(--foreground))';
+const MUTED = 'hsl(var(--muted-foreground))';
+const LINE  = 'hsl(var(--border))';
 const BLUE  = '#4169FF';
 
-// ─── Helpers (unchanged) ──────────────────────────────────────────────────────
+// ─── Helpers
 function getFileTypeFromExt(name: string): string {
   const ext = name.split('.').pop()?.toLowerCase() || '';
   if (ext === 'pdf') return 'pdf';
@@ -100,7 +100,7 @@ export function UploadDocumentModal({ isOpen, onClose, projects, folderId, folde
       {/* Backdrop */}
       <div className="absolute inset-0" style={{ background: 'rgba(16,24,40,0.45)', backdropFilter: 'blur(4px)' }} onClick={onClose} />
 
-      <div className="relative w-full max-w-[520px] rounded-xl shadow-2xl" style={{ background: '#fff', border: `1px solid ${LINE}` }}>
+      <div className="relative w-full max-w-[520px] rounded-xl shadow-2xl" style={{ background: 'hsl(var(--card))', border: `1px solid ${LINE}` }}>
 
         {/* ── Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px 16px', borderBottom: `1px solid ${LINE}` }}>
@@ -109,9 +109,9 @@ export function UploadDocumentModal({ isOpen, onClose, projects, folderId, folde
               <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: TEXT }}>Upload Document</p>
             </div>
           </div>
-          <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: 6, border: `1px solid ${LINE}`, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: MUTED }}
-            onMouseEnter={e => e.currentTarget.style.background = '#f7f8fb'}
-            onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+          <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: 6, border: `1px solid ${LINE}`, background: 'hsl(var(--muted))', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: MUTED }}
+            onMouseEnter={e => e.currentTarget.style.background = 'hsl(var(--accent))'}
+            onMouseLeave={e => e.currentTarget.style.background = 'hsl(var(--muted))'}>
             <X style={{ width: 14, height: 14 }} />
           </button>
         </div>
@@ -130,7 +130,7 @@ export function UploadDocumentModal({ isOpen, onClose, projects, folderId, folde
                 style={{
                   width: '100%', height: 40, display: 'flex', alignItems: 'center', gap: 8,
                   padding: '0 12px', border: `1px solid ${showProjectDrop ? BLUE : LINE}`,
-                  borderRadius: 8, background: '#fff', cursor: 'pointer', fontFamily: 'inherit',
+                  borderRadius: 8, background: 'hsl(var(--input))', cursor: 'pointer', fontFamily: 'inherit',
                   boxShadow: showProjectDrop ? `0 0 0 3px ${BLUE}18` : 'none',
                   transition: 'border-color 0.15s, box-shadow 0.15s',
                 }}
@@ -152,7 +152,7 @@ export function UploadDocumentModal({ isOpen, onClose, projects, folderId, folde
               {showProjectDrop && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowProjectDrop(false)} />
-                  <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 50, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(16,24,40,.12)', overflow: 'hidden', padding: '4px 0', maxHeight: 220, overflowY: 'auto' }}>
+                  <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 50, background: 'hsl(var(--popover))', border: `1px solid ${LINE}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.20)', overflow: 'hidden', padding: '4px 0', maxHeight: 220, overflowY: 'auto' }}>
                     {projects.length === 0 && (
                       <p style={{ padding: '10px 14px', fontSize: 13, color: MUTED }}>No projects found.</p>
                     )}
@@ -162,8 +162,8 @@ export function UploadDocumentModal({ isOpen, onClose, projects, folderId, folde
                       return (
                         <button key={p.id}
                           onClick={() => { setSelectedProjectId(p.id); setShowProjectDrop(false); setError(''); }}
-                          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', border: 'none', background: isActive ? '#EEF4FF' : 'transparent', cursor: 'pointer', fontSize: 14, fontWeight: isActive ? 700 : 500, color: isActive ? BLUE : TEXT, textAlign: 'left', fontFamily: 'inherit' }}
-                          onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = '#F7F8FB'; }}
+                          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', border: 'none', background: isActive ? `${BLUE}18` : 'transparent', cursor: 'pointer', fontSize: 14, fontWeight: isActive ? 700 : 500, color: isActive ? BLUE : TEXT, textAlign: 'left', fontFamily: 'inherit' }}
+                          onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'hsl(var(--accent))'; }}
                           onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
                         >
                           <span style={{ width: 10, height: 10, borderRadius: '50%', background: typeHex, flexShrink: 0 }} />
@@ -188,13 +188,13 @@ export function UploadDocumentModal({ isOpen, onClose, projects, folderId, folde
           {/* File drop zone */}
           {!file ? (
             <div
-              style={{ border: `2px dashed ${dragOver ? BLUE : LINE}`, background: dragOver ? '#EEF4FF' : '#fafbfc', borderRadius: 10, padding: '36px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', transition: 'border-color 0.15s, background 0.15s' }}
+              style={{ border: `2px dashed ${dragOver ? BLUE : LINE}`, background: dragOver ? `${BLUE}12` : 'hsl(var(--muted))', borderRadius: 10, padding: '36px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', transition: 'border-color 0.15s, background 0.15s' }}
               onDragOver={e => { e.preventDefault(); setDragOver(true); }}
               onDragLeave={() => setDragOver(false)}
               onDrop={handleDrop}
               onClick={() => document.getElementById('upload-file-input')?.click()}
             >
-              <div style={{ width: 44, height: 44, borderRadius: 10, background: dragOver ? '#EEF4FF' : '#F3F4F6', border: `1px solid ${dragOver ? BLUE + '40' : LINE}`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
+             <div style={{ width: 44, height: 44, borderRadius: 10, background: dragOver ? `${BLUE}18` : 'hsl(var(--accent))', border: `1px solid ${dragOver ? BLUE + '40' : LINE}`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
                 <Upload style={{ width: 20, height: 20, color: dragOver ? BLUE : MUTED }} />
               </div>
               <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 600, color: TEXT }}>
@@ -204,7 +204,7 @@ export function UploadDocumentModal({ isOpen, onClose, projects, folderId, folde
               <input id="upload-file-input" type="file" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); }} />
             </div>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: `1px solid ${LINE}`, borderRadius: 8, background: '#fafbfc', padding: '12px 14px', gap: 12 }}>
+           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: `1px solid ${LINE}`, borderRadius: 8, background: 'hsl(var(--muted))', padding: '12px 14px', gap: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                 <div style={{ width: 36, height: 36, borderRadius: 8, background: '#EEF4FF', border: `1px solid #c7d2fe`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <FileText style={{ width: 16, height: 16, color: BLUE }} />
@@ -214,9 +214,9 @@ export function UploadDocumentModal({ isOpen, onClose, projects, folderId, folde
                   <p style={{ margin: 0, fontSize: 12, color: MUTED }}>{formatFileSize(file.size)}</p>
                 </div>
               </div>
-              <button onClick={() => setFile(null)} style={{ width: 26, height: 26, borderRadius: 6, border: `1px solid ${LINE}`, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: MUTED, flexShrink: 0 }}
+              <button onClick={() => setFile(null)} style={{ width: 26, height: 26, borderRadius: 6, border: `1px solid ${LINE}`, background: 'hsl(var(--card))', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: MUTED, flexShrink: 0 }}
                 onMouseEnter={e => { e.currentTarget.style.background = '#FEE2E2'; (e.currentTarget as HTMLButtonElement).style.color = '#EF4444'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = '#fff'; (e.currentTarget as HTMLButtonElement).style.color = MUTED; }}>
+                onMouseLeave={e => { e.currentTarget.style.background = 'hsl(var(--card))'; (e.currentTarget as HTMLButtonElement).style.color = MUTED; }}>
                 <X style={{ width: 13, height: 13 }} />
               </button>
             </div>
@@ -239,9 +239,9 @@ export function UploadDocumentModal({ isOpen, onClose, projects, folderId, folde
         {/* ── Footer */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, padding: '14px 24px 18px', borderTop: `1px solid ${LINE}` }}>
           <button onClick={onClose}
-            style={{ height: 38, padding: '0 18px', border: `1px solid ${LINE}`, borderRadius: 8, background: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer', color: TEXT, fontFamily: 'inherit' }}
-            onMouseEnter={e => e.currentTarget.style.background = '#f7f8fb'}
-            onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+            style={{ height: 38, padding: '0 18px', border: `1px solid ${LINE}`, borderRadius: 8, background: 'hsl(var(--muted))', fontSize: 14, fontWeight: 500, cursor: 'pointer', color: TEXT, fontFamily: 'inherit' }}
+            onMouseEnter={e => e.currentTarget.style.background = 'hsl(var(--accent))'}
+            onMouseLeave={e => e.currentTarget.style.background = 'hsl(var(--muted))'}>
             Cancel
           </button>
           <button onClick={handleUpload} disabled={!canUpload}

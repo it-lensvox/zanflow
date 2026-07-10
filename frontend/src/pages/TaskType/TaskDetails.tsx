@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { Link } from 'react-router-dom';
 import {
-  ArrowLeft, Loader2, Upload, List, Grid3X3, Settings, MessageCircle, Copy, Check,
+  ArrowLeft, Loader2, Upload, List, Grid3X3, Settings, Copy, Check,
   Search, FileText, Info, X, Calendar, User, NotebookPen, Pencil, Plus, Trash2
 } from 'lucide-react';
 import { DualView, ViewToggle } from '@/components/layout/DualView';
@@ -15,7 +15,7 @@ import { InlineCreateRow } from '@/components/layout/CreateTask/InlineCreateRow'
 import { DocumentPreview, useDocumentPreviewKeyboard } from '@/components/common/DocumentPreview';
 import { DocumentShareModal } from '@/pages/Documents/DocumentShareModal';
 import DeleteModal from '@/components/common/Deletemodal';
-import Threads from '../Project/Thread';
+// import Threads from '../Project/Thread';
 import { useProjectDetails, TabType } from '@/hooks/useTaskDetails';
 import type { Task, QuickNote } from '@/types';
 import { taskApi } from '@/services/api';
@@ -43,7 +43,7 @@ function DateFieldDropdown({
   return ReactDOM.createPortal(
     <div
       style={{ position: 'absolute', top: dropdownPos.top, left: dropdownPos.left, zIndex: 9999 }}
-      className="bg-white border border-gray-200 rounded-lg shadow-lg min-w-[130px] py-1"
+      className="bg-popover border border-border rounded-lg shadow-lg min-w-[130px] py-1"
       onMouseDown={(e) => e.stopPropagation()}
     >
       {DATE_FIELD_OPTIONS.map((opt) => (
@@ -53,7 +53,7 @@ function DateFieldDropdown({
             e.stopPropagation();
             onSelect(opt.value);
           }}
-          className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-purple-50 hover:text-purple-700 transition-colors ${dateField === opt.value ? 'font-semibold text-purple-600 bg-purple-50' : 'text-gray-700'
+          className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-purple-500/10 hover:text-purple-500 transition-colors ${dateField === opt.value ? 'font-semibold text-purple-500 bg-purple-500/10' : 'text-foreground'
             }`}
         >
           {dateField === opt.value && <span className="mr-1.5">✓</span>}
@@ -83,7 +83,7 @@ function PersonFieldDropdown({
   return ReactDOM.createPortal(
     <div
       style={{ position: 'absolute', top: dropdownPos.top, left: dropdownPos.left, zIndex: 9999 }}
-      className="bg-white border border-gray-200 rounded-lg shadow-lg min-w-[130px] py-1"
+      className="bg-popover border border-border rounded-lg shadow-lg min-w-[130px] py-1"
       onMouseDown={(e) => e.stopPropagation()}
     >
       {PERSON_FIELD_OPTIONS.map((opt) => (
@@ -93,7 +93,7 @@ function PersonFieldDropdown({
             e.stopPropagation();
             onSelect(opt.value);
           }}
-          className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-purple-50 hover:text-purple-700 transition-colors ${personField === opt.value ? 'font-semibold text-purple-600 bg-purple-50' : 'text-gray-700'
+          className={`w-full text-left px-3 py-1.5 text-[13px] hover:bg-purple-500/10 hover:text-purple-500 transition-colors ${personField === opt.value ? 'font-semibold text-purple-500 bg-purple-500/10' : 'text-foreground'
             }`}
         >
           {personField === opt.value && <span className="mr-1.5">✓</span>}
@@ -125,15 +125,15 @@ function DocumentFilterBar({
   handleFileUpload,
 }: any) {
   return (
-    <div className="flex items-center justify-between mb-6 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+    <div className="flex items-center justify-between mb-6 bg-card p-4 rounded-xl shadow-sm border border-border">
       <div className="flex items-center gap-3">
         {(['project', 'task'] as const).map((f) => (
           <button
             key={f}
             onClick={() => handleFilterChange(f)}
             className={`px-5 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 capitalize ${documentFilter === f
-              ? 'bg-black text-white shadow-md'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              ? 'bg-foreground text-background shadow-md'
+              : 'bg-muted text-muted-foreground hover:bg-accent'
               }`}
           >
             {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -144,27 +144,27 @@ function DocumentFilterBar({
           <div className="relative" ref={taskDropdownRef}>
             <button
               onClick={() => setShowTaskDropdown(!showTaskDropdown)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-white border-2 border-gray-300 rounded-lg hover:border-gray-400 transition-all duration-200 min-w-[200px]"
+            className="flex items-center gap-2 px-4 py-2.5 bg-input border-2 border-border rounded-lg hover:border-muted-foreground/40 transition-all duration-200 min-w-[200px]"
             >
-              <span className="text-sm font-medium text-gray-700 truncate flex-1 text-left">
+              <span className="text-sm font-medium text-foreground truncate flex-1 text-left">
                 {selectedTaskName}
               </span>
-              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </button>
 
             {showTaskDropdown && (
-              <div className="absolute top-full left-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-200 z-50 max-h-96 overflow-hidden">
-                <div className="p-3 border-b border-gray-200">
+              <div className="absolute top-full left-0 mt-2 w-80 bg-popover rounded-xl shadow-lg border border-border z-50 max-h-96 overflow-hidden">
+                <div className="p-3 border-b border-border">
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <input
                       type="text"
                       placeholder="Search tasks..."
                       value={taskSearchQuery}
                       onChange={(e) => setTaskSearchQuery(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                      className="w-full pl-10 pr-4 py-2 border border-border rounded-lg text-sm bg-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
                 </div>
@@ -174,14 +174,14 @@ function DocumentFilterBar({
                       <button
                         key={option.task_id}
                         onClick={() => handleTaskSelect(option.task_id)}
-                        className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors duration-150 border-b border-gray-100 last:border-b-0 ${selectedTaskId === option.task_id ? 'bg-gray-100' : ''
+                        className={`w-full text-left px-4 py-3 hover:bg-accent transition-colors duration-150 border-b border-border last:border-b-0 ${selectedTaskId === option.task_id ? 'bg-accent' : ''
                           }`}
                       >
-                        <p className="text-sm font-medium text-gray-900">{option.task_heading}</p>
+                        <p className="text-sm font-medium text-foreground">{option.task_heading}</p>
                       </button>
                     ))
                   ) : (
-                    <div className="px-4 py-8 text-center text-sm text-gray-500">No tasks found</div>
+                    <div className="px-4 py-8 text-center text-sm text-muted-foreground">No tasks found</div>
                   )}
                 </div>
               </div>
@@ -194,7 +194,7 @@ function DocumentFilterBar({
         <ViewToggle viewMode={docViewMode} onViewModeChange={setDocViewMode} />
         {documentFilter === 'project' && (
           <label
-            className={`flex items-center gap-2 px-5 py-2.5 bg-black text-white rounded-lg font-medium text-sm cursor-pointer hover:bg-gray-800 transition-all duration-200 shadow-sm ${isUploading ? 'opacity-50 cursor-not-allowed' : ''
+            className={`flex items-center gap-2 px-5 py-2.5 bg-foreground text-background rounded-lg font-medium text-sm cursor-pointer hover:opacity-90 transition-all duration-200 shadow-sm ${isUploading ? 'opacity-50 cursor-not-allowed' : ''
               }`}
           >
             <input
@@ -379,10 +379,10 @@ export function TaskDetails() {
       <button
         ref={ctx.dateTriggerRef}
         onClick={ctx.openDateFieldDropdown}
-        className="flex items-center gap-1 text-[14px] font-bold tracking-wide text-gray-700 hover:text-purple-600 transition-colors"
+        className="flex items-center gap-1 text-[14px] font-bold tracking-wide text-foreground hover:text-purple-500 transition-colors"
       >
         {ctx.activeDateLabel}
-        <svg className="w-3 h-3 mt-0.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-3 h-3 mt-0.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
@@ -403,10 +403,10 @@ export function TaskDetails() {
           }
           ctx.setShowPersonFieldDropdown((v: boolean) => !v);
         }}
-        className="flex items-center gap-1 text-[14px] font-bold tracking-wide text-gray-700 hover:text-purple-600 transition-colors"
+        className="flex items-center gap-1 text-[14px] font-bold tracking-wide text-foreground hover:text-purple-500 transition-colors"
       >
         {ctx.activePersonLabel}
-        <svg className="w-3 h-3 mt-0.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-3 h-3 mt-0.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
@@ -441,36 +441,36 @@ export function TaskDetails() {
   return (
     <>
       {/* ── Outer layout wrapper ── */}
-      <div className="min-h-screen bg-[#f8fafc] text-black">
+      <div className="min-h-screen bg-background text-foreground">
         <div className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 py-8">
 
           {/* ── Header ── */}
           <div className="flex items-center gap-4 mb-8">
             <Link
               to="/projects"
-              className="p-3 rounded-xl bg-white shadow-sm text-black hover:bg-slate-100 hover:shadow-md hover:-translate-x-0.5 transition-all duration-200 flex items-center justify-center"
+              className="p-3 rounded-xl bg-card border border-border shadow-sm text-foreground hover:bg-accent hover:shadow-md hover:-translate-x-0.5 transition-all duration-200 flex items-center justify-center"
             >
               <ArrowLeft className="h-5 w-5" />
             </Link>
             <div className="flex items-center justify-between w-full">
-              <h1 className="text-[1.3rem] font-bold bg-black bg-clip-text text-transparent m-0">
+              <h1 className="text-[1.3rem] font-bold text-foreground m-0">
                 {ctx.project.name}
               </h1>
-              <p className="text-base text-slate-500 font-semibold tracking-wide m-0">
+              <p className="text-base text-muted-foreground font-semibold tracking-wide m-0">
                 {ctx.project.task_type?.replace('_', ' ').toUpperCase()} DASHBOARD
               </p>
             </div>
           </div>
 
           {/* ── Tab bar ── */}
-          <div className="flex gap-2 border-b-2 border-slate-200 bg-white rounded-t-2xl px-2 pt-2 shadow-[0_2px_8px_rgba(0,0,0,0.05)]">
+         <div className="flex gap-2 border-b-2 border-border bg-card rounded-t-2xl px-2 pt-2 shadow-[0_2px_8px_rgba(0,0,0,0.05)]">
             {tabs.map(({ key, label }) => (
               <button
                 key={key}
                 onClick={() => ctx.setActiveTab(key)}
                 className={`px-8 py-3.5 rounded-t-lg border-b-[3px] text-[0.95rem] font-semibold cursor-pointer transition-all duration-200 ${ctx.activeTab === key
-                  ? 'bg-slate-100 text-black border-b-2 border-black'
-                  : 'border-transparent text-slate-500 hover:text-black hover:bg-slate-50'
+                  ? 'bg-accent text-foreground border-b-2 border-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-accent/50'
                   }`}
               >
                 {label}
@@ -479,10 +479,10 @@ export function TaskDetails() {
 
             {/* List / Grid toggle */}
             {ctx.activeTab === 'tasks' && (
-              <div className="flex items-center bg-white p-1 gap-1 ml-auto">
+              <div className="flex items-center bg-muted p-1 gap-1 ml-auto rounded-lg">
                 <button
                   onClick={() => ctx.setViewMode('list')}
-                  className={`p-1.5 rounded transition-colors ${ctx.viewMode === 'list' ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:bg-gray-50'
+                  className={`p-1.5 rounded transition-colors ${ctx.viewMode === 'list' ? 'bg-blue-500/20 text-blue-500' : 'text-muted-foreground hover:bg-accent'
                     }`}
                   title="List View"
                 >
@@ -490,7 +490,7 @@ export function TaskDetails() {
                 </button>
                 <button
                   onClick={() => ctx.setViewMode('grid')}
-                  className={`p-1.5 rounded transition-colors ${ctx.viewMode === 'grid' ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:bg-gray-50'
+                  className={`p-1.5 rounded transition-colors ${ctx.viewMode === 'grid' ? 'bg-blue-500/20 text-blue-500' : 'text-muted-foreground hover:bg-accent'
                     }`}
                   title="Grid View"
                 >
@@ -501,7 +501,7 @@ export function TaskDetails() {
 
             {/* Create Task */}
             <button
-              className={`flex items-center gap-2 px-6 py-3.5 border-b-[3px] border-transparent text-slate-500 font-semibold text-[0.95rem] cursor-pointer transition-all duration-200 hover:bg-gradient-to-r hover:from-[#5568d3] hover:to-[#65408b] hover:text-white rounded-t-lg ${ctx.activeTab !== 'tasks' ? 'ml-auto' : ''
+              className={`flex items-center gap-2 px-6 py-3.5 border-b-[3px] border-transparent text-muted-foreground font-semibold text-[0.95rem] cursor-pointer transition-all duration-200 hover:bg-gradient-to-r hover:from-[#5568d3] hover:to-[#65408b] hover:text-white rounded-t-lg ${ctx.activeTab !== 'tasks' ? 'ml-auto' : ''
                 }`}
               onClick={() => ctx.setIsCreateTaskModalOpen(true)}
             >
@@ -512,7 +512,7 @@ export function TaskDetails() {
             {ctx.activeTab === 'tasks' && (
               <button
                 onClick={() => setIsBulkUploadModalOpen(true)}
-                className="flex items-center gap-2 px-6 py-3.5 border-b-[3px] border-transparent text-slate-500 font-semibold text-[0.95rem] cursor-pointer transition-all duration-200 hover:bg-gradient-to-r hover:from-[#5568d3] hover:to-[#65408b] hover:text-white rounded-t-lg"
+                className="flex items-center gap-2 px-6 py-3.5 border-b-[3px] border-transparent text-muted-foreground font-semibold text-[0.95rem] cursor-pointer transition-all duration-200 hover:bg-gradient-to-r hover:from-[#5568d3] hover:to-[#65408b] hover:text-white rounded-t-lg"
                 title="Import tasks via JSON"
               >
                 <Upload className="w-4 h-4" />
@@ -523,25 +523,16 @@ export function TaskDetails() {
             {/* Quick Notes */}
             <button
               onClick={() => ctx.setShowNotesPanel(true)}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors flex items-center gap-2 text-gray-600 hover:text-black"
+              className="p-2 hover:bg-accent rounded-full transition-colors flex items-center gap-2 text-muted-foreground hover:text-foreground"
               title="Project Notes"
             >
               <NotebookPen className="h-4 w-4" />
             </button>
 
-            {/* Chat */}
-            <button
-              onClick={ctx.handleNavigateToChat}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors flex items-center gap-2 text-gray-600 hover:text-black"
-              title="Team Chat"
-            >
-              <MessageCircle className="h-4 w-4" />
-            </button>
-
             {/* Settings */}
             <button
               onClick={() => ctx.navigate(`/projects/${ctx.id}/settings`)}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors flex items-center gap-2 text-gray-600 hover:text-black"
+              className="p-2 hover:bg-accent rounded-full transition-colors flex items-center gap-2 text-muted-foreground hover:text-foreground"
               title="Project Settings"
             >
               <Settings className="h-4 w-4" />
@@ -561,22 +552,22 @@ export function TaskDetails() {
                 ) : ctx.tasks.length > 0 ? (
                   <>
                     {ctx.viewMode === 'list' ? (
-                      <div className="bg-white rounded-lg shadow-sm">
+                      <div className="bg-card border border-border rounded-lg shadow-sm">
                         {/* ── Bulk selection toolbar ── */}
                         {ctx.selectedTaskIds.size > 0 && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: '1px solid #dfe1e6', background: '#f8faff' }}>
+                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: '1px solid hsl(var(--border))', background: 'hsl(var(--muted))' }}>
                             <span style={{ fontSize: 13, fontWeight: 700, color: '#1663f6', background: '#EEF4FF', border: '1px solid #c7d7fd', borderRadius: 6, padding: '4px 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
                               <Check size={13} strokeWidth={3} /> {ctx.selectedTaskIds.size} selected
                             </span>
                             <button
                               onClick={handleBulkDeleteClick}
-                              style={{ height: 32, border: '1px solid #fca5a5', borderRadius: 6, background: '#fff', padding: '0 14px', fontSize: 13, fontWeight: 600, display: 'inline-flex', gap: 6, alignItems: 'center', cursor: 'pointer', color: '#dc2626' }}
+                              style={{ height: 32, border: '1px solid #fca5a5', borderRadius: 6, background: 'hsl(var(--card))', padding: '0 14px', fontSize: 13, fontWeight: 600, display: 'inline-flex', gap: 6, alignItems: 'center', cursor: 'pointer', color: '#dc2626' }}
                             >
                               <Trash2 size={13} /> Delete
                             </button>
                             <button
                               onClick={() => ctx.toggleAllTasks(ctx.filteredTasks)}
-                              style={{ marginLeft: 'auto', height: 32, border: '1px solid #e5e7eb', borderRadius: 6, background: 'none', padding: '0 12px', fontSize: 13, fontWeight: 500, cursor: 'pointer', color: '#667085' }}
+                              style={{ marginLeft: 'auto', height: 32, border: '1px solid hsl(var(--border))', borderRadius: 6, background: 'none', padding: '0 12px', fontSize: 13, fontWeight: 500, cursor: 'pointer', color: 'hsl(var(--muted-foreground))' }}
                             >
                               Clear
                             </button>
@@ -748,10 +739,10 @@ export function TaskDetails() {
                         {/* Inline create row  */}
                         {ctx.viewMode === 'list' && !ctx.isInlineCreating && (
                           <div
-                            className="p-3 border border-t-0 border-[#dfe1e6] bg-white cursor-pointer hover:bg-gray-50 transition-colors rounded-b-md"
+                            className="p-3 border border-t-0 border-border bg-card cursor-pointer hover:bg-accent transition-colors rounded-b-md"
                             onClick={() => ctx.setIsInlineCreating(true)}
                           >
-                            <div className="flex items-center gap-2 text-gray-500 text-[13px] font-medium pl-1">
+                           <div className="flex items-center gap-2 text-muted-foreground text-[13px] font-medium pl-1">
                               <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                               </svg>
@@ -784,10 +775,10 @@ export function TaskDetails() {
                     )}
                   </>
                 ) : (
-                  <div className="flex flex-col items-center justify-center p-16 text-center border-2 border-dashed border-slate-200 rounded-2xl bg-white shadow-sm">
+                  <div className="flex flex-col items-center justify-center p-16 text-center border-2 border-dashed border-border rounded-2xl bg-card shadow-sm">
                     <div className="text-6xl mb-4">📋</div>
-                    <h3 className="text-2xl font-bold m-0 mb-2">No tasks found</h3>
-                    <p className="text-slate-500 m-0 mb-8 text-base">
+                    <h3 className="text-2xl font-bold m-0 mb-2 text-foreground">No tasks found</h3>
+                    <p className="text-muted-foreground m-0 mb-8 text-base">
                       Try changing your filter or create a new task
                     </p>
                   </div>
@@ -861,7 +852,7 @@ export function TaskDetails() {
                       gridClassName: 'grid gap-4 md:grid-cols-2 lg:grid-cols-3',
                       emptyState: (
                         <div className="flex flex-col items-center justify-center p-12 mt-8">
-                          <p className="text-base font-semibold text-slate-500 m-0">
+                          <p className="text-base font-semibold text-muted-foreground m-0">
                             No documents uploaded yet
                           </p>
                         </div>
@@ -894,7 +885,7 @@ export function TaskDetails() {
                       onRowClick: (doc: any) => ctx.handleDocumentClick(doc),
                       emptyState: (
                         <div className="flex flex-col items-center justify-center p-12 mt-8">
-                          <p className="text-base font-semibold text-slate-500 m-0">
+                          <p className="text-base font-semibold text-muted-foreground m-0">
                             No documents uploaded yet
                           </p>
                         </div>
@@ -906,7 +897,7 @@ export function TaskDetails() {
                 {/* Drag overlay */}
                 {ctx.isDragging && (
                   <div className="fixed inset-0 bg-primary/10 border-4 border-dashed border-primary pointer-events-none z-50 flex items-center justify-center">
-                    <div className="bg-white p-8 rounded-lg shadow-lg">
+                    <div className="bg-card p-8 rounded-lg shadow-lg">
                       <Upload className="h-16 w-16 text-primary mx-auto mb-4" />
                       <p className="text-xl font-semibold text-primary">
                         Drop document anywhere to upload
@@ -932,14 +923,14 @@ export function TaskDetails() {
       {/* Document Info Panel */}
       {ctx.infoDoc && (
         <div className="fixed inset-0 z-50 flex justify-end pointer-events-none">
-          <div className="pointer-events-auto w-[340px] h-full bg-white border-l border-gray-200 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-50">
+          <div className="pointer-events-auto w-[340px] h-full bg-card border-l border-border shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-muted">
               <div className="flex items-center gap-2">
-                <Info className="w-4 h-4 text-blue-600" />
-                <span className="text-sm font-semibold text-gray-800">Document Info</span>
+                <Info className="w-4 h-4 text-blue-500" />
+                <span className="text-sm font-semibold text-foreground">Document Info</span>
               </div>
-              <button onClick={() => ctx.setInfoDoc(null)} className="p-1.5 rounded hover:bg-gray-200 transition-colors">
-                <X className="w-4 h-4 text-gray-500" />
+              <button onClick={() => ctx.setInfoDoc(null)} className="p-1.5 rounded hover:bg-accent transition-colors">
+                <X className="w-4 h-4 text-muted-foreground" />
               </button>
             </div>
             <div className="flex-1 overflow-y-auto px-5 py-3 space-y-3">
@@ -949,11 +940,11 @@ export function TaskDetails() {
                 { icon: <Calendar className="w-4 h-4 text-rose-500" />, label: 'Created At', value: ctx.infoDoc.created_at ? new Date(ctx.infoDoc.created_at).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A' },
                 { icon: <Calendar className="w-4 h-4 text-amber-500" />, label: 'Updated At', value: ctx.infoDoc.updated_at ? new Date(ctx.infoDoc.updated_at).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A' },
               ].map((row, i) => (
-                <div key={i} className="flex items-start gap-3 py-1.5 border-b border-gray-50 last:border-0">
+                <div key={i} className="flex items-start gap-3 py-1.5 border-b border-border last:border-0">
                   <div className="mt-0.5 flex-shrink-0">{row.icon}</div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-[13px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">{row.label}</div>
-                    <div className="text-[12px] text-gray-700 break-all">{row.value}</div>
+                    <div className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">{row.label}</div>
+                    <div className="text-[12px] text-foreground break-all">{row.value}</div>
                   </div>
                 </div>
               ))}
@@ -988,10 +979,6 @@ export function TaskDetails() {
         />
       )}
 
-      {ctx.project && (
-        <Threads projectId={ctx.project.id} projectName={ctx.project.name} />
-      )}
-
       <DeleteModal
         isOpen={!!ctx.deleteConfirm}
         type="confirm"
@@ -1024,17 +1011,17 @@ export function TaskDetails() {
       {/* Quick Notes Slide-Out Panel */}
       {ctx.showNotesPanel && (
         <div
-          className="fixed inset-0 z-50 flex justify-end bg-black/20"
+          className="fixed inset-0 z-50 flex justify-end bg-black/30"
           onClick={() => ctx.setShowNotesPanel(false)}
         >
           <div
-            className="w-96 bg-white h-full shadow-2xl flex flex-col transform transition-transform animate-in slide-in-from-right"
+            className="w-96 bg-card h-full shadow-2xl flex flex-col transform transition-transform animate-in slide-in-from-right border-l border-border"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between p-5 border-b border-gray-100 bg-gray-50">
+            <div className="flex items-center justify-between p-5 border-b border-border bg-muted">
               <div className="flex items-center gap-2">
                 <NotebookPen className="w-5 h-5 text-purple-600" />
-                <h2 className="text-[1.1rem] font-bold text-gray-800">Quick Notes</h2>
+                <h2 className="text-[1.1rem] font-bold text-foreground">Quick Notes</h2>
               </div>
               <div className="flex items-center gap-2">
                 {!ctx.isCreatingNote && (
@@ -1046,27 +1033,27 @@ export function TaskDetails() {
                     <Plus className="h-4 w-4" />
                   </button>
                 )}
-                <button className="p-1.5 rounded-full hover:bg-gray-200 transition-colors" onClick={() => ctx.setShowNotesPanel(false)}>
-                  <X className="h-5 w-5 text-gray-500" />
+                <button className="p-1.5 rounded-full hover:bg-accent transition-colors" onClick={() => ctx.setShowNotesPanel(false)}>
+                  <X className="h-5 w-5 text-muted-foreground" />
                 </button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-[#f8fafc]">
+            <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-background">
 
               {/* New Note Creation Form */}
               {ctx.isCreatingNote && (
-                <div className="bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.08)] border border-purple-200 p-4">
+                <div className="bg-card rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.08)] border border-purple-500/30 p-4">
                   <textarea
                     value={ctx.newNoteContent}
                     onChange={(e) => ctx.setNewNoteContent(e.target.value)}
-                    className="w-full min-h-[120px] p-3 text-[14px] text-gray-700 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white resize-y"
+                    className="w-full min-h-[120px] p-3 text-[14px] text-foreground border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-input resize-y placeholder:text-muted-foreground"
                     placeholder="Type a new shared note for this project..."
                     autoFocus
                   />
                   <div className="flex justify-end gap-2 mt-3">
                     <button
                       onClick={ctx.handleCreateNoteCancel}
-                      className="px-4 py-1.5 text-[13px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                      className="px-4 py-1.5 text-[13px] font-medium text-muted-foreground bg-muted hover:bg-accent rounded-md transition-colors"
                       disabled={ctx.isSavingNewNote}
                     >
                       Cancel
@@ -1103,13 +1090,13 @@ export function TaskDetails() {
                     : editorUser?.username;
 
                   return (
-                    <div key={note.id} className="group bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-gray-100 p-4 hover:shadow-md transition-all">
+                    <div key={note.id} className="group bg-card rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-border p-4 hover:shadow-md transition-all">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-3">
                           <div className="h-8 w-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-sm font-bold uppercase">
                             {initial}
                           </div>
-                          <span className="text-sm font-bold text-gray-800">
+                          <span className="text-sm font-bold text-foreground">
                             {displayName}
                           </span>
                         </div>
@@ -1119,7 +1106,7 @@ export function TaskDetails() {
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                             <button
                               onClick={() => ctx.handleEditNoteStart(note)}
-                              className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-md transition-colors"
+                              className="p-1.5 text-muted-foreground hover:text-purple-500 hover:bg-purple-500/10 rounded-md transition-colors"
                               title="Edit Note"
                             >
                               <Pencil className="h-4 w-4" />
@@ -1128,7 +1115,7 @@ export function TaskDetails() {
                             {note.user === ctx.user?.id && (
                               <button
                                 onClick={() => ctx.handleDeleteNote(note.id)}
-                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                className="p-1.5 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-md transition-colors"
                                 title="Delete Note"
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -1143,14 +1130,14 @@ export function TaskDetails() {
                           <textarea
                             value={ctx.editNoteContent}
                             onChange={(e) => ctx.setEditNoteContent(e.target.value)}
-                            className="w-full min-h-[120px] p-3 text-[14px] text-gray-700 border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white resize-y"
+                            className="w-full min-h-[120px] p-3 text-[14px] text-foreground border border-purple-500/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-input resize-y placeholder:text-muted-foreground"
                             placeholder="Type your note here..."
                             autoFocus
                           />
                           <div className="flex justify-end gap-2 mt-3">
                             <button
                               onClick={ctx.handleEditNoteCancel}
-                              className="px-4 py-1.5 text-[13px] font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                              className="px-4 py-1.5 text-[13px] font-medium text-muted-foreground bg-muted hover:bg-accent rounded-md transition-colors"
                               disabled={ctx.isSavingNote}
                             >
                               Cancel
@@ -1166,21 +1153,21 @@ export function TaskDetails() {
                           </div>
                         </div>
                       ) : (
-                        <div className="text-[14px] text-gray-600 leading-relaxed whitespace-pre-wrap">
+                        <div className="text-[14px] text-foreground leading-relaxed whitespace-pre-wrap">
                           {note.content}
                         </div>
                       )}
 
                       {/* Display the Last Edited badge when anyone edits it, including the owner */}
                       {note.updated_by && editorName && ctx.editingNoteId !== note.id && (
-                        <div className="mt-2.5 flex items-center gap-1.5 text-[11px] font-medium text-gray-400 bg-gray-50/80 w-fit px-2 py-1 rounded-md border border-gray-100">
-                          <Pencil className="w-3 h-3 text-gray-400" />
+                        <div className="mt-2.5 flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground bg-muted w-fit px-2 py-1 rounded-md border border-border">
+                          <Pencil className="w-3 h-3 text-muted-foreground" />
                           Last edited by {editorName}
                         </div>
                       )}
 
                       {note.attachments && note.attachments.length > 0 && (
-                        <div className="mt-4 flex flex-wrap gap-2 pt-3 border-t border-gray-50">
+                        <div className="mt-4 flex flex-wrap gap-2 pt-3 border-t border-border">
                           {note.attachments.map((att) => (
                             <button
                               key={att.id}
@@ -1189,7 +1176,7 @@ export function TaskDetails() {
                                 fileName: att.filename,
                                 fileType: att.filename.split('.').pop()?.toLowerCase() || ''
                               })}
-                              className="px-2.5 py-1 bg-gray-50 hover:bg-gray-100 hover:text-purple-600 hover:border-purple-200 text-gray-600 rounded-md text-[11px] font-semibold border border-gray-200 transition-colors cursor-pointer text-left"
+                              className="px-2.5 py-1 bg-muted hover:bg-accent hover:text-purple-500 hover:border-purple-500/30 text-muted-foreground rounded-md text-[11px] font-semibold border border-border transition-colors cursor-pointer text-left"
                               title="Click to preview document"
                             >
                               {att.filename}
@@ -1202,8 +1189,8 @@ export function TaskDetails() {
                 })
               ) : (
                 <div className="text-center py-12 flex flex-col items-center">
-                  <NotebookPen className="h-12 w-12 text-gray-300 mb-3" />
-                  <p className="text-gray-500 font-medium text-sm">No quick notes attached to this project.</p>
+                 <NotebookPen className="h-12 w-12 text-muted-foreground/30 mb-3" />
+                  <p className="text-muted-foreground font-medium text-sm">No quick notes attached to this project.</p>
                 </div>
               )}
             </div>
@@ -1225,25 +1212,25 @@ export function TaskDetails() {
 
       {/* ── Import Tasks Modal ── */}
       {isBulkUploadModalOpen && (
-        <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col transform transition-all animate-in zoom-in-95 duration-200">
+       <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col transform transition-all animate-in zoom-in-95 duration-200">
 
             {/* Header */}
-            <div className="flex items-center justify-between p-5 border-b border-gray-100 bg-gray-50">
+            <div className="flex items-center justify-between p-5 border-b border-border bg-muted">
               <div className="flex items-center gap-2">
                 <Upload className="w-5 h-5 text-[#65408b]" />
-                <h2 className="text-[1.1rem] font-bold text-gray-800">Import Tasks via JSON</h2>
+                <h2 className="text-[1.1rem] font-bold text-foreground">Import Tasks via JSON</h2>
               </div>
-              <button onClick={() => setIsBulkUploadModalOpen(false)} className="p-1.5 rounded-full hover:bg-gray-200 transition-colors">
-                <X className="w-5 h-5 text-gray-500" />
+              <button onClick={() => setIsBulkUploadModalOpen(false)} className="p-1.5 rounded-full hover:bg-accent transition-colors">
+                <X className="w-5 h-5 text-muted-foreground" />
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto flex-1 bg-[#f8fafc] flex flex-col gap-6">
+            <div className="p-6 overflow-y-auto flex-1 bg-background flex flex-col gap-6">
 
               {/* Expected Format Section */}
-              <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+              <div className="bg-card p-4 rounded-xl border border-border shadow-sm">
+                <h3 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
                   <Info className="w-4 h-4 text-blue-500" /> Expected Format
                 </h3>
                 <div className="relative">
@@ -1253,7 +1240,7 @@ export function TaskDetails() {
                     aria-label={jsonExampleCopied ? 'Copied' : 'Copy sample JSON'}
                     className={`absolute top-2 right-2 z-10 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all ${jsonExampleCopied
                       ? 'bg-green-500/20 text-green-300'
-                      : 'bg-white/10 text-gray-200 hover:bg-white/20'
+                      : 'bg-white/10 text-white/80 hover:bg-white/20'
                       }`}
                   >
                     {jsonExampleCopied ? (
@@ -1266,20 +1253,20 @@ export function TaskDetails() {
                       </>
                     )}
                   </button>
-                  <pre className="bg-slate-900 text-green-400 p-4 rounded-lg text-[12px] overflow-x-auto font-mono leading-relaxed">
+                 <pre className="bg-[#0d1117] text-green-400 p-4 rounded-lg text-[12px] overflow-x-auto font-mono leading-relaxed">
                     {dummyJsonExample}
                   </pre>
                 </div>
               </div>
 
               {/* Paste or Upload Section */}
-              <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-4">
-                <h3 className="text-sm font-bold text-gray-800">Paste JSON Code</h3>
+              <div className="bg-card p-4 rounded-xl border border-border shadow-sm flex flex-col gap-4">
+                <h3 className="text-sm font-bold text-foreground">Paste JSON Code</h3>
                 <textarea
                   value={pastedJson}
                   onChange={(e) => setPastedJson(e.target.value)}
                   placeholder="Paste your JSON array here..."
-                  className="w-full h-48 p-3 text-[13px] text-gray-700 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#65408b] font-mono resize-y bg-gray-50"
+                  className="w-full h-48 p-3 text-[13px] text-foreground border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#65408b] font-mono resize-y bg-input placeholder:text-muted-foreground"
                 />
 
                 {/* Inline count + preview hint */}
@@ -1297,7 +1284,7 @@ export function TaskDetails() {
                   <p className="text-[11px] text-red-500 mt-1">{previewError}</p>
                 )}
 
-                <div className="flex items-center justify-between mt-2 pt-4 border-t border-gray-100">
+                <div className="flex items-center justify-between mt-2 pt-4 border-t border-border">
                   <div className="flex items-center gap-3">
                     <input
                       type="file"
@@ -1310,9 +1297,9 @@ export function TaskDetails() {
                     <button
                       onClick={() => bulkFileInputRef.current?.click()}
                       disabled={isBulkUploading}
-                      className="px-4 py-2 bg-white hover:bg-gray-50 text-gray-700 text-sm font-semibold rounded-lg transition-colors flex items-center gap-2 border border-gray-300 shadow-sm"
+                      className="px-4 py-2 bg-muted hover:bg-accent text-foreground text-sm font-semibold rounded-lg transition-colors flex items-center gap-2 border border-border shadow-sm"
                     >
-                      <FileText className="w-4 h-4 text-gray-500" />
+                      <FileText className="w-4 h-4 text-muted-foreground" />
                       Select .json File
                     </button>
                   </div>
@@ -1334,7 +1321,7 @@ export function TaskDetails() {
 
       {/* ── Bulk Upload Result Modal ── */}
       {uploadResultModal && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all animate-in zoom-in-95 duration-200">
             <div className={`p-6 text-center border-t-4 ${uploadResultModal.type === 'success' ? 'border-green-500' : 'border-red-500'}`}>
               <div className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full mb-4 ${uploadResultModal.type === 'success' ? 'bg-green-100' : 'bg-red-100'}`}>

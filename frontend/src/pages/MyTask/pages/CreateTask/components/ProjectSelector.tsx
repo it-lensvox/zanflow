@@ -28,8 +28,8 @@ const chipStyle: React.CSSProperties = {
 
 const dropdownStyle: React.CSSProperties = {
   position: 'absolute', zIndex: 20, top: 'calc(100% + 4px)', left: 0, right: 0,
-  background: '#fff', border: `1px solid ${LINE}`, borderRadius: 10,
-  boxShadow: '0 8px 24px rgba(16,24,40,.1)', maxHeight: 220, overflowY: 'auto',
+  background: 'hsl(var(--popover))', border: `1px solid ${LINE}`, borderRadius: 10,
+  boxShadow: '0 8px 24px rgba(0,0,0,.18)', maxHeight: 220, overflowY: 'auto',
 };
 
 export function ProjectSelector({
@@ -39,7 +39,7 @@ export function ProjectSelector({
   projectSearchInputRef, filteredProjectOptions, allProjectOptions,
   projectsLoading, fixedProjectId,
 }: ProjectSelectorProps) {
-  const triggerStyle: React.CSSProperties = {
+ const triggerStyle: React.CSSProperties = {
     width: '100%', minHeight: 38, padding: '4px 10px',
     border: `1px solid ${LINE}`, borderRadius: 8,
     background: fixedProjectId ? '#f9fafb' : '#fff',
@@ -117,7 +117,7 @@ export function ProjectSelector({
               <div
                 key={p.id}
                 style={{ padding: '9px 14px', fontSize: 13, color: TEXT, cursor: 'pointer' }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#f7f8fb')}
+                onMouseEnter={e => (e.currentTarget.style.background = 'hsl(var(--accent))')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 onClick={() => { setSelectedProjects([p.id]); setProjectDropdownOpen(false); setProjectSearchInput(''); }}
               >

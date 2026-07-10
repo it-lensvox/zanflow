@@ -147,18 +147,18 @@ export function WorkspaceSwitcher({ onCreateWorkspace }: WorkspaceSwitcherProps)
         <button
           onClick={() => setIsOpen(!isOpen)}
           disabled={isSwitching}
-          className="flex items-center justify-between w-full gap-2 bg-white  hover:bg-gray-50 transition-colors disabled:opacity-50 text-sm"
+          className="flex items-center justify-between w-full gap-2 bg-card hover:bg-accent transition-colors disabled:opacity-50 text-sm"
         >
           <span className="font-medium truncate">
             {isSwitching ? 'Switching...' : isLoading ? 'Loading...' : (activeWorkspace?.name || 'Select Workspace')}
           </span>
-          <ChevronDown className="w-18 h-4 text-gray-500 flex-shrink-0" />
+          <ChevronDown className="w-18 h-4 text-muted-foreground flex-shrink-0" />
         </button>
 
         {/* Dropdown Menu - Opens UPWARD */}
         {isOpen && (
           <div
-            className="absolute left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden"
+            className="absolute left-0 right-0 bg-popover border border-border rounded-lg shadow-xl overflow-hidden"
             style={{
               top: 'calc(100% + 8px)',
               zIndex: 9999,
@@ -166,11 +166,11 @@ export function WorkspaceSwitcher({ onCreateWorkspace }: WorkspaceSwitcherProps)
             }}
           >
             {isLoading ? (
-              <div className="px-4 py-3 text-sm text-gray-500">Loading workspaces...</div>
+              <div className="px-4 py-3 text-sm text-muted-foreground">Loading workspaces...</div>
             ) : error ? (
               <div className="px-4 py-3 text-sm text-red-600">Failed to load workspaces</div>
             ) : workspaces.length === 0 ? (
-              <div className="px-4 py-3 text-sm text-gray-500">No workspaces found</div>
+              <div className="px-4 py-3 text-sm text-muted-foreground">No workspaces found</div>
             ) : (
               <>
                 {/* Workspace List */}
@@ -187,7 +187,7 @@ export function WorkspaceSwitcher({ onCreateWorkspace }: WorkspaceSwitcherProps)
                         <button
                           onClick={() => handleSwitch(workspace.id)}
                           disabled={isSwitching}
-                          className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0 text-left disabled:opacity-50"
+                          className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-accent transition-colors border-b border-border last:border-b-0 text-left disabled:opacity-50"
                         >
                           <div className="flex-1 min-w-0 pr-8">
                             <div className="flex items-center gap-2">
@@ -201,12 +201,12 @@ export function WorkspaceSwitcher({ onCreateWorkspace }: WorkspaceSwitcherProps)
                               )}
                             </div>
                             <div className="flex items-center gap-2 mt-0.5">
-                            <Users className="w-2.5 h-2.5 text-gray-400" />
-                              <span className="text-[10px] text-gray-500">
+                            <Users className="w-2.5 h-2.5 text-muted-foreground" />
+                              <span className="text-[10px] text-muted-foreground">
                                 {workspace.member_count} members
                               </span>
-                              <span className="text-[10px] text-gray-400">·</span>
-                              <span className="text-[10px] text-gray-500 capitalize">
+                              <span className="text-[10px] text-muted-foreground">·</span>
+                              <span className="text-[10px] text-muted-foreground capitalize">
                                 {workspace.role}
                               </span>
                             </div>
@@ -220,7 +220,7 @@ export function WorkspaceSwitcher({ onCreateWorkspace }: WorkspaceSwitcherProps)
                         {/* {canDelete && (
                           <button
                             onClick={(e) => handleDeleteClick(workspace, e)}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-600 transition-all"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-all"
                             title="Delete workspace"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -238,7 +238,7 @@ export function WorkspaceSwitcher({ onCreateWorkspace }: WorkspaceSwitcherProps)
                       setIsOpen(false);
                       onCreateWorkspace?.();
                     }}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium text-white bg-black hover:bg-gray-700 transition-colors"
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium text-white bg-[#1663f6] hover:bg-[#0f4bd4] transition-colors"
                   >
                     <Plus className="h-4 w-4" />
                     <span>New Workspace</span>
@@ -253,14 +253,14 @@ export function WorkspaceSwitcher({ onCreateWorkspace }: WorkspaceSwitcherProps)
       {/* Delete Confirmation Dialog */}
 {showDeleteConfirm && workspaceToDelete && (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000]">
-    <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+    <div className="bg-card border border-border rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
       <div className="flex items-center gap-3 mb-4">
         <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
           <Trash2 className="w-6 h-6 text-red-600" />
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">Delete Workspace?</h3>
-          <p className="text-sm text-gray-500">This action cannot be undone</p>
+          <h3 className="text-lg font-semibold text-foreground">Delete Workspace?</h3>
+          <p className="text-sm text-muted-foreground">This action cannot be undone</p>
         </div>
       </div>
 
@@ -281,7 +281,7 @@ export function WorkspaceSwitcher({ onCreateWorkspace }: WorkspaceSwitcherProps)
 
       {/* ✅ Confirmation Input Section */}
       <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-foreground mb-2">
           Type <span className="font-semibold text-red-600">"{workspaceToDelete.name}"</span> to confirm:
         </label>
         <div className="relative">

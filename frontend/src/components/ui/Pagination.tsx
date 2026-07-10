@@ -37,8 +37,8 @@ function btnStyle(active: boolean, disabled: boolean): React.CSSProperties {
     padding:     '0 4px',
     border:      `1px solid ${active ? '#88acff' : LINE}`,
     borderRadius: 6,
-    background:   active   ? '#f6f9ff' : '#fff',
-    color:        disabled  ? '#d1d5db'
+    background:   active   ? `${BLUE}12` : 'hsl(var(--card))',
+    color:        disabled  ? 'hsl(var(--muted-foreground))'
                 : active    ? BLUE
                 :             MUTED,
     fontWeight:  active ? 700 : 600,
@@ -78,7 +78,7 @@ export function Pagination({
         justifyContent:  'space-between',
         padding:         '0 16px',
         borderTop:       `1px solid ${LINE}`,
-        background:      '#fff',
+        background:      'hsl(var(--card))',
         flexShrink:      0,
         gap:             12,
         flexWrap:        'wrap',
@@ -102,8 +102,8 @@ export function Pagination({
           disabled={currentPage === 1}
           style={btnStyle(false, currentPage === 1)}
           aria-label="Previous page"
-          onMouseEnter={e => { if (currentPage !== 1) e.currentTarget.style.background = '#f7f8fb'; }}
-          onMouseLeave={e => { if (currentPage !== 1) e.currentTarget.style.background = '#fff'; }}
+         onMouseEnter={e => { if (currentPage !== 1) e.currentTarget.style.background = 'hsl(var(--accent))'; }}
+          onMouseLeave={e => { if (currentPage !== 1) e.currentTarget.style.background = 'hsl(var(--card))'; }}
         >
           <ChevronLeft size={14} />
         </button>
@@ -120,8 +120,8 @@ export function Pagination({
               style={btnStyle(pg === currentPage, false)}
               aria-label={`Page ${pg}`}
               aria-current={pg === currentPage ? 'page' : undefined}
-              onMouseEnter={e => { if (pg !== currentPage) e.currentTarget.style.background = '#f7f8fb'; }}
-              onMouseLeave={e => { if (pg !== currentPage) e.currentTarget.style.background = '#fff'; }}
+              onMouseEnter={e => { if (pg !== currentPage) e.currentTarget.style.background = 'hsl(var(--accent))'; }}
+              onMouseLeave={e => { if (pg !== currentPage) e.currentTarget.style.background = 'hsl(var(--card))'; }}
             >
               {pg}
             </button>
@@ -134,8 +134,8 @@ export function Pagination({
           disabled={currentPage === totalPages}
           style={btnStyle(false, currentPage === totalPages)}
           aria-label="Next page"
-          onMouseEnter={e => { if (currentPage !== totalPages) e.currentTarget.style.background = '#f7f8fb'; }}
-          onMouseLeave={e => { if (currentPage !== totalPages) e.currentTarget.style.background = '#fff'; }}
+          onMouseEnter={e => { if (currentPage !== totalPages) e.currentTarget.style.background = 'hsl(var(--accent))'; }}
+          onMouseLeave={e => { if (currentPage !== totalPages) e.currentTarget.style.background = 'hsl(var(--card))'; }}
         >
           <ChevronRight size={14} />
         </button>
