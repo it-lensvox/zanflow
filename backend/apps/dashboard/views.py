@@ -2,9 +2,55 @@ from django.db import transaction
 from rest_framework import mixins, status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
-from .models import CustomDashboard
-from .serializers import CustomDashboardSerializer
+from .models import CustomDashboard, UserPreference
+from .serializers import CustomDashboardSerializer, UserPreferenceSerializer
+
+
+class UserPreferenceView(APIView):
+    """
+    GET  /api/v1/dashboard/preferences/
+        Returns the authenticated user's saved preferences, merging any missing
+        keys with their defaults so the response shape is always complete.
+
+    PATCH /api/v1/dashboard/preferences/
+        Merges the supplied keys into the stored preferences object.
+        Unknown keys are ignored; omitted keys are left untouched.
+        Returns the full updated preferences object.
+    """
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def _get_or_init(self, user):
+        """Return the UserPreference row, or an unsaved stub with empty data."""
+        try:
+            return UserPreference.objects.get(user=user)
+        except UserPreference.DoesNotExist:
+            return UserPreference(user=user, data={})
+
+    def get(self, request):
+        pref = self._get_or_init(request.user)
+        serializer = UserPreferenceSerializer(pref)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def patch(self, request):
+        pref = self._get_or_init(request.user)
+
+        # Validate only the keys the client sent
+        serializer = UserPreferenceSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+
+        # Merge validated keys into the stored JSON blob
+        pref.data.update(serializer.validated_data)
+        pref.save()
+
+        # Return the full representation (defaults filled in for any missing keys)
+        return Response(
+            UserPreferenceSerializer(pref).data,
+            status=status.HTTP_200_OK,
+        )
 
 
 class CustomDashboardViewSet(

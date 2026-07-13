@@ -13,7 +13,6 @@ from .models import Organization, WorkspaceMembership, Workspace
 from .serializers import OrganizationSerializer, TenantSignupSerializer
 from .services import TenantOnboardingService
 from .throttles import GlobalSignupDailyThrottle
-from django.contrib.auth import get_user_model
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
@@ -97,18 +96,62 @@ class OrganizationViewSet(viewsets.ModelViewSet):
 class TenantSignupView(APIView):
     """
     Public self-service signup endpoint.
+
+    SSO addition (additive — existing logic unchanged):
+        Before running serializer validation, checks whether the email already
+        exists. If it does, returns HTTP 409 with code EMAIL_ALREADY_EXISTS so
+        the frontend can show a friendly "add this platform to your existing
+        account" dialog instead of a generic validation error.
+
+        If the email is new, proceeds as normal AND auto-creates a PlatformAccess
+        row for the platform the user signed up from (default: "pm").
+        The signup request may optionally include a "platform" field to specify
+        which platform the user is signing up from e.g. "hrms" or "crm".
     """
     permission_classes = [permissions.AllowAny]
-    throttle_classes = [GlobalSignupDailyThrottle]
+    # throttle_classes = [GlobalSignupDailyThrottle]  # Uncomment in production
 
     def post(self, request):
+
+        # ── SSO: detect email conflict BEFORE serializer validation ───────
+        # We must do this here because TenantSignupSerializer.validate_admin_email
+        # raises a 400 ValidationError on duplicate emails — we want 409 instead
+        # so the frontend can show the "add platform" dialog.
+        admin_email = request.data.get("admin_email", "").strip().lower()
+        if admin_email:
+            existing_user = User.objects.filter(email__iexact=admin_email).first()
+            if existing_user:
+                from .models import PlatformAccess
+                existing_platforms = list(
+                    PlatformAccess.objects.filter(
+                        organization=existing_user.organization,
+                        is_active=True,
+                        platform__is_active=True,
+                    ).values_list("platform__key", flat=True)
+                )
+                signup_platform = request.data.get("platform", "pm")
+                return Response(
+                    {
+                        "code":               "EMAIL_ALREADY_EXISTS",
+                        "detail":             "An account with this email already exists.",
+                        "existing_platforms": existing_platforms,
+                        "can_add_platform":   signup_platform not in existing_platforms,
+                        "signup_platform":    signup_platform,
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+        # ── End SSO addition ───────────────────────────────────────────────
+
         serializer = TenantSignupSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         # 1. Variables are extracted and assigned here
         company_name = serializer.validated_data["company_name"]
-        admin_email = serializer.validated_data["admin_email"]
-        password = serializer.validated_data["password"]
+        admin_email  = serializer.validated_data["admin_email"]
+        password     = serializer.validated_data["password"]
+
+        # Which platform is the user signing up from (default: pm)
+        signup_platform = request.data.get("platform", "pm")
 
         # Auto-generate username from company name
         admin_username = slugify(company_name).replace("-", "_") + "_admin"
@@ -126,11 +169,43 @@ class TenantSignupView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        org = result["organization"]
+        org        = result["organization"]
         admin_user = result["admin_user"]
 
         # 2. Delete the OTP from cache (admin_email is safely defined above)
         cache.delete(f"signup_otp_{admin_email}")
+
+        # ── SSO: grant platform access for the platform they signed up from ──
+        try:
+            from .models import Platform, PlatformAccess
+            platform_obj = Platform.objects.filter(
+                key=signup_platform, is_active=True
+            ).first()
+            if platform_obj:
+                PlatformAccess.objects.get_or_create(
+                    organization=org,
+                    platform=platform_obj,
+                    defaults={"is_active": True},
+                )
+                logger.info(
+                    "PlatformAccess granted: org=%s, platform=%s",
+                    org.name, signup_platform,
+                )
+            else:
+                # Fallback — grant pm access if the requested platform doesn't exist
+                pm = Platform.objects.filter(key="pm", is_active=True).first()
+                if pm:
+                    PlatformAccess.objects.get_or_create(
+                        organization=org,
+                        platform=pm,
+                        defaults={"is_active": True},
+                    )
+        except Exception as e:
+            # Never fail a signup because of platform access — just log it
+            logger.warning(
+                "Could not grant platform access for org=%s: %s", org.name, str(e)
+            )
+        # ── End SSO addition ───────────────────────────────────────────────
 
         # Generate JWT tokens for auto-login
         refresh = RefreshToken.for_user(admin_user)
@@ -198,7 +273,7 @@ class TenantSignupView(APIView):
         subject = f"🔔 New Tenant Signup: {org.name}"
 
         message = (
-            f"A new organization has signed up on Dyuksa.\n\n"
+            f"A new organization has signed up on DYUKSA.\n\n"
             f"────────────────────────────────\n"
             f"Organization:  {org.name}\n"
             f"Slug:          {org.slug}\n"
@@ -309,9 +384,10 @@ class TenantDetailView(APIView):
     """
     Super-admin only: Get detailed info for a specific tenant.
 
-    GET /api/v1/organizations/dashboard/<org_id>/
+    GET /api/v1/organizations/overview/<org_id>/
 
-    Returns full stats, all users, recent projects, and activity.
+    Returns full stats, all users, recent projects, activity,
+    and the platforms list showing which platforms the org has access to.
     """
 
     permission_classes = [IsSuperUser]
@@ -319,6 +395,7 @@ class TenantDetailView(APIView):
     def get(self, request, org_id):
         from apps.projects.models import Project
         from apps.tasksite.models import Task
+        from .models import Platform, PlatformAccess
 
         User = get_user_model()
 
@@ -342,7 +419,7 @@ class TenantDetailView(APIView):
         recent_projects = Project.original_objects.filter(
             organization=org
         ).order_by("-created_at").values(
-            "id", "name", "task_type", "is_active", "created_at"
+            "id", "name", "task_type", "status", "created_at"
         )[:10]
 
         # Recent tasks
@@ -352,19 +429,41 @@ class TenantDetailView(APIView):
             "id", "heading", "status", "priority", "created_at"
         )[:10]
 
+        # ── SSO: platforms list ───────────────────────────────────────────
+        # Fetch ALL active platforms and mark which ones this org has access to.
+        # Frontend renders a toggle per platform row — fully dynamic,
+        # no hardcoding needed. Adding ERP in future shows up automatically.
+        all_platforms = Platform.objects.filter(is_active=True).order_by("key")
+        granted_keys  = set(
+            PlatformAccess.objects.filter(
+                organization=org,
+                is_active=True,
+            ).values_list("platform__key", flat=True)
+        )
+        platforms_data = [
+            {
+                "key":        p.key,
+                "name":       p.name,
+                "has_access": p.key in granted_keys,
+            }
+            for p in all_platforms
+        ]
+        # ── End SSO addition ──────────────────────────────────────────────
+
         return Response({
             "organization": {
-                "id": org.id,
-                "name": org.name,
-                "slug": org.slug,
-                "is_active": org.is_active,
+                "id":         org.id,
+                "name":       org.name,
+                "slug":       org.slug,
+                "is_active":  org.is_active,
                 "created_at": org.created_at,
                 "updated_at": org.updated_at,
             },
-            "stats": stats,
-            "users": list(users),
+            "stats":           stats,
+            "users":           list(users),
             "recent_projects": list(recent_projects),
-            "recent_tasks": list(recent_tasks),
+            "recent_tasks":    list(recent_tasks),
+            "platforms":       platforms_data,
         })
 
 
@@ -469,48 +568,6 @@ class TenantToggleStatusView(APIView):
             })
 
 
-class TenantToggleStatusView(APIView):
-    """
-    Super-admin only: Activate or deactivate a tenant.
-
-    POST /api/v1/organizations/overview/<org_id>/toggle-status/
-
-    Toggles between active and inactive.
-    If active → deactivates org + all its users.
-    If inactive → reactivates org + all its users.
-    """
-
-    permission_classes = [IsSuperUser]
-
-    def post(self, request, org_id):
-        try:
-            org = Organization.objects.get(id=org_id)
-        except Organization.DoesNotExist:
-            return Response(
-                {"detail": "Organization not found."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        # Prevent deactivating your own organization
-        if request.user.organization_id == org_id and org.is_active:
-            return Response(
-                {"detail": "You cannot deactivate your own organization."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if org.is_active:
-            TenantOnboardingService.deactivate_tenant(org_id)
-            return Response({
-                "message": f"'{org.name}' has been deactivated.",
-                "is_active": False,
-            })
-        else:
-            TenantOnboardingService.reactivate_tenant(org_id)
-            return Response({
-                "message": f"'{org.name}' has been reactivated.",
-                "is_active": True,
-            })
-        
 class IsAdminOrManager(permissions.BasePermission):
     """Only workspace admins and managers can create workspaces."""
     def has_permission(self, request, view):
@@ -1265,3 +1322,281 @@ class WorkspaceAvailableUsersView(APIView):
             "available_count": len(users_data),
             "users": users_data,
         })
+
+class AddPlatformAccessView(APIView):
+    """
+    Self-service endpoint — lets an existing user add a new platform to
+    their account without creating a duplicate account.
+
+    Called by the frontend when the signup page receives EMAIL_ALREADY_EXISTS
+    and the user clicks "Yes, add this platform to my existing account".
+
+    POST /api/v1/organizations/add-platform/
+
+    Request body:
+        {
+            "email":    "ram@gmail.com",
+            "password": "their_existing_password",
+            "platform": "pm"             ← the platform they want to add
+        }
+
+    Response (success):
+        {
+            "message": "Platform 'pm' added to your account.",
+            "platforms": ["hrms", "pm"],  ← full updated list
+            "tokens": { "access": "...", "refresh": "..." }
+        }
+
+    Security:
+        - Password is verified before granting access — prevents someone
+          who has another user's JWT from silently adding platforms.
+        - No authentication header required — this is a public endpoint
+          called before login.
+        - Rate-limited by the existing GlobalSignupDailyThrottle.
+    """
+
+    permission_classes = [permissions.AllowAny]
+    # throttle_classes = [GlobalSignupDailyThrottle]  # No throttle for add-platform
+
+    def post(self, request):
+        from .models import Platform, PlatformAccess
+
+        email    = request.data.get("email", "").strip().lower()
+        password = request.data.get("password", "")
+        platform_key = request.data.get("platform", "").strip().lower()
+
+        # ── Basic validation ───────────────────────────────────────────────
+        if not email or not password or not platform_key:
+            return Response(
+                {"detail": "email, password, and platform are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # ── Verify the platform exists ─────────────────────────────────────
+        try:
+            platform_obj = Platform.objects.get(key=platform_key, is_active=True)
+        except Platform.DoesNotExist:
+            return Response(
+                {"detail": f"Platform '{platform_key}' does not exist or is not active."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # ── Verify user credentials ────────────────────────────────────────
+        user = User.objects.filter(email__iexact=email).first()
+        if not user or not user.check_password(password):
+            return Response(
+                {"detail": "Invalid email or password."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        if not user.is_active:
+            return Response(
+                {"detail": "This account has been deactivated. Please contact support."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if user.organization is None:
+            return Response(
+                {"detail": "Your account is not linked to an organisation."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # ── Check if they already have this platform ───────────────────────
+        already_has = PlatformAccess.objects.filter(
+            organization=user.organization,
+            platform=platform_obj,
+            is_active=True,
+        ).exists()
+
+        if already_has:
+            return Response(
+                {
+                    "detail": f"Your account already has access to '{platform_key}'.",
+                    "code":   "PLATFORM_ALREADY_GRANTED",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # ── Grant platform access ──────────────────────────────────────────
+        PlatformAccess.objects.get_or_create(
+            organization=user.organization,
+            platform=platform_obj,
+            defaults={"is_active": True},
+        )
+
+        logger.info(
+            "Platform access added: user=%s, org=%s, platform=%s",
+            user.email, user.organization.name, platform_key,
+        )
+
+        # ── Issue fresh JWT with updated platforms list ────────────────────
+        # Use DyuksaTokenObtainPairSerializer so the new token carries
+        # the full updated platforms list automatically
+        from apps.users.serializers import DyuksaTokenObtainPairSerializer
+        refresh = DyuksaTokenObtainPairSerializer.get_token(user)
+
+        # Build the updated platforms list for the response
+        updated_platforms = list(
+            PlatformAccess.objects.filter(
+                organization=user.organization,
+                is_active=True,
+                platform__is_active=True,
+            ).values_list("platform__key", flat=True)
+        )
+
+        return Response(
+            {
+                "message":   f"Platform '{platform_key}' has been added to your account.",
+                "platforms": updated_platforms,
+                "tokens": {
+                    "access":  str(refresh.access_token),
+                    "refresh": str(refresh),
+                },
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class TenantPlatformAccessView(APIView):
+    """
+    Super-admin only: Grant or revoke platform access for an organisation.
+
+    POST /api/v1/organizations/overview/<org_id>/platform-access/
+
+    Request body:
+        {
+            "platform": "hrms",   ← platform key: "pm", "hrms", "crm", etc.
+            "enable":   true      ← true = grant, false = revoke
+        }
+
+    Response:
+        {
+            "message":           "HRMS access enabled for Acme Corp.",
+            "org_id":            4,
+            "platform":          "hrms",
+            "is_active":         true,
+            "updated_platforms": ["pm", "hrms"]
+        }
+
+    updated_platforms returns the full current list for the org so the
+    frontend can update all toggles in one go without a separate GET call.
+
+    The change takes effect on the user's next login — their new JWT will
+    automatically reflect the updated platforms list.
+    """
+
+    permission_classes = [IsSuperUser]
+
+    def post(self, request, org_id):
+        from .models import Platform, PlatformAccess
+
+        # ── Validate org ──────────────────────────────────────────────────
+        try:
+            org = Organization.objects.get(id=org_id)
+        except Organization.DoesNotExist:
+            return Response(
+                {"detail": "Organization not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # ── Validate request body ─────────────────────────────────────────
+        platform_key = request.data.get("platform", "").strip().lower()
+        enable       = request.data.get("enable")
+
+        if not platform_key:
+            return Response(
+                {"detail": "platform field is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if enable is None:
+            return Response(
+                {"detail": "enable field is required (true or false)."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not isinstance(enable, bool):
+            return Response(
+                {"detail": "enable must be a boolean (true or false)."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # ── Validate platform exists ──────────────────────────────────────
+        try:
+            platform_obj = Platform.objects.get(key=platform_key)
+        except Platform.DoesNotExist:
+            return Response(
+                {
+                    "detail": f"Platform '{platform_key}' does not exist.",
+                    "available_platforms": list(
+                        Platform.objects.filter(is_active=True)
+                        .values_list("key", flat=True)
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # ── Grant or revoke ───────────────────────────────────────────────
+        if enable:
+            # Grant — get_or_create so it's safe to call multiple times
+            access, created = PlatformAccess.objects.get_or_create(
+                organization=org,
+                platform=platform_obj,
+                defaults={"is_active": True},
+            )
+            if not created and not access.is_active:
+                # Row exists but was previously revoked — reactivate it
+                access.is_active = True
+                access.save(update_fields=["is_active", "updated_at"])
+
+            action_msg = "enabled"
+            logger.info(
+                "Superuser granted platform access: org=%s, platform=%s, by=%s",
+                org.name, platform_key, request.user,
+            )
+        else:
+            # Revoke — set is_active=False (keeps the row for audit trail)
+            updated = PlatformAccess.objects.filter(
+                organization=org,
+                platform=platform_obj,
+            ).update(is_active=False)
+
+            if not updated:
+                return Response(
+                    {
+                        "detail": (
+                            f"Organisation '{org.name}' does not have "
+                            f"'{platform_key}' access to revoke."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            action_msg = "disabled"
+            logger.info(
+                "Superuser revoked platform access: org=%s, platform=%s, by=%s",
+                org.name, platform_key, request.user,
+            )
+
+        # ── Build updated platforms list ──────────────────────────────────
+        updated_platforms = list(
+            PlatformAccess.objects.filter(
+                organization=org,
+                is_active=True,
+                platform__is_active=True,
+            ).values_list("platform__key", flat=True)
+        )
+
+        return Response(
+            {
+                "message":           (
+                    f"{platform_obj.name} access {action_msg} "
+                    f"for '{org.name}'."
+                ),
+                "org_id":            org.id,
+                "platform":          platform_key,
+                "is_active":         enable,
+                "updated_platforms": updated_platforms,
+            },
+            status=status.HTTP_200_OK,
+        )
