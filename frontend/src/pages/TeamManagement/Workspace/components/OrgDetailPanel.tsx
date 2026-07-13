@@ -7,7 +7,7 @@ import type { OrgDetailPlatform } from '@/types';
 
 function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <div style={{ flex: '1 1 70px', padding: '10px 12px', background: '#f9fafb', borderRadius: 10, border: `1px solid ${LINE}` }}>
+    <div style={{ flex: '1 1 70px', padding: '10px 12px', background: 'hsl(var(--muted))', borderRadius: 10, border: `1px solid ${LINE}` }}>
       <div style={{ fontSize: 18, fontWeight: 800, color }}>{value}</div>
       <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>{label}</div>
     </div>
@@ -37,7 +37,7 @@ function PlatformRow({ platform, orgId, activePlatformKeys, onUpdated }: {
   };
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: isEnabled ? '#f0fdf4' : '#f9fafb', borderRadius: 8, border: `1px solid ${isEnabled ? '#bbf7d0' : LINE}`, transition: 'all 0.15s' }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: isEnabled ? 'rgba(22,163,74,0.08)' : 'hsl(var(--muted))', borderRadius: 8, border: `1px solid ${isEnabled ? '#bbf7d0' : LINE}`, transition: 'all 0.15s' }}>
       <div>
         <div style={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{platform.name}</div>
         <div style={{ fontSize: 11, color: MUTED, marginTop: 1 }}>{platform.key.toUpperCase()}</div>
@@ -46,7 +46,7 @@ function PlatformRow({ platform, orgId, activePlatformKeys, onUpdated }: {
         onClick={handleToggle}
         disabled={isLoading}
         title={isEnabled ? `Revoke ${platform.name} access` : `Grant ${platform.name} access`}
-        style={{ width: 40, height: 22, borderRadius: 11, background: isEnabled ? '#16a34a' : '#d1d5db', border: 'none', cursor: isLoading ? 'wait' : 'pointer', position: 'relative', transition: 'background 0.2s', padding: 0, flexShrink: 0, opacity: isLoading ? 0.6 : 1 }}
+        style={{ width: 40, height: 22, borderRadius: 11, background: isEnabled ? '#16a34a' : 'hsl(var(--border))', border: 'none', cursor: isLoading ? 'wait' : 'pointer', position: 'relative', transition: 'background 0.2s', padding: 0, flexShrink: 0, opacity: isLoading ? 0.6 : 1 }}
       >
         {isLoading
           ? <Loader2 size={11} style={{ color: '#fff', position: 'absolute', top: 6, left: 15 }} className="animate-spin" />
@@ -99,8 +99,8 @@ export function OrgDetailPanel({ orgId, onClose, onDelete }: Props) {
       zIndex: 200,
       borderLeft: `1px solid ${LINE}`,
       display: 'flex', flexDirection: 'column',
-      background: '#fff',
-      boxShadow: '-4px 0 24px rgba(0,0,0,0.08)',
+      background: 'hsl(var(--card))',
+      boxShadow: '-4px 0 24px rgba(0,0,0,0.18)',
     }}>
 
       {/* Backdrop for mobile — tap outside to close */}
@@ -174,8 +174,8 @@ export function OrgDetailPanel({ orgId, onClose, onDelete }: Props) {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {org.users.slice(0, 8).map(u => (
-                  <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', background: '#f9fafb', borderRadius: 8 }}>
-                    <div style={{ width: 26, height: 26, borderRadius: 7, background: '#EEF4FF', display: 'grid', placeItems: 'center', color: BLUE, fontWeight: 800, fontSize: 11, flexShrink: 0 }}>
+                  <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 10px', background: 'hsl(var(--muted))', borderRadius: 8 }}>
+                    <div style={{ width: 26, height: 26, borderRadius: 7, background: `${BLUE}12`, display: 'grid', placeItems: 'center', color: BLUE, fontWeight: 800, fontSize: 11, flexShrink: 0 }}>
                       {u.username[0].toUpperCase()}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -193,9 +193,9 @@ export function OrgDetailPanel({ orgId, onClose, onDelete }: Props) {
           )}
           <section style={{ paddingTop: 8, borderTop: `1px solid ${LINE}` }}>
             <button onClick={onDelete}
-              style={{ width: '100%', padding: '10px', borderRadius: 8, border: '1px solid #fecaca', background: '#fff', color: '#dc2626', fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'background 0.15s' }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#fef2f2')}
-              onMouseLeave={e => (e.currentTarget.style.background = '#fff')}
+              style={{ width: '100%', padding: '10px', borderRadius: 8, border: '1px solid #fecaca', background: 'hsl(var(--card))', color: '#dc2626', fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'background 0.15s' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(220,38,38,0.08)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'hsl(var(--card))')}
             >
               Delete Organization
             </button>

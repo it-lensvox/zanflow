@@ -528,12 +528,13 @@ export function TaskDetailConfirms({ detail, task }: TaskDetailContentProps) {
             {showNotAdminPopup && (
                 <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4">
                     <div style={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,.35)', width: '100%', maxWidth: 360, padding: 24, textAlign: 'center' }}>
-                        <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                        <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(217,119,6,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
                             <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#d97706" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
                         </div>
-                        <h3 style={{ fontSize: 15, fontWeight: 700, color: T.text, margin: '0 0 8px' }}>Permission denied</h3>
-                        <p style={{ fontSize: 13, color: T.muted, margin: '0 0 20px' }}>Only the person who created this task can delete it.</p>
-                        <button onClick={() => setShowNotAdminPopup(false)} style={{ width: '100%', padding: '9px 0', borderRadius: 10, border: 'none', background: T.text, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Got it</button>
+                        <h3 style={{ fontSize: 15, fontWeight: 700, color: T.text, margin: '0 0 8px' }}>Permission Denied</h3>
+                        <p style={{ fontSize: 13, color: T.muted, margin: '0 0 6px' }}>You can't delete this task.</p>
+                        <p style={{ fontSize: 13, color: T.muted, margin: '0 0 20px' }}>Only the <strong style={{ color: T.text }}>person who created it</strong> can delete it.</p>
+                        <button onClick={() => setShowNotAdminPopup(false)} style={{ width: '100%', padding: '9px 0', borderRadius: 10, border: 'none', background: '#1663f6', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Okay, got it</button>
                     </div>
                 </div>
             )}
@@ -541,7 +542,7 @@ export function TaskDetailConfirms({ detail, task }: TaskDetailContentProps) {
                 <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4">
                     <div style={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,.35)', width: '100%', maxWidth: 420, padding: 24 }}>
                         <h3 style={{ fontSize: 15, fontWeight: 700, color: T.text, margin: '0 0 8px' }}>Delete attachment</h3>
-                        <p style={{ fontSize: 13, color: T.muted, margin: '0 0 24px' }}>Delete <strong>{deleteAttachmentConfirm.name}</strong>?</p>
+                        <p style={{ fontSize: 13, color: T.muted, margin: '0 0 24px' }}>Delete <strong style={{ color: T.text }}>{deleteAttachmentConfirm.name}</strong>?</p>
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                             <button onClick={() => setDeleteAttachmentConfirm(null)} style={{ padding: '8px 18px', borderRadius: 8, border: `1px solid ${T.line}`, background: 'hsl(var(--muted))', fontSize: 13, fontWeight: 500, color: T.text, cursor: 'pointer' }}>Cancel</button>
                             <button onClick={() => handleDeleteAttachment(deleteAttachmentConfirm.id)} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: '#dc2626', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Delete</button>

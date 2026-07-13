@@ -55,7 +55,7 @@ export function TasksLineChartCard({
             <ChevronDown size={11} />
           </button>
           {showChartMonthPicker && (
-            <div style={{ position: 'absolute', top: 42, right: 0, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.10)', zIndex: 200, overflow: 'hidden', minWidth: 170 }}>
+            <div style={{ position: 'absolute', top: 42, right: 0, background: 'hsl(var(--popover))', border: `1px solid ${LINE}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.18)', zIndex: 200, overflow: 'hidden', minWidth: 170 }}>
               {monthOptions.map(opt => {
                 const active = selectedMonth.year === opt.year && selectedMonth.month === opt.month;
                 return (

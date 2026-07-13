@@ -78,7 +78,7 @@ export function CustomDashboardView({
       {/* ── Edit mode toolbar */}
       {isEditMode && (
         <div style={{
-          background: '#EEF4FF', borderBottom: `1px solid #C7D7FD`,
+          background: 'hsl(var(--muted))', borderBottom: `1px solid hsl(var(--border))`,
           padding: '8px 20px', display: 'flex', alignItems: 'center',
           gap: 10, flexWrap: 'wrap',
         }}>
@@ -114,7 +114,7 @@ export function CustomDashboardView({
             )}
           </div>
 
-          <span style={{ fontSize: 12, color: '#4A6FA5', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ fontSize: 12, color: MUTED, display: 'flex', alignItems: 'center', gap: 4 }}>
             <Settings2 size={12} /> Drag widgets to rearrange
           </span>
 
@@ -192,7 +192,7 @@ export function CustomDashboardView({
           }}>
             <div style={{
               width: 56, height: 56, borderRadius: 16,
-              background: '#EEF4FF', display: 'flex',
+              background: `${BLUE}12`, display: 'flex',
               alignItems: 'center', justifyContent: 'center',
             }}>
               <Plus size={24} color={BLUE} />

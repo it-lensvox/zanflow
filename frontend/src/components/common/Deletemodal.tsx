@@ -59,7 +59,7 @@ const DeleteModal: React.FC<DeleteModalProps> = ({
           {/* Button */}
           <button
             onClick={onCancel}
-            className="w-full px-6 py-3 text-white bg-foreground rounded-lg hover:opacity-90 transition-opacity font-medium text-base focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+            className="w-full px-6 py-3 text-white bg-[#1663f6] hover:bg-[#0f4bd4] rounded-lg transition-colors font-medium text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
           >
             OK, Got it
           </button>
@@ -92,23 +92,23 @@ const DeleteModal: React.FC<DeleteModalProps> = ({
         </h3>
 
         {/* Message */}
-        <p className="text-muted-foreground text-center mb-8">
-          {itemName ? (
-            <>
-              Are you sure you want to delete{' '}
-              <span className="font-semibold text-gray-900">"{itemName}"</span>?
-            </>
-          ) : (
-            `Are you sure you want to delete this ${itemType}?`
-          )}
-        </p>
+       <p className="text-muted-foreground text-center mb-8">
+            {itemName ? (
+              <>
+                Are you sure you want to delete{' '}
+                <span className="font-semibold text-foreground">"{itemName}"</span>?
+              </>
+            ) : (
+              `Are you sure you want to delete this ${itemType}?`
+            )}
+          </p>
 
         {/* Buttons */}
         <div className="flex gap-3">
           <button
             onClick={onCancel}
             disabled={isDeleting}
-            className="flex-1 px-6 py-3 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2"
+            className="flex-1 px-6 py-3 text-foreground bg-muted rounded-lg hover:bg-accent transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-border focus:ring-offset-2"
           >
             No
           </button>

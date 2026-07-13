@@ -58,7 +58,7 @@ export function WidgetPicker({ onClose, onAdd, onRemove, existingTypes }: Props)
                 transition: 'background 0.12s',
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.background = added ? '#FEE2E2' : BG;
+                e.currentTarget.style.background = added ? 'rgba(239,68,68,0.12)' : 'hsl(var(--accent))';
               }}
               onMouseLeave={e => {
                 e.currentTarget.style.background = added ? 'rgba(239,68,68,0.08)' : 'hsl(var(--card))';
@@ -67,7 +67,7 @@ export function WidgetPicker({ onClose, onAdd, onRemove, existingTypes }: Props)
               <div style={{
                 width: 30, height: 30, borderRadius: 7, flexShrink: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: added ? '#FEE2E2' : BG,
+                background: added ? 'rgba(239,68,68,0.08)' : BG,
                 color: added ? '#EF4444' : MUTED,
               }}>
                 {w.icon}

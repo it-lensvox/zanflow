@@ -57,7 +57,7 @@ export function MyTasksPanel({
               style={{ flex: 1, padding: '8px 4px', fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: 'none', color: active ? BLUE : MUTED, borderBottom: active ? `2px solid ${BLUE}` : '2px solid transparent', marginBottom: -1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, whiteSpace: 'nowrap' }}
             >
               {tab.label}
-              <span style={{ fontSize: 10, fontWeight: 700, background: active ? '#EEF2FF' : '#F3F4F6', color: active ? BLUE : '#9CA3AF', borderRadius: 12, padding: '1px 6px' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, background: active ? `${BLUE}18` : 'hsl(var(--muted))', color: active ? BLUE : 'hsl(var(--muted-foreground))', borderRadius: 12, padding: '1px 6px' }}>
                 {countMap[tab.key]}
               </span>
             </button>
@@ -69,7 +69,7 @@ export function MyTasksPanel({
       {isLoading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
          {[1, 2, 3, 4, 5].map(i => (
-            <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 110px 28px', alignItems: 'center', gap: 12, padding: '14px 6px', borderBottom: '1px solid #F3F4F6' }}>
+            <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 110px 28px', alignItems: 'center', gap: 12, padding: '14px 6px', borderBottom: '1px solid hsl(var(--border))' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div style={SkeletonBlock({ width: '70%', height: 14 })} />
                 <div style={SkeletonBlock({ width: '30%', height: 11 })} />
@@ -88,7 +88,7 @@ export function MyTasksPanel({
           <div
             key={task.id}
             onClick={() => navigate(`/tasks/${task.id}`)}
-            style={{ display: 'grid', gridTemplateColumns: '1fr 110px 28px', alignItems: 'center', gap: 12, padding: '11px 6px', borderBottom: `1px solid #F3F4F6`, cursor: 'pointer' }}
+            style={{ display: 'grid', gridTemplateColumns: '1fr 110px 28px', alignItems: 'center', gap: 12, padding: '11px 6px', borderBottom: `1px solid hsl(var(--border))`, cursor: 'pointer' }}
             onMouseEnter={e => (e.currentTarget.style.background = BG)}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           >

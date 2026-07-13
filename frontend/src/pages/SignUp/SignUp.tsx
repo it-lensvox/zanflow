@@ -218,7 +218,7 @@ export function Signup() {
             {/* 409 Add-platform confirmation dialog */}
            {addPlatformPrompt && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4">
+                    <div className="bg-card border border-border rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4">
                         <h2 className="text-lg font-bold mb-2">Account already exists</h2>
                         <p className="text-sm text-muted-foreground mb-4">
                             You already have a Dyuksa account with <strong>{addPlatformPrompt.email}</strong>. Would you like to add <strong>Project Management</strong> to your existing account?

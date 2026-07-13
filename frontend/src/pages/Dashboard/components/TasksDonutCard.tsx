@@ -40,7 +40,7 @@ export function TasksDonutCard({ donut, donutTotal, isLoading }: TasksDonutCardP
               <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: i < donut.length - 1 ? 12 : 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ width: 10, height: 10, borderRadius: '50%', background: d.color, flexShrink: 0 }} />
-                  <span style={{ fontSize: 13, color: '#344054' }}>{d.label}</span>
+                  <span style={{ fontSize: 13, color: TEXT }}>{d.label}</span>
                 </div>
                 <span style={{ fontSize: 13, color: TEXT }}>
                   {d.value}{' '}

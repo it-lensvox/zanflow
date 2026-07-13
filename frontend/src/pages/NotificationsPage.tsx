@@ -239,11 +239,11 @@ export function NotificationsPage({
       onClick={handleClose}>
 
       {/* The Popup Card */}
-      <div className="w-full max-w-md border border-white/10 rounded-[2rem] shadow-2xl flex flex-col max-h-[85vh] bg-white"
+      <div className="w-full max-w-md border border-border rounded-[2rem] shadow-2xl flex flex-col max-h-[85vh] bg-card"
         onClick={(e) => e.stopPropagation()}>
 
         {/* Header Section */}
-        <div className="px-6 py-5 border-b border-white/5 bg-white/10">
+        <div className="px-6 py-5 border-b border-border bg-muted/50">
           <div className="flex items-center justify-between mb-4">
             {/* Left: Title (Hide when searching on small screens if needed) */}
             <div className='mx-3'>
@@ -263,7 +263,7 @@ export function NotificationsPage({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     autoFocus
-                    className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#97bd30]/30"
+                    className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-border bg-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                   />
                   <X
                     className="h-4 w-4 opacity-60 hover:opacity-100 cursor-pointer flex-shrink-0"
@@ -278,7 +278,7 @@ export function NotificationsPage({
                   <button
                     onClick={() => clearAllReadMutation.mutate()}
                     disabled={clearAllReadMutation.isPending || notifications.length === 0}
-                    className="text-[10px] font-semibold text-gray-400 hover:text-red-500 transition-colors disabled:opacity-40 whitespace-nowrap"
+                    className="text-[10px] font-semibold text-muted-foreground hover:text-red-500 transition-colors disabled:opacity-40 whitespace-nowrap"
                     title="Clear all notifications"
                   >
                     Clear All
@@ -286,7 +286,7 @@ export function NotificationsPage({
                   <button
                     onClick={() => markAllReadMutation.mutate()}
                     disabled={markAllReadMutation.isPending || notifications.every(n => n.is_read)}
-                    className="text-[10px] font-semibold text-gray-400 hover:text-blue-500 transition-colors disabled:opacity-40 whitespace-nowrap"
+                    className="text-[10px] font-semibold text-muted-foreground hover:text-blue-500 transition-colors disabled:opacity-40 whitespace-nowrap"
                     title="Mark all as read"
                   >
                     Mark All Read
@@ -305,7 +305,7 @@ export function NotificationsPage({
           </div>
 
           {/* Filter Toggle inside the header */}
-          <div className="inline-flex p-1 bg-gray-100 rounded-xl">
+          <div className="inline-flex p-1 bg-muted rounded-xl">
             {(['all', 'unread'] as const).map((key) => (
               <button
                 key={key}
@@ -314,7 +314,7 @@ export function NotificationsPage({
                   "px-5 py-1.5 text-xs font-semibold rounded-lg transition-all",
                   filter === key
                     ? "bg-[#97bd30] text-white shadow-lg shadow-[#97bd30]/20"
-                    : "text-gray-500 hover:text-gray-700 bg-transparent"
+                    : "text-muted-foreground hover:text-foreground bg-transparent"
                 )}
               >
                 {key === 'all' ? 'All' : 'Unread'}
@@ -329,17 +329,17 @@ export function NotificationsPage({
   {/* ── Other Workspaces Summary — always at top ── */}
   {otherWorkspaces.length > 0 && (
     <div className="mt-4 mb-2">
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 px-1 mb-2">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground px-1 mb-2">
         Other Workspaces
       </p>
       {otherWorkspaces.map((ws: any) => (
         <div
           key={ws.workspace_id}
-          className="flex items-center justify-between p-3 rounded-2xl mb-2 border border-gray-100 bg-gray-50"
+          className="flex items-center justify-between p-3 rounded-2xl mb-2 border border-border bg-muted"
         >
           <div className="flex items-center gap-2">
             <span className="text-lg">🔔</span>
-            <p className="text-xs text-gray-600">{ws.message}</p>
+            <p className="text-xs text-foreground">{ws.message}</p>
           </div>
           <button
             onClick={() => handleWorkspaceSwitch(ws.workspace_id)}
@@ -367,8 +367,8 @@ export function NotificationsPage({
                     className={cn(
                       "group relative p-4 rounded-2xl mb-3 border transition-all cursor-pointer",
                       !isRead
-                        ? "bg-blue-50/50 border-blue-100 shadow-sm"
-                        : "bg-white border-gray-100 hover:bg-gray-50"
+                        ? "bg-blue-500/5 border-blue-500/20 shadow-sm"
+                        : "bg-card border-border hover:bg-accent"
                     )}
                   >
                     {/* Unread Accent */}
@@ -385,7 +385,7 @@ export function NotificationsPage({
                         e.stopPropagation();
                         deleteNotificationMutation.mutate(n.id);
                       }}
-                      className="absolute top-3 right-3 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-50 text-gray-400 hover:text-red-500 transition-all"
+                      className="absolute top-3 right-3 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-all"
                       title="Delete notification"
                     >
                       <Trash2 className="h-3.5 w-3.5" />

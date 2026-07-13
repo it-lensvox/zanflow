@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Building2, Users, CheckCircle, XCircle, Plus } from 'lucide-react';
+import { Search, Building2, Users, CheckCircle, XCircle } from 'lucide-react';
 import { useOrganization } from './hooks/useOrganization';
 import { OrgDetailPanel } from './components/OrgDetailPanel';
 import DeleteModal from '@/components/common/Deletemodal';
@@ -8,14 +8,14 @@ import { BLUE, LINE, TEXT, MUTED } from '@/config/tokens';
 import { formatRelativeTime } from '@/lib/utils';
 import type { Tenant } from '@/types';
 
-// ── Shared table styles — same as Projects page ───────────────────────────────
-const th: React.CSSProperties = { textAlign: 'left', color: '#172033', fontSize: 14, fontWeight: 800, padding: '14px 16px', borderBottom: `1px solid ${LINE}`, borderRight: `1px solid ${LINE}`, background: '#f9fafb', whiteSpace: 'nowrap', position: 'sticky', top: 0, zIndex: 1 };
+// ── Shared table styles 
+const th: React.CSSProperties = { textAlign: 'left', color: 'hsl(var(--foreground))', fontSize: 14, fontWeight: 800, padding: '14px 16px', borderBottom: `1px solid ${LINE}`, borderRight: `1px solid ${LINE}`, background: 'hsl(var(--muted))', whiteSpace: 'nowrap', position: 'sticky', top: 0, zIndex: 1 };
 const td: React.CSSProperties = { padding: '14px 16px', borderBottom: `1px solid ${LINE}`, borderRight: `1px solid ${LINE}`, verticalAlign: 'middle', fontSize: 14, color: TEXT };
 
-// ── Summary card — same pattern as Project status pills ───────────────────────
+// ── Summary card 
 function SummaryCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: number; color: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 10, flex: 1, minWidth: 140 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', background: 'hsl(var(--card))', border: `1px solid ${LINE}`, borderRadius: 10, flex: 1, minWidth: 140 }}>
       <div style={{ width: 36, height: 36, borderRadius: 8, background: `${color}18`, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
         {React.cloneElement(icon as React.ReactElement, { size: 16, style: { color } })}
       </div>
@@ -27,12 +27,12 @@ function SummaryCard({ icon, label, value, color }: { icon: React.ReactNode; lab
   );
 }
 
-// ── Main exported component (named export kept for backward compat) ────────────
+
 export function WorkSpace() {
   const o = useOrganization();
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#fff', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'hsl(var(--background))', overflow: 'hidden' }}>
       <DeleteModal
         isOpen={!!o.deleteTarget}
         type="confirm"
@@ -43,9 +43,9 @@ export function WorkSpace() {
         isDeleting={o.isDeleting}
       />
 
-      {/* ── Sticky header — same pattern as Projects page ── */}
+      {/* ── Sticky header  */}
       <div className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40"
-        style={{ flexShrink: 0, background: '#fff', borderBottom: `1px solid ${LINE}`, paddingTop: 16, paddingBottom: 16 }}>
+        style={{ flexShrink: 0, background: 'hsl(var(--card))', borderBottom: `1px solid ${LINE}`, paddingTop: 16, paddingBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16, gap: 12 }}>
           <div>
             <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, color: TEXT, letterSpacing: '-.04em' }}>Organizations</h1>
@@ -66,7 +66,7 @@ export function WorkSpace() {
           </div>
           {(['all', 'active', 'inactive'] as const).map(s => (
             <button key={s} onClick={() => o.setStatusFilter(s)}
-              style={{ height: 40, padding: '0 16px', borderRadius: 8, border: `1px solid ${o.statusFilter === s ? BLUE : LINE}`, background: o.statusFilter === s ? '#EEF4FF' : '#fff', color: o.statusFilter === s ? BLUE : TEXT, fontWeight: 600, fontSize: 13, cursor: 'pointer', textTransform: 'capitalize' }}>
+              style={{ height: 40, padding: '0 16px', borderRadius: 8, border: `1px solid ${o.statusFilter === s ? BLUE : LINE}`, background: o.statusFilter === s ? `${BLUE}12` : 'hsl(var(--card))', color: o.statusFilter === s ? BLUE : TEXT, fontWeight: 600, fontSize: 13, cursor: 'pointer', textTransform: 'capitalize' }}>
               {s === 'all' ? 'All' : s === 'active' ? '● Active' : '○ Inactive'}
             </button>
           ))}
@@ -88,7 +88,7 @@ export function WorkSpace() {
         )}
 
         {/* Table + optional detail panel side-by-side */}
-        <div style={{ display: 'flex', gap: 0, border: `1px solid ${LINE}`, borderRadius: 12, overflow: 'hidden', background: '#fff' }}>
+        <div style={{ display: 'flex', gap: 0, border: `1px solid ${LINE}`, borderRadius: 12, overflow: 'hidden', background: 'hsl(var(--card))' }}>
 
           {/* Table */}
           <div style={{ flex: 1, minWidth: 0, overflowX: 'auto' }}>
@@ -118,13 +118,13 @@ export function WorkSpace() {
                     return (
                       <tr key={t.id}
                         onClick={() => o.setDetailOrgId(isSelected ? null : t.id)}
-                        style={{ background: isSelected ? '#f0f4ff' : undefined, cursor: 'pointer' }}
-                        onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = '#f9fafb'; }}
+                        style={{ background: isSelected ? `${BLUE}0d` : undefined, cursor: 'pointer' }}
+                        onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'hsl(var(--accent))'; }}
                         onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = ''; }}
                       >
                         <td style={td}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <div style={{ width: 30, height: 30, borderRadius: 7, background: '#EEF4FF', display: 'grid', placeItems: 'center', color: BLUE, fontWeight: 800, fontSize: 14, flexShrink: 0 }}>
+                            <div style={{ width: 30, height: 30, borderRadius: 7, background: `${BLUE}12`, display: 'grid', placeItems: 'center', color: BLUE, fontWeight: 800, fontSize: 14, flexShrink: 0 }}>
                               {t.name[0].toUpperCase()}
                             </div>
                             <div style={{ minWidth: 0 }}>
@@ -157,7 +157,7 @@ export function WorkSpace() {
             )}
           </div>
 
-          {/* Detail panel — slides in when row is clicked, same as Project detail panel */}
+          {/* Detail panel  */}
           {o.detailOrgId && (
             <OrgDetailPanel
               orgId={o.detailOrgId}

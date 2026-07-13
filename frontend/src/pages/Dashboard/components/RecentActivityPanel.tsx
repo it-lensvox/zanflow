@@ -32,7 +32,7 @@ export function RecentActivityPanel({ recentActivity, getFileBadge, handleDocume
       {isLoading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
          {[1, 2, 3, 4, 5].map(i => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0', borderBottom: '1px solid #F3F4F6' }}>
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0', borderBottom: '1px solid hsl(var(--border))' }}>
               <div style={SkeletonBlock({ width: 40, height: 40, borderRadius: 8, style: { flexShrink: 0 } })} />
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div style={SkeletonBlock({ width: '65%', height: 14 })} />
@@ -53,7 +53,7 @@ export function RecentActivityPanel({ recentActivity, getFileBadge, handleDocume
             <div
               key={doc.id}
               onClick={() => handleDocumentClick(doc)}
-              style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0', borderBottom: i < recentActivity.length - 1 ? '1px solid #F3F4F6' : 'none', cursor: 'pointer' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0', borderBottom: i < recentActivity.length - 1 ? '1px solid hsl(var(--border))' : 'none', cursor: 'pointer' }}
               onMouseEnter={e => (e.currentTarget.style.background = BG)}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             >

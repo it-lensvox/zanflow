@@ -246,8 +246,8 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
               {/* Action intent banner */}
               {isActionIntent ? (
                 <div style={{ padding: '20px 18px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 13, color: '#172033', fontWeight: 600, marginBottom: 6 }}>{actionMessage}</div>
-                  <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 14 }}>
+                  <div style={{ fontSize: 13, color: 'hsl(var(--foreground))', fontWeight: 600, marginBottom: 6 }}>{actionMessage}</div>
+                  <div style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))', marginBottom: 14 }}>
                     Try the AI assistant to complete this action.
                   </div>
                   <button
@@ -273,7 +273,7 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
                 const showEmpty   = aiDoneEmpty || basicEmpty;
 
                 if (showEmpty) return (
-                  <div style={{ padding: '32px 0', textAlign: 'center', color: '#9CA3AF', fontSize: 14 }}>
+                  <div style={{ padding: '32px 0', textAlign: 'center', color: 'hsl(var(--muted-foreground))', fontSize: 14 }}>
                     No results for "<strong>{query}</strong>"
                   </div>
                 );
@@ -283,10 +283,10 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
                   <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {[1, 2, 3].map(i => (
                       <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div style={{ width: 32, height: 32, borderRadius: 8, background: '#F3F4F6', flexShrink: 0 }} />
+                        <div style={{ width: 32, height: 32, borderRadius: 8, background: 'hsl(var(--muted))', flexShrink: 0 }} />
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
-                          <div style={{ height: 12, borderRadius: 4, background: 'linear-gradient(90deg,#f0f2f5 25%,#e4e7ec 50%,#f0f2f5 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite', width: '55%' }} />
-                          <div style={{ height: 10, borderRadius: 4, background: 'linear-gradient(90deg,#f0f2f5 25%,#e4e7ec 50%,#f0f2f5 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite', width: '30%' }} />
+                          <div style={{ height: 12, borderRadius: 4, background: 'hsl(var(--muted))', backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite', width: '55%' }} />
+                          <div style={{ height: 10, borderRadius: 4, background: 'hsl(var(--muted))', backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite', width: '30%' }} />
                         </div>
                       </div>
                     ))}
@@ -311,8 +311,8 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
                           const initials = member.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
                           return (
                             <div key={member.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px' }}>
-                              <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#EEF4FF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                <span style={{ fontSize: 11, fontWeight: 700, color: '#1663F6' }}>{initials}</span>
+                              <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(22,99,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                <span style={{ fontSize: 11, fontWeight: 700, color: '#1663f6' }}>{initials}</span>
                               </div>
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ fontSize: 13, fontWeight: 600, color: 'hsl(var(--foreground))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.name}</div>
@@ -326,7 +326,7 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
                                   navigate(route);
                                   onClose();
                                 }}
-                                style={{ height: 26, padding: '0 10px', borderRadius: 6, border: '1px solid #C7D7FD', background: '#EEF4FF', fontSize: 11, fontWeight: 600, color: '#1663F6', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, fontFamily: 'inherit' }}
+                                style={{ height: 26, padding: '0 10px', borderRadius: 6, border: '1px solid rgba(22,99,246,0.3)', background: 'rgba(22,99,246,0.1)', fontSize: 11, fontWeight: 600, color: '#1663f6', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, fontFamily: 'inherit' }}
                               >
                                 <MessageSquare size={10} /> Chat
                               </button>

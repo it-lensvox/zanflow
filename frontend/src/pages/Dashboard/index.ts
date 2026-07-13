@@ -5,17 +5,17 @@ export { BLUE, LINE, TEXT, MUTED, BG };
 // ─── Reusable inline style objects
 export const CARD: CSSProperties = {
   background: 'hsl(var(--card))',
-  border: `1px solid hsl(var(--border))`,
+  border: `1px solid ${LINE}`,
   borderRadius: 12,
-  boxShadow: '0 1px 3px rgba(16,24,40,.05)',
+  boxShadow: '0 1px 3px rgba(0,0,0,.07)',
 };
 
 export const MONTH_BTN: CSSProperties = {
   fontSize: 14,
   fontWeight: 500,
-  color: 'hsl(var(--foreground))',
+  color: TEXT,
   background: 'hsl(var(--card))',
-  border: `1px solid hsl(var(--border))`,
+  border: `1px solid ${LINE}`,
   borderRadius: 6,
   padding: '5px 12px',
   cursor: 'pointer',

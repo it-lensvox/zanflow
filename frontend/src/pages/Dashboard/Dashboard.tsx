@@ -165,11 +165,11 @@ export function Dashboard() {
             aria-label="Open menu"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <path d="M2 4h14M2 9h14M2 14h14" stroke="#344054" strokeWidth="1.75" strokeLinecap="round" />
+              <path d="M2 4h14M2 9h14M2 14h14" stroke="hsl(var(--muted-foreground))" strokeWidth="1.75" strokeLinecap="round" />
             </svg>
           </button>
           <span style={{ color: MUTED, fontWeight: 500 }}>DYUKSA</span>
-          <span style={{ color: '#CBD5E1' }}> </span>
+          <span style={{ color: 'hsl(var(--border))' }}> </span>
           <span style={{ color: TEXT, fontWeight: 700 }}>Dashboard</span>
         </div>
 
@@ -181,7 +181,7 @@ export function Dashboard() {
           style={{ ...MONTH_BTN, flex: '0 1 40%', minWidth: 160, gap: 8, height: 34, padding: '0 12px', marginLeft: 'auto' }}
         >
           <Search size={13} color={MUTED} />
-          <span style={{ flex: 1, textAlign: 'left', fontSize: 13, color: '#9CA3AF' }}>Search anything…</span>
+          <span style={{ flex: 1, textAlign: 'left', fontSize: 13, color: 'hsl(var(--muted-foreground))' }}>Search anything…</span>
          <kbd style={{ marginLeft: 'auto', background: 'hsl(var(--muted))', border: '1px solid hsl(var(--border))', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700, color: 'hsl(var(--muted-foreground))' }}>⌘K</kbd>
         </button>
 
@@ -254,7 +254,7 @@ export function Dashboard() {
                   color: active ? '#fff' : MUTED,
                   transition: 'all 0.15s',
                 }}
-                onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#F1F5F9'; }}
+                onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'hsl(var(--accent))'; }}
                 onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
               >
                 {tab.icon}
@@ -450,13 +450,13 @@ export function Dashboard() {
                     padding: '10px 16px', border: 'none', cursor: 'pointer',
                     background: 'hsl(var(--card))', fontFamily: 'inherit',
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.background = '#F7F8FB')}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'hsl(var(--accent))')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'hsl(var(--card))')}
                 >
                   <div style={{
                     width: 34, height: 34, borderRadius: 9, flexShrink: 0,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: '#F1F5F9', color: MUTED, border: `1.5px dashed #CBD5E1`,
+                    background: 'hsl(var(--muted))', color: MUTED, border: `1.5px dashed hsl(var(--border))`,
                   }}>
                     <Plus size={16} color={MUTED} />
                   </div>
@@ -740,7 +740,7 @@ export function Dashboard() {
                 display: 'flex', alignItems: 'center', gap: 8,
                 fontFamily: 'inherit',
               }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#FEF2F2')}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.08)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'hsl(var(--card))')}
             >
               <Trash2 size={13} color="#EF4444" /> Delete
