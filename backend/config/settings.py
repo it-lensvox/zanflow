@@ -174,6 +174,7 @@ _cors_origins = config(
         "http://192.168.1.11:5173,"
         "http://192.168.1.188:8000,"
         "http://192.168.1.15:5173,"
+        "http://192.168.1.15:8081,"
         "http://192.168.1.14:5173,"
         # Dyuksa production domains
         "https://pm.dyuksa.com,"
