@@ -12,11 +12,11 @@ const MODE_CONFIG: Record<string, { icon: React.FC<{ size: number }>; label: str
 };
 
 // ─── Design tokens 
-const ACTIVE_BG     = '#f5f8ff';
-const ACTIVE_BORDER = '#a7c1ff';
+const ACTIVE_BG     = 'rgba(22,99,246,0.08)';
+const ACTIVE_BORDER = 'rgba(22,99,246,0.35)';
 const ACTIVE_COLOR  = '#1663f6';
-const IDLE_COLOR    = '#667085';
-const WRAP_BORDER   = '#e6ebf2';
+const IDLE_COLOR    = 'hsl(var(--muted-foreground))';
+const WRAP_BORDER   = 'hsl(var(--border))';
 
 // ─── Props
 interface ViewToggleProps {
@@ -50,7 +50,7 @@ export function ViewToggle({
         padding:      3,
         gap:          2,
         flexShrink:   0,
-        background:   '#fff',
+        background:   'hsl(var(--card))',
       }}
     >
       {modes.map(mode => {
@@ -79,7 +79,7 @@ export function ViewToggle({
               fontFamily:  'inherit',
             }}
             onMouseEnter={e => {
-              if (!active) e.currentTarget.style.background = '#f7f8fb';
+              if (!active) e.currentTarget.style.background = 'hsl(var(--accent))';
             }}
             onMouseLeave={e => {
               if (!active) e.currentTarget.style.background = 'transparent';

@@ -2,8 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Font-size scaling */
+:root {
+  font-size: 15px;
+}
+html.font-small  { font-size: 13px; }
+html.font-medium { font-size: 15px; }
+html.font-large  { font-size: 17px; }
+
 @layer base {
   :root {
+    /* ── Core tokens (shadcn)  */
     --background: 0 0% 100%;
     --foreground: 224 71.4% 4.1%;
     --card: 0 0% 100%;
@@ -21,23 +30,62 @@
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 20% 98%;
     --border: 220 13% 91%;
-    --input: 220 13% 91%;
+    --input: 0 0% 100%;
     --ring: 224 71.4% 4.1%;
     --radius: 0.5rem;
-    :root {
-    font-size: 15px;
-  }
-  html.font-small  { font-size: 13px; }
-  html.font-medium { font-size: 15px; }
-  html.font-large  { font-size: 17px; }
+
+    /* ── Sidebar ──────────────────────────────────────── */
+    --sidebar-bg: 220 20% 97%;
+    --sidebar-foreground: 224 71.4% 4.1%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-accent: 220 14.3% 93%;
+    --sidebar-accent-foreground: 220.9 39.3% 11%;
+    --sidebar-muted: 220 8.9% 46.1%;
+
+    /* ── Extended surface tokens */
+    --surface-raised: 0 0% 100%;
+    --surface-overlay: 0 0% 100%;
+    --surface-sunken: 220 14.3% 97.5%;
+
+    /* ── Status / semantic colors  */
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --info: 217 91% 60%;
+    --info-foreground: 0 0% 100%;
+
+    /* ── Chart palette ────────────────────────────────── */
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+
+    /* ── Badge / tag status tints ─────────────────────── */
+    --badge-completed-bg: 142 76% 94%;
+    --badge-completed-text: 142 71% 29%;
+    --badge-pending-bg: 38 100% 94%;
+    --badge-pending-text: 32 95% 35%;
+    --badge-in-progress-bg: 217 100% 94%;
+    --badge-in-progress-text: 217 91% 40%;
+    --badge-backlog-bg: 220 14% 94%;
+    --badge-backlog-text: 220 9% 40%;
+    --badge-review-bg: 280 100% 95%;
+    --badge-review-text: 280 68% 40%;
+    --badge-deferred-bg: 0 0% 94%;
+    --badge-deferred-text: 0 0% 40%;
+    --badge-deployed-bg: 173 80% 92%;
+    --badge-deployed-text: 173 80% 28%;
   }
 
   .dark {
+    /* ── Core tokens (shadcn) ─────────────────────────── */
     --background: 224 71.4% 4.1%;
     --foreground: 210 20% 98%;
-    --card: 224 71.4% 4.1%;
+    --card: 222 47% 8%;
     --card-foreground: 210 20% 98%;
-    --popover: 224 71.4% 4.1%;
+    --popover: 222 47% 8%;
     --popover-foreground: 210 20% 98%;
     --primary: 210 20% 98%;
     --primary-foreground: 220.9 39.3% 11%;
@@ -52,6 +100,50 @@
     --border: 215 27.9% 16.9%;
     --input: 215 27.9% 16.9%;
     --ring: 216 12.2% 83.9%;
+
+    /* ── Sidebar ──────────────────────────────────────── */
+    --sidebar-bg: 224 71.4% 3%;
+    --sidebar-foreground: 210 20% 92%;
+    --sidebar-border: 215 27.9% 14%;
+    --sidebar-accent: 215 27.9% 14%;
+    --sidebar-accent-foreground: 210 20% 98%;
+    --sidebar-muted: 217.9 10.6% 55%;
+
+    /* ── Extended surface tokens ──────────────────────── */
+    --surface-raised: 222 47% 8%;
+    --surface-overlay: 222 47% 10%;
+    --surface-sunken: 224 71.4% 3%;
+
+    /* ── Status / semantic colors ─────────────────────── */
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --info: 217 91% 60%;
+    --info-foreground: 0 0% 100%;
+
+    /* ── Chart palette (slightly muted for dark bg) ──── */
+    --chart-1: 220 70% 60%;
+    --chart-2: 160 60% 50%;
+    --chart-3: 30 80% 60%;
+    --chart-4: 280 65% 65%;
+    --chart-5: 340 75% 60%;
+
+    /* ── Badge / tag status tints (dark-safe) ─────────── */
+    --badge-completed-bg: 142 50% 14%;
+    --badge-completed-text: 142 71% 60%;
+    --badge-pending-bg: 38 60% 14%;
+    --badge-pending-text: 38 92% 60%;
+    --badge-in-progress-bg: 217 60% 14%;
+    --badge-in-progress-text: 217 91% 65%;
+    --badge-backlog-bg: 220 20% 14%;
+    --badge-backlog-text: 220 9% 65%;
+    --badge-review-bg: 280 50% 14%;
+    --badge-review-text: 280 68% 65%;
+    --badge-deferred-bg: 0 0% 14%;
+    --badge-deferred-text: 0 0% 65%;
+    --badge-deployed-bg: 173 50% 12%;
+    --badge-deployed-text: 173 80% 55%;
   }
 }
 
@@ -67,55 +159,162 @@
   }
 }
 
-/* Custom scrollbar */
+/* ── Custom scrollbar ─────────────────────────────────────────── */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
-
 ::-webkit-scrollbar-track {
   background: hsl(var(--muted));
   border-radius: 4px;
 }
-
 ::-webkit-scrollbar-thumb {
   background: hsl(var(--muted-foreground) / 0.3);
   border-radius: 4px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground) / 0.5);
 }
 
-/* Utility: hide scrollbar visually while keeping scroll functional */
 @layer utilities {
+  /* Hide scrollbar visually while keeping scroll functional */
   .scrollbar-hide {
-    -ms-overflow-style: none; 
-    scrollbar-width: none; 
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
   .scrollbar-hide::-webkit-scrollbar {
-    display: none; 
+    display: none;
   }
-}
 
-@layer utilities {
-  /* existing scrollbar-hide ... */
-
-  /* Responsive page content wrapper — use on the outermost div of each page */
+  /* Responsive page content wrapper */
   .page-container {
     @apply w-full px-4 sm:px-6 md:px-8 lg:px-10 py-6;
   }
 
-  /* Responsive page header row — title left, actions right, wraps on mobile */
+  /* Responsive page header row */
   .page-header {
     @apply flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6;
   }
 
-  /* Ensure tables scroll horizontally rather than breaking layout */
+  /* Ensure tables scroll horizontally */
   .table-scroll-wrapper {
     @apply w-full overflow-x-auto -mx-0;
   }
 }
 
+/* ─────────────────────────────────────────────────────────────────
+   GLOBAL DARK MODE OVERRIDES
+   These rules remap Tailwind's hardcoded light-only utility classes
+   to theme-aware equivalents when .dark is on <html>.
+   Covers all pages without needing per-component dark: prefixes.
+   ───────────────────────────────────────────────────────────────── */
+
+/* ── Backgrounds ── */
+.dark .bg-white { background-color: hsl(var(--card)) !important; }
+.dark .bg-gray-50   { background-color: hsl(var(--muted)) !important; }
+.dark .bg-gray-100  { background-color: hsl(var(--secondary)) !important; }
+.dark .bg-gray-200  { background-color: hsl(var(--accent)) !important; }
+.dark .bg-gray-800  { background-color: hsl(var(--secondary)) !important; }
+.dark .bg-gray-900  { background-color: hsl(var(--card)) !important; }
+.dark .bg-slate-50  { background-color: hsl(var(--muted)) !important; }
+.dark .bg-slate-100 { background-color: hsl(var(--secondary)) !important; }
+
+/* ── Text ── */
+.dark .text-gray-900,
+.dark .text-gray-950,
+.dark .text-slate-900 { color: hsl(var(--foreground)) !important; }
+.dark .text-gray-800,
+.dark .text-slate-800 { color: hsl(var(--foreground)) !important; }
+.dark .text-gray-700,
+.dark .text-slate-700 { color: hsl(var(--foreground) / 0.85) !important; }
+.dark .text-gray-600,
+.dark .text-slate-600 { color: hsl(var(--muted-foreground)) !important; }
+.dark .text-gray-500,
+.dark .text-slate-500 { color: hsl(var(--muted-foreground)) !important; }
+.dark .text-gray-400,
+.dark .text-slate-400 { color: hsl(var(--muted-foreground) / 0.7) !important; }
+.dark .text-gray-300  { color: hsl(var(--muted-foreground) / 0.5) !important; }
+
+/* ── Borders ── */
+.dark .border-gray-100,
+.dark .border-gray-200,
+.dark .border-slate-200 { border-color: hsl(var(--border)) !important; }
+.dark .border-gray-300  { border-color: hsl(var(--border)) !important; }
+.dark .divide-gray-100,
+.dark .divide-gray-200  { border-color: hsl(var(--border)) !important; }
+
+/* ── Hover states ── */
+.dark .hover\:bg-gray-50:hover  { background-color: hsl(var(--accent)) !important; }
+.dark .hover\:bg-gray-100:hover { background-color: hsl(var(--accent)) !important; }
+.dark .hover\:bg-gray-200:hover { background-color: hsl(var(--secondary)) !important; }
+
+/* ── TeamChat specific — heavily uses hardcoded Tailwind classes ── */
+.dark .bg-\[#f3f2f1\] { background-color: hsl(var(--muted)) !important; }
+
+/* ── Input & form elements ── */
+.dark input:not([class*="bg-"]):not([type="date"]):not([type="time"]):not([type="datetime-local"]),
+.dark textarea:not([class*="bg-"]),
+.dark select:not([class*="bg-"]) {
+  background-color: hsl(var(--input));
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--border));
+}
+.dark input::placeholder,
+.dark textarea::placeholder { color: hsl(var(--muted-foreground)); }
 
 
+/* ── Modal / overlay surfaces ── */
+.dark .bg-white.rounded-2xl,
+.dark .bg-white.rounded-xl,
+.dark .bg-white.rounded-lg {
+  background-color: hsl(var(--card)) !important;
+}
+
+/* ── Inline-style overrides: catch any remaining raw hex literals ── */
+.dark [style*="background: #fff"],
+.dark [style*="background:#fff"],
+.dark [style*="background: rgb(255, 255, 255)"] {
+  background-color: hsl(var(--card)) !important;
+}
+.dark [style*="background: #F7F8FB"],
+.dark [style*="background: #f7f8fb"] {
+  background-color: hsl(var(--background)) !important;
+}
+.dark [style*="background: #ffffff"],
+.dark [style*="background: #FFFFFF"] {
+  background-color: hsl(var(--card)) !important;
+}
+
+/* ── TeamPerformance SCSS overrides ── */
+.dark .team-performance-full-page {
+  background-color: hsl(var(--background)) !important;
+}
+.dark .team-performance-full-page .header-bar {
+  background-color: hsl(var(--card)) !important;
+  border-bottom-color: hsl(var(--border)) !important;
+}
+.dark .team-performance-full-page .header-bar .back-link {
+  color: hsl(var(--foreground)) !important;
+}
+
+/* ── Rich text editor (Tiptap) ── */
+.dark .ProseMirror {
+  color: hsl(var(--foreground));
+  background: hsl(var(--card));
+}
+.dark .tiptap-toolbar,
+.dark [class*="toolbar"] {
+  background: hsl(var(--muted));
+  border-color: hsl(var(--border));
+}
+
+/* ── Skeleton shimmer keyframes ── */
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Scrollbar in dark mode ── */
+.dark ::-webkit-scrollbar-track { background: hsl(var(--muted)); }
+.dark ::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.25); }
+.dark ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.4); }

@@ -51,6 +51,7 @@ export function useCalendar() {
     const [showRepeatSubmenu, setShowRepeatSubmenu] = useState(false);
     const [showDeclineModal, setShowDeclineModal]   = useState(false);
     const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+    const [isEventListOpen, setIsEventListOpen]     = useState(false);
     const [selectedInvitationEvent, setSelectedInvitationEvent] = useState<CalendarEventType | null>(null);
     const [seenEventIds, setSeenEventIds] = useState<number[]>(() => {
         const saved = localStorage.getItem('seen_event_notifications');
@@ -518,6 +519,7 @@ export function useCalendar() {
         showRepeatSubmenu, setShowRepeatSubmenu,
         showDeclineModal, setShowDeclineModal,
         showRescheduleModal, setShowRescheduleModal,
+        isEventListOpen, setIsEventListOpen,
         selectedInvitationEvent, setSelectedInvitationEvent,
         seenEventIds,
         // data

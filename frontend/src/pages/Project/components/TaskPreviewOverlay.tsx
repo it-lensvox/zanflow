@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { X, Upload, Loader2, Users, ArrowLeft, CheckCircle2 } from 'lucide-react';
-import { getStatusConfig } from '@/components/layout/DualView/taskConfig';
 import { getPriorityConfig } from '@/config/priorityConfig';
 import type { PreviewTask } from '@/hooks/useJsonPreview';
 
@@ -16,13 +15,13 @@ function PriorityBadge({ priority }: { priority?: string }) {
 
 // ─── Status badge 
 const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  pending:     { bg: '#FFF9EC', text: '#B45309', label: 'Pending' },
-  backlog:     { bg: '#FFF4ED', text: '#C2410C', label: 'Backlog' },
-  in_progress: { bg: '#EEF2FF', text: '#4338CA', label: 'In Progress' },
-  completed:   { bg: '#F0FDF4', text: '#15803D', label: 'Completed' },
-  deployed:    { bg: '#F5F3FF', text: '#7C3AED', label: 'Deployed' },
-  deferred:    { bg: '#F9FAFB', text: '#6B7280', label: 'Deferred' },
-  review:      { bg: '#EFF6FF', text: '#1D4ED8', label: 'Review' },
+  pending:     { bg: 'rgba(180,83,9,0.12)',   text: '#B45309', label: 'Pending' },
+  backlog:     { bg: 'rgba(194,65,12,0.12)',  text: '#C2410C', label: 'Backlog' },
+  in_progress: { bg: 'rgba(67,56,202,0.12)',  text: '#6366F1', label: 'In Progress' },
+  completed:   { bg: 'rgba(21,128,61,0.12)',  text: '#16a34a', label: 'Completed' },
+  deployed:    { bg: 'rgba(124,58,237,0.12)', text: '#7C3AED', label: 'Deployed' },
+  deferred:    { bg: 'rgba(107,114,128,0.12)',text: '#6B7280', label: 'Deferred' },
+  review:      { bg: 'rgba(29,78,216,0.12)',  text: '#3B82F6', label: 'Review' },
 };
 
 function StatusBadge({ status }: { status?: string }) {
@@ -61,19 +60,19 @@ function TaskPreviewCard({ task, index, onRemove, onEditTitle }: TaskPreviewCard
 
   return (
     <div style={{
-      background: '#fff',
-      border: '1px solid #E6EBF2',
+      background: 'hsl(var(--card))',
+      border: '1px solid hsl(var(--border))',
       borderRadius: 12,
       padding: '14px 14px 12px',
       display: 'flex',
       flexDirection: 'column',
       gap: 10,
       position: 'relative',
-      boxShadow: '0 1px 4px rgba(16,24,40,.06)',
+      boxShadow: '0 1px 4px rgba(0,0,0,.08)',
       transition: 'box-shadow 0.18s',
     }}
-      onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 16px rgba(16,24,40,.10)')}
-      onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 1px 4px rgba(16,24,40,.06)')}
+      onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,.16)')}
+      onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,.08)')}
     >
       {/* Remove button */}
       <button
@@ -84,17 +83,17 @@ function TaskPreviewCard({ task, index, onRemove, onEditTitle }: TaskPreviewCard
           width: 22, height: 22, borderRadius: '50%',
           border: 'none', background: 'transparent', cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#9CA3AF', transition: 'background 0.15s, color 0.15s',
+          color: 'hsl(var(--muted-foreground))', transition: 'background 0.15s, color 0.15s',
         }}
         onMouseEnter={e => { e.currentTarget.style.background = '#FEE2E2'; e.currentTarget.style.color = '#EF4444'; }}
-        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#9CA3AF'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'hsl(var(--muted-foreground))'; }}
       >
         <X size={13} strokeWidth={2.5} />
       </button>
 
       {/* Task number */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', letterSpacing: '0.05em' }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: 'hsl(var(--muted-foreground))', letterSpacing: '0.05em' }}>
           TASK {index + 1}
         </span>
       </div>
@@ -108,10 +107,10 @@ function TaskPreviewCard({ task, index, onRemove, onEditTitle }: TaskPreviewCard
           onBlur={commitTitle}
           onKeyDown={e => { if (e.key === 'Enter') commitTitle(); if (e.key === 'Escape') { setTitleValue(task.heading); setIsEditingTitle(false); } }}
           style={{
-            fontSize: 14, fontWeight: 600, color: '#172033',
+            fontSize: 14, fontWeight: 600, color: 'hsl(var(--foreground))',
             border: '1.5px solid #6366F1', borderRadius: 6,
             padding: '4px 8px', outline: 'none', width: '100%',
-            background: '#F5F7FF', fontFamily: 'inherit',
+            background: 'hsl(var(--input))', fontFamily: 'inherit',
           }}
         />
       ) : (
@@ -119,23 +118,23 @@ function TaskPreviewCard({ task, index, onRemove, onEditTitle }: TaskPreviewCard
           onClick={() => setIsEditingTitle(true)}
           title="Click to edit title"
           style={{
-            fontSize: 14, fontWeight: 600, color: '#172033',
+            fontSize: 14, fontWeight: 600, color: 'hsl(var(--foreground))',
             lineHeight: 1.4, paddingRight: 20, cursor: 'text',
             borderRadius: 6, padding: '4px 6px', margin: '-4px -6px',
             transition: 'background 0.15s',
           }}
-          onMouseEnter={e => (e.currentTarget.style.background = '#F7F8FB')}
+          onMouseEnter={e => (e.currentTarget.style.background = 'hsl(var(--accent))')}
           onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
         >
           {task.heading}
-          <span style={{ marginLeft: 6, fontSize: 10, color: '#9CA3AF', fontWeight: 400 }}>✎</span>
+          <span style={{ marginLeft: 6, fontSize: 10, color: 'hsl(var(--muted-foreground))', fontWeight: 400 }}>✎</span>
         </div>
       )}
 
       {/* Description */}
       {task.description && (
         <p style={{
-          fontSize: 12, color: '#667085', lineHeight: 1.5,
+          fontSize: 12, color: 'hsl(var(--muted-foreground))', lineHeight: 1.5,
           margin: 0, overflow: 'hidden',
           display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
         } as React.CSSProperties}>
@@ -153,7 +152,7 @@ function TaskPreviewCard({ task, index, onRemove, onEditTitle }: TaskPreviewCard
       {emails.length > 0 && (
         <div style={{ position: 'relative' }}>
           {emails.length === 1 ? (
-            <span style={{ fontSize: 11, color: '#667085', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontSize: 11, color: 'hsl(var(--muted-foreground))', display: 'flex', alignItems: 'center', gap: 4 }}>
               <Users size={11} /> {emails[0]}
             </span>
           ) : (
@@ -212,9 +211,10 @@ export function TaskPreviewOverlay({
       <div style={{
         width: '100%', maxWidth: 860,
         maxHeight: 'calc(100vh - 48px)',
-        background: '#F7F8FB',
+        background: 'hsl(var(--background))',
+        border: '1px solid hsl(var(--border))',
         borderRadius: 18,
-        boxShadow: '0 24px 60px rgba(16,24,40,.22)',
+        boxShadow: '0 24px 60px rgba(0,0,0,.35)',
         display: 'flex', flexDirection: 'column',
         overflow: 'hidden',
       }}>
@@ -223,8 +223,8 @@ export function TaskPreviewOverlay({
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '18px 22px',
-          background: '#fff',
-          borderBottom: '1px solid #E6EBF2',
+          background: 'hsl(var(--card))',
+          borderBottom: '1px solid hsl(var(--border))',
           flexShrink: 0,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -232,27 +232,27 @@ export function TaskPreviewOverlay({
               onClick={onBack}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
-                fontSize: 13, fontWeight: 600, color: '#667085',
-                background: 'none', border: '1px solid #E6EBF2',
+                fontSize: 13, fontWeight: 600, color: 'hsl(var(--muted-foreground))',
+                background: 'none', border: '1px solid hsl(var(--border))',
                 borderRadius: 8, padding: '6px 12px', cursor: 'pointer',
                 transition: 'all 0.15s',
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#F7F8FB'; e.currentTarget.style.color = '#344054'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = '#667085'; }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'hsl(var(--accent))'; e.currentTarget.style.color = 'hsl(var(--foreground))'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'hsl(var(--muted-foreground))'; }}
             >
               <ArrowLeft size={14} /> Back to Import
             </button>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 16, fontWeight: 800, color: '#172033' }}>Preview Tasks</span>
+                <span style={{ fontSize: 16, fontWeight: 800, color: 'hsl(var(--foreground))' }}>Preview Tasks</span>
                 <span style={{
                   fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20,
-                  background: '#EEF2FF', color: '#4338CA',
+                  background: 'rgba(67,56,202,0.12)', color: '#6366F1',
                 }}>
                   {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}
                 </span>
               </div>
-              <p style={{ margin: 0, fontSize: 12, color: '#667085', marginTop: 2 }}>
+              <p style={{ margin: 0, fontSize: 12, color: 'hsl(var(--muted-foreground))', marginTop: 2 }}>
                 Edit titles, remove unwanted tasks, then create.
               </p>
             </div>
@@ -264,8 +264,8 @@ export function TaskPreviewOverlay({
             style={{
               display: 'flex', alignItems: 'center', gap: 8,
               padding: '9px 22px', borderRadius: 9, border: 'none',
-              background: tasks.length === 0 ? '#E5E7EB' : 'linear-gradient(135deg,#5568d3,#65408b)',
-              color: tasks.length === 0 ? '#9CA3AF' : '#fff',
+              background: tasks.length === 0 ? 'hsl(var(--muted))' : 'linear-gradient(135deg,#5568d3,#65408b)',
+              color: tasks.length === 0 ? 'hsl(var(--muted-foreground))' : '#fff',
               fontSize: 14, fontWeight: 700, cursor: tasks.length === 0 || isCreating ? 'not-allowed' : 'pointer',
               opacity: isCreating ? 0.75 : 1,
               boxShadow: tasks.length > 0 ? '0 2px 8px rgba(101,64,139,.30)' : 'none',
@@ -282,9 +282,9 @@ export function TaskPreviewOverlay({
         {/* ── Grid of cards ── */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 22px 24px' }}>
           {tasks.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '48px 0', color: '#9CA3AF' }}>
-              <CheckCircle2 size={40} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
-              <p style={{ fontSize: 14, fontWeight: 500 }}>All tasks removed</p>
+           <div style={{ textAlign: 'center', padding: '48px 0', color: 'hsl(var(--muted-foreground))' }}>
+              <CheckCircle2 size={40} style={{ margin: '0 auto 12px', opacity: 0.4 }} />
+              <p style={{ fontSize: 14, fontWeight: 500, color: 'hsl(var(--foreground))' }}>All tasks removed</p>
               <p style={{ fontSize: 12, marginTop: 4 }}>Go back to import more.</p>
             </div>
           ) : (

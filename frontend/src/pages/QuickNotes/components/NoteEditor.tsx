@@ -149,7 +149,7 @@ export function NoteEditor({ selectedNote, isPending = false, isReadOnly = false
 
   if (!selectedNote && !isPending) {
     return (
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', background: '#fff', gap: 12 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'hsl(var(--muted-foreground))', background: 'hsl(var(--card))', gap: 12 }}>
         <FileText style={{ width: 36, height: 36 }} />
         <p style={{ fontSize: 14 }}>Select or create a note</p>
       </div>
@@ -157,39 +157,39 @@ export function NoteEditor({ selectedNote, isPending = false, isReadOnly = false
   }
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#fff', overflow: 'hidden' }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'hsl(var(--card))', overflow: 'hidden' }}>
       {/* Note header */}
-      <div style={{ padding: '20px 32px 12px', flexShrink: 0, borderBottom: '1px solid #e6ebf2' }} className="group">
+      <div style={{ padding: '20px 32px 12px', flexShrink: 0, borderBottom: '1px solid hsl(var(--border))' }} className="group">
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
           <div style={{ flex: 1, minWidth: 0, paddingRight: 16 }}>
             {isEditingTitle && selectedNote ? (
               <input ref={titleInputRef} value={titleVal} onChange={e => setTitleVal(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') commitTitle(); if (e.key === 'Escape') setIsEditingTitle(false); }}
                 onBlur={commitTitle}
-                style={{ width: '100%', fontSize: 18, fontWeight: 600, color: '#172033', background: 'transparent', border: 'none', borderBottom: '1px solid #1663f6', outline: 'none', padding: '0 0 2px' }} placeholder="Note title…" />
+                style={{ width: '100%', fontSize: 18, fontWeight: 600, color: 'hsl(var(--foreground))', background: 'transparent', border: 'none', borderBottom: '1px solid #4169FF', outline: 'none', padding: '0 0 2px' }} placeholder="Note title…" />
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <p style={{ fontSize: 18, fontWeight: 600, color: '#172033', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <p style={{ fontSize: 18, fontWeight: 600, color: 'hsl(var(--foreground))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {selectedNote ? getNoteTitle(selectedNote) : 'New Note'}
                 </p>
                 {selectedNote && !isPending && !isReadOnly && (
                   <button onClick={startEditingTitle} title="Rename"
                     className="opacity-0 group-hover:opacity-100 transition-opacity"
-                    style={{ padding: 4, color: '#667085', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 4, display: 'flex' }}
-                    onMouseEnter={e => { e.currentTarget.style.background = '#f3f4f6'; e.currentTarget.style.color = '#172033'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = '#667085'; }}>
+                    style={{ padding: 4, color: 'hsl(var(--muted-foreground))', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 4, display: 'flex' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'hsl(var(--accent))'; e.currentTarget.style.color = 'hsl(var(--foreground))'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'hsl(var(--muted-foreground))'; }}>
                     <Pencil style={{ width: 14, height: 14 }} />
                   </button>
                 )}
               </div>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-              <p style={{ fontSize: 11, color: '#667085' }}>{selectedNote ? formatRelativeTime(selectedNote.updated_at) : 'Start typing to save…'}</p>
+              <p style={{ fontSize: 11, color: 'hsl(var(--muted-foreground))' }}>{selectedNote ? formatRelativeTime(selectedNote.updated_at) : 'Start typing to save…'}</p>
               {selectedNote?.updated_by && (() => {
                 const u = users.find(user => user.id === selectedNote.updated_by);
                 const name = u?.first_name ? `${u.first_name} ${u.last_name || ''}`.trim() : (u?.username || 'User');
                 return (
-                  <span style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 4, background: '#f3f4f6', padding: '2px 7px', borderRadius: 4, color: '#667085' }}>
+                  <span style={{ fontSize: 10, display: 'flex', alignItems: 'center', gap: 4, background: 'hsl(var(--muted))', padding: '2px 7px', borderRadius: 4, color: 'hsl(var(--muted-foreground))' }}>
                     <NotebookPen style={{ width: 10, height: 10 }} />Last edited by {name}
                   </span>
                 );
@@ -200,9 +200,9 @@ export function NoteEditor({ selectedNote, isPending = false, isReadOnly = false
             <div style={{ flexShrink: 0, marginLeft: 16 }}>
               <input type="file" ref={fileInputRef} onChange={handleFileSelect} style={{ display: 'none' }} accept="*/*" multiple />
               <button onClick={() => fileInputRef.current?.click()} disabled={isUploading} title="Upload attachment"
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 6, border: 'none', background: 'none', cursor: 'pointer', color: '#667085' }}
-                onMouseEnter={e => { e.currentTarget.style.background = '#f3f4f6'; e.currentTarget.style.color = '#172033'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = '#667085'; }}>
+               style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 5, borderRadius: 5, border: 'none', background: 'none', cursor: 'pointer', color: 'hsl(var(--muted-foreground))' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'hsl(var(--accent))'; e.currentTarget.style.color = 'hsl(var(--foreground))'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'hsl(var(--muted-foreground))'; }}>
                 {isUploading ? <Loader2 style={{ width: 16, height: 16, animation: 'spin 1s linear infinite' }} /> : <Paperclip style={{ width: 16, height: 16 }} />}
               </button>
             </div>
@@ -212,7 +212,7 @@ export function NoteEditor({ selectedNote, isPending = false, isReadOnly = false
 
       {/* Formatting toolbar */}
       {!isReadOnly && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '6px 32px', borderBottom: '1px solid #e6ebf2', background: '#fafafa', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '6px 32px', borderBottom: '1px solid hsl(var(--border))', background: 'hsl(var(--muted))', flexShrink: 0 }}>
           {[
             { icon: <Bold style={{ width: 15, height: 15 }} />, label: 'Bold',           action: () => applyFormatting('**', '**') },
             { icon: <Italic style={{ width: 15, height: 15 }} />, label: 'Italic',         action: () => applyFormatting('*', '*') },
@@ -220,7 +220,7 @@ export function NoteEditor({ selectedNote, isPending = false, isReadOnly = false
             { icon: <List style={{ width: 15, height: 15 }} />, label: 'Bullet List',    action: () => applyFormatting('- ') },
             { icon: <ListOrdered style={{ width: 15, height: 15 }} />, label: 'Numbered List', action: () => applyFormatting('1. ') },
           ].map((btn, i) => btn === null ? (
-            <div key={i} style={{ width: 1, height: 14, background: '#e6ebf2', margin: '0 4px' }} />
+            <div key={i} style={{ width: 1, height: 14, background: 'hsl(var(--border))', margin: '0 4px' }} />
           ) : (
             <button key={btn.label} onClick={btn.action} title={btn.label}
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 5, borderRadius: 5, border: 'none', background: 'none', cursor: 'pointer', color: '#667085' }}
@@ -238,31 +238,31 @@ export function NoteEditor({ selectedNote, isPending = false, isReadOnly = false
           autoFocus={isPending} readOnly={isReadOnly} disabled={isReadOnly}
           placeholder={isReadOnly ? 'This note is read-only.' : 'Start writing…'}
           spellCheck
-          style={{ flex: 1, resize: 'none', background: 'transparent', fontSize: 14, color: '#172033', padding: '20px 32px 32px', border: 'none', outline: 'none', lineHeight: 1.7, fontFamily: 'inherit', cursor: isReadOnly ? 'not-allowed' : 'text', opacity: isReadOnly ? 0.75 : 1 }} />
+          style={{ flex: 1, resize: 'none', background: 'transparent', fontSize: 14, color: 'hsl(var(--foreground))', padding: '20px 32px 32px', border: 'none', outline: 'none', lineHeight: 1.7, fontFamily: 'inherit', cursor: isReadOnly ? 'not-allowed' : 'text', opacity: isReadOnly ? 0.75 : 1 }} />
 
         {selectedNote?.attachments && selectedNote.attachments.length > 0 && (
-          <div style={{ width: 260, flexShrink: 0, borderLeft: '1px solid #e6ebf2', background: '#fafafa', padding: 16, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <h4 style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.08em', color: '#667085', marginBottom: 4 }}>
+          <div style={{ width: 260, flexShrink: 0, borderLeft: '1px solid hsl(var(--border))', background: 'hsl(var(--muted))', padding: 16, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <h4 style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.08em', color: 'hsl(var(--muted-foreground))', marginBottom: 4 }}>
               Attachments ({selectedNote.attachments.length})
             </h4>
             {selectedNote.attachments.map(attachment => (
               <div key={attachment.id} style={{ position: 'relative' }} className="group">
                 <button type="button" onClick={() => setPreviewAttachment(attachment)}
-                  style={{ width: '100%', display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px', borderRadius: 8, border: '1px solid #e6ebf2', background: '#fff', cursor: 'pointer', textAlign: 'left', paddingRight: 36 }}
+                  style={{ width: '100%', display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px', borderRadius: 8, border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))', cursor: 'pointer', textAlign: 'left', paddingRight: 36 }}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = '#1663f6'; }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = '#e6ebf2'; }}>
                   <FileText style={{ width: 16, height: 16, color: '#1663f6', flexShrink: 0, marginTop: 2 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: 13, fontWeight: 500, color: '#172033', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{attachment.filename}</p>
-                    <p style={{ fontSize: 10, color: '#667085', marginTop: 2 }}>{new Date(attachment.created_at).toLocaleDateString()}</p>
+                    <p style={{ fontSize: 13, fontWeight: 500, color: 'hsl(var(--foreground))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{attachment.filename}</p>
+                    <p style={{ fontSize: 10, color: 'hsl(var(--muted-foreground))', marginTop: 2 }}>{new Date(attachment.created_at).toLocaleDateString()}</p>
                   </div>
                 </button>
                 {!isReadOnly && (
                   <button onClick={e => { e.stopPropagation(); setAttachmentToDelete({ id: attachment.id, name: attachment.filename }); }}
                     title="Delete" className="opacity-0 group-hover:opacity-100 transition-opacity"
-                    style={{ position: 'absolute', top: 8, right: 8, padding: 4, color: '#667085', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 4, display: 'flex' }}
-                    onMouseEnter={e => { e.currentTarget.style.background = '#fef2f2'; e.currentTarget.style.color = '#ef4444'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = '#667085'; }}>
+                    style={{ position: 'absolute', top: 8, right: 8, padding: 4, color: 'hsl(var(--muted-foreground))', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 4, display: 'flex' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#ef444418'; e.currentTarget.style.color = '#ef4444'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = 'hsl(var(--muted-foreground))'; }}>
                     <Trash2 style={{ width: 14, height: 14 }} />
                   </button>
                 )}

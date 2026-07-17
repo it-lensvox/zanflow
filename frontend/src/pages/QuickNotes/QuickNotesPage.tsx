@@ -34,12 +34,12 @@ export function QuickNotesPage() {
   }, [location.state, state.isLoading]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#fff', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'hsl(var(--background))', overflow: 'hidden' }}>
 
       {/* ── Header ── */}
       <div
         className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40"
-       style={{ flexShrink: 0, background: '#fff', borderBottom: `1px solid ${LINE}`, paddingTop: 16, paddingBottom: 16 }}
+       style={{ flexShrink: 0, background: 'hsl(var(--card))', borderBottom: `1px solid ${LINE}`, paddingTop: 16, paddingBottom: 16 }}
       >
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div>
@@ -53,9 +53,9 @@ export function QuickNotesPage() {
           <div className="flex items-center gap-2 flex-wrap" style={{ paddingTop: 4 }}>
             <button
               onClick={() => setTriggerFolderCreate(true)}
-              style={{ height: 40, display: 'flex', alignItems: 'center', gap: 8, padding: '0 18px', border: `1px solid ${LINE}`, borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 16, fontWeight: 600, color: TEXT, whiteSpace: 'nowrap' }}
-              onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
-              onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+              style={{ height: 40, display: 'flex', alignItems: 'center', gap: 8, padding: '0 18px', border: `1px solid ${LINE}`, borderRadius: 8, background: 'hsl(var(--muted))', cursor: 'pointer', fontSize: 16, fontWeight: 600, color: TEXT, whiteSpace: 'nowrap' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'hsl(var(--accent))'}
+              onMouseLeave={e => e.currentTarget.style.background = 'hsl(var(--muted))'}
             >
               <FolderPlus size={15} /> New Folder
             </button>
@@ -76,7 +76,7 @@ export function QuickNotesPage() {
         className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40"
         style={{ flex: 1, overflowY: 'hidden', paddingTop: 20, paddingBottom: 20, display: 'flex' }}
       >
-        <div style={{ flex: 1, borderRadius: 12, border: `1px solid ${LINE}`, overflow: 'hidden', background: '#fff', display: 'flex', flexDirection: 'column', boxShadow: '0 1px 4px rgba(16,24,40,.06)' }}>
+        <div style={{ flex: 1, borderRadius: 12, border: `1px solid ${LINE}`, overflow: 'hidden', background: 'hsl(var(--card))', display: 'flex', flexDirection: 'column', boxShadow: '0 1px 4px rgba(0,0,0,.08)' }}>
           <QuickNotesContent
             state={state}
             getNotesForFolder={getNotesForFolder}

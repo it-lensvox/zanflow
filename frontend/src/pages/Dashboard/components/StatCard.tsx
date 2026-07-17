@@ -39,7 +39,7 @@ export function StatCard({ label, value, change, sub, up, color, icon, sparkData
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 10 }}>
             {up ? <TrendingUp size={11} color="#22C55E" /> : <TrendingDown size={11} color="#EF4444" />}
             <span style={{ fontSize: 11, fontWeight: 700, color: up ? '#22C55E' : '#EF4444' }}>{change}</span>
-            <span style={{ fontSize: 11, color: '#9CA3AF' }}>{sub}</span>
+            <span style={{ fontSize: 11, color: MUTED }}>{sub}</span>
           </div>
         )
       }

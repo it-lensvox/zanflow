@@ -9,9 +9,9 @@ type PreviewTab = 'preview' | 'details' | 'activity' | 'comments';
 
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between" style={{ padding: '10px 0', borderBottom: '1px solid #e5e7eb' }}>
-      <span style={{ fontSize: 13, color: '#6b7280' }}>{label}</span>
-      <span style={{ fontSize: 13, color: '#1a1a1a', fontWeight: 500, textAlign: 'right', maxWidth: '60%' }}>{value}</span>
+   <div className="flex items-center justify-between" style={{ padding: '10px 0', borderBottom: '1px solid hsl(var(--border))' }}>
+      <span style={{ fontSize: 13, color: 'hsl(var(--muted-foreground))' }}>{label}</span>
+      <span style={{ fontSize: 13, color: 'hsl(var(--foreground))', fontWeight: 500, textAlign: 'right', maxWidth: '60%' }}>{value}</span>
     </div>
   );
 }
@@ -97,18 +97,18 @@ export function SidePreviewPanel({ doc, previewUrl, onClose, onOpenFull }: SideP
   ];
 
   return (
-    <div className="flex-shrink-0 flex flex-col" style={{ width: 380, borderLeft: '1px solid #e5e7eb', background: '#fff' }}>
-      <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #e5e7eb' }}>
+    <div className="flex-shrink-0 flex flex-col" style={{ width: 380, borderLeft: '1px solid hsl(var(--border))', background: 'hsl(var(--card))' }}>
+      <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid hsl(var(--border))' }}>
         <div className="flex items-center gap-3 min-w-0">
           <div className="rounded flex items-center justify-center text-white flex-shrink-0" style={{ width: 32, height: 40, background: ib }}><FileText className="w-4 h-4" /></div>
-          <span style={{ fontWeight: 600, fontSize: 14, color: '#1a1a1a' }} className="truncate">{fn}</span>
+          <span style={{ fontWeight: 600, fontSize: 14, color: 'hsl(var(--foreground))' }} className="truncate">{fn}</span>
         </div>
-        <button onClick={onClose} style={{ color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}><X className="w-4 h-4" /></button>
+        <button onClick={onClose} style={{ color: 'hsl(var(--muted-foreground))', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}><X className="w-4 h-4" /></button>
       </div>
-      <div style={{ borderBottom: '1px solid #e5e7eb', padding: '0 20px' }}>
+      <div style={{ borderBottom: '1px solid hsl(var(--border))', padding: '0 20px' }}>
         <div className="flex gap-5">
           {tabs.map(t => (
-            <button key={t.k} onClick={() => setTab(t.k)} className="flex items-center gap-1.5" style={{ padding: '8px 4px', fontSize: 14, fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', color: tab === t.k ? '#1a1a1a' : '#6b7280', borderBottom: `2px solid ${tab === t.k ? '#4169FF' : 'transparent'}` }}>
+            <button key={t.k} onClick={() => setTab(t.k)} className="flex items-center gap-1.5" style={{ padding: '8px 4px', fontSize: 14, fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', color: tab === t.k ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))', borderBottom: `2px solid ${tab === t.k ? '#4169FF' : 'transparent'}` }}>
               {t.l}{t.badge && <span className="rounded-full" style={{ background: '#EF4444', color: '#fff', fontSize: 11, fontWeight: 600, padding: '2px 6px', marginLeft: 6 }}>{t.badge}</span>}
             </button>
           ))}
@@ -116,33 +116,34 @@ export function SidePreviewPanel({ doc, previewUrl, onClose, onOpenFull }: SideP
       </div>
       <div className="flex-1 overflow-y-auto p-5">
         {tab === 'preview' && (<>
-          <div className="rounded-lg overflow-hidden mb-5" style={{ border: '1px solid #e5e7eb' }}>
+         <div className="rounded-lg overflow-hidden mb-5" style={{ border: '1px solid hsl(var(--border))' }}>
             {previewUrl && (ext === 'pdf' || doc.file_type?.includes('pdf')) ? (
               <div><iframe src={`https://docs.google.com/viewer?url=${encodeURIComponent(previewUrl)}&embedded=true`} className="w-full border-0" style={{ height: 400 }} title={fn} />
-                <div className="flex items-center justify-center gap-3 py-3" style={{ background: '#f9fafb', borderTop: '1px solid #e5e7eb', fontSize: 13, color: '#6b7280' }}>
-                  <button style={{ padding: 4, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer' }}><ZoomOut className="w-3.5 h-3.5" /></button><span>1 / 12</span><button style={{ padding: 4, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer' }}><ZoomIn className="w-3.5 h-3.5" /></button>
+                <div className="flex items-center justify-center gap-3 py-3" style={{ background: 'hsl(var(--muted))', borderTop: '1px solid hsl(var(--border))', fontSize: 13, color: 'hsl(var(--muted-foreground))' }}>
+                  <button style={{ padding: 4, color: 'hsl(var(--muted-foreground))', background: 'none', border: 'none', cursor: 'pointer' }}></button>
                 </div></div>
             ) : previewUrl && ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(ext) ? (
-              <div className="p-4 flex items-center justify-center" style={{ background: '#f9fafb', minHeight: 300 }}><img src={previewUrl} alt={fn} className="max-w-full max-h-[300px] object-contain rounded" /></div>
+              <div className="p-4 flex items-center justify-center" style={{ background: 'hsl(var(--muted))', minHeight: 300 }}><img src={previewUrl} alt={fn} className="max-w-full max-h-[300px] object-contain rounded" /></div>
             ) : (
-              <div className="p-8 flex flex-col items-center justify-center text-center" style={{ background: '#fff', minHeight: 300 }}>
+              <div className="p-8 flex flex-col items-center justify-center text-center" style={{ background: 'hsl(var(--card))', minHeight: 300 }}>
                 <div className="rounded-lg flex items-center justify-center text-white mb-3" style={{ width: 64, height: 80, background: ib }}><FileText className="w-6 h-6" /></div>
-                <p style={{ fontSize: 14, fontWeight: 500, color: '#1a1a1a', marginBottom: 4 }}>{fn}</p><p style={{ fontSize: 12, color: '#6b7280' }}>Click "Open Document" to view full preview</p>
+                <p style={{ fontSize: 14, fontWeight: 500, color: 'hsl(var(--foreground))', marginBottom: 4 }}>{fn}</p><p style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))' }}>Click "Open Document" to view full preview</p>
               </div>)}
           </div>
           <div>
             <DetailRow label="Type" value={ext.toUpperCase() || doc.file_type || 'Unknown'} />
             <DetailRow label="Status" value={<span className="inline-flex rounded-full" style={{ padding: '4px 12px', fontSize: 12, fontWeight: 500, background: ss.bg, color: ss.text }}>{ss.label}</span>} />
-            <DetailRow label="Project" value={<span className="inline-flex items-center gap-1.5 rounded-md" style={{ padding: '4px 10px', background: '#EEF2FF', color: '#4F46E5', fontSize: 13 }}><Folder className="w-3 h-3" />{doc.project_name || 'General'}</span>} />
+            <DetailRow label="Project" value={<span className="inline-flex items-center gap-1.5 rounded-md" style={{ padding: '4px 10px', background: 'rgba(99,102,241,0.12)', color: '#6366f1', fontSize: 13 }}><Folder className="w-3 h-3" />{doc.project_name || 'General'}</span>} />
             <DetailRow label="Owner" value={doc.created_by?.full_name || 'System'} />
             <DetailRow label="Created" value={fmtS(doc.created_at)} />
             <DetailRow label="Updated" value={fmtD(doc.updated_at)} />
-            {doc.labels && doc.labels.length > 0 && <DetailRow label="Tags" value={<div className="flex flex-wrap gap-1.5 justify-end">{doc.labels.slice(0, 2).map(l => <span key={l.id} className="rounded-md" style={{ padding: '4px 10px', fontSize: 12, fontWeight: 500, background: l.color ? `${l.color}20` : '#F3E8FF', color: l.color || '#7C3AED' }}>{l.name}</span>)}{doc.labels.length > 2 && <span className="rounded-md" style={{ padding: '4px 8px', fontSize: 12, fontWeight: 500, background: '#F3F4F6', color: '#6B7280' }}>+{doc.labels.length - 2}</span>}</div>} />}
+            {doc.labels && doc.labels.length > 0 && <DetailRow label="Tags" value={<div className="flex flex-wrap gap-1.5 justify-end">{doc.labels.slice(0, 2).map(l => <span key={l.id} className="rounded-md" style={{ padding: '4px 10px', fontSize: 12, fontWeight: 500, background: l.color ? `${l.color}20` : '#F3E8FF', color: l.color || '#7C3AED' }}>{l.name}</span>)}
+            {doc.labels.length > 2 && <span className="rounded-md" style={{ padding: '4px 8px', fontSize: 12, fontWeight: 500, background: 'hsl(var(--muted))', color: 'hsl(var(--muted-foreground))' }}>+{doc.labels.length - 2}</span>}</div>} />}
           </div>
           <button onClick={onOpenFull} className="w-full mt-5 rounded-lg flex items-center justify-center gap-2" style={{ padding: 12, background: '#4169FF', color: '#fff', border: 'none', fontWeight: 600, fontSize: 14, cursor: 'pointer' }} onMouseEnter={e => { e.currentTarget.style.background = '#3554CC'; }} onMouseLeave={e => { e.currentTarget.style.background = '#4169FF'; }}><ExternalLink className="w-4 h-4" />Open Document</button>
         </>)}
         {tab === 'details' && <div>
-          <DetailRow label="File Name" value={<span style={{ fontWeight: 500, color: '#1a1a1a', wordBreak: 'break-all' as const }}>{fn}</span>} />
+          <DetailRow label="File Name" value={<span style={{ fontWeight: 500, color: 'hsl(var(--foreground))', wordBreak: 'break-all' as const }}>{fn}</span>} />
           <DetailRow label="Type" value={ext.toUpperCase() || 'Unknown'} />
           <DetailRow label="Status" value={<span className="inline-flex rounded-full" style={{ padding: '4px 12px', fontSize: 12, fontWeight: 500, background: ss.bg, color: ss.text }}>{ss.label}</span>} />
           <DetailRow label="Project" value={doc.project_name || 'General'} />
@@ -164,12 +165,12 @@ export function SidePreviewPanel({ doc, previewUrl, onClose, onOpenFull }: SideP
                   {activity.type === 'commented' && <div className="rounded-full flex items-center justify-center" style={{ width: 32, height: 32, background: '#FCE7F3' }}><MessageSquare className="w-4 h-4" style={{ color: '#EC4899' }} /></div>}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p style={{ fontSize: 13, color: '#1a1a1a', fontWeight: 500, marginBottom: 2 }}>{activity.description}</p>
-                  <div className="flex items-center gap-2"><span style={{ fontSize: 12, color: '#6b7280' }}>{activity.user?.full_name || 'System'}</span><span style={{ color: '#e5e7eb' }}>•</span><span style={{ fontSize: 12, color: '#6b7280' }}>{new Date(activity.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span></div>
+                  <p style={{ fontSize: 13, color: 'hsl(var(--foreground))', fontWeight: 500, marginBottom: 2 }}>{activity.description}</p>
+                  <div className="flex items-center gap-2"><span style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))' }}>{activity.user?.full_name || 'System'}</span><span style={{ color: 'hsl(var(--border))' }}>•</span><span style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))' }}>{new Date(activity.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span></div>
                 </div>
               </div>
             )) : (
-              <div className="flex flex-col items-center justify-center py-12 text-center"><Clock className="w-10 h-10 mb-3" style={{ color: '#e5e7eb' }} /><p style={{ fontSize: 14, fontWeight: 500, color: '#6b7280' }}>No activity yet</p></div>
+              <div className="flex flex-col items-center justify-center py-12 text-center"><Clock className="w-10 h-10 mb-3" style={{ color: 'hsl(var(--muted-foreground))' }} /><p style={{ fontSize: 14, fontWeight: 500, color: 'hsl(var(--muted-foreground))' }}>No activity yet</p></div>
             )}
           </div>
         )}
@@ -182,14 +183,14 @@ export function SidePreviewPanel({ doc, previewUrl, onClose, onOpenFull }: SideP
                     {comment.user?.full_name?.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || 'U'}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="rounded-lg" style={{ background: '#f9fafb', padding: '10px 12px' }}>
-                      <div className="flex items-center gap-2 mb-1"><span style={{ fontSize: 13, fontWeight: 600, color: '#1a1a1a' }}>{comment.user?.full_name || 'Anonymous'}</span><span style={{ fontSize: 12, color: '#6b7280' }}>{new Date(comment.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span></div>
+                    <div className="rounded-lg" style={{ background: 'hsl(var(--muted))', padding: '10px 12px' }}>
+                      <div className="flex items-center gap-2 mb-1"><span style={{ fontSize: 13, fontWeight: 600, color: 'hsl(var(--foreground))' }}>{comment.user?.full_name || 'Anonymous'}</span><span style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))' }}>{new Date(comment.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span></div>
                       <p style={{ fontSize: 13, color: '#374151', lineHeight: '1.5' }}>{renderCommentWithMentions(comment.content)}</p>
                     </div>
                   </div>
                 </div>
               )) : (
-                <div className="flex flex-col items-center justify-center py-12 text-center"><MessageSquare className="w-10 h-10 mb-3" style={{ color: '#e5e7eb' }} /><p style={{ fontSize: 14, fontWeight: 500, color: '#6b7280' }}>No comments yet</p></div>
+                <div className="flex flex-col items-center justify-center py-12 text-center"><MessageSquare className="w-10 h-10 mb-3" style={{ color: 'hsl(var(--muted-foreground))' }} /><p style={{ fontSize: 14, fontWeight: 500, color: 'hsl(var(--muted-foreground))' }}>No comments yet</p></div>
               )}
             </div>
             <div className="pt-4 relative" style={{ borderTop: '1px solid #e5e7eb' }}>

@@ -46,7 +46,7 @@ export function AIBot() {
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden', borderRadius: 16 }}>
 
       {/* History sidebar */}
-      <div style={{ width: b.isHistoryOpen ? 240 : 0, flexShrink: 0, overflow: 'hidden', transition: 'width .25s ease', borderRight: b.isHistoryOpen ? '1px solid #1e293b' : 'none' }}>
+      <div style={{ width: b.isHistoryOpen ? 240 : 0, flexShrink: 0, overflow: 'hidden', transition: 'width .25s ease', borderRight: b.isHistoryOpen ? '1px solid hsl(var(--border))' : 'none' }}>
         {b.isHistoryOpen && (
           <HistoryPanel
             sessions={b.sessions}
@@ -98,7 +98,7 @@ export function AIBot() {
   if (b.isExpanded) {
     return (
       <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,.4)', backdropFilter: 'blur(4px)' }}>
-        <div style={{ width: b.isHistoryOpen ? 'min(1280px, calc(100vw - 48px))' : 'min(1040px, calc(100vw - 48px))', height: 'calc(100vh - 80px)', background: '#fff', borderRadius: 16, boxShadow: '0 25px 60px rgba(0,0,0,.25)', overflow: 'hidden', transition: 'width .25s ease' }}>
+        <div style={{ width: b.isHistoryOpen ? 'min(1280px, calc(100vw - 48px))' : 'min(1040px, calc(100vw - 48px))', height: 'calc(100vh - 80px)', background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 16, boxShadow: '0 25px 60px rgba(0,0,0,.35)', overflow: 'hidden', transition: 'width .25s ease' }}>
           {innerLayout}
         </div>
       </div>

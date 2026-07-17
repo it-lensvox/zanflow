@@ -58,7 +58,7 @@ function TaskDetailPageInner({ task, onDelete }: { task: Task; onDelete: (id: nu
     return (
         <div style={{ background: T.bg, minHeight: '100vh', fontFamily: '-apple-system,BlinkMacSystemFont,"Inter",system-ui,sans-serif' }}>
             {/* Page header */}
-            <div style={{ background: '#fff', borderBottom: `1px solid ${T.line}` }}>
+            <div style={{ background: 'hsl(var(--card))', borderBottom: `1px solid ${T.line}` }}>
                 <div className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 py-3.5 flex items-center justify-between gap-4">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
                         <Link to="/taskboard" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 34, height: 34, borderRadius: 8, border: `1px solid ${T.line}`, color: T.muted, flexShrink: 0, textDecoration: 'none' }}>
@@ -82,15 +82,15 @@ function TaskDetailPageInner({ task, onDelete }: { task: Task; onDelete: (id: nu
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                         <button onClick={handleSave} disabled={isSaving || !hasUnsavedChanges}
-                            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 16px', borderRadius: 8, border: 'none', background: isSaving || !hasUnsavedChanges ? '#e6ebf2' : '#172033', color: isSaving || !hasUnsavedChanges ? T.muted : '#fff', fontSize: 13, fontWeight: 600, cursor: isSaving || !hasUnsavedChanges ? 'not-allowed' : 'pointer', transition: 'background .15s' }}>
+                            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 16px', borderRadius: 8, border: 'none', background: isSaving || !hasUnsavedChanges ? 'hsl(var(--muted))' : '#1663f6', color: isSaving || !hasUnsavedChanges ? T.muted : '#fff', fontSize: 13, fontWeight: 600, cursor: isSaving || !hasUnsavedChanges ? 'not-allowed' : 'pointer', transition: 'background .15s' }}>
                             {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                             {isSaving ? 'Saving…' : 'Save changes'}
                         </button>
                         {(user?.role === 'admin' || task.assigned_by === user?.id) && (
                             <button onClick={() => setShowDeleteConfirm(true)}
-                                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 8, border: `1px solid ${T.line}`, background: '#fff', color: T.muted, cursor: 'pointer' }}
+                                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 8, border: `1px solid ${T.line}`, background: 'hsl(var(--muted))', color: T.muted, cursor: 'pointer' }}
                                 onMouseEnter={e => { e.currentTarget.style.background = '#fef2f2'; e.currentTarget.style.color = '#dc2626'; e.currentTarget.style.borderColor = '#fecaca'; }}
-                                onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = T.muted; e.currentTarget.style.borderColor = T.line; }}>
+                                onMouseLeave={e => { e.currentTarget.style.background = 'hsl(var(--muted))'; e.currentTarget.style.color = T.muted; e.currentTarget.style.borderColor = T.line; }}>
                                 <Trash2 size={15} />
                             </button>
                         )}

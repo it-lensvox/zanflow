@@ -89,7 +89,7 @@ function Dropdown({
       {open && (
         <div style={{
           position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 200,
-          background: '#fff', border: `1px solid ${LINE}`, borderRadius: 10,
+          background: 'hsl(var(--card))', border: `1px solid ${LINE}`, borderRadius: 10,
           boxShadow: '0 8px 24px rgba(0,0,0,.12)', minWidth: 180, overflow: 'hidden',
         }}>
           {children}
@@ -341,7 +341,7 @@ export function TodayTab({
     fontSize: 13,
     fontWeight: active ? 700 : 500,
     color: active ? TEXT : MUTED,
-    background: active ? '#fff' : 'transparent',
+    background: active ? 'hsl(var(--card))' : 'transparent',
     border: `1px solid ${active ? LINE : 'transparent'}`,
     borderRadius: 7,
     padding: '4px 10px',
@@ -355,7 +355,7 @@ export function TodayTab({
     fontSize: 12,
     fontWeight: active ? 700 : 500,
     color: active ? TEXT : MUTED,
-    background: active ? '#fff' : 'transparent',
+    background: active ? 'hsl(var(--card))' : 'transparent',
     border: `1px solid ${active ? LINE : 'transparent'}`,
     borderRadius: 6,
     padding: '3px 9px',
@@ -476,7 +476,7 @@ export function TodayTab({
                   onClick={() => { setGroupOpen(v => !v); setSortOpen(false); }}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 500,
-                    color: MUTED, background: '#fff', border: `1px solid ${LINE}`,
+                    color: MUTED, background: 'hsl(var(--card))', border: `1px solid ${LINE}`,
                     borderRadius: 7, padding: '5px 10px', cursor: 'pointer', fontFamily: 'inherit',
                   }}
                 >
@@ -496,7 +496,7 @@ export function TodayTab({
                     onClick={() => { setGroupBy(opt.key); setGroupOpen(false); }}
                     style={{
                       width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-                      padding: '9px 14px', border: 'none', background: groupBy === opt.key ? '#F7F8FB' : '#fff',
+                      padding: '9px 14px', border: 'none', background: groupBy === opt.key ? 'hsl(var(--accent))' : 'transparent',
                       cursor: 'pointer', fontSize: 14, color: TEXT, fontFamily: 'inherit',
                       justifyContent: 'space-between',
                     }}
@@ -520,7 +520,7 @@ export function TodayTab({
                   onClick={() => { setSortOpen(v => !v); setGroupOpen(false); }}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 500,
-                    color: MUTED, background: '#fff', border: `1px solid ${LINE}`,
+                    color: MUTED, background: 'hsl(var(--card))', border: `1px solid ${LINE}`,
                     borderRadius: 7, padding: '5px 10px', cursor: 'pointer', fontFamily: 'inherit',
                   }}
                 >
@@ -540,7 +540,7 @@ export function TodayTab({
                     onClick={() => { setSortBy(opt.key); setSortOpen(false); }}
                     style={{
                       width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '9px 14px', border: 'none', background: sortBy === opt.key ? '#F7F8FB' : '#fff',
+                      padding: '9px 14px', border: 'none', background: sortBy === opt.key ? 'hsl(var(--accent))' : 'transparent',
                       cursor: 'pointer', fontSize: 14, color: TEXT, fontFamily: 'inherit', gap: 10,
                     }}
                   >

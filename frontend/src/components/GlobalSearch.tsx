@@ -216,25 +216,25 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
       onClick={onClose}
     >
       <div
-        style={{ width: 560, background: '#fff', borderRadius: 16, boxShadow: '0 24px 80px rgba(0,0,0,.22)', overflow: 'hidden' }}
+        style={{ width: 560, background: 'hsl(var(--card))', borderRadius: 16, boxShadow: '0 24px 80px rgba(0,0,0,.35)', overflow: 'hidden' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Input row */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', borderBottom: '1px solid #E6EBF2' }}>
-          <Search size={17} color="#9CA3AF" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', borderBottom: '1px solid hsl(var(--border))' }}>
+          <Search size={17} color="hsl(var(--muted-foreground))" />
           <input
             ref={inputRef}
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="Search projects, tasks, documents…"
-            style={{ flex: 1, border: 'none', outline: 'none', fontSize: 14, color: '#172033', background: 'transparent', fontFamily: 'inherit' }}
+            style={{ flex: 1, border: 'none', outline: 'none', fontSize: 14, color: 'hsl(var(--foreground))', background: 'transparent', fontFamily: 'inherit' }}
           />
           {query ? (
             <button onClick={() => setQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-              <X size={15} color="#9CA3AF" />
+              <X size={15} color="hsl(var(--muted-foreground))" />
             </button>
           ) : (
-            <kbd style={{ background: '#F3F4F6', border: '1px solid #E5E7EB', borderRadius: 5, padding: '2px 7px', fontSize: 11, fontWeight: 700, color: '#6B7280' }}>ESC</kbd>
+            <kbd style={{ background: 'hsl(var(--muted))', border: '1px solid hsl(var(--border))', borderRadius: 5, padding: '2px 7px', fontSize: 11, fontWeight: 700, color: 'hsl(var(--muted-foreground))' }}>ESC</kbd>
           )}
         </div>
 
@@ -246,8 +246,8 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
               {/* Action intent banner */}
               {isActionIntent ? (
                 <div style={{ padding: '20px 18px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 13, color: '#172033', fontWeight: 600, marginBottom: 6 }}>{actionMessage}</div>
-                  <div style={{ fontSize: 12, color: '#9CA3AF', marginBottom: 14 }}>
+                  <div style={{ fontSize: 13, color: 'hsl(var(--foreground))', fontWeight: 600, marginBottom: 6 }}>{actionMessage}</div>
+                  <div style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))', marginBottom: 14 }}>
                     Try the AI assistant to complete this action.
                   </div>
                   <button
@@ -273,7 +273,7 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
                 const showEmpty   = aiDoneEmpty || basicEmpty;
 
                 if (showEmpty) return (
-                  <div style={{ padding: '32px 0', textAlign: 'center', color: '#9CA3AF', fontSize: 14 }}>
+                  <div style={{ padding: '32px 0', textAlign: 'center', color: 'hsl(var(--muted-foreground))', fontSize: 14 }}>
                     No results for "<strong>{query}</strong>"
                   </div>
                 );
@@ -283,10 +283,10 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
                   <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {[1, 2, 3].map(i => (
                       <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div style={{ width: 32, height: 32, borderRadius: 8, background: '#F3F4F6', flexShrink: 0 }} />
+                        <div style={{ width: 32, height: 32, borderRadius: 8, background: 'hsl(var(--muted))', flexShrink: 0 }} />
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
-                          <div style={{ height: 12, borderRadius: 4, background: 'linear-gradient(90deg,#f0f2f5 25%,#e4e7ec 50%,#f0f2f5 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite', width: '55%' }} />
-                          <div style={{ height: 10, borderRadius: 4, background: 'linear-gradient(90deg,#f0f2f5 25%,#e4e7ec 50%,#f0f2f5 75%)', backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite', width: '30%' }} />
+                          <div style={{ height: 12, borderRadius: 4, background: 'hsl(var(--muted))', backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite', width: '55%' }} />
+                          <div style={{ height: 10, borderRadius: 4, background: 'hsl(var(--muted))', backgroundSize: '200% 100%', animation: 'shimmer 1.4s infinite', width: '30%' }} />
                         </div>
                       </div>
                     ))}
@@ -299,11 +299,11 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
                     {/* Members section — only from AI search */}
                     {memberResults.length > 0 && (
                       <div>
-                        <div style={{ padding: '10px 18px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <span style={{ fontSize: 10, fontWeight: 800, color: '#9CA3AF', letterSpacing: '.08em', textTransform: 'uppercase' }}>
+                       <div style={{ padding: '10px 18px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: 10, fontWeight: 800, color: 'hsl(var(--muted-foreground))', letterSpacing: '.08em', textTransform: 'uppercase' }}>
                             Members
                           </span>
-                          <span style={{ fontSize: 10, fontWeight: 600, color: '#9CA3AF', background: '#F3F4F6', borderRadius: 10, padding: '1px 7px' }}>
+                          <span style={{ fontSize: 10, fontWeight: 600, color: 'hsl(var(--muted-foreground))', background: 'hsl(var(--muted))', borderRadius: 10, padding: '1px 7px' }}>
                             {memberResults.length}
                           </span>
                         </div>
@@ -311,12 +311,12 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
                           const initials = member.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
                           return (
                             <div key={member.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px' }}>
-                              <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#EEF4FF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                <span style={{ fontSize: 11, fontWeight: 700, color: '#1663F6' }}>{initials}</span>
+                              <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(22,99,246,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                <span style={{ fontSize: 11, fontWeight: 700, color: '#1663f6' }}>{initials}</span>
                               </div>
                               <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: '#172033', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.name}</div>
-                                <div style={{ fontSize: 11, color: '#9CA3AF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.email}</div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: 'hsl(var(--foreground))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.name}</div>
+                              <div style={{ fontSize: 11, color: 'hsl(var(--muted-foreground))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.email}</div>
                               </div>
                               <button
                                 onClick={() => {
@@ -326,7 +326,7 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
                                   navigate(route);
                                   onClose();
                                 }}
-                                style={{ height: 26, padding: '0 10px', borderRadius: 6, border: '1px solid #C7D7FD', background: '#EEF4FF', fontSize: 11, fontWeight: 600, color: '#1663F6', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, fontFamily: 'inherit' }}
+                                style={{ height: 26, padding: '0 10px', borderRadius: 6, border: '1px solid rgba(22,99,246,0.3)', background: 'rgba(22,99,246,0.1)', fontSize: 11, fontWeight: 600, color: '#1663f6', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, fontFamily: 'inherit' }}
                               >
                                 <MessageSquare size={10} /> Chat
                               </button>
@@ -350,12 +350,12 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
                         <div key={model}>
                           {/* Section header with total count + View all link */}
                           <div style={{ padding: '10px 18px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <span style={{ fontSize: 10, fontWeight: 800, color: '#9CA3AF', letterSpacing: '.08em', textTransform: 'uppercase' }}>
+                            <span style={{ fontSize: 10, fontWeight: 800, color: 'hsl(var(--muted-foreground))', letterSpacing: '.08em', textTransform: 'uppercase' }}>
                               {staticMeta?.label ?? 'Project'}s
                             </span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                               {sectionTotal > 0 && (
-                                <span style={{ fontSize: 10, fontWeight: 600, color: '#9CA3AF', background: '#F3F4F6', borderRadius: 10, padding: '1px 7px' }}>
+                                <span style={{ fontSize: 10, fontWeight: 600, color: 'hsl(var(--muted-foreground))', background: 'hsl(var(--muted))', borderRadius: 10, padding: '1px 7px' }}>
                                   {sectionTotal}
                                 </span>
                               )}
@@ -392,15 +392,15 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
                                 }}
                                 disabled={isDocLoading}
                                 style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', background: 'none', border: 'none', cursor: isDocLoading ? 'wait' : 'pointer', textAlign: 'left', opacity: isDocLoading ? 0.6 : 1 }}
-                                onMouseEnter={e => (e.currentTarget.style.background = '#F7F8FB')}
+                                onMouseEnter={e => (e.currentTarget.style.background = 'hsl(var(--accent))')}
                                 onMouseLeave={e => (e.currentTarget.style.background = 'none')}
                               >
                                 <div style={{ width: 32, height: 32, borderRadius: 8, background: meta.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                                   {meta.icon}
                                 </div>
                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontSize: 13, fontWeight: 600, color: '#172033', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
-                                  {item.sub && <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 1 }}>{item.sub}</div>}
+                                  <div style={{ fontSize: 13, fontWeight: 600, color: 'hsl(var(--foreground))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
+                                  {item.sub && <div style={{ fontSize: 11, color: 'hsl(var(--muted-foreground))', marginTop: 1 }}>{item.sub}</div>}
                                 </div>
                                 {statusColors ? (
                                   <span style={{ fontSize: 10, fontWeight: 700, color: statusColors.text, background: statusColors.bg, padding: '2px 8px', borderRadius: 10, flexShrink: 0 }}>
@@ -439,7 +439,7 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
                       const staticMeta = type !== 'project' ? TYPE_META[type] : null;
                       return (
                         <div key={type}>
-                          <div style={{ padding: '10px 18px 4px', fontSize: 10, fontWeight: 800, color: '#9CA3AF', letterSpacing: '.08em', textTransform: 'uppercase' }}>
+                          <div style={{ padding: '10px 18px 4px', fontSize: 10, fontWeight: 800, color: 'hsl(var(--muted-foreground))', letterSpacing: '.08em', textTransform: 'uppercase' }}>
                             {staticMeta?.label ?? 'Project'}s
                           </div>
                           {group.map(item => {
@@ -450,15 +450,15 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
                                 key={item.id}
                                 onClick={() => go(item.route)}
                                 style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
-                                onMouseEnter={e => (e.currentTarget.style.background = '#F7F8FB')}
+                                onMouseEnter={e => (e.currentTarget.style.background = 'hsl(var(--accent))')}
                                 onMouseLeave={e => (e.currentTarget.style.background = 'none')}
                               >
                                 <div style={{ width: 32, height: 32, borderRadius: 8, background: meta.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                                   {meta.icon}
                                 </div>
                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontSize: 13, fontWeight: 600, color: '#172033', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
-                                  {item.sub && <div style={{ fontSize: 11, color: '#9CA3AF', marginTop: 1 }}>{item.sub}</div>}
+                                  <div style={{ fontSize: 13, fontWeight: 600, color: 'hsl(var(--foreground))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
+                                  {item.sub && <div style={{ fontSize: 11, color: 'hsl(var(--muted-foreground))', marginTop: 1 }}>{item.sub}</div>}
                                 </div>
                                 {statusColors ? (
                                   <span style={{ fontSize: 10, fontWeight: 700, color: statusColors.text, background: statusColors.bg, padding: '2px 8px', borderRadius: 10, flexShrink: 0 }}>
@@ -479,18 +479,18 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
             </>
           ) : (
             <div style={{ padding: '16px 18px' }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: '#9CA3AF', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 10 }}>Quick links</div>
+              <div style={{ fontSize: 11, fontWeight: 800, color: 'hsl(var(--muted-foreground))', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 10 }}>Quick links</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                 {quickLinks.map(l => (
                   <button
                     key={l.route}
                     onClick={() => go(l.route)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: l.bg, border: 'none', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'hsl(var(--muted))', border: 'none', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit' }}
                     onMouseEnter={e => (e.currentTarget.style.opacity = '.8')}
                     onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
                   >
                     {l.icon}
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#172033' }}>{l.label}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'hsl(var(--foreground))' }}>{l.label}</span>
                   </button>
                 ))}
               </div>
@@ -499,10 +499,10 @@ export function GlobalSearchOverlay({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Footer hint */}
-        <div style={{ padding: '10px 18px', borderTop: '1px solid #E6EBF2', display: 'flex', gap: 16 }}>
+      <div style={{ padding: '10px 18px', borderTop: '1px solid hsl(var(--border))', display: 'flex', gap: 16 }}>
           {[['↵', 'to select'], ['↑↓', 'to navigate'], ['esc', 'to close']].map(([key, label]) => (
-            <span key={key} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#9CA3AF' }}>
-              <kbd style={{ background: '#F3F4F6', border: '1px solid #E5E7EB', borderRadius: 4, padding: '1px 5px', fontSize: 10, fontWeight: 700, color: '#6B7280' }}>{key}</kbd>
+            <span key={key} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'hsl(var(--muted-foreground))' }}>
+              <kbd style={{ background: 'hsl(var(--muted))', border: '1px solid hsl(var(--border))', borderRadius: 4, padding: '1px 5px', fontSize: 10, fontWeight: 700, color: 'hsl(var(--muted-foreground))' }}>{key}</kbd>
               {label}
             </span>
           ))}
@@ -541,16 +541,15 @@ export function GlobalSearchTrigger() {
         style={{
           display: 'flex', alignItems: 'center', gap: 8,
           height: 36, padding: '0 14px',
-          background: '#F7F8FB', border: '1px solid #E6EBF2',
+          background: 'hsl(var(--muted))', border: '1px solid hsl(var(--border))',
           borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit',
           minWidth: 200, width: '100%',
         }}
       >
-        <Search size={13} color="#667085" />
-        <span style={{ flex: 1, textAlign: 'left', fontSize: 13, color: '#9CA3AF' }}>Search anything…</span>
-        <kbd style={{ background: '#fff', border: '1px solid #E3E8EF', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700, color: '#6B7280' }}>⌘K</kbd>
+        <Search size={13} color="hsl(var(--muted-foreground))" />
+        <span style={{ flex: 1, textAlign: 'left', fontSize: 13, color: 'hsl(var(--muted-foreground))' }}>Search anything…</span>
+        <kbd style={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700, color: 'hsl(var(--muted-foreground))' }}>⌘K</kbd>
       </button>
-
       {open && <GlobalSearchOverlay onClose={() => setOpen(false)} />}
     </>
   );

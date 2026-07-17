@@ -28,8 +28,6 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [zoom, setZoom] = useState(100);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
     const [textContent, setTextContent] = useState<string>('');
     const [downloading, setDownloading] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(defaultFullscreen);
@@ -247,18 +245,18 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
             const currentSheet = excelSheets[activeSheetIndex];
             
             return (
-                <div className="h-full w-full flex flex-col bg-white overflow-hidden">
+                <div className="h-full w-full flex flex-col bg-card overflow-hidden">
                     {/* Sheet tabs (only show if multiple sheets) */}
                     {excelSheets.length > 1 && (
-                        <div className="flex-shrink-0 flex items-center gap-1 px-4 py-2 bg-gray-100 border-b border-gray-200 overflow-x-auto">
+                        <div className="flex-shrink-0 flex items-center gap-1 px-4 py-2 bg-muted border-b border-border overflow-x-auto">
                             {excelSheets.map((sheet, index) => (
                                 <button
                                     key={sheet.name}
                                     onClick={() => setActiveSheetIndex(index)}
                                     className={`px-3 py-1 text-sm font-medium rounded transition-colors whitespace-nowrap ${
                                         activeSheetIndex === index
-                                            ? 'bg-white text-blue-600 border border-blue-300 shadow-sm'
-                                            : 'text-gray-600 hover:bg-white'
+                                            ? 'bg-card text-blue-500 border border-blue-500/30 shadow-sm'
+                                            : 'text-muted-foreground hover:bg-card'
                                     }`}
                                 >
                                     {sheet.name}
@@ -281,10 +279,10 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
                                     currentSheet.data.map((row, rowIndex) => (
                                         <tr 
                                             key={rowIndex}
-                                            className={rowIndex === 0 ? 'bg-gray-100 font-semibold' : 'hover:bg-gray-50'}
+                                            className={rowIndex === 0 ? 'bg-muted font-semibold' : 'hover:bg-accent'}
                                         >
                                             {/* Row number cell */}
-                                            <td className="px-3 py-1.5 text-xs text-gray-400 bg-gray-50 border border-gray-200 text-center min-w-[40px] sticky left-0 z-10">
+                                            <td className="px-3 py-1.5 text-xs text-muted-foreground bg-muted border border-border text-center min-w-[40px] sticky left-0 z-10">
                                                 {rowIndex + 1}
                                             </td>
                                             
@@ -292,7 +290,7 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
                                             {row.map((cell, cellIndex) => (
                                                 <td 
                                                     key={cellIndex}
-                                                    className="px-3 py-1.5 border border-gray-200 whitespace-nowrap"
+                                                    className="px-3 py-1.5 border border-border whitespace-nowrap text-foreground"
                                                     title={String(cell || '')}
                                                 >
                                                     {cell !== null && cell !== undefined ? String(cell) : ''}
@@ -306,7 +304,7 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
                     </div>
                     
                     {/* Footer info */}
-                    <div className="flex-shrink-0 px-4 py-2 bg-gray-50 border-t border-gray-200 text-xs text-gray-500 flex justify-between items-center">
+                    <div className="flex-shrink-0 px-4 py-2 bg-muted border-t border-border text-xs text-muted-foreground flex justify-between items-center">
                         <span>
                             {currentSheet.data.length} rows × {currentSheet.data[0]?.length || 0} columns
                         </span>
@@ -468,10 +466,10 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
 
         // Fallback for unsupported file types
         return (
-            <div className="flex flex-col items-center justify-center h-full bg-gray-50 p-8">
-                <FileText className="w-20 h-20 text-gray-400 mb-4" />
-                <h3 className="text-xl font-semibold text-gray-700 mb-2">Preview Not Available</h3>
-                <p className="text-gray-500 mb-6 text-center max-w-md">
+            <div className="flex flex-col items-center justify-center h-full bg-muted/40 p-8">
+                <FileText className="w-20 h-20 text-muted-foreground mb-4" />
+                <h3 className="text-xl font-semibold text-foreground mb-2">Preview Not Available</h3>
+                <p className="text-muted-foreground mb-6 text-center max-w-md">
                     Preview is not supported for this file type (.{extension}).
                     Please download the file to view it.
                 </p>
@@ -698,17 +696,17 @@ export const DocumentThumbnail: React.FC<DocumentThumbnailProps> = ({
         if (isOfficeDoc) return { icon: <FileText className="w-8 h-8" />, color: 'bg-blue-100 text-blue-600' };
         if (isPresentation) return { icon: <FileText className="w-8 h-8" />, color: 'bg-orange-100 text-orange-600' };
         if (isSpreadsheet) return { icon: <FileText className="w-8 h-8" />, color: 'bg-green-100 text-green-600' };
-        if (isText || isCode) return { icon: <FileText className="w-8 h-8" />, color: 'bg-gray-100 text-gray-600' };
+        if (isText || isCode) return { icon: <FileText className="w-8 h-8" />, color: 'bg-muted text-muted-foreground' };
         if (isVideo) return { icon: <FileText className="w-8 h-8" />, color: 'bg-purple-100 text-purple-600' };
         if (isAudio) return { icon: <FileText className="w-8 h-8" />, color: 'bg-pink-100 text-pink-600' };
-        return { icon: <FileText className="w-8 h-8" />, color: 'bg-gray-100 text-gray-500' };
+        return { icon: <FileText className="w-8 h-8" />, color: 'bg-muted text-muted-foreground' };
     };
 
     const renderThumbnail = () => {
         // Image thumbnail - show actual image
         if (isImage && !thumbnailError) {
             return (
-                <div className="w-full h-full overflow-hidden bg-gray-50 rounded-lg">
+                <div className="w-full h-full overflow-hidden bg-muted rounded-lg">
                     <img
                         src={url}
                         alt={fileName}
@@ -735,7 +733,7 @@ export const DocumentThumbnail: React.FC<DocumentThumbnailProps> = ({
             onClick={onClick}
         >
             {/* Thumbnail Container */}
-            <div className="w-full h-32 rounded-xl overflow-hidden border-2 border-gray-200 hover:border-blue-500 transition-all duration-200 bg-white shadow-sm">
+            <div className="w-full h-32 rounded-xl overflow-hidden border-2 border-border hover:border-blue-500 transition-all duration-200 bg-card shadow-sm">
                 {renderThumbnail()}
 
                 {/* Hover Overlay */}
@@ -748,7 +746,7 @@ export const DocumentThumbnail: React.FC<DocumentThumbnailProps> = ({
 
             {/* File Name */}
             {showFileName && (
-                <p className="mt-2 text-sm text-gray-700 truncate text-center" title={fileName}>
+                <p className="mt-2 text-sm text-foreground truncate text-center" title={fileName}>
                     {fileName}
                 </p>
             )}

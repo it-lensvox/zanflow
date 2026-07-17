@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { workspaceApi } from '@/services/api';
 import { useAuth } from '@/hooks/useAuth';
+import { useTheme } from '@/hooks/useTheme';
 import {
   Settings2, Palette, Plus, X, Check,
   Monitor, Cloud, Sun, Moon, LayoutGrid, Table2,
@@ -11,18 +12,18 @@ import {
 } from 'lucide-react';
 import { getRoleConfig } from '@/config/roleConfig';
 
-// Design tokens
-const PAGE_BG = '#F7F8FB';
+// Design tokens — CSS variable references so they adapt to dark mode automatically
+const PAGE_BG = 'hsl(var(--background))';
 const CARD: React.CSSProperties = {
-  background: '#fff',
-  border: '1px solid #E6EBF2',
+  background: 'hsl(var(--card))',
+  border: '1px solid hsl(var(--border))',
   borderRadius: 12,
   boxShadow: '0 1px 3px rgba(16,24,40,.05)',
 };
-const TEXT_PRIMARY = '#172033';
-const TEXT_SECONDARY = '#667085';
-const TEXT_MUTED = '#9CA3AF';
-const BORDER = '#E6EBF2';
+const TEXT_PRIMARY = 'hsl(var(--foreground))';
+const TEXT_SECONDARY = 'hsl(var(--muted-foreground))';
+const TEXT_MUTED = 'hsl(var(--muted-foreground))';
+const BORDER = 'hsl(var(--border))';
 const BLUE = '#1663F6';
 
 // ─── Reusable primitives ──────────────────────────────────────────────────────
@@ -55,7 +56,7 @@ function SegmentedControl<T extends string>({
 }) {
   return (
     <div style={{
-      display: 'flex', background: '#F3F4F6', borderRadius: 8,
+      display: 'flex', background: 'hsl(var(--muted))', borderRadius: 8,
       padding: 3, gap: 2, flexShrink: 0, flexWrap: 'nowrap',
     }}>
       {options.map((opt) => (
@@ -67,7 +68,7 @@ function SegmentedControl<T extends string>({
             padding: '4px 10px', borderRadius: 6, border: 'none', cursor: 'pointer',
             fontSize: 14, fontWeight: 500, transition: 'all .15s',
             whiteSpace: 'nowrap', flexShrink: 0,
-            background: value === opt.value ? '#fff' : 'transparent',
+            background: value === opt.value ? 'hsl(var(--card))' : 'transparent',
             color: value === opt.value ? TEXT_PRIMARY : TEXT_SECONDARY,
             boxShadow: value === opt.value ? '0 1px 3px rgba(16,24,40,.08)' : 'none',
           }}
@@ -102,7 +103,7 @@ function SettingSelect({ value, onChange, options }: {
         onClick={handleOpen}
         style={{
           display: 'flex', alignItems: 'center', gap: 6,
-          border: `1px solid ${BORDER}`, borderRadius: 6, background: '#fff',
+          border: `1px solid ${BORDER}`, borderRadius: 6, background: 'hsl(var(--card))',
           padding: '5px 10px', fontSize: 14, color: TEXT_PRIMARY,
           cursor: 'pointer', outline: 'none', whiteSpace: 'nowrap',
         }}
@@ -114,7 +115,7 @@ function SettingSelect({ value, onChange, options }: {
       </button>
 
       {/* Portal dropdown — renders in document.body, escapes all overflow containers */}
-      {open && anchor && createPortal(
+     {open && anchor && createPortal(
         <>
           <div
             style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
@@ -122,9 +123,9 @@ function SettingSelect({ value, onChange, options }: {
           />
           <div style={{
             position: 'fixed', top: anchor.top, right: anchor.right,
-            zIndex: 9999, background: '#fff',
+            zIndex: 9999, background: 'hsl(var(--popover))',
             border: `1px solid ${BORDER}`, borderRadius: 8,
-            boxShadow: '0 4px 20px rgba(16,24,40,.12)',
+            boxShadow: '0 4px 20px rgba(0,0,0,.18)',
             minWidth: 160, overflow: 'hidden',
           }}>
             {options.map((opt) => {
@@ -138,11 +139,11 @@ function SettingSelect({ value, onChange, options }: {
                     padding: '9px 14px', cursor: 'pointer', fontSize: 14,
                     fontWeight: isActive ? 600 : 400,
                     color: isActive ? BLUE : TEXT_PRIMARY,
-                    background: isActive ? '#EEF2FF' : '#fff',
+                    background: isActive ? `${BLUE}18` : 'transparent',
                     transition: 'background .12s',
                   }}
                   onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = PAGE_BG; }}
-                  onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = '#fff'; }}
+                  onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}
                 >
                   {opt.label}
                   {isActive && (
@@ -380,7 +381,7 @@ function WorkspaceCard({ activeWorkspace, userRole }: { activeWorkspace: any; us
                     style={{
                       border: `1px solid ${BLUE}`, borderRadius: 6, padding: '3px 8px',
                       fontSize: 16, fontWeight: 600, color: TEXT_PRIMARY, outline: 'none',
-                      background: '#fff', width: 160,
+                      background: 'hsl(var(--input))', width: 160,
                     }}
                   />
                   <button onClick={handleSaveName} disabled={isSavingName}
@@ -388,7 +389,7 @@ function WorkspaceCard({ activeWorkspace, userRole }: { activeWorkspace: any; us
                     {isSavingName ? '...' : 'Save'}
                   </button>
                   <button onClick={() => { setIsEditingName(false); setWorkspaceName(activeWorkspace?.name || ''); }}
-                    style={{ padding: '3px 8px', border: `1px solid ${BORDER}`, borderRadius: 5, fontSize: 13, color: TEXT_SECONDARY, background: '#fff', cursor: 'pointer' }}>
+                    style={{ padding: '3px 8px', border: `1px solid ${BORDER}`, borderRadius: 5, fontSize: 13, color: TEXT_SECONDARY, background: 'hsl(var(--input))', cursor: 'pointer' }}>
                     Cancel
                   </button>
                 </div>
@@ -421,14 +422,14 @@ function WorkspaceCard({ activeWorkspace, userRole }: { activeWorkspace: any; us
           </p>
         </div>
         <div style={{ position: 'relative', marginBottom: 10 }}>
-          <input
+         <input
             value={memberSearch}
             onChange={e => setMemberSearch(e.target.value)}
             placeholder="Search members..."
             style={{
               width: '100%', padding: '7px 8px 7px 30px',
               border: `1px solid ${BORDER}`, borderRadius: 7,
-              fontSize: 14, color: TEXT_PRIMARY, background: '#fff',
+              fontSize: 14, color: TEXT_PRIMARY, background: 'hsl(var(--input))',
               outline: 'none', boxSizing: 'border-box',
             }}
           />
@@ -548,7 +549,7 @@ function WorkspaceCard({ activeWorkspace, userRole }: { activeWorkspace: any; us
       {showAddMember && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.4)', backdropFilter: 'blur(4px)' }} onClick={() => setShowAddMember(false)} />
-          <div style={{ position: 'relative', background: '#fff', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,.18)', width: '100%', maxWidth: 420, margin: '0 16px', overflow: 'hidden' }}>
+          <div style={{ position: 'relative', background: 'hsl(var(--card))', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,.25)', width: '100%', maxWidth: 420, margin: '0 16px', overflow: 'hidden' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: `1px solid ${BORDER}` }}>
               <h3 style={{ fontSize: 18, fontWeight: 700, color: TEXT_PRIMARY, margin: 0 }}>Add Member</h3>
               <button onClick={() => { setShowAddMember(false); setSelectedUser(null); setAddSearch(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: TEXT_MUTED, display: 'flex' }}>
@@ -558,7 +559,7 @@ function WorkspaceCard({ activeWorkspace, userRole }: { activeWorkspace: any; us
             <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div style={{ position: 'relative' }}>
                 <input value={addSearch} onChange={e => setAddSearch(e.target.value)} placeholder="Search users to add..."
-                  style={{ width: '100%', padding: '8px 10px 8px 32px', border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 16, color: TEXT_PRIMARY, outline: 'none', background: '#fff', boxSizing: 'border-box' }} />
+                  style={{ width: '100%', padding: '8px 10px 8px 32px', border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 16, color: TEXT_PRIMARY, outline: 'none', background: 'hsl(var(--input))', boxSizing: 'border-box' }} />
                 <svg style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} width="14" height="14" fill="none" viewBox="0 0 24 24" stroke={TEXT_MUTED}>
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
@@ -573,9 +574,9 @@ function WorkspaceCard({ activeWorkspace, userRole }: { activeWorkspace: any; us
                   const isSel = selectedUser?.user_id === u.user_id;
                   return (
                     <div key={u.user_id} onClick={() => setSelectedUser(isSel ? null : u)}
-                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', background: isSel ? '#EEF2FF' : '#fff', transition: 'background .15s' }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', background: isSel ? `${BLUE}18` : 'transparent', transition: 'background .15s' }}
                       onMouseEnter={e => { if (!isSel) (e.currentTarget as HTMLDivElement).style.background = PAGE_BG; }}
-                      onMouseLeave={e => { if (!isSel) (e.currentTarget as HTMLDivElement).style.background = '#fff'; }}
+                      onMouseLeave={e => { if (!isSel) (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}
                     >
                       <div style={{ width: 32, height: 32, borderRadius: '50%', background: BLUE, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 14, fontWeight: 700, flexShrink: 0 }}>
                         {uname[0]?.toUpperCase()}
@@ -592,7 +593,7 @@ function WorkspaceCard({ activeWorkspace, userRole }: { activeWorkspace: any; us
               <div>
                 <label style={{ display: 'block', fontSize: 14, fontWeight: 600, color: TEXT_SECONDARY, marginBottom: 6 }}>Role</label>
                 <select value={selectedRole} onChange={e => setSelectedRole(e.target.value)}
-                  style={{ width: '100%', padding: '8px 10px', border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 16, color: TEXT_PRIMARY, outline: 'none', background: '#fff' }}>
+                  style={{ width: '100%', padding: '8px 10px', border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 16, color: TEXT_PRIMARY, outline: 'none', background: 'hsl(var(--input))' }}>
                   <option value="admin">Admin</option>
                   <option value="manager">Manager</option>
                   <option value="developer">Developer</option>
@@ -616,10 +617,10 @@ function WorkspaceCard({ activeWorkspace, userRole }: { activeWorkspace: any; us
       )}
 
       {/* Confirmation Modal ── */}
-      {showConfirmDelete && (
+     {showConfirmDelete && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.4)', backdropFilter: 'blur(4px)' }} onClick={() => { setShowConfirmDelete(false); setUserToDelete(null); }} />
-          <div style={{ position: 'relative', background: '#fff', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,.18)', width: '100%', maxWidth: 380, margin: '0 16px', overflow: 'hidden' }}>
+          <div style={{ position: 'relative', background: 'hsl(var(--card))', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,.25)', width: '100%', maxWidth: 380, margin: '0 16px', overflow: 'hidden' }}>
             <div style={{ padding: '20px 20px 14px' }}>
               <h3 style={{ fontSize: 18, fontWeight: 700, color: TEXT_PRIMARY, margin: '0 0 6px' }}>Remove Member</h3>
               <p style={{ fontSize: 16, color: TEXT_SECONDARY, margin: 0 }}>
@@ -652,10 +653,10 @@ function WorkspaceCard({ activeWorkspace, userRole }: { activeWorkspace: any; us
             top: dropdownAnchor.top,
             right: dropdownAnchor.right,
             zIndex: 9999,
-            background: '#fff',
+            background: 'hsl(var(--popover))',
             border: `1px solid ${BORDER}`,
             borderRadius: 8,
-            boxShadow: '0 4px 20px rgba(16,24,40,.14)',
+            boxShadow: '0 4px 20px rgba(0,0,0,.20)',
             minWidth: 140,
             overflow: 'hidden',
           }}>
@@ -678,11 +679,11 @@ function WorkspaceCard({ activeWorkspace, userRole }: { activeWorkspace: any; us
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     padding: '9px 14px', cursor: 'pointer',
-                    background: isActive ? rs.bg : '#fff',
+                    background: isActive ? rs.bg : 'transparent',
                     transition: 'background .12s',
                   }}
                   onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = PAGE_BG; }}
-                  onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = '#fff'; }}
+                  onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLDivElement).style.background = 'transparent'; }}
                 >
                   <span style={{ fontSize: 12, fontWeight: 700, color: rs.color }}>
                     {role.toUpperCase()}
@@ -708,11 +709,13 @@ function WorkspaceCard({ activeWorkspace, userRole }: { activeWorkspace: any; us
 export function Settings() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { theme: resolvedTheme, setTheme: applyTheme } = useTheme();
   const [dataMode, setDataMode] = useState<'local' | 'cloud'>('cloud');
   const [defaultView, setDefaultView] = useState<'grid' | 'table'>('grid');
   const [language, setLanguage] = useState('en');
   const [dateFormat, setDateFormat] = useState('DD/MM/YYYY');
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const theme = resolvedTheme === 'system' ? 'light' : resolvedTheme as 'light' | 'dark';
+  const setTheme = (val: 'light' | 'dark') => applyTheme(val);
   const [fontSize, setFontSize] = useState<string>(
     () => localStorage.getItem('dyuksa_font_size') || 'medium'
   );
@@ -1050,7 +1053,7 @@ export function Settings() {
       {/* ── Delete Workspace Confirmation Modal ── */}
       {showDeleteModal && activeWorkspace && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: 16 }}>
-          <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,.2)', maxWidth: 440, width: '100%', overflow: 'hidden' }}>
+          <div style={{ background: 'hsl(var(--card))', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,.3)', maxWidth: 440, width: '100%', overflow: 'hidden' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '20px 20px 16px' }}>
               <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Trash2 size={20} color="#DC2626" />

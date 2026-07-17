@@ -566,15 +566,16 @@ export const EventModal: React.FC<EventModalProps> = ({
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={onClose}>
             <div
-                className="bg-white w-full max-w-[850px] rounded-2xl shadow-2xl flex overflow-hidden"
+                className="bg-card border border-border w-full max-w-[850px] rounded-2xl shadow-2xl flex flex-col md:flex-row overflow-hidden"
+                style={{ maxHeight: '90vh' }}
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* ═══════════════ LEFT PANEL - Event Details ═══════════════ */}
                 <div className="flex-1 flex flex-col min-w-0">
                     {/* Header */}
-                    <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                    <div className="flex items-center justify-between px-6 py-4 border-b border-border">
                         <div className="flex items-center gap-3">
-                            <h2 className="text-lg font-semibold text-gray-900">
+                            <h2 className="text-lg font-semibold text-foreground">
                                 {event ? (isReadOnly ? 'View event' : 'Edit event') : 'Create event'}
                             </h2>
                             {event?.my_invitation_status && (
@@ -583,7 +584,7 @@ export const EventModal: React.FC<EventModalProps> = ({
                                 </span>
                             )}
                         </div>
-                        <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
+                        <button onClick={onClose} className="p-1.5 rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors">
                             <X size={20} />
                         </button>
                     </div>
@@ -601,10 +602,10 @@ export const EventModal: React.FC<EventModalProps> = ({
                                         closeAllDropdowns();
                                         setShowDatePicker(!showDatePicker);
                                     }}
-                                    className={`flex items-center gap-2 px-4 py-2.5 bg-gray-50 rounded-xl border border-gray-200 hover:border-gray-300 transition-colors ${isReadOnly ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
+                                    className={`flex items-center gap-2 px-4 py-2.5 bg-muted rounded-xl border border-border hover:border-muted-foreground/40 transition-colors ${isReadOnly ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
                                 >
                                     <CalendarIcon size={16} className="text-gray-500" />
-                                    <span className="text-sm font-medium text-gray-900">
+                                    <span className="text-sm font-medium text-foreground">
                                         {formatDisplayDate(startTime)}
                                     </span>
                                 </button>
@@ -613,7 +614,7 @@ export const EventModal: React.FC<EventModalProps> = ({
                                 {showDatePicker && !isReadOnly && (
                                     <>
                                         <div className="fixed inset-0 z-10" onClick={() => setShowDatePicker(false)} />
-                                        <div className="absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-20 p-4 w-72">
+                                        <div className="absolute top-full left-0 mt-2 bg-popover border border-border rounded-xl shadow-xl z-20 p-4 w-72">
                                             {/* Month/Year Header */}
                                             <div className="flex items-center justify-between mb-4">
                                                 <button
@@ -626,11 +627,11 @@ export const EventModal: React.FC<EventModalProps> = ({
                                                             setPickerMonth(pickerMonth - 1);
                                                         }
                                                     }}
-                                                    className="p-1 hover:bg-gray-100 rounded-lg text-gray-600"
+                                                    className="p-1 hover:bg-accent rounded-lg text-muted-foreground"
                                                 >
                                                     <ChevronLeft size={18} />
                                                 </button>
-                                                <span className="text-sm font-semibold text-gray-900">
+                                                <span className="text-sm font-semibold text-foreground">
                                                     {MINI_MONTHS[pickerMonth]} {pickerYear}
                                                 </span>
                                                 <button
@@ -643,7 +644,7 @@ export const EventModal: React.FC<EventModalProps> = ({
                                                             setPickerMonth(pickerMonth + 1);
                                                         }
                                                     }}
-                                                    className="p-1 hover:bg-gray-100 rounded-lg text-gray-600"
+                                                    className="p-1 hover:bg-accent rounded-lg text-muted-foreground"
                                                 >
                                                     <ChevronRight size={18} />
                                                 </button>
@@ -652,7 +653,7 @@ export const EventModal: React.FC<EventModalProps> = ({
                                             {/* Day Headers */}
                                             <div className="grid grid-cols-7 mb-2">
                                                 {MINI_DAYS.map(d => (
-                                                    <div key={d} className="text-[11px] font-semibold text-gray-400 text-center py-1">
+                                                    <div key={d} className="text-[11px] font-semibold text-muted-foreground text-center py-1">
                                                         {d}
                                                     </div>
                                                 ))}
@@ -680,9 +681,9 @@ export const EventModal: React.FC<EventModalProps> = ({
                                                                         ? 'text-blue-600 font-semibold border border-blue-300'
                                                                         : isCurrentMonth
                                                                             ? isPast
-                                                                                ? 'text-gray-300 cursor-not-allowed'
-                                                                                : 'text-gray-700 hover:bg-gray-100'
-                                                                            : 'text-gray-300'
+                                                                                ? 'text-muted-foreground/40 cursor-not-allowed'
+                                                                                : 'text-foreground hover:bg-accent'
+                                                                            : 'text-muted-foreground/30'
                                                                 }
                                                             `}
                                                         >
@@ -705,9 +706,9 @@ export const EventModal: React.FC<EventModalProps> = ({
                                         closeAllDropdowns();
                                         setShowStartTimeDropdown(!showStartTimeDropdown);
                                     }}
-                                    className={`flex items-center gap-2 px-4 py-2.5 bg-gray-50 rounded-xl border border-gray-200 hover:border-gray-300 transition-colors ${isReadOnly ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
+                                    className={`flex items-center gap-2 px-4 py-2.5 bg-muted rounded-xl border border-border hover:border-muted-foreground/40 transition-colors ${isReadOnly ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
                                 >
-                                    <span className="text-sm font-medium text-gray-900">
+                                    <span className="text-sm font-medium text-foreground">
                                         {startTime.split('T')[1]?.slice(0, 5) || '13:00'}
                                     </span>
                                     <ChevronRight size={14} className="text-gray-400 rotate-90" />
@@ -718,7 +719,7 @@ export const EventModal: React.FC<EventModalProps> = ({
                                         <div className="fixed inset-0 z-10" onClick={() => setShowStartTimeDropdown(false)} />
                                         <div
                                             ref={startTimeRef}
-                                            className="absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-20 w-24 max-h-64 overflow-y-auto"
+                                            className="absolute top-full left-0 mt-2 bg-popover border border-border rounded-xl shadow-xl z-20 w-24 max-h-64 overflow-y-auto"
                                         >
                                             {timeSlots.map(time => {
                                                 // --- NEW LOGIC START ---
@@ -735,13 +736,13 @@ export const EventModal: React.FC<EventModalProps> = ({
                                                     <div
                                                         key={`start-${time}`}
                                                         className={`px-4 py-2 cursor-pointer text-sm transition-colors ${isPastTime
-                                                            ? 'text-gray-500 cursor-not-allowed opacity-70'
+                                                            ? 'text-muted-foreground cursor-not-allowed opacity-70'
                                                             : isSelected
-                                                                ? 'bg-blue-50 text-blue-700 font-medium'
-                                                                : 'text-gray-700 hover:bg-gray-50'
+                                                                ? 'bg-blue-500/10 text-blue-600 font-medium'
+                                                                : 'text-foreground hover:bg-accent'
                                                             }`}
                                                         onClick={() => {
-                                                            if (isPastTime) return; // Prevent selection of past times
+                                                            if (isPastTime) return;
 
                                                             const date = startTime.split('T')[0];
                                                             setStartTime(`${date}T${time}`);
@@ -764,7 +765,7 @@ export const EventModal: React.FC<EventModalProps> = ({
                                 )}
                             </div>
 
-                            <span className="text-gray-400 font-medium">—</span>
+                            <span className="text-muted-foreground font-medium">—</span>
 
                             {/* End Time Dropdown */}
                             <div className="relative">
@@ -777,7 +778,7 @@ export const EventModal: React.FC<EventModalProps> = ({
                                     }}
                                     className={`flex items-center gap-2 px-4 py-2.5 bg-gray-50 rounded-xl border border-gray-200 hover:border-gray-300 transition-colors ${isReadOnly ? 'cursor-not-allowed opacity-80' : 'cursor-pointer'}`}
                                 >
-                                    <span className="text-sm font-medium text-gray-900">
+                                    <span className="text-sm font-medium text-foreground">
                                         {endTime.split('T')[1]?.slice(0, 5) || '13:30'}
                                     </span>
                                     <ChevronRight size={14} className="text-gray-400 rotate-90" />
@@ -802,10 +803,10 @@ export const EventModal: React.FC<EventModalProps> = ({
                                                     <div
                                                         key={`end-${time}`}
                                                         className={`px-4 py-2 cursor-pointer text-sm transition-colors ${isPastTime
-                                                            ? 'text-gray-500 cursor-not-allowed opacity-70'
+                                                            ? 'text-muted-foreground cursor-not-allowed opacity-70'
                                                             : isSelected
-                                                                ? 'bg-blue-50 text-blue-700 font-medium'
-                                                                : 'text-gray-700 hover:bg-gray-50'
+                                                                ? 'bg-blue-500/10 text-blue-600 font-medium'
+                                                                : 'text-foreground hover:bg-accent'
                                                             }`}
                                                         onClick={() => {
                                                             if (isPastTime) return; // Prevent selection
@@ -898,7 +899,7 @@ export const EventModal: React.FC<EventModalProps> = ({
 
                         {/* ── Event Name Input ── */}
                         <div>
-                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                            <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                                 Event Name
                             </label>
                             <input
@@ -907,13 +908,13 @@ export const EventModal: React.FC<EventModalProps> = ({
                                 value={title}
                                 onChange={(e) => setTitle(e.target.value)}
                                 disabled={isReadOnly}
-                                className={`w-full text-base font-medium text-gray-900 placeholder:text-gray-400 bg-transparent border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${isReadOnly ? 'cursor-not-allowed opacity-80' : ''}`}
+                                className={`w-full text-base font-medium text-foreground placeholder:text-muted-foreground bg-input border border-border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${isReadOnly ? 'cursor-not-allowed opacity-80' : ''}`}
                             />
                         </div>
 
                         {/* ── Event Type Selector ── */}
                         <div>
-                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                            <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                                 Event Type
                             </label>
                             <div className="relative">
@@ -936,12 +937,12 @@ export const EventModal: React.FC<EventModalProps> = ({
                                 {showEventTypeDropdown && !isReadOnly && (
                                     <>
                                         <div className="fixed inset-0 z-10" onClick={() => setShowEventTypeDropdown(false)} />
-                                        <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-20 overflow-hidden">
+                                        <div className="absolute top-full left-0 right-0 mt-2 bg-popover border border-border rounded-xl shadow-xl z-20 overflow-hidden">
                                             {/* Predefined Types */}
                                             {EVENT_TYPES.map(type => (
                                                 <div
                                                     key={type.value}
-                                                    className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-gray-50 ${eventType === type.value ? 'bg-gray-50' : ''}`}
+                                                    className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors hover:bg-accent ${eventType === type.value ? 'bg-accent' : ''}`}
                                                     onClick={() => {
                                                         setEventType(type.value);
                                                         setCustomEventType('');
@@ -949,7 +950,7 @@ export const EventModal: React.FC<EventModalProps> = ({
                                                     }}
                                                 >
                                                     <span className="text-lg">{type.icon}</span>
-                                                    <span className="text-sm font-medium text-gray-900">{type.value}</span>
+                                                    <span className="text-sm font-medium text-foreground">{type.value}</span>
                                                     {eventType === type.value && (
                                                         <CheckSquare size={16} className="ml-auto text-blue-600" />
                                                     )}
@@ -957,7 +958,7 @@ export const EventModal: React.FC<EventModalProps> = ({
                                             ))}
 
                                             {/* Divider */}
-                                            <div className="border-t border-gray-100" />
+                                            <div className="border-t border-border" />
 
                                             {/* Custom Type Input */}
                                             <div className="p-3">
@@ -974,7 +975,7 @@ export const EventModal: React.FC<EventModalProps> = ({
                                                                 setShowEventTypeDropdown(false);
                                                             }
                                                         }}
-                                                        className="flex-1 text-sm text-gray-900 placeholder:text-gray-400 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                        className="flex-1 text-sm text-foreground placeholder:text-muted-foreground bg-input border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                         onClick={(e) => e.stopPropagation()}
                                                     />
                                                     {customEventType.trim() && (
@@ -1017,7 +1018,7 @@ export const EventModal: React.FC<EventModalProps> = ({
 
                         {/* ── Description ── */}
                         <div>
-                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                            <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                                 Description
                             </label>
                             <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
@@ -1027,21 +1028,21 @@ export const EventModal: React.FC<EventModalProps> = ({
                                     disabled={isReadOnly}
                                     onChange={e => setDescription(e.target.value)}
                                     rows={4}
-                                    className={`w-full bg-transparent resize-none focus:outline-none text-sm text-gray-700 placeholder:text-gray-400 p-4 ${isReadOnly ? 'cursor-not-allowed opacity-80' : ''}`}
+                                    className={`w-full bg-transparent resize-none focus:outline-none text-sm text-foreground placeholder:text-muted-foreground p-4 ${isReadOnly ? 'cursor-not-allowed opacity-80' : ''}`}
                                 />
                             </div>
                         </div>
 
                         {/* ── Location (Optional) ── */}
-                        <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl border border-gray-200">
-                            <MapPin size={18} className="text-gray-400 flex-shrink-0" />
+                        <div className="flex items-center gap-3 px-4 py-3 bg-muted rounded-xl border border-border">
+                            <MapPin size={18} className="text-muted-foreground flex-shrink-0" />
                             <input
                                 type="text"
                                 disabled={isReadOnly}
                                 placeholder="Add location (optional)"
                                 value={location}
                                 onChange={e => setLocation(e.target.value)}
-                                className={`flex-1 text-sm text-gray-900 placeholder:text-gray-400 bg-transparent focus:outline-none ${isReadOnly ? 'cursor-not-allowed opacity-80' : ''}`}
+                                className={`flex-1 text-sm text-foreground placeholder:text-muted-foreground bg-transparent focus:outline-none ${isReadOnly ? 'cursor-not-allowed opacity-80' : ''}`}
                             />
                         </div>
                     </div>
@@ -1057,8 +1058,7 @@ export const EventModal: React.FC<EventModalProps> = ({
                     )}
 
                     {/* Footer */}
-                    {/* Footer */}
-                    <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/50">
+                    <div className="px-6 py-4 border-t border-border flex items-center justify-between bg-muted/50">
                         <div>
                             {event && !isReadOnly && (
                                 <button
@@ -1101,7 +1101,7 @@ export const EventModal: React.FC<EventModalProps> = ({
                             <div className="flex items-center gap-3">
                                 <button
                                     onClick={onClose}
-                                    className="px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
+                                    className="px-5 py-2.5 text-sm font-medium text-foreground hover:bg-accent rounded-xl transition-colors"
                                 >
                                     Cancel
                                 </button>
@@ -1120,10 +1120,10 @@ export const EventModal: React.FC<EventModalProps> = ({
                 </div>
 
                 {/* ═══════════════ RIGHT PANEL - Participants ═══════════════ */}
-                <div className="w-64 bg-slate-50 border-l border-gray-200 flex flex-col">
+                <div className="md:w-64 w-full bg-muted border-t md:border-t-0 md:border-l border-border flex flex-col">
                     {/* Participants Header */}
-                    <div className="px-4 py-4 border-b border-gray-200">
-                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Participants</h3>
+                    <div className="px-4 py-4 border-b border-border">
+                        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Participants</h3>
                         {checkingAvailability && (
                             <div className="flex items-center gap-1.5 text-[11px] text-blue-600 mt-1.5">
                                 <Loader2 size={10} className="animate-spin" />
@@ -1136,7 +1136,7 @@ export const EventModal: React.FC<EventModalProps> = ({
                     <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
                         {/* Show Organizer First */}
                         {event && (
-                            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-blue-50 border border-blue-100 mb-2">
+                            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 mb-2">
                                 <div className="relative flex-shrink-0">
                                     <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-semibold shadow-sm ${getAvatarColor(event.organizer)}`}>
                                         {(() => {
@@ -1153,10 +1153,10 @@ export const EventModal: React.FC<EventModalProps> = ({
                                     </div>
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-gray-900 truncate">
+                                    <p className="text-sm font-medium text-foreground truncate">
                                         {rsvpData?.organizer || event.organizer_name || 'Organizer'}
                                     </p>
-                                    <p className="text-[10px] font-medium text-blue-600">Organizer</p>
+                                    <p className="text-[10px] font-medium text-blue-500">Organizer</p>
                                 </div>
                             </div>
                         )}
@@ -1198,7 +1198,7 @@ export const EventModal: React.FC<EventModalProps> = ({
                             return (
                                 <div
                                     key={userId}
-                                    className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-white transition-colors group"
+                                    className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-card transition-colors group"
                                 >
                                     <div className="relative flex-shrink-0">
                                         <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-semibold shadow-sm ${getAvatarColor(userId)}`}>
@@ -1212,7 +1212,7 @@ export const EventModal: React.FC<EventModalProps> = ({
                                     </div>
 
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-gray-900 truncate">{fullName}</p>
+                                        <p className="text-sm font-medium text-foreground truncate">{fullName}</p>
                                         <p className={`text-[10px] font-medium ${statusTextColor}`}>
                                             {/* If we have no rsvpStatus, it means the user was just added locally */}
                                             {!rsvpStatus ? 'Newly Added' : status.charAt(0) + status.slice(1).toLowerCase()}
@@ -1245,7 +1245,7 @@ export const EventModal: React.FC<EventModalProps> = ({
 
                         {/* Empty state for new events */}
                         {!event && attendees.length === 0 && (
-                            <div className="text-center py-8 text-gray-400">
+                            <div className="text-center py-8 text-muted-foreground">
                                 <Users size={28} className="mx-auto mb-2 opacity-40" />
                                 <p className="text-xs">No participants yet</p>
                             </div>
@@ -1254,9 +1254,9 @@ export const EventModal: React.FC<EventModalProps> = ({
 
                     {/* Add Participant */}
                     {!isReadOnly && (
-                        <div className="p-3 border-t border-gray-200 relative">
+                        <div className="p-3 border-t border-border relative">
                             <div
-                                className="flex items-center gap-2.5 p-2.5 rounded-xl border border-dashed border-gray-300 hover:border-blue-400 hover:bg-white cursor-text transition-all"
+                                className="flex items-center gap-2.5 p-2.5 rounded-xl border border-dashed border-border hover:border-blue-400 hover:bg-card cursor-text transition-all"
                                 onClick={() => setShowUserDropdown(true)}
                             >
                                 <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
@@ -1271,15 +1271,15 @@ export const EventModal: React.FC<EventModalProps> = ({
                                         setShowUserDropdown(true);
                                     }}
                                     onFocus={() => setShowUserDropdown(true)}
-                                    className="flex-1 bg-transparent text-sm text-gray-700 placeholder:text-gray-500 focus:outline-none min-w-0"
+                                    className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none min-w-0"
                                 />
                             </div>
 
                             {showUserDropdown && (
                                 <>
                                     <div className="fixed inset-0 z-10" onClick={() => setShowUserDropdown(false)} />
-                                    <div className="absolute bottom-full left-3 right-3 mb-2 bg-white border border-gray-200 rounded-xl shadow-xl z-20 max-h-60 overflow-hidden flex flex-col">
-                                        <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 flex items-center gap-4 text-[10px] font-semibold text-gray-500">
+                                    <div className="absolute bottom-full left-3 right-3 mb-2 bg-popover border border-border rounded-xl shadow-xl z-20 max-h-60 overflow-hidden flex flex-col">
+                                        <div className="px-3 py-2 bg-muted border-b border-border flex items-center gap-4 text-[10px] font-semibold text-muted-foreground">
                                             <span className="flex items-center gap-1">
                                                 <span className="w-2 h-2 rounded-full bg-green-500" />
                                                 Available
@@ -1303,7 +1303,7 @@ export const EventModal: React.FC<EventModalProps> = ({
                                                     return (
                                                         <div
                                                             key={u.id}
-                                                            className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors ${loading ? 'hover:bg-gray-50' : available ? 'hover:bg-green-50' : 'hover:bg-red-50'
+                                                            className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors ${loading ? 'hover:bg-accent' : available ? 'hover:bg-green-500/10' : 'hover:bg-red-500/10'
                                                                 }`}
                                                             onClick={() => {
                                                                 setAttendees(prev => [...prev, u.id]);
@@ -1326,8 +1326,8 @@ export const EventModal: React.FC<EventModalProps> = ({
                                                             </div>
 
                                                             <div className="flex-1 min-w-0">
-                                                                <p className="text-sm font-medium text-gray-900 truncate">{fullName}</p>
-                                                                <p className="text-[11px] text-gray-500 truncate">{u.email}</p>
+                                                                <p className="text-sm font-medium text-foreground truncate">{fullName}</p>
+                                                                <p className="text-[11px] text-muted-foreground truncate">{u.email}</p>
                                                             </div>
 
                                                             <div className={`text-[10px] font-bold px-2 py-1 rounded-full flex-shrink-0 ${loading

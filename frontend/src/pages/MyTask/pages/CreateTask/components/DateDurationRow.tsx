@@ -2,6 +2,7 @@ import React from 'react';
 import { Calendar, Clock } from 'lucide-react';
 import { FormField } from './FormField';
 import { LINE, INPUT_STYLE } from '../createTaskConstants';
+import { useTheme } from '@/hooks/useTheme';
 
 interface DateDurationRowProps {
   startDate: string;
@@ -12,17 +13,21 @@ interface DateDurationRowProps {
   handleDurationChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
-const dateInputStyle: React.CSSProperties = {
-  ...INPUT_STYLE,
-  cursor: 'pointer',
-};
-
 export function DateDurationRow({ startDate, setStartDate, endDate, setEndDate, duration, handleDurationChange }: DateDurationRowProps) {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
+
+  const dateInputStyle: React.CSSProperties = {
+    ...INPUT_STYLE,
+    cursor: 'pointer',
+    colorScheme: isDark ? 'dark' : 'light',
+  };
+
   return (
     <div style={{
       display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12,
-      padding: 16, background: '#f7f8fb',
-      border: `1px solid ${LINE}`, borderRadius: 10,
+      padding: 16, background: 'hsl(var(--muted))',
+      border: `1px solid hsl(var(--border))`, borderRadius: 10,
     }}>
       <FormField label="Start date" icon={<Calendar size={13} />}>
         <input

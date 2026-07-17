@@ -128,7 +128,7 @@ export function AnalyticsTab({
             <span style={{ fontSize: 13 }}>Last 30 days</span>
             <ChevronDown size={11} />
           </button>
-          <button style={{ ...MONTH_BTN, gap: 6, background: '#fff' }}>
+          <button style={{ ...MONTH_BTN, gap: 6, background: 'hsl(var(--card))' }}>
             <Download size={13} color={MUTED} />
             <span style={{ fontSize: 13 }}>Export</span>
           </button>
@@ -210,7 +210,7 @@ export function AnalyticsTab({
                       <button
                         key={`${opt.year}-${opt.month}`}
                         onClick={() => { setSelectedMonth({ year: opt.year, month: opt.month }); setShowChartMonthPicker(() => false); }}
-                        style={{ width: '100%', padding: '9px 14px', border: 'none', background: active ? '#EEF4FF' : '#fff', color: active ? BLUE : TEXT, fontSize: 14, fontWeight: active ? 700 : 500, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
+                        style={{ width: '100%', padding: '9px 14px', border: 'none', background: active ? `${BLUE}18` : 'transparent', color: active ? BLUE : TEXT, fontSize: 14, fontWeight: active ? 700 : 500, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
                       >
                         {opt.label}
                       </button>

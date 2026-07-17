@@ -25,10 +25,10 @@ export const createUserTableColumns = ({ onRoleClick, onDeleteClick }: UserTable
             {user.first_name?.charAt(0) || user.username.charAt(0).toUpperCase()}
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="font-medium text-[#172b4d] truncate">
+            <span className="font-medium text-foreground truncate">
               {user.first_name} {user.last_name}
             </span>
-            <span className="text-[11px] text-gray-400 truncate">{user.email}</span>
+            <span className="text-[11px] text-muted-foreground truncate">{user.email}</span>
           </div>
         </div>
       ),
@@ -53,7 +53,7 @@ export const createUserTableColumns = ({ onRoleClick, onDeleteClick }: UserTable
       key: 'date_joined',
       label: 'Joined Date',
       render: (user: AppUser) => (
-        <span className="text-[12px] text-gray-700">
+        <span className="text-[12px] text-foreground">
           {formatDate(user.date_joined)}
         </span>
       ),
@@ -66,10 +66,10 @@ export const createUserTableColumns = ({ onRoleClick, onDeleteClick }: UserTable
         <div className="flex justify-end">
           <button
             onClick={(e) => { e.stopPropagation(); onDeleteClick(user); }}
-            className="opacity-0 group-hover:opacity-100 transition-all duration-200 p-1.5 hover:bg-red-50 rounded"
+            className="opacity-0 group-hover:opacity-100 transition-all duration-200 p-1.5 hover:bg-red-500/10 rounded"
             title="Delete User"
           >
-            <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-600" />
+            <Trash2 className="w-4 h-4 text-muted-foreground hover:text-red-500" />
           </button>
         </div>
       ),

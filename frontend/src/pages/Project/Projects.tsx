@@ -24,7 +24,7 @@ function ProjectEllipsisMenu({ onOpen, onFav, isFav }: { onOpen: () => void; onF
         onClick={e => { e.stopPropagation(); setOpen(v => !v); }}
         style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', borderRadius: 6, color: MUTED, display: 'flex', alignItems: 'center', opacity: 0 }}
         className="group-hover/row:opacity-100 transition-opacity"
-        onMouseEnter={e => { e.currentTarget.style.background = '#F7F8FB'; e.currentTarget.style.opacity = '1'; }}
+        onMouseEnter={e => { e.currentTarget.style.background = 'hsl(var(--accent))'; e.currentTarget.style.opacity = '1'; }}
         onMouseLeave={e => { if (!open) { e.currentTarget.style.background = 'none'; e.currentTarget.style.opacity = ''; } }}
         title="More options"
       >
@@ -33,14 +33,14 @@ function ProjectEllipsisMenu({ onOpen, onFav, isFav }: { onOpen: () => void; onF
       {open && (
         <>
           <div style={{ position: 'fixed', inset: 0, zIndex: 10 }} onClick={() => setOpen(false)} />
-          <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 200, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(16,24,40,.12)', minWidth: 148, overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 200, background: 'hsl(var(--popover))', border: `1px solid ${LINE}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.18)', minWidth: 148, overflow: 'hidden' }}>
             {[
               { label: 'Open Project', action: (e: React.MouseEvent) => { e.stopPropagation(); setOpen(false); onOpen(); } },
               { label: isFav ? 'Remove Favourite' : 'Add to Favourites', action: (e: React.MouseEvent) => { setOpen(false); onFav(e); } },
             ].map(item => (
               <button key={item.label} onClick={item.action}
                 style={{ width: '100%', padding: '8px 12px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: TEXT, textAlign: 'left', fontFamily: 'inherit' }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#F7F8FB')}
+                onMouseEnter={e => (e.currentTarget.style.background = 'hsl(var(--accent))')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
                 {item.label}
@@ -53,7 +53,7 @@ function ProjectEllipsisMenu({ onOpen, onFav, isFav }: { onOpen: () => void; onF
   );
 }
 
-const th: React.CSSProperties = { textAlign: 'left', color: '#172033', fontSize: 14, fontWeight: 800, padding: '14px 16px', borderBottom: `1px solid ${LINE}`, borderRight: `1px solid ${LINE}`, background: '#f9fafb', whiteSpace: 'nowrap' as const, position: 'sticky', top: 0, zIndex: 1 };
+const th: React.CSSProperties = { textAlign: 'left', color: 'hsl(var(--foreground))', fontSize: 14, fontWeight: 800, padding: '14px 16px', borderBottom: `1px solid ${LINE}`, borderRight: `1px solid ${LINE}`, background: 'hsl(var(--muted))', whiteSpace: 'nowrap' as const, position: 'sticky', top: 0, zIndex: 1 };
 const td: React.CSSProperties = { padding: '14px 16px', borderBottom: `1px solid ${LINE}`, borderRight: `1px solid ${LINE}`, verticalAlign: 'middle', fontSize: 14, color: TEXT };
 
 // ── Reusable sortable + filterable column header 
@@ -159,10 +159,10 @@ export function Projects() {
   const typeLabel   = TYPE_OPTIONS.find(o => o.value === p.typeFilter)?.label ?? 'All Types';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#fff', overflow: 'hidden' }}>
+   <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'hsl(var(--background))', overflow: 'hidden' }}>
 
      {/* TOP BAR */}
-      <div className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40" style={{ flexShrink: 0, background: '#fff', borderBottom: `1px solid ${LINE}`, paddingTop: 16, paddingBottom: 16 }}>
+      <div className="px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40" style={{ flexShrink: 0, background: 'hsl(var(--card))', borderBottom: `1px solid ${LINE}`, paddingTop: 16, paddingBottom: 16 }}>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
           <div>
@@ -177,17 +177,17 @@ export function Projects() {
         </div>
 
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 14 }}>
-          <div style={{ flex: 1, height: 40, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 8, display: 'flex', alignItems: 'center', padding: '0 12px', gap: 10, minWidth: 0 }}>
+          <div style={{ flex: 1, height: 40, background: 'hsl(var(--input))', border: `1px solid ${LINE}`, borderRadius: 8, display: 'flex', alignItems: 'center', padding: '0 12px', gap: 10, minWidth: 0 }}>
             <Search className="w-4 h-4" style={{ color: MUTED, flexShrink: 0 }} />
             <input value={p.searchTerm} onChange={e => p.setSearchTerm(e.target.value)} placeholder="Search projects by name or client..." style={{ flex: 1, border: 'none', outline: 'none', fontSize: 14, color: TEXT, fontFamily: 'inherit', background: 'transparent', minWidth: 0 }} />
-            <span style={{ background: '#f5f7fb', border: '1px solid #e3e8ef', borderRadius: 5, padding: '2px 8px', fontSize: 12, fontWeight: 700, color: MUTED, flexShrink: 0 }}>⌘ K</span>
+            <span style={{ background: 'hsl(var(--muted))', border: `1px solid ${LINE}`, borderRadius: 5, padding: '2px 8px', fontSize: 12, fontWeight: 700, color: MUTED, flexShrink: 0 }}>⌘ K</span>
           </div>
           {/* ── Status dropdown ── */}
           <div style={{ position: 'relative', flexShrink: 0 }}>
             {showStatusDrop && <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={() => setShowStatusDrop(false)} />}
             <button
               onClick={() => { setShowStatusDrop(v => !v); setShowTypeDrop(false); }}
-              style={{ height: 40, display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', border: `1px solid ${showStatusDrop ? BLUE : LINE}`, borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 16, fontWeight: 600, color: p.statusFilter ? TEXT : MUTED, whiteSpace: 'nowrap', minWidth: 100 }}
+              style={{ height: 40, display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', border: `1px solid ${showStatusDrop ? BLUE : LINE}`, borderRadius: 8, background: 'hsl(var(--card))', cursor: 'pointer', fontSize: 16, fontWeight: 600, color: p.statusFilter ? TEXT : MUTED, whiteSpace: 'nowrap', minWidth: 100 }}
             >
               {p.statusFilter && STATUS_OPTIONS.find(o => o.value === p.statusFilter)?.dot && (
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: STATUS_OPTIONS.find(o => o.value === p.statusFilter)?.dot, flexShrink: 0 }} />
@@ -196,11 +196,11 @@ export function Projects() {
               <ChevronDown size={14} color={MUTED} style={{ marginLeft: 'auto', transition: 'transform 0.2s', transform: showStatusDrop ? 'rotate(180deg)' : 'none' }} />
             </button>
             {showStatusDrop && (
-              <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 50, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(16,24,40,.12)', minWidth: 160, overflow: 'hidden', padding: '4px 0' }}>
+              <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 50, background: 'hsl(var(--popover))', border: `1px solid ${LINE}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.18)', minWidth: 160, overflow: 'hidden', padding: '4px 0' }}>
                 {STATUS_OPTIONS.map(opt => (
                   <button key={opt.value} onClick={() => { p.setStatusFilter(opt.value); setShowStatusDrop(false); }}
-                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', border: 'none', background: p.statusFilter === opt.value ? '#EEF4FF' : 'transparent', cursor: 'pointer', fontSize: 16, fontWeight: p.statusFilter === opt.value ? 700 : 500, color: p.statusFilter === opt.value ? BLUE : TEXT, textAlign: 'left', fontFamily: 'inherit', transition: 'background 0.12s' }}
-                    onMouseEnter={e => { if (p.statusFilter !== opt.value) e.currentTarget.style.background = '#F7F8FB'; }}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', border: 'none', background: p.statusFilter === opt.value ? `${BLUE}18` : 'transparent', cursor: 'pointer', fontSize: 16, fontWeight: p.statusFilter === opt.value ? 700 : 500, color: p.statusFilter === opt.value ? BLUE : TEXT, textAlign: 'left', fontFamily: 'inherit', transition: 'background 0.12s' }}
+                    onMouseEnter={e => { if (p.statusFilter !== opt.value) e.currentTarget.style.background = 'hsl(var(--accent))'; }}
                     onMouseLeave={e => { if (p.statusFilter !== opt.value) e.currentTarget.style.background = 'transparent'; }}
                   >
                     {opt.dot ? <span style={{ width: 8, height: 8, borderRadius: '50%', background: opt.dot, flexShrink: 0 }} /> : <span style={{ width: 8 }} />}
@@ -217,7 +217,7 @@ export function Projects() {
             {showTypeDrop && <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={() => setShowTypeDrop(false)} />}
             <button
               onClick={() => { setShowTypeDrop(v => !v); setShowStatusDrop(false); }}
-              style={{ height: 40, display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', border: `1px solid ${showTypeDrop ? BLUE : LINE}`, borderRadius: 8, background: '#fff', cursor: 'pointer', fontSize: 16, fontWeight: 600, color: p.typeFilter ? TEXT : MUTED, whiteSpace: 'nowrap', minWidth: 120 }}
+              style={{ height: 40, display: 'flex', alignItems: 'center', gap: 8, padding: '0 12px', border: `1px solid ${showTypeDrop ? BLUE : LINE}`, borderRadius: 8, background: 'hsl(var(--card))', cursor: 'pointer', fontSize: 16, fontWeight: 600, color: p.typeFilter ? TEXT : MUTED, whiteSpace: 'nowrap', minWidth: 120 }}
             >
               {p.typeFilter && TYPE_OPTIONS.find(o => o.value === p.typeFilter)?.dot && (
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: TYPE_OPTIONS.find(o => o.value === p.typeFilter)?.dot, flexShrink: 0 }} />
@@ -226,11 +226,11 @@ export function Projects() {
               <ChevronDown size={14} color={MUTED} style={{ marginLeft: 'auto', transition: 'transform 0.2s', transform: showTypeDrop ? 'rotate(180deg)' : 'none' }} />
             </button>
             {showTypeDrop && (
-              <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 50, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(16,24,40,.12)', minWidth: 180, overflow: 'hidden', padding: '4px 0' }}>
+              <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 50, background: 'hsl(var(--popover))', border: `1px solid ${LINE}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.18)', minWidth: 180, overflow: 'hidden', padding: '4px 0' }}>
                 {TYPE_OPTIONS.map(opt => (
                   <button key={opt.value} onClick={() => { p.setTypeFilter(opt.value); setShowTypeDrop(false); }}
-                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', border: 'none', background: p.typeFilter === opt.value ? '#EEF4FF' : 'transparent', cursor: 'pointer', fontSize: 16, fontWeight: p.typeFilter === opt.value ? 700 : 500, color: p.typeFilter === opt.value ? BLUE : TEXT, textAlign: 'left', fontFamily: 'inherit', transition: 'background 0.12s' }}
-                    onMouseEnter={e => { if (p.typeFilter !== opt.value) e.currentTarget.style.background = '#F7F8FB'; }}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', border: 'none', background: p.typeFilter === opt.value ? `${BLUE}18` : 'transparent', cursor: 'pointer', fontSize: 16, fontWeight: p.typeFilter === opt.value ? 700 : 500, color: p.typeFilter === opt.value ? BLUE : TEXT, textAlign: 'left', fontFamily: 'inherit', transition: 'background 0.12s' }}
+                    onMouseEnter={e => { if (p.typeFilter !== opt.value) e.currentTarget.style.background = 'hsl(var(--accent))'; }}
                     onMouseLeave={e => { if (p.typeFilter !== opt.value) e.currentTarget.style.background = 'transparent'; }}
                   >
                     {opt.dot ? <span style={{ width: 8, height: 8, borderRadius: '50%', background: opt.dot, flexShrink: 0 }} /> : <span style={{ width: 8 }} />}
@@ -271,7 +271,7 @@ export function Projects() {
             onClear={() => p.setSelectedIds(new Set())}
             emptyHint="Select projects to perform bulk actions"
           >
-            <button onClick={() => p.setShowMoveModal(true)} style={{ height: 34, border: `1px solid ${LINE}`, borderRadius: 6, background: '#fff', padding: '0 14px', fontSize: 16, fontWeight: 600, display: 'inline-flex', gap: 7, alignItems: 'center', cursor: 'pointer', color: TEXT }}>
+            <button onClick={() => p.setShowMoveModal(true)} style={{ height: 34, border: `1px solid ${LINE}`, borderRadius: 6, background: 'hsl(var(--card))', padding: '0 14px', fontSize: 16, fontWeight: 600, display: 'inline-flex', gap: 7, alignItems: 'center', cursor: 'pointer', color: TEXT }}>
               <Move size={14} />Move
             </button>
             <button
@@ -279,7 +279,7 @@ export function Projects() {
                 const firstSelectedId = [...p.selectedIds][0];
                 if (firstSelectedId) p.navigate(`/projects/${firstSelectedId}/settings`);
               }}
-              style={{ height: 34, border: `1px solid ${LINE}`, borderRadius: 6, background: '#fff', padding: '0 14px', fontSize: 16, fontWeight: 600, display: 'inline-flex', gap: 7, alignItems: 'center', cursor: 'pointer', color: TEXT }}
+              style={{ height: 34, border: `1px solid ${LINE}`, borderRadius: 6, background: 'hsl(var(--card))', padding: '0 14px', fontSize: 16, fontWeight: 600, display: 'inline-flex', gap: 7, alignItems: 'center', cursor: 'pointer', color: TEXT }}
             >
               <Settings size={14} />Edit
             </button>
@@ -299,15 +299,15 @@ export function Projects() {
                   if (groupProjects.length === 0) return null;
                   return (
                     <div key={group.label} style={{ marginBottom: 16, border: `1px solid ${LINE}`, borderRadius: 10, overflow: 'hidden' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#f9fafb', borderBottom: `1px solid ${LINE}` }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: 'hsl(var(--muted))', borderBottom: `1px solid ${LINE}` }}>
                         <Folder className="w-4 h-4" style={{ color: group.color }} />
                         <span style={{ fontWeight: 700, fontSize: 14, color: TEXT, flex: 1 }}>{group.label}</span>
-                        <span style={{ fontSize: 12, color: MUTED, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, padding: '2px 10px', fontWeight: 600 }}>{groupProjects.length} {groupProjects.length === 1 ? 'project' : 'projects'}</span>
+                        <span style={{ fontSize: 12, color: MUTED, background: 'hsl(var(--card))', border: `1px solid ${LINE}`, borderRadius: 12, padding: '2px 10px', fontWeight: 600 }}>{groupProjects.length} {groupProjects.length === 1 ? 'project' : 'projects'}</span>
                       </div>
                       {groupProjects.map((proj, idx) => {
                         const color = getTypeHex((proj as any).task_type); const tint = getTypeBg((proj as any).task_type); const members = (proj as any).members || []; const isSel = p.selectedIds.has(proj.id);
                         return (
-                          <div key={proj.id} onClick={() => p.handleDetailProject(proj)} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderBottom: idx < groupProjects.length - 1 ? `1px solid ${LINE}` : 'none', background: isSel ? '#f7faff' : '#fff', cursor: 'pointer', paddingLeft: 36, minHeight: 56 }} onMouseOver={e => { if (!isSel) e.currentTarget.style.background = '#f3f4f6'; }} onMouseOut={e => { e.currentTarget.style.background = isSel ? '#f7faff' : '#fff'; }}>
+                          <div key={proj.id} onClick={() => p.handleDetailProject(proj)} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderBottom: idx < groupProjects.length - 1 ? `1px solid ${LINE}` : 'none', background: isSel ? `${BLUE}0d` : 'hsl(var(--card))', cursor: 'pointer', paddingLeft: 36, minHeight: 56 }} onMouseOver={e => { if (!isSel) e.currentTarget.style.background = 'hsl(var(--accent))'; }} onMouseOut={e => { e.currentTarget.style.background = isSel ? `${BLUE}0d` : 'hsl(var(--card))'; }}>
                             <div
                               onClick={e => { e.stopPropagation(); p.toggleSelect(proj.id); }}
                               title={isSel ? 'Deselect' : 'Select'}
@@ -516,7 +516,7 @@ export function Projects() {
                   ) : p.paginated.map((proj, idx) => {
                     const color = getTypeHex((proj as any).task_type); const tint = getTypeBg((proj as any).task_type); const members = (proj as any).members || []; const isSel = p.selectedIds.has(proj.id); const isDetail = p.detailProject?.id === proj.id;
                     return (
-                      <tr key={proj.id} onClick={() => p.handleDetailProject(proj)} onMouseEnter={() => p.handleRowHover(proj)} style={{ background: isSel ? '#f7faff' : idx % 2 === 0 ? '#fff' : '#fafbfc', cursor: 'pointer', borderLeft: isDetail ? `3px solid ${color}` : '3px solid transparent' }} onMouseOver={e => { if (!isSel && !isDetail) e.currentTarget.style.background = '#f3f4f6'; }} onMouseOut={e => { e.currentTarget.style.background = isSel ? '#f7faff' : idx % 2 === 0 ? '#fff' : '#fafbfc'; }}>
+                      <tr key={proj.id} onClick={() => p.handleDetailProject(proj)} onMouseEnter={() => p.handleRowHover(proj)} style={{ background: isSel ? `${BLUE}0d` : idx % 2 === 0 ? 'hsl(var(--card))' : 'hsl(var(--muted)/0.4)', cursor: 'pointer', borderLeft: isDetail ? `3px solid ${color}` : '3px solid transparent' }} onMouseOver={e => { if (!isSel && !isDetail) e.currentTarget.style.background = 'hsl(var(--accent))'; }} onMouseOut={e => { e.currentTarget.style.background = isSel ? `${BLUE}0d` : idx % 2 === 0 ? 'hsl(var(--card))' : 'hsl(var(--muted)/0.4)'; }}>
                         <td style={{ ...td, width: 44, minWidth: 44, maxWidth: 44, padding: '14px 4px', textAlign: 'center' }}>
                           {/* Avatar doubles as checkbox  */}
                           <div

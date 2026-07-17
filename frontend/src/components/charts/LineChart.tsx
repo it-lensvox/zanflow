@@ -21,7 +21,7 @@ export function LineChart({ series, labels }: LineChartProps) {
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} style={{ display: 'block' }}>
         {[0, 0.25, 0.5, 0.75, 1].map((g, i) => (
-          <line key={i} x1="0" x2={W} y1={py(allMax * g)} y2={py(allMax * g)} stroke="#E6EBF2" strokeWidth="1" />
+          <line key={i} x1="0" x2={W} y1={py(allMax * g)} y2={py(allMax * g)} stroke="hsl(var(--border))" strokeWidth="1" />
         ))}
         {series.map((s, si) => {
           const pts = s.data.map((v, i) => `${px(i)},${py(v)}`).join(' ');
@@ -31,7 +31,7 @@ export function LineChart({ series, labels }: LineChartProps) {
           <circle key={`${si}-${i}`} cx={px(i)} cy={py(v)} r="3.5" fill={s.color} />
         )))}
       </svg>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#9CA3AF', padding: '4px 2px 0' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'hsl(var(--muted-foreground))', padding: '4px 2px 0' }}>
         {xLabels.map((l, i) => <span key={i}>{l}</span>)}
       </div>
     </div>

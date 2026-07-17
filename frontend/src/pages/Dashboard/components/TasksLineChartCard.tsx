@@ -55,14 +55,14 @@ export function TasksLineChartCard({
             <ChevronDown size={11} />
           </button>
           {showChartMonthPicker && (
-            <div style={{ position: 'absolute', top: 42, right: 0, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.10)', zIndex: 200, overflow: 'hidden', minWidth: 170 }}>
+            <div style={{ position: 'absolute', top: 42, right: 0, background: 'hsl(var(--popover))', border: `1px solid ${LINE}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.18)', zIndex: 200, overflow: 'hidden', minWidth: 170 }}>
               {monthOptions.map(opt => {
                 const active = selectedMonth.year === opt.year && selectedMonth.month === opt.month;
                 return (
                   <button
                     key={`${opt.year}-${opt.month}`}
                     onClick={() => { setSelectedMonth({ year: opt.year, month: opt.month }); setShowChartMonthPicker(() => false); }}
-                    style={{ width: '100%', padding: '9px 14px', border: 'none', background: active ? '#EEF4FF' : '#fff', color: active ? BLUE : TEXT, fontSize: 14, fontWeight: active ? 700 : 500, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
+                    style={{ width: '100%', padding: '9px 14px', border: 'none', background: active ? `${BLUE}18` : 'transparent', color: active ? BLUE : TEXT, fontSize: 14, fontWeight: active ? 700 : 500, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
                   >
                     {opt.label}
                   </button>

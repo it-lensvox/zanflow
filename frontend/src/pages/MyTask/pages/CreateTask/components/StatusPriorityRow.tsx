@@ -24,8 +24,8 @@ const selectTrigger: React.CSSProperties = {
 
 const dropdownStyle: React.CSSProperties = {
   position: 'absolute', zIndex: 20, top: 'calc(100% + 4px)', left: 0, right: 0,
-  background: '#fff', border: `1px solid ${LINE}`, borderRadius: 10,
-  boxShadow: '0 8px 24px rgba(16,24,40,.1)', overflow: 'hidden',
+  background: 'hsl(var(--popover))', border: `1px solid ${LINE}`, borderRadius: 10,
+  boxShadow: '0 8px 24px rgba(0,0,0,.18)', overflow: 'hidden',
 };
 
 const checkIcon = (
@@ -63,7 +63,7 @@ export function StatusPriorityRow({
               <div
                 key={opt.value}
                 style={{ padding: '9px 14px', fontSize: 13, color: TEXT, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#f7f8fb')}
+                onMouseEnter={e => (e.currentTarget.style.background = 'hsl(var(--accent))')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 onClick={() => { setStatus(opt.value); setStatusDropdownOpen(false); }}
               >
@@ -103,7 +103,7 @@ export function StatusPriorityRow({
               <div
                 key={opt.value}
                 style={{ padding: '9px 14px', fontSize: 13, color: TEXT, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#f7f8fb')}
+                onMouseEnter={e => (e.currentTarget.style.background = 'hsl(var(--accent))')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 onClick={() => { setPriority(opt.value); setPriorityDropdownOpen(false); }}
               >

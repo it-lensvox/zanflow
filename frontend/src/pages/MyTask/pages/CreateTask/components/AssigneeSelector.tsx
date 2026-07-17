@@ -21,15 +21,15 @@ interface AssigneeSelectorProps {
 const chipStyle: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 4,
   padding: '2px 8px', borderRadius: 6,
-  background: '#f1f5f9', color: '#334155',
+  background: 'hsl(var(--muted))', color: 'hsl(var(--foreground))',
   fontSize: 12, fontWeight: 500,
-  border: '1px solid #e2e8f0',
+  border: '1px solid hsl(var(--border))',
 };
 
 const dropdownStyle: React.CSSProperties = {
   position: 'absolute', zIndex: 20, top: 'calc(100% + 4px)', left: 0, right: 0,
-  background: '#fff', border: `1px solid ${LINE}`, borderRadius: 10,
-  boxShadow: '0 8px 24px rgba(16,24,40,.1)', maxHeight: 220, overflowY: 'auto',
+  background: 'hsl(var(--popover))', border: `1px solid ${LINE}`, borderRadius: 10,
+  boxShadow: '0 8px 24px rgba(0,0,0,.18)', maxHeight: 220, overflowY: 'auto',
 };
 
 export function AssigneeSelector({
@@ -104,7 +104,7 @@ export function AssigneeSelector({
               key={user.id}
               style={{
                 padding: '9px 14px', fontSize: 13, cursor: 'pointer',
-                background: i === highlightedUserIndex ? '#eef3ff' : 'transparent',
+                background: i === highlightedUserIndex ? 'hsl(var(--accent))' : 'transparent',
                 color: i === highlightedUserIndex ? '#1663f6' : TEXT,
               }}
               onMouseEnter={() => setHighlightedUserIndex(i)}

@@ -91,10 +91,10 @@ export const MyTask: React.FC = () => {
     <button
       ref={t.dateTriggerRef}
       onClick={t.openDateDropdown}
-      className="flex items-center gap-1 text-[14px] font-bold tracking-wide text-gray-700 hover:text-purple-600 transition-colors"
+      className="flex items-center gap-1 text-[14px] font-bold tracking-wide text-foreground hover:text-purple-500 transition-colors"
     >
       {t.activeDateLabel}
-      <svg className="w-3 h-3 mt-0.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-3 h-3 mt-0.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
       </svg>
     </button>
@@ -105,10 +105,10 @@ export const MyTask: React.FC = () => {
       ref={t.personTriggerRef}
       type="button"
       onClick={t.openPersonDropdown}
-      className="flex items-center gap-1 text-[14px] font-bold tracking-wide text-gray-700 hover:text-purple-600 transition-colors"
+      className="flex items-center gap-1 text-[14px] font-bold tracking-wide text-foreground hover:text-purple-500 transition-colors"
     >
       {t.activePersonLabel}
-      <svg className="w-3 h-3 mt-0.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-3 h-3 mt-0.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
       </svg>
     </button>
@@ -117,7 +117,7 @@ export const MyTask: React.FC = () => {
   if (!isBoard) return <Outlet />;
 
   return (
-   <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#fff', overflow: 'hidden' }}>
+   <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'hsl(var(--background))', overflow: 'hidden' }}>
 
       {/* ── Sticky header ── */}
       <TaskBoardHeader
@@ -145,7 +145,7 @@ export const MyTask: React.FC = () => {
       >
        {/* Bulk action bar — table and grid share the same bar and logic */}
         {t.selectedTaskIds.size > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', marginBottom: 4, background: '#f8faff', border: '1px solid #dfe1e6', borderRadius: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', marginBottom: 4, background: `#1663f60d`, border: '1px solid hsl(var(--border))', borderRadius: 8 }}>
             {/* Select-all toggle */}
             <div
               onClick={() => t.toggleAllTasks(t.filteredTasks)}
@@ -159,15 +159,15 @@ export const MyTask: React.FC = () => {
             <span style={{ fontSize: 13, fontWeight: 700, color: '#1663f6', background: '#EEF4FF', border: '1px solid #c7d7fd', borderRadius: 6, padding: '4px 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
               {t.selectedTaskIds.size} selected
             </span>
-            <button
+           <button
               onClick={handleBulkDeleteClick}
-              style={{ height: 32, border: '1px solid #fca5a5', borderRadius: 6, background: '#fff', padding: '0 14px', fontSize: 13, fontWeight: 600, display: 'inline-flex', gap: 6, alignItems: 'center', cursor: 'pointer', color: '#dc2626' }}
+              style={{ height: 32, border: '1px solid #fca5a5', borderRadius: 6, background: 'hsl(var(--card))', padding: '0 14px', fontSize: 13, fontWeight: 600, display: 'inline-flex', gap: 6, alignItems: 'center', cursor: 'pointer', color: '#dc2626' }}
             >
               <Trash2 size={13} /> Delete
             </button>
             <button
               onClick={() => { t.toggleAllTasks([]); setIsGridSelectionMode(false); }}
-              style={{ marginLeft: 'auto', height: 32, border: '1px solid #e5e7eb', borderRadius: 6, background: 'none', padding: '0 12px', fontSize: 13, fontWeight: 500, cursor: 'pointer', color: '#667085' }}
+              style={{ marginLeft: 'auto', height: 32, border: '1px solid hsl(var(--border))', borderRadius: 6, background: 'none', padding: '0 12px', fontSize: 13, fontWeight: 500, cursor: 'pointer', color: 'hsl(var(--muted-foreground))' }}
             >
               Clear
             </button>
@@ -304,35 +304,35 @@ export const MyTask: React.FC = () => {
         />
 
         {/* ── Pagination bar — shown for both table and grid ── */}
-        {t.viewMode === 'grid' && !isGridSelectionMode && t.filteredTasks.length > 0 && (
-          <p style={{ fontSize: 12, color: '#94a3b8', textAlign: 'center', padding: '4px 0 0', margin: 0 }}>
+       {t.viewMode === 'grid' && !isGridSelectionMode && t.filteredTasks.length > 0 && (
+          <p style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))', textAlign: 'center', padding: '4px 0 0', margin: 0 }}>
             Double-click any card to enter selection mode
           </p>
         )}
 
         {(t.viewMode === 'table' || t.viewMode === 'grid') && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 4px', marginTop: 4, gap: 12 }}>
-            <span style={{ fontSize: 13, color: '#667085' }}>
+            <span style={{ fontSize: 13, color: 'hsl(var(--muted-foreground))' }}>
               {t.isFetchingNextPage
                 ? 'Loading…'
                 : `Showing ${t.totalCount === 0 ? 0 : (t.currentPage - 1) * 20 + 1}–${Math.min(t.currentPage * 20, t.totalCount)} of ${t.totalCount} tasks`
               }
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <button
+             <button
                 onClick={() => t.setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={!t.hasPrevPage || t.isFetchingNextPage}
-                style={{ height: 32, padding: '0 14px', borderRadius: 6, border: '1px solid #dfe1e6', background: '#fff', fontSize: 13, fontWeight: 500, color: t.hasPrevPage ? '#172033' : '#9ca3af', cursor: t.hasPrevPage ? 'pointer' : 'not-allowed' }}
+                style={{ height: 32, padding: '0 14px', borderRadius: 6, border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))', fontSize: 13, fontWeight: 500, color: t.hasPrevPage ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))', cursor: t.hasPrevPage ? 'pointer' : 'not-allowed' }}
               >
                 ← Prev
               </button>
-              <span style={{ fontSize: 13, color: '#172033', fontWeight: 600, padding: '0 8px' }}>
+              <span style={{ fontSize: 13, color: 'hsl(var(--foreground))', fontWeight: 600, padding: '0 8px' }}>
                 {t.currentPage} / {t.totalPages}
               </span>
               <button
                 onClick={() => t.setCurrentPage(p => Math.min(t.totalPages, p + 1))}
                 disabled={!t.hasNextPage || t.isFetchingNextPage}
-                style={{ height: 32, padding: '0 14px', borderRadius: 6, border: '1px solid #dfe1e6', background: '#fff', fontSize: 13, fontWeight: 500, color: t.hasNextPage ? '#172033' : '#9ca3af', cursor: t.hasNextPage ? 'pointer' : 'not-allowed' }}
+                style={{ height: 32, padding: '0 14px', borderRadius: 6, border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))', fontSize: 13, fontWeight: 500, color: t.hasNextPage ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))', cursor: t.hasNextPage ? 'pointer' : 'not-allowed' }}
               >
                 Next →
               </button>
@@ -344,12 +344,12 @@ export const MyTask: React.FC = () => {
         {t.viewMode === 'table' && !t.isInlineCreating && (
           <div
             onClick={() => t.setIsInlineCreating(true)}
-            style={{ padding: '10px 12px', borderTop: `1px solid ${LINE}`, background: '#fff', cursor: 'pointer', borderRadius: '0 0 8px 8px', marginTop: -1 }}
-            className="hover:bg-gray-50 transition-colors"
+            style={{ padding: '10px 12px', borderTop: `1px solid hsl(var(--border))`, background: 'hsl(var(--card))', cursor: 'pointer', borderRadius: '0 0 8px 8px', marginTop: -1 }}
+            className="hover:bg-accent transition-colors"
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 16, color: '#9CA3AF', fontWeight: 500 }}>
-              <Plus size={15} className="text-gray-400" />
-              <span className="hover:text-blue-600 transition-colors">Create task</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 16, color: 'hsl(var(--muted-foreground))', fontWeight: 500 }}>
+              <Plus size={15} />
+              <span className="hover:text-blue-500 transition-colors">Create task</span>
             </div>
           </div>
         )}

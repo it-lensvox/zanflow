@@ -48,7 +48,7 @@ function AIBtn({ loading, onClick, title }: { loading: boolean; onClick: () => v
   );
 }
 
-// ── Form body — rendered inside the standard Modal ──────────────────────────
+// ── Form body 
 function CreateTaskContent({ f, fixedProjectId }: { f: ReturnType<typeof useCreateTask>; fixedProjectId?: number }) {
   return (
     <>
@@ -97,9 +97,9 @@ function CreateTaskContent({ f, fixedProjectId }: { f: ReturnType<typeof useCrea
               type="button"
               onClick={f.handleMinimize}
               title="Minimize"
-              style={{ width: 36, height: 36, borderRadius: 7, border: `1px solid ${LINE}`, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, transition: 'all .15s' }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#f7f8fb')}
-              onMouseLeave={e => (e.currentTarget.style.background = '#fff')}
+              style={{ width: 36, height: 36, borderRadius: 7, border: `1px solid ${LINE}`, background: 'hsl(var(--card))', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: MUTED, transition: 'all .15s' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'hsl(var(--accent))')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'hsl(var(--card))')}
             >
               <Minus size={14} />
             </button>
@@ -111,7 +111,7 @@ function CreateTaskContent({ f, fixedProjectId }: { f: ReturnType<typeof useCrea
       <form
         id="create-task-form"
         onSubmit={f.handleSubmit}
-        className="p-6 space-y-6"
+        className="p-4 space-y-4"
         style={{ background: BG, fontFamily: '-apple-system,BlinkMacSystemFont,"Inter",system-ui,sans-serif' }}
       >
 
@@ -261,7 +261,7 @@ export const CreateTask: React.FC<CreateTaskProps> = (props) => {
   }
 
   return (
-    <Modal isOpen onClose={f.handleClose} maxWidth="max-w-3xl">
+    <Modal isOpen onClose={f.handleClose} maxWidth="max-w-4xl">
       <CreateTaskContent f={f} fixedProjectId={fixedProjectId} />
     </Modal>
   );

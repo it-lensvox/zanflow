@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Bell, Calendar, ChevronDown, LayoutDashboard, ListTodo, BarChart2, Star, Moon, Search, HelpCircle, Plus, Pencil, Trash2, MoreHorizontal } from 'lucide-react';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { NotificationsPage } from '@/pages/NotificationsPage';
 import { CreateProjectModal } from '@/pages/Project/CreateProjectModal';
 import { DocumentPreview } from '@/components/common/DocumentPreview';
@@ -147,7 +148,7 @@ export function Dashboard() {
       <div
         style={{
           position: 'sticky', top: 0, zIndex: 27,
-          background: '#fff', borderBottom: `1px solid ${LINE}`,
+         background: 'hsl(var(--card))', borderBottom: `1px solid ${LINE}`,
           display: 'flex', alignItems: 'center',
           height: 52, padding: '0 20px', gap: 12,
         }}
@@ -164,11 +165,11 @@ export function Dashboard() {
             aria-label="Open menu"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <path d="M2 4h14M2 9h14M2 14h14" stroke="#344054" strokeWidth="1.75" strokeLinecap="round" />
+              <path d="M2 4h14M2 9h14M2 14h14" stroke="hsl(var(--muted-foreground))" strokeWidth="1.75" strokeLinecap="round" />
             </svg>
           </button>
           <span style={{ color: MUTED, fontWeight: 500 }}>DYUKSA</span>
-          <span style={{ color: '#CBD5E1' }}> </span>
+          <span style={{ color: 'hsl(var(--border))' }}> </span>
           <span style={{ color: TEXT, fontWeight: 700 }}>Dashboard</span>
         </div>
 
@@ -180,19 +181,29 @@ export function Dashboard() {
           style={{ ...MONTH_BTN, flex: '0 1 40%', minWidth: 160, gap: 8, height: 34, padding: '0 12px', marginLeft: 'auto' }}
         >
           <Search size={13} color={MUTED} />
-          <span style={{ flex: 1, textAlign: 'left', fontSize: 13, color: '#9CA3AF' }}>Search anything…</span>
-          <kbd style={{ marginLeft: 'auto', background: '#F3F4F6', border: '1px solid #E3E8EF', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700, color: '#6B7280' }}>⌘K</kbd>
+          <span style={{ flex: 1, textAlign: 'left', fontSize: 13, color: 'hsl(var(--muted-foreground))' }}>Search anything…</span>
+         <kbd style={{ marginLeft: 'auto', background: 'hsl(var(--muted))', border: '1px solid hsl(var(--border))', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700, color: 'hsl(var(--muted-foreground))' }}>⌘K</kbd>
         </button>
 
         {/* Right: theme + new task + bell + help */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          {/* Theme toggle — UI only, not yet active */}
-          <button
-            style={{ width: 34, height: 34, border: `1px solid ${LINE}`, borderRadius: 8, background: '#fff', cursor: 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, opacity: 0.5 }}
-            title="Dark mode coming soon"
+          {/* Theme toggle — active */}
+          <div
+            style={{
+              width: 34, height: 34,
+              border: `1px solid ${LINE}`,
+              borderRadius: 8,
+              background: 'hsl(var(--accent))',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0, cursor: 'pointer',
+              boxShadow: '0 1px 3px rgba(0,0,0,.06)',
+              transition: 'background .2s',
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = 'hsl(var(--secondary))'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = 'hsl(var(--accent))'; }}
           >
-            <Moon size={15} color={TEXT} />
-          </button>
+            <ThemeToggle />
+          </div>
 
           {/* + New task (moved from row 3) */}
           <QuickCreateButton />
@@ -200,7 +211,7 @@ export function Dashboard() {
           {/* Notifications bell (moved from row 3) */}
           <button
             onClick={() => db.setIsActivityOpen(!db.isActivityOpen)}
-            style={{ position: 'relative', width: 34, height: 34, border: `1px solid ${LINE}`, borderRadius: 8, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+           style={{ position: 'relative', width: 34, height: 34, border: `1px solid ${LINE}`, borderRadius: 8, background: 'hsl(var(--card))', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
           >
             <Bell size={15} color={TEXT} />
             {db.unreadCount > 0 && (
@@ -211,7 +222,7 @@ export function Dashboard() {
           </button>
           {/* Help */}
           <button
-            style={{ width: 34, height: 34, border: `1px solid ${LINE}`, borderRadius: 8, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+            style={{ width: 34, height: 34, border: `1px solid ${LINE}`, borderRadius: 8, background: 'hsl(var(--card))', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
             className="hidden sm:flex"
           >
             <HelpCircle size={15} color={MUTED} />
@@ -243,7 +254,7 @@ export function Dashboard() {
                   color: active ? '#fff' : MUTED,
                   transition: 'all 0.15s',
                 }}
-                onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#F1F5F9'; }}
+                onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'hsl(var(--accent))'; }}
                 onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent'; }}
               >
                 {tab.icon}
@@ -268,14 +279,14 @@ export function Dashboard() {
             style={{
               display: 'flex', alignItems: 'center', gap: 6, fontSize: 13,
               color: defaultTab === activeTab ? '#1663f6' : MUTED,
-              background: defaultTab === activeTab ? '#EEF3FF' : 'none',
+              background: defaultTab === activeTab ? `${BLUE}15` : 'none',
               border: `1px solid ${defaultTab === activeTab ? '#C7D7FD' : 'transparent'}`,
               cursor: 'pointer', padding: '5px 10px', borderRadius: 7,
               fontFamily: 'inherit', fontWeight: defaultTab === activeTab ? 600 : 500,
               transition: 'all 0.15s',
             }}
             onMouseEnter={e => {
-              if (defaultTab !== activeTab) e.currentTarget.style.background = '#F7F8FB';
+              if (defaultTab !== activeTab) e.currentTarget.style.background = 'hsl(var(--accent))';
             }}
             onMouseLeave={e => {
               if (defaultTab !== activeTab) e.currentTarget.style.background = 'none';
@@ -299,7 +310,7 @@ export function Dashboard() {
               style={{
                 width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 border: `1px solid ${switcherOpen ? BLUE : LINE}`,
-                borderRadius: 7, background: switcherOpen ? '#EEF4FF' : '#fff',
+                borderRadius: 7, background: switcherOpen ? `${BLUE}18` : 'hsl(var(--card))',
                 cursor: 'pointer', color: switcherOpen ? BLUE : MUTED,
                 transition: 'all 0.15s',
               }}
@@ -317,7 +328,7 @@ export function Dashboard() {
             {switcherOpen && (
               <div style={{
                 position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 300,
-                background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14,
+                background: 'hsl(var(--popover))', border: `1px solid hsl(var(--border))`, borderRadius: 14,
                 boxShadow: '0 12px 32px rgba(16,24,40,.12)', minWidth: 240, overflow: 'hidden',
                 padding: '8px 0',
               }}>
@@ -337,11 +348,11 @@ export function Dashboard() {
                       style={{
                         width: '100%', display: 'flex', alignItems: 'center', gap: 12,
                         padding: '10px 16px', border: 'none', cursor: 'pointer',
-                        background: isActive ? '#F7F8FB' : '#fff',
+                        background: isActive ? 'hsl(var(--muted))' : 'transparent',
                         fontFamily: 'inherit', transition: 'background 0.12s',
                       }}
-                      onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = '#F7F8FB'; }}
-                      onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = '#fff'; }}
+                      onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'hsl(var(--accent))'; }}
+                      onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
                     >
                       <div style={{
                         width: 34, height: 34, borderRadius: 9, flexShrink: 0,
@@ -383,11 +394,11 @@ export function Dashboard() {
                             style={{
                               flex: 1, display: 'flex', alignItems: 'center', gap: 12,
                               padding: '10px 16px', border: 'none', cursor: 'pointer',
-                              background: isActive ? '#F7F8FB' : '#fff',
+                              background: isActive ? 'hsl(var(--accent))' : 'transparent',
                               fontFamily: 'inherit', transition: 'background 0.12s',
                             }}
-                            onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = '#F7F8FB'; }}
-                            onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = '#fff'; }}
+                            onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'hsl(var(--accent))'; }}
+                      onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
                           >
                             <div style={{
                               width: 34, height: 34, borderRadius: 9, flexShrink: 0,
@@ -437,15 +448,15 @@ export function Dashboard() {
                   style={{
                     width: '100%', display: 'flex', alignItems: 'center', gap: 12,
                     padding: '10px 16px', border: 'none', cursor: 'pointer',
-                    background: '#fff', fontFamily: 'inherit',
+                    background: 'hsl(var(--card))', fontFamily: 'inherit',
                   }}
-                  onMouseEnter={e => (e.currentTarget.style.background = '#F7F8FB')}
-                  onMouseLeave={e => (e.currentTarget.style.background = '#fff')}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'hsl(var(--accent))')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'hsl(var(--card))')}
                 >
                   <div style={{
                     width: 34, height: 34, borderRadius: 9, flexShrink: 0,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: '#F1F5F9', color: MUTED, border: `1.5px dashed #CBD5E1`,
+                    background: 'hsl(var(--muted))', color: MUTED, border: `1.5px dashed hsl(var(--border))`,
                   }}>
                     <Plus size={16} color={MUTED} />
                   </div>
@@ -491,7 +502,7 @@ export function Dashboard() {
                       <button
                         key={val}
                         onClick={() => { db.setDateRange(val); db.setShowRangePicker(false); }}
-                        style={{ width: '100%', padding: '9px 14px', border: 'none', background: db.dateRange === val ? '#EEF4FF' : '#fff', color: db.dateRange === val ? BLUE : TEXT, fontSize: 14, fontWeight: db.dateRange === val ? 700 : 500, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
+                       style={{ width: '100%', padding: '9px 14px', border: 'none', background: db.dateRange === val ? `${BLUE}18` : 'transparent', color: db.dateRange === val ? BLUE : TEXT, fontSize: 14, fontWeight: db.dateRange === val ? 700 : 500, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
                       >
                         {label}
                       </button>
@@ -644,7 +655,7 @@ export function Dashboard() {
             top: menuPos.top,
             right: menuPos.right,
             zIndex: 499,
-            background: '#fff',
+            background: 'hsl(var(--popover))',
             border: `1px solid ${LINE}`,
             borderRadius: 10,
             boxShadow: '0 8px 24px rgba(16,24,40,.12)',
@@ -668,15 +679,15 @@ export function Dashboard() {
                   }}
                   style={{
                     width: '100%', padding: '9px 14px', border: 'none',
-                    background: isAlreadyDefault ? '#EEF3FF' : '#fff',
+                    background: isAlreadyDefault ? `${BLUE}18` : 'transparent',
                     fontSize: 13, fontWeight: isAlreadyDefault ? 600 : 500,
                     color: isAlreadyDefault ? '#1663f6' : TEXT,
                     cursor: isAlreadyDefault ? 'default' : 'pointer',
                     textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8,
                     fontFamily: 'inherit',
                   }}
-                  onMouseEnter={e => { if (!isAlreadyDefault) e.currentTarget.style.background = '#F7F8FB'; }}
-                  onMouseLeave={e => { if (!isAlreadyDefault) e.currentTarget.style.background = '#fff'; }}
+                  onMouseEnter={e => { if (!isAlreadyDefault) e.currentTarget.style.background = 'hsl(var(--accent))'; }}
+                  onMouseLeave={e => { if (!isAlreadyDefault) e.currentTarget.style.background = 'transparent'; }}
                 >
                   <Star
                     size={13}
@@ -698,13 +709,13 @@ export function Dashboard() {
               }}
               style={{
                 width: '100%', padding: '9px 14px', border: 'none',
-                background: '#fff', fontSize: 13, fontWeight: 500,
+                background: 'hsl(var(--card))', fontSize: 13, fontWeight: 500,
                 color: TEXT, cursor: 'pointer', textAlign: 'left',
                 display: 'flex', alignItems: 'center', gap: 8,
                 fontFamily: 'inherit',
               }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#F7F8FB')}
-              onMouseLeave={e => (e.currentTarget.style.background = '#fff')}
+              onMouseEnter={e => (e.currentTarget.style.background = 'hsl(var(--accent))')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'hsl(var(--card))')}
             >
               <Pencil size={13} color={MUTED} /> Rename
             </button>
@@ -724,13 +735,13 @@ export function Dashboard() {
               }}
               style={{
                 width: '100%', padding: '9px 14px', border: 'none',
-                background: '#fff', fontSize: 13, fontWeight: 500,
+                background: 'hsl(var(--card))', fontSize: 13, fontWeight: 500,
                 color: '#EF4444', cursor: 'pointer', textAlign: 'left',
                 display: 'flex', alignItems: 'center', gap: 8,
                 fontFamily: 'inherit',
               }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#FEF2F2')}
-              onMouseLeave={e => (e.currentTarget.style.background = '#fff')}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.08)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'hsl(var(--card))')}
             >
               <Trash2 size={13} color="#EF4444" /> Delete
             </button>
@@ -750,7 +761,7 @@ export function Dashboard() {
           onClick={(e) => { if (e.target === e.currentTarget) setRenameState(null); }}
         >
           <div style={{
-            background: '#fff', borderRadius: 14, width: '100%', maxWidth: 380,
+            background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 14, width: '100%', maxWidth: 380,
             boxShadow: '0 20px 60px rgba(16,24,40,0.18)',
             padding: '20px',
           }}>
@@ -784,7 +795,7 @@ export function Dashboard() {
                 onClick={() => setRenameState(null)}
                 style={{
                   height: 34, padding: '0 14px', borderRadius: 8,
-                  border: `1px solid ${LINE}`, background: '#fff',
+                  border: `1px solid ${LINE}`, background: 'hsl(var(--muted))',
                   fontSize: 13, fontWeight: 600, color: TEXT,
                   cursor: 'pointer', fontFamily: 'inherit',
                 }}

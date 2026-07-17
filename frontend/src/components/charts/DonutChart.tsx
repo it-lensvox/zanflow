@@ -15,9 +15,9 @@ export function DonutChart({ data, total }: DonutChartProps) {
   if (total === 0) return (
     <svg width={164} height={164} viewBox="0 0 164 164" style={{ flexShrink: 0 }}>
       <circle cx={cx} cy={cy} r={R} fill="#E5E7EB" />
-      <circle cx={cx} cy={cy} r={r} fill="white" />
-      <text x={cx} y={cy - 6} textAnchor="middle" fontSize={28} fontWeight="800" fill="#9CA3AF">0</text>
-      <text x={cx} y={cy + 14} textAnchor="middle" fontSize={11} fill="#9CA3AF">Total Tasks</text>
+      <circle cx={cx} cy={cy} r={r} fill="hsl(var(--card))" />
+      <text x={cx} y={cy - 6} textAnchor="middle" fontSize={28} fontWeight="800" fill="hsl(var(--muted-foreground))">0</text>
+      <text x={cx} y={cy + 14} textAnchor="middle" fontSize={11} fill="hsl(var(--muted-foreground))">Total Tasks</text>
     </svg>
   );
 
@@ -51,9 +51,9 @@ export function DonutChart({ data, total }: DonutChartProps) {
   return (
     <svg width={164} height={164} viewBox="0 0 164 164" style={{ flexShrink: 0 }}>
       {slices.map((s, i) => s.pct > 0 ? <path key={i} d={arc(s.start, s.pct)} fill={s.color} fillRule="evenodd" /> : null)}
-      <circle cx={cx} cy={cy} r={r - 2} fill="white" />
-      <text x={cx} y={cy - 6} textAnchor="middle" fontSize={28} fontWeight="800" fill="#172033">{total}</text>
-      <text x={cx} y={cy + 14} textAnchor="middle" fontSize={11} fill="#667085">Total Tasks</text>
+      <circle cx={cx} cy={cy} r={r - 2} fill="hsl(var(--card))" />
+      <text x={cx} y={cy - 6} textAnchor="middle" fontSize={28} fontWeight="800" fill="hsl(var(--foreground))">{total}</text>
+      <text x={cx} y={cy + 14} textAnchor="middle" fontSize={11} fill="hsl(var(--muted-foreground))">Total Tasks</text>
     </svg>
   );
 }

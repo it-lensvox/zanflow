@@ -52,22 +52,22 @@ export function WidgetPicker({ onClose, onAdd, onRemove, existingTypes }: Props)
                 display: 'flex', alignItems: 'center', gap: 10,
                 padding: '9px 12px', borderRadius: 8,
                 border: `1px solid ${added ? '#FECACA' : LINE}`,
-                background: added ? '#FFF5F5' : '#fff',
+                background: added ? 'rgba(239,68,68,0.08)' : 'hsl(var(--card))',
                 cursor: 'pointer',
                 fontFamily: 'inherit', textAlign: 'left',
                 transition: 'background 0.12s',
               }}
               onMouseEnter={e => {
-                e.currentTarget.style.background = added ? '#FEE2E2' : BG;
+                e.currentTarget.style.background = added ? 'rgba(239,68,68,0.12)' : 'hsl(var(--accent))';
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.background = added ? '#FFF5F5' : '#fff';
+                e.currentTarget.style.background = added ? 'rgba(239,68,68,0.08)' : 'hsl(var(--card))';
               }}
             >
               <div style={{
                 width: 30, height: 30, borderRadius: 7, flexShrink: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: added ? '#FEE2E2' : BG,
+                background: added ? 'rgba(239,68,68,0.08)' : BG,
                 color: added ? '#EF4444' : MUTED,
               }}>
                 {w.icon}
@@ -104,7 +104,7 @@ export function WidgetPicker({ onClose, onAdd, onRemove, existingTypes }: Props)
       <div style={{
         position: 'relative', zIndex: 1,
         width: '100%', maxWidth: 320,
-        height: '100%', background: '#fff',
+        height: '100%', background: 'hsl(var(--card))',
         borderLeft: `1px solid ${LINE}`,
         display: 'flex', flexDirection: 'column',
         boxShadow: '-8px 0 32px rgba(16,24,40,0.10)',
@@ -122,7 +122,7 @@ export function WidgetPicker({ onClose, onAdd, onRemove, existingTypes }: Props)
             onClick={onClose}
             style={{
               width: 28, height: 28, borderRadius: 7,
-              border: `1px solid ${LINE}`, background: '#fff',
+              border: `1px solid ${LINE}`, background: 'hsl(var(--muted))',
               cursor: 'pointer', display: 'flex',
               alignItems: 'center', justifyContent: 'center',
             }}

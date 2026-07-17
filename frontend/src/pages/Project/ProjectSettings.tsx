@@ -278,8 +278,8 @@ export function ProjectSettings() {
         }
       />
 
-      {/* Tabs — single set, inline style system matching the rest of the modal */}
-      <div style={{ display: 'flex', gap: 4, borderBottom: `1px solid ${LINE}`, padding: '0 24px', background: '#fff' }}>
+      {/* Tabs  */}
+      <div style={{ display: 'flex', gap: 4, borderBottom: `1px solid ${LINE}`, padding: '0 24px', background: 'hsl(var(--card))' }}>
         {([
           { key: 'general', label: 'General',              icon: <Settings size={13} /> },
           { key: 'labels',  label: `Labels (${labels.length})`, icon: <Tags size={13} /> },
@@ -315,7 +315,7 @@ export function ProjectSettings() {
                   />
                 </FormField>
                 <FormField label="Created By">
-                  <div style={{ ...INPUT_STYLE, height: 38, display: 'flex', alignItems: 'center', background: '#f9fafb', cursor: 'default' }}>
+                  <div style={{ ...INPUT_STYLE, height: 38, display: 'flex', alignItems: 'center', background: 'hsl(var(--muted))', cursor: 'default' }}>
                     <span style={{ fontSize: 13, color: TEXT }}>{project.created_by?.full_name || project.created_by?.username || '—'}</span>
                   </div>
                 </FormField>
@@ -395,7 +395,7 @@ export function ProjectSettings() {
                       const displayName = member.full_name || member.user?.full_name || (member.user?.first_name && member.user?.last_name ? `${member.user.first_name} ${member.user.last_name}` : member.user?.username) || '—';
                       const roleLabel = PROJECT_ROLES.find(r => r.value === member.role)?.label || member.role || '—';
                       return (
-                        <div key={member.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderBottom: index !== project.members.length - 1 ? `1px solid ${LINE}` : 'none', background: '#fff' }}>
+                        <div key={member.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderBottom: index !== project.members.length - 1 ? `1px solid ${LINE}` : 'none', background: 'hsl(var(--card))' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                             <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#EEF4FF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: BLUE }}>{displayName.charAt(0)}</div>
                             <div>
@@ -440,7 +440,7 @@ export function ProjectSettings() {
                     )}
                   </div>
                   <button type="button" onClick={handleAddMember} disabled={!tempUser || !tempRole}
-                    style={{ height: 38, width: 44, borderRadius: 8, border: `1px solid ${LINE}`, background: (!tempUser || !tempRole) ? '#f3f4f6' : BLUE, color: (!tempUser || !tempRole) ? MUTED : '#fff', cursor: (!tempUser || !tempRole) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .15s' }}>
+                    style={{ height: 38, width: 44, borderRadius: 8, border: `1px solid hsl(var(--border))`, background: (!tempUser || !tempRole) ? 'hsl(var(--muted))' : BLUE, color: (!tempUser || !tempRole) ? MUTED : '#fff', cursor: (!tempUser || !tempRole) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .15s' }}>
                     <Plus size={16} />
                   </button>
                 </div>
@@ -453,7 +453,7 @@ export function ProjectSettings() {
                       const roleLabel = PROJECT_ROLES.find(r => r.value === assignment.role)?.label;
                       if (!user) return null;
                       return (
-                        <div key={assignment.userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, border: `1px solid ${LINE}`, background: '#fff' }}>
+                        <div key={assignment.userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, border: `1px solid ${LINE}`, background: 'hsl(var(--muted))' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                             <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#EEF4FF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: BLUE }}>{user.label.charAt(0)}</div>
                             <div>
@@ -480,7 +480,7 @@ export function ProjectSettings() {
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <button type="button"
                   onClick={() => { if (project) { setFormData({ name: project.name, description: project.description || '', task_type: project.task_type, status: (project.status || 'active') as ProjectStatus }); } setIsFormDirty(false); }}
-                  style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid ${LINE}`, background: '#fff', fontSize: 13, fontWeight: 500, color: MUTED, cursor: 'pointer' }}>
+                  style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid ${LINE}`, background: 'hsl(var(--muted))', fontSize: 13, fontWeight: 500, color: MUTED, cursor: 'pointer' }}>
                   Discard Changes
                 </button>
               </div>
@@ -539,7 +539,7 @@ export function ProjectSettings() {
 
         {/* ── Danger Zone Tab ── */}
         {activeTab === 'danger' && (
-          <div style={{ ...CARD_STYLE, padding: 20, border: '1px solid #fecaca', background: '#fff' }}>
+          <div style={{ ...CARD_STYLE, padding: 20, border: '1px solid #fecaca', background: 'hsl(var(--card))' }}>
             <p style={{ margin: '0 0 6px', fontSize: 14, fontWeight: 700, color: '#dc2626' }}>Delete Project</p>
             <p style={{ margin: '0 0 16px', fontSize: 13, color: '#b91c1c' }}>
               This will permanently delete the project, all documents, tasks and associated data. This action cannot be undone.

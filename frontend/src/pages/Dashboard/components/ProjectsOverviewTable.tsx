@@ -51,7 +51,7 @@ export function ProjectsOverviewTable({ projectsOverview, navigate, isLoading }:
           {isLoading ? (
             <>
               {[1, 2, 3, 4, 5].map(i => (
-                <div key={i} style={{ display: 'grid', gridTemplateColumns: GRID, gap: 10, padding: '14px 6px', borderBottom: '1px solid #F3F4F6', alignItems: 'center' }}>
+                <div key={i} style={{ display: 'grid', gridTemplateColumns: GRID, gap: 10, padding: '14px 6px', borderBottom: '1px solid hsl(var(--border))', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <div style={SkeletonBlock({ width: 28, height: 28, borderRadius: 7, style: { flexShrink: 0 } })} />
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -77,7 +77,7 @@ export function ProjectsOverviewTable({ projectsOverview, navigate, isLoading }:
               <div
                 key={p.id}
                 onClick={() => navigate(`/projects/${p.id}`)}
-                style={{ display: 'grid', gridTemplateColumns: GRID, gap: 10, padding: '12px 6px', borderBottom: i < projectsOverview.length - 1 ? '1px solid #F3F4F6' : 'none', cursor: 'pointer', borderRadius: 8, alignItems: 'center' }}
+                style={{ display: 'grid', gridTemplateColumns: GRID, gap: 10, padding: '12px 6px', borderBottom: i < projectsOverview.length - 1 ? '1px solid hsl(var(--border))' : 'none', cursor: 'pointer', borderRadius: 8, alignItems: 'center' }}
                 onMouseEnter={e => (e.currentTarget.style.background = BG)}
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
@@ -93,12 +93,12 @@ export function ProjectsOverviewTable({ projectsOverview, navigate, isLoading }:
                 </div>
 
                 {/* Task count */}
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#344054' }}>{p.taskCount}</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: TEXT }}>{p.taskCount}</div>
 
                 {/* Progress bar */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <ProgressBar pct={p.pct} color={p.color} />
-                  <span style={{ fontSize: 13, fontWeight: 700, color: '#344054', flexShrink: 0, width: 32, textAlign: 'right' }}>{p.pct}%</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: TEXT, flexShrink: 0, width: 32, textAlign: 'right' }}>{p.pct}%</span>
                 </div>
 
                 {/* Team avatars */}

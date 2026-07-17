@@ -38,7 +38,7 @@ export function Modal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
@@ -53,10 +53,10 @@ export function Modal({
           maxWidth,
           className,
         )}
-        style={{ maxHeight: '90vh', overflow: 'visible' }}
+        style={{ maxHeight: '82vh', overflow: 'visible' }}
       >
         {/* Inner scroll container — clips content but not absolute-positioned overlays */}
-        <div style={{ maxHeight: '90vh', overflowY: 'auto', borderRadius: 'inherit' }}>
+        <div style={{ maxHeight: '82vh', overflowY: 'auto', borderRadius: 'inherit' }}>
           {children}
         </div>
       </div>
@@ -76,16 +76,18 @@ export function ModalHeader({ title, subtitle, onClose, actions }: ModalHeaderPr
   return (
     <div
       className="flex items-center justify-between border-b sticky top-0 bg-card z-10 gap-3"
-      style={{ padding: '10px 16px', fontFamily: '-apple-system,BlinkMacSystemFont,"Inter",system-ui,sans-serif' }}
+      style={{ padding: '12px 16px', fontFamily: '-apple-system,BlinkMacSystemFont,"Inter",system-ui,sans-serif' }}
     >
-      <div className="min-w-0 flex items-center gap-2">
-        <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#172033', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</h2>
+      {/* Left: title stacked above subtitle */}
+      <div className="min-w-0 flex flex-col justify-center" style={{ gap: 2 }}>
+        <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'hsl(var(--foreground))', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</h2>
         {subtitle && (
-          <span style={{ fontSize: 12, color: '#667085', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            — {subtitle}
+          <span style={{ fontSize: 11, color: 'hsl(var(--muted-foreground))', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {subtitle}
           </span>
         )}
       </div>
+      {/* Right: action buttons + close */}
       <div className="flex items-center gap-2 flex-shrink-0">
         {actions}
         <button
@@ -95,7 +97,7 @@ export function ModalHeader({ title, subtitle, onClose, actions }: ModalHeaderPr
           style={{ padding: '4px 6px', display: 'flex', alignItems: 'center', border: 'none', background: 'none', cursor: 'pointer' }}
           aria-label="Close"
         >
-          <X className="h-4 w-4" style={{ color: '#667085' }} />
+          <X className="h-4 w-4" style={{ color: 'hsl(var(--muted-foreground))' }} />
         </button>
       </div>
     </div>

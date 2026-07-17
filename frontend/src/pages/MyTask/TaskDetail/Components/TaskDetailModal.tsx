@@ -45,11 +45,11 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
         <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4 md:p-6"
             onClick={handleBackdropClick}>
             <div className="flex flex-col w-full h-[95vh] sm:h-[90vh] sm:max-w-3xl sm:rounded-2xl shadow-2xl overflow-hidden"
-                style={{ background: '#fff' }} role="dialog" aria-modal="true">
+                style={{ background: 'hsl(var(--card))' }} role="dialog" aria-modal="true">
 
                 {/* Header */}
                 <div className="flex items-center justify-between gap-3 sticky top-0 z-20"
-                    style={{ padding: '14px 20px', borderBottom: `1px solid ${T.line}`, background: '#fff' }}>
+                    style={{ padding: '14px 20px', borderBottom: `1px solid ${T.line}`, background: 'hsl(var(--card))' }}>
                     <div className="flex-1 min-w-0" style={{ borderLeft: `3px solid ${T.blue}`, paddingLeft: 10 }}>
                         <div className="flex items-center gap-1.5 min-w-0">
                             {isEditingTitle ? (
@@ -70,14 +70,14 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
                             </button>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-                            <span style={{ fontSize: 11, fontWeight: 600, color: T.blue, background: '#EEF4FF', border: '1px solid #C7D7FD', borderRadius: 5, padding: '1px 7px', letterSpacing: '0.01em', whiteSpace: 'nowrap', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block' }}>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: T.blue, background: 'rgba(22,99,246,0.12)', border: '1px solid rgba(22,99,246,0.25)', borderRadius: 5, padding: '1px 7px', letterSpacing: '0.01em', whiteSpace: 'nowrap', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block' }}>
                                 {task.project_details?.name || task.project_name || 'No project'}
                             </span>
                         </div>
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
                         <button onClick={handleSave} disabled={isSaving || !hasUnsavedChanges}
-                            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: 'none', background: isSaving || !hasUnsavedChanges ? '#e6ebf2' : '#172033', color: isSaving || !hasUnsavedChanges ? T.muted : '#fff', fontSize: 13, fontWeight: 600, cursor: isSaving || !hasUnsavedChanges ? 'not-allowed' : 'pointer', transition: 'background .15s', whiteSpace: 'nowrap' }}>
+                           style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: 'none', background: isSaving || !hasUnsavedChanges ? 'hsl(var(--muted))' : '#1663f6', color: isSaving || !hasUnsavedChanges ? T.muted : '#fff', fontSize: 13, fontWeight: 600, cursor: isSaving || !hasUnsavedChanges ? 'not-allowed' : 'pointer', transition: 'background .15s', whiteSpace: 'nowrap' }}>
                             {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                             <span className="hidden sm:inline">{isSaving ? 'Saving…' : 'Save changes'}</span>
                         </button>
@@ -87,9 +87,9 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
                             { icon: <X size={15} />, onClick: onClose, title: 'Close' },
                         ].map((btn, i) => (
                             <button key={i} onClick={btn.onClick} title={btn.title}
-                                style={{ width: 32, height: 32, borderRadius: 8, border: `1px solid ${T.line}`, background: '#fff', color: T.muted, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s' }}
-                                onMouseEnter={e => { e.currentTarget.style.background = (btn as any).danger ? '#fef2f2' : '#f7f8fb'; e.currentTarget.style.color = (btn as any).danger ? '#dc2626' : T.text; e.currentTarget.style.borderColor = (btn as any).danger ? '#fecaca' : T.line; }}
-                                onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = T.muted; e.currentTarget.style.borderColor = T.line; }}>
+                                style={{ width: 32, height: 32, borderRadius: 8, border: `1px solid ${T.line}`, background: 'hsl(var(--muted))', color: T.muted, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .15s' }}
+                                onMouseEnter={e => { e.currentTarget.style.background = (btn as any).danger ? '#fef2f2' : 'hsl(var(--accent))'; e.currentTarget.style.color = (btn as any).danger ? '#dc2626' : T.text; e.currentTarget.style.borderColor = (btn as any).danger ? '#fecaca' : T.line; }}
+                                onMouseLeave={e => { e.currentTarget.style.background = 'hsl(var(--muted))'; e.currentTarget.style.color = T.muted; e.currentTarget.style.borderColor = T.line; }}>
                                 {btn.icon}
                             </button>
                         ))}
@@ -102,7 +102,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
                         <TaskDetailContent detail={detail} task={task} onChildTaskClick={handleChildTaskClick} />
                         {childTaskLoading && (
                             <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.3)' }}>
-                                <div style={{ background: '#fff', borderRadius: 12, padding: '20px 28px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: '#172033' }}>
+                                <div style={{ background: 'hsl(var(--card))', borderRadius: 12, padding: '20px 28px', display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: 'hsl(var(--foreground))' }}>
                                     <Loader2 size={18} className="animate-spin" style={{ color: '#1663f6' }} /> Loading task…
                                 </div>
                             </div>
@@ -112,7 +112,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
             </div>
             <TaskDetailConfirms detail={detail} task={task} />
 
-            {/* ── Child task modal — opens on top when child task row is clicked ── */}
+            {/* ── Child task modal  ── */}
             {childTask && (
                 <TaskDetailModal
                     task={childTask}

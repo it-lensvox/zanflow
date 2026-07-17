@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { X, Search, Copy, Check, Link2, Users, ChevronDown, Trash2, Globe, Lock, Loader2, AlertCircle, Download } from 'lucide-react';
+import { X, Search, Copy, Check, Link2, Users, ChevronDown, Trash2, Globe, Lock, Loader2, Download } from 'lucide-react';
 import { usersApi, eventApi, calendarShareApi, calendarLinkApi } from '@/services/api';
-
 interface SharedUser {
     id: number;
     first_name: string;
@@ -34,6 +34,8 @@ export const ShareCalendarModal: React.FC<ShareCalendarModalProps> = ({
     const [activeLinkId, setActiveLinkId] = useState<number | null>(null);
     const [isLinkLoading, setIsLinkLoading] = useState(false);
     const [activePermissionDropdown, setActivePermissionDropdown] = useState<number | null>(null);
+    const [permDropdownRect, setPermDropdownRect] = useState<DOMRect | null>(null);
+    const permBtnRefs = useRef<Record<number, HTMLButtonElement | null>>({});
     const [pendingAction, setPendingAction] = useState<number | null>(null);
 
     // Fetch all users for search
@@ -193,23 +195,23 @@ export const ShareCalendarModal: React.FC<ShareCalendarModalProps> = ({
             />
 
             {/* Modal */}
-            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+            <div className="relative bg-card border border-border rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
                 {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-purple-50">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-accent/50">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-indigo-100 rounded-lg">
-                            <Users size={20} className="text-indigo-600" />
+                        <div className="p-2 bg-indigo-500/15 rounded-lg">
+                            <Users size={20} className="text-indigo-500" />
                         </div>
                         <div>
-                            <h2 className="text-lg font-semibold text-gray-900">Share Calendar</h2>
-                            <p className="text-sm text-gray-500">Share your calendar with team members</p>
+                            <h2 className="text-base font-semibold text-foreground">Share Calendar</h2>
+                            <p className="text-sm text-muted-foreground">Share your calendar with team members</p>
                         </div>
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-2 hover:bg-white/80 rounded-lg transition-colors"
+                        className="p-2 hover:bg-accent rounded-lg transition-colors"
                     >
-                        <X size={20} className="text-gray-400" />
+                        <X size={18} className="text-muted-foreground" />
                     </button>
                 </div>
 
@@ -217,11 +219,11 @@ export const ShareCalendarModal: React.FC<ShareCalendarModalProps> = ({
                 <div className="p-6 space-y-6">
                     {/* Search Users */}
                     <div className="relative">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-medium text-foreground mb-2">
                             Add people
                         </label>
                         <div className="relative">
-                            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                             <input
                                 type="text"
                                 value={searchQuery}
@@ -231,37 +233,36 @@ export const ShareCalendarModal: React.FC<ShareCalendarModalProps> = ({
                                 }}
                                 onFocus={() => setShowUserDropdown(true)}
                                 placeholder="Search by name or email..."
-                                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-sm"
+                                className="w-full pl-10 pr-4 py-2.5 border border-border rounded-lg bg-input text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all text-sm"
                             />
                         </div>
 
                         {/* User Search Dropdown */}
                         {showUserDropdown && searchQuery && filteredUsers.length > 0 && (
-                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                            <div className="absolute z-10 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
                                 {filteredUsers.map((user: any) => (
                                     <button
                                         key={user.id}
                                         onClick={() => handleAddUser(user)}
-                                        className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left"
+                                        className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-accent transition-colors text-left"
                                     >
-                                        <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-sm font-medium">
+                                        <div className="w-8 h-8 rounded-full bg-indigo-500/15 text-indigo-500 flex items-center justify-center text-sm font-medium flex-shrink-0">
                                             {user.first_name?.[0]}{user.last_name?.[0]}
                                         </div>
-                                        <div>
-                                            <p className="text-sm font-medium text-gray-900">
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-medium text-foreground truncate">
                                                 {user.first_name} {user.last_name}
                                             </p>
                                             {user.email && (
-                                                <p className="text-xs text-gray-500">{user.email}</p>
+                                                <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                                             )}
                                         </div>
                                     </button>
                                 ))}
                             </div>
                         )}
-
                         {showUserDropdown && searchQuery && filteredUsers.length === 0 && (
-                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-sm text-gray-500">
+                            <div className="absolute z-10 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg p-4 text-center text-sm text-muted-foreground">
                                 No users found
                             </div>
                         )}
@@ -275,37 +276,42 @@ export const ShareCalendarModal: React.FC<ShareCalendarModalProps> = ({
                         </div>
                     ) : myShares.length > 0 ? (
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                           <label className="block text-sm font-medium text-foreground mb-2">
                                 Shared with ({myShares.length})
                             </label>
-                            <div className="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-48 overflow-visible">
+                            <div className="border border-border rounded-lg divide-y divide-border max-h-48 overflow-y-auto">
                                 {myShares.map((share: any) => (
-                                    <div key={share.id} className="flex items-center justify-between p-3 hover:bg-gray-50 transition-colors">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 text-white flex items-center justify-center text-sm font-medium">
+                                    <div key={share.id} className="flex items-center justify-between p-3 hover:bg-accent transition-colors">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 text-white flex items-center justify-center text-sm font-medium flex-shrink-0">
                                                 {share.shared_with_name?.split(' ').map((n: string) => n[0]).join('') || '?'}
                                             </div>
-                                            <div>
-                                                <p className="text-sm font-medium text-gray-900">
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-medium text-foreground truncate">
                                                     {share.shared_with_name}
                                                 </p>
-                                                <p className="text-xs text-gray-500">
+                                                <p className="text-xs text-muted-foreground">
                                                     Shared {new Date(share.created_at).toLocaleDateString()}
                                                 </p>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            {/* Permission Dropdown */}
+                                            {/* Permission Dropdown — portal to escape overflow */}
                                             <div className="relative">
                                                 <button
+                                                    ref={el => { permBtnRefs.current[share.id] = el; }}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        setActivePermissionDropdown(
-                                                            activePermissionDropdown === share.id ? null : share.id
-                                                        );
+                                                        if (activePermissionDropdown === share.id) {
+                                                            setActivePermissionDropdown(null);
+                                                        } else {
+                                                            const rect = permBtnRefs.current[share.id]?.getBoundingClientRect();
+                                                            if (rect) setPermDropdownRect(rect);
+                                                            setActivePermissionDropdown(share.id);
+                                                        }
                                                     }}
                                                     disabled={pendingAction === share.id}
-                                                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors disabled:opacity-50"
+                                                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-muted-foreground bg-muted hover:bg-accent rounded-md transition-colors disabled:opacity-50"
                                                 >
                                                     {pendingAction === share.id ? (
                                                         <Loader2 size={14} className="animate-spin" />
@@ -318,42 +324,7 @@ export const ShareCalendarModal: React.FC<ShareCalendarModalProps> = ({
                                                         </>
                                                     )}
                                                 </button>
-
-                                                {activePermissionDropdown === share.id && (
-                                                    <>
-                                                        <div
-                                                            className="fixed inset-0 z-[60]"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setActivePermissionDropdown(null);
-                                                            }}
-                                                        />
-                                                        <div className="absolute right-0 bottom-full mb-2 z-[70] w-36 bg-white border border-gray-200 rounded-lg shadow-2xl py-1">
-                                                            {[
-                                                                { value: 'view', label: 'View only' },
-                                                                { value: 'edit', label: 'Can edit' },
-                                                                { value: 'full', label: 'Full access' },
-                                                            ].map((option) => (
-                                                                <button
-                                                                    key={option.value}
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        handlePermissionChange(share.id, option.value as 'view' | 'edit' | 'full');
-                                                                    }}
-                                                                    className={`w-full px-3 py-2 text-left text-xs hover:bg-gray-50 transition-colors ${share.permission === option.value
-                                                                        ? 'text-indigo-600 font-medium bg-indigo-50'
-                                                                        : 'text-gray-700'
-                                                                        }`}
-                                                                >
-                                                                    {share.permission === option.value && <span className="mr-1">✓</span>}
-                                                                    {option.label}
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                    </>
-                                                )}
                                             </div>
-
                                             <button
                                                 onClick={() => handleRemoveShare(share.id)}
                                                 disabled={pendingAction === share.id}
@@ -414,7 +385,7 @@ export const ShareCalendarModal: React.FC<ShareCalendarModalProps> = ({
                             <div className="w-full border-t border-gray-200"></div>
                         </div>
                         <div className="relative flex justify-center">
-                            <span className="px-3 bg-white text-sm text-gray-500">Or share via link</span>
+                            <span className="px-3 bg-card text-sm text-muted-foreground">Or share via link</span>
                         </div>
                     </div>
 
@@ -423,7 +394,7 @@ export const ShareCalendarModal: React.FC<ShareCalendarModalProps> = ({
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <Link2 size={18} className="text-gray-500" />
-                                <span className="text-sm font-medium text-gray-700">Public link</span>
+                                <span className="text-sm font-medium text-foreground">Public link</span>
                             </div>
                             <label className="relative inline-flex items-center cursor-pointer">
                                 <input
@@ -442,15 +413,15 @@ export const ShareCalendarModal: React.FC<ShareCalendarModalProps> = ({
                         {isLinkEnabled && (
                             <div className="space-y-2">
                                 <div className="flex items-center gap-2">
-                                    <div className="flex-1 flex items-center bg-gray-50 border border-gray-200 rounded-lg overflow-hidden">
-                                        <div className="px-3 py-2 bg-gray-100 border-r border-gray-200">
-                                            <Globe size={16} className="text-gray-500" />
+                                    <div className="flex-1 flex items-center bg-muted border border-border rounded-lg overflow-hidden">
+                                        <div className="px-3 py-2 bg-accent border-r border-border">
+                                            <Globe size={16} className="text-muted-foreground" />
                                         </div>
                                         <input
                                             type="text"
                                             value={shareLink}
                                             readOnly
-                                            className="flex-1 px-3 py-2 bg-transparent text-sm text-gray-600 focus:outline-none"
+                                            className="flex-1 px-3 py-2 bg-transparent text-sm text-foreground focus:outline-none"
                                         />
                                     </div>
                                     <button
@@ -473,7 +444,7 @@ export const ShareCalendarModal: React.FC<ShareCalendarModalProps> = ({
                                         )}
                                     </button>
                                 </div>
-                                <p className="text-xs text-gray-500 flex items-center gap-1">
+                                <p className="text-xs text-muted-foreground flex items-center gap-1">
                                     <Lock size={12} />
                                     Anyone with this link can view your calendar (read-only)
                                 </p>
@@ -482,15 +453,15 @@ export const ShareCalendarModal: React.FC<ShareCalendarModalProps> = ({
                     </div>
 
                     {/* Export Calendar Section */}
-                    <div className="pt-4 border-t border-gray-200">
+                     <div className="pt-4 border-t border-border">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-green-100 rounded-lg">
                                     <Download size={18} className="text-green-600" />
                                 </div>
                                 <div>
-                                    <p className="text-sm font-medium text-gray-700">Export Calendar</p>
-                                    <p className="text-xs text-gray-500">Download as ICS file for Google/Outlook</p>
+                                    <p className="text-sm font-medium text-foreground">Export Calendar</p>
+                            <p className="text-xs text-muted-foreground">Download as ICS file for Google/Outlook</p>
                                 </div>
                             </div>
                             <button
@@ -512,15 +483,71 @@ export const ShareCalendarModal: React.FC<ShareCalendarModalProps> = ({
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50">
+                <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border bg-muted/50">
                     <button
                         onClick={onClose}
-                        className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 rounded-lg transition-colors"
+                        className="px-4 py-2 text-sm font-medium text-foreground hover:bg-accent rounded-lg transition-colors"
                     >
                         Close
                     </button>
                 </div>
             </div>
+
+            {/* Permission dropdown portal — renders above everything, never clipped */}
+            {activePermissionDropdown !== null && permDropdownRect && ReactDOM.createPortal(
+                <>
+                    <div
+                        className="fixed inset-0 z-[9998]"
+                        onClick={(e) => { e.stopPropagation(); setActivePermissionDropdown(null); }}
+                    />
+                    <div style={{
+                        position: 'fixed',
+                        top: permDropdownRect.bottom + 4,
+                        left: permDropdownRect.left,
+                        minWidth: 140,
+                        zIndex: 9999,
+                        background: 'hsl(var(--popover))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: 10,
+                        boxShadow: '0 8px 24px rgba(0,0,0,.20)',
+                        overflow: 'hidden',
+                        padding: '4px 0',
+                    }}>
+                        {[
+                            { value: 'view', label: 'View only' },
+                            { value: 'edit', label: 'Can edit' },
+                            { value: 'full', label: 'Full access' },
+                        ].map((option) => {
+                            const share = myShares.find((s: any) => s.id === activePermissionDropdown);
+                            const isActive = share?.permission === option.value;
+                            return (
+                                <button
+                                    key={option.value}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handlePermissionChange(activePermissionDropdown, option.value as 'view' | 'edit' | 'full');
+                                    }}
+                                    style={{
+                                        width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+                                        padding: '9px 14px', border: 'none', cursor: 'pointer',
+                                        fontSize: 13, fontWeight: isActive ? 600 : 400,
+                                        color: isActive ? '#6366f1' : 'hsl(var(--foreground))',
+                                        background: isActive ? 'rgba(99,102,241,0.1)' : 'transparent',
+                                        textAlign: 'left',
+                                    }}
+                                    onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'hsl(var(--accent))'; }}
+                                    onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
+                                >
+                                    {isActive && <Check size={12} color="#6366f1" />}
+                                    {!isActive && <span style={{ width: 12 }} />}
+                                    {option.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </>,
+                document.body
+            )}
         </div>
     );
 };

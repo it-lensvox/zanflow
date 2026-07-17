@@ -18,11 +18,11 @@ export function CreateDocumentModal({ isOpen, onClose }: CreateDocumentModalProp
 
   // ── Local state ──────────────────────────────────────────────────────────────
   const [projectFilter, setProjectFilter] = useState('');
-  const [newDocName, setNewDocName]       = useState('');
+  const [newDocName, setNewDocName] = useState('');
   const [newDocContent, setNewDocContent] = useState('');
-  const [newDocFormat, setNewDocFormat]   = useState('txt');
-  const [customFormat, setCustomFormat]   = useState('');
-  const [isSubmitting, setIsSubmitting]   = useState(false);
+  const [newDocFormat, setNewDocFormat] = useState('txt');
+  const [customFormat, setCustomFormat] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // ── Fetch projects ───────────────────────────────────────────────────────────
   const { data: projectsRes } = useQuery({
@@ -54,7 +54,7 @@ export function CreateDocumentModal({ isOpen, onClose }: CreateDocumentModalProp
 
     try {
       setIsSubmitting(true);
-      const format   = customFormat.trim() || newDocFormat;
+      const format = customFormat.trim() || newDocFormat;
       const fullName = newDocName.includes('.') ? newDocName : `${newDocName}.${format}`;
 
       const blob = new Blob([newDocContent], { type: 'text/plain' });
@@ -110,11 +110,11 @@ export function CreateDocumentModal({ isOpen, onClose }: CreateDocumentModalProp
   if (!isOpen) return null;
 
   const formats = [
-    { ext: 'txt',  emoji: '📄' },
-    { ext: 'pdf',  emoji: '📕' },
+    { ext: 'txt', emoji: '📄' },
+    { ext: 'pdf', emoji: '📕' },
     { ext: 'docx', emoji: '📘' },
     { ext: 'xlsx', emoji: '📊' },
-    { ext: 'md',   emoji: '📝' },
+    { ext: 'md', emoji: '📝' },
     { ext: 'json', emoji: '🔧' },
   ];
 
@@ -130,16 +130,16 @@ export function CreateDocumentModal({ isOpen, onClose }: CreateDocumentModalProp
       {/* Modal */}
       <div
         className="relative w-full rounded-xl shadow-2xl"
-        style={{ maxWidth: 700, background: '#fff', border: '1px solid #e5e7eb', maxHeight: '90vh', overflow: 'hidden' }}
+        style={{ maxWidth: 700, background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', maxHeight: '90vh', overflow: 'hidden' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid #e5e7eb' }}>
+        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid hsl(var(--border))' }}>
           <div className="flex items-center gap-2">
-            <FileText className="w-5 h-5" style={{ color: '#4169FF' }} />
-            <span style={{ fontSize: 16, fontWeight: 600, color: '#1a1a1a' }}>Create New Document</span>
+            <FileText className="w-5 h-5" style={{ color: '#1663f6' }} />
+            <span style={{ fontSize: 16, fontWeight: 600, color: 'hsl(var(--foreground))' }}>Create New Document</span>
           </div>
-          <button onClick={handleClose} style={{ color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+          <button onClick={handleClose} style={{ color: 'hsl(var(--muted-foreground))', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -157,28 +157,28 @@ export function CreateDocumentModal({ isOpen, onClose }: CreateDocumentModalProp
               onChange={e => setProjectFilter(e.target.value)}
               style={{
                 width: '100%', padding: '10px 32px 10px 12px',
-                border: '1px solid #e5e7eb', borderRadius: 6,
-                fontSize: 14, background: '#fff', cursor: 'pointer',
+                border: '1px solid hsl(var(--border))', borderRadius: 6,
+                fontSize: 14, background: 'hsl(var(--input))', color: 'hsl(var(--foreground))', cursor: 'pointer',
                 appearance: 'none' as const,
                 backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M3 5L6 8L9 5' stroke='%236B7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\")",
                 backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center', outline: 'none',
               }}
-              onFocus={e => e.currentTarget.style.borderColor = '#4169FF'}
-              onBlur={e => e.currentTarget.style.borderColor = '#e5e7eb'}
+              onFocus={e => e.currentTarget.style.borderColor = '#1663f6'}
+              onBlur={e => e.currentTarget.style.borderColor = 'hsl(var(--border))'}
             >
               <option value="">All Documents (No specific project)</option>
               {projects.map(p => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
-            <p style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
+            <p style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))', marginTop: 6 }}>
               Leave as "All Documents" to create without a project, or select a project to organize your document.
             </p>
           </div>
 
           {/* Selected project indicator */}
           {projectFilter && (
-            <div className="flex items-center gap-3 rounded-lg" style={{ padding: '12px 16px', background: '#EEF2FF', border: '1px solid #c7d2fe' }}>
+            <div className="flex items-center gap-3 rounded-lg" style={{ padding: '12px 16px', background: 'rgba(22,99,246,0.08)', border: '1px solid rgba(22,99,246,0.25)' }}>
               <Folder className="w-5 h-5 flex-shrink-0" style={{ color: '#4169FF' }} />
               <div>
                 <p style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Saving to</p>
@@ -189,7 +189,7 @@ export function CreateDocumentModal({ isOpen, onClose }: CreateDocumentModalProp
 
           {/* Document Name */}
           <div>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#1a1a1a', marginBottom: 8 }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'hsl(var(--foreground))', marginBottom: 8 }}>
               Document Name *
             </label>
             <input
@@ -197,15 +197,15 @@ export function CreateDocumentModal({ isOpen, onClose }: CreateDocumentModalProp
               value={newDocName}
               onChange={e => setNewDocName(e.target.value)}
               placeholder="Enter document name"
-              style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 14, outline: 'none' }}
-              onFocus={e => e.currentTarget.style.borderColor = '#4169FF'}
-              onBlur={e => e.currentTarget.style.borderColor = '#e5e7eb'}
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid hsl(var(--border))', borderRadius: 6, fontSize: 14, outline: 'none', background: 'hsl(var(--input))', color: 'hsl(var(--foreground))' }}
+              onFocus={e => e.currentTarget.style.borderColor = '#1663f6'}
+              onBlur={e => e.currentTarget.style.borderColor = 'hsl(var(--border))'}
             />
           </div>
 
           {/* Content */}
           <div>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#1a1a1a', marginBottom: 8 }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'hsl(var(--foreground))', marginBottom: 8 }}>
               Content
             </label>
             <textarea
@@ -214,18 +214,19 @@ export function CreateDocumentModal({ isOpen, onClose }: CreateDocumentModalProp
               placeholder="Type or paste your content here..."
               style={{
                 width: '100%', minHeight: 200, padding: '12px',
-                border: '1px solid #e5e7eb', borderRadius: 6,
+                border: '1px solid hsl(var(--border))', borderRadius: 6,
                 fontSize: 14, fontFamily: 'Monaco, Courier New, monospace',
                 resize: 'vertical', outline: 'none',
+                background: 'hsl(var(--input))', color: 'hsl(var(--foreground))',
               }}
-              onFocus={e => e.currentTarget.style.borderColor = '#4169FF'}
-              onBlur={e => e.currentTarget.style.borderColor = '#e5e7eb'}
+              onFocus={e => e.currentTarget.style.borderColor = '#1663f6'}
+              onBlur={e => e.currentTarget.style.borderColor = 'hsl(var(--border))'}
             />
           </div>
 
           {/* Format Selector */}
           <div>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#1a1a1a', marginBottom: 8 }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'hsl(var(--foreground))', marginBottom: 8 }}>
               Select Format
             </label>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 12 }}>
@@ -236,12 +237,12 @@ export function CreateDocumentModal({ isOpen, onClose }: CreateDocumentModalProp
                   style={{
                     padding: 16, border: `2px solid ${newDocFormat === ext ? '#4169FF' : '#e5e7eb'}`,
                     borderRadius: 8, textAlign: 'center', cursor: 'pointer',
-                    background: newDocFormat === ext ? '#EEF2FF' : 'transparent',
+                    background: newDocFormat === ext ? 'rgba(22,99,246,0.1)' : 'hsl(var(--muted))',
                     transition: 'all 0.2s',
                   }}
                 >
                   <div style={{ fontSize: 24, marginBottom: 8 }}>{emoji}</div>
-                  <div style={{ fontSize: 12, fontWeight: 500, color: '#666' }}>.{ext}</div>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: 'hsl(var(--muted-foreground))' }}>.{ext}</div>
                 </div>
               ))}
             </div>
@@ -249,7 +250,7 @@ export function CreateDocumentModal({ isOpen, onClose }: CreateDocumentModalProp
 
           {/* Custom Format */}
           <div>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#1a1a1a', marginBottom: 8 }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'hsl(var(--foreground))', marginBottom: 8 }}>
               Or Type Custom Format
             </label>
             <input
@@ -257,19 +258,19 @@ export function CreateDocumentModal({ isOpen, onClose }: CreateDocumentModalProp
               value={customFormat}
               onChange={e => setCustomFormat(e.target.value)}
               placeholder="e.g., csv, html, xml"
-              style={{ width: '100%', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 14, outline: 'none' }}
-              onFocus={e => e.currentTarget.style.borderColor = '#4169FF'}
-              onBlur={e => e.currentTarget.style.borderColor = '#e5e7eb'}
+              style={{ width: '100%', padding: '10px 12px', border: '1px solid hsl(var(--border))', borderRadius: 6, fontSize: 14, outline: 'none', background: 'hsl(var(--input))', color: 'hsl(var(--foreground))' }}
+              onFocus={e => e.currentTarget.style.borderColor = '#1663f6'}
+              onBlur={e => e.currentTarget.style.borderColor = 'hsl(var(--border))'}
             />
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4" style={{ borderTop: '1px solid #e5e7eb' }}>
+        <div className="flex items-center justify-end gap-3 px-6 py-4" style={{ borderTop: '1px solid hsl(var(--border))' }}>
           <button
             onClick={handleClose}
             className="rounded-lg"
-            style={{ padding: '8px 20px', border: '1px solid #e5e7eb', background: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer', color: '#1a1a1a' }}
+            style={{ padding: '8px 20px', border: '1px solid hsl(var(--border))', background: 'hsl(var(--muted))', fontSize: 14, fontWeight: 500, cursor: 'pointer', color: 'hsl(var(--foreground))' }}
           >
             Cancel
           </button>

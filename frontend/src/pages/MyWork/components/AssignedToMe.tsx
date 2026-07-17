@@ -33,7 +33,7 @@ export function AssignedToMe({ assignedToMe, isLoading }: { assignedToMe: any[];
                 key={task.id}
                 onClick={() => navigate('/taskboard')}
                 style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0', borderBottom: idx < assignedToMe.length - 1 ? `1px solid ${LINE}` : 'none', cursor: 'pointer' }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#F7F8FB')}
+                onMouseEnter={e => (e.currentTarget.style.background = 'hsl(var(--accent))')}
                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
                 {/* Content */}

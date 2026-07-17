@@ -164,27 +164,27 @@ export function Profile() {
   const getInitials = (name?: string) => name?.charAt(0)?.toUpperCase() || '?';
 
   return (
-    <div className="min-h-screen bg-[#F7F8FB] px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 pt-6 pb-8">
+    <div className="min-h-screen bg-background px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 pt-6 pb-8">
       {/* ── Inner Card Container ── */}
       <div className="flex flex-col flex-1 space-y-6">
 
         {/* Header Card */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+        <div className="bg-card rounded-xl shadow-sm border border-border p-8">
           <div className="flex items-start space-x-6">
             {/* Profile Picture */}
             <div className="relative flex-shrink-0">
               <label htmlFor="profile-upload" className="cursor-pointer group">
-                <div className="w-32 h-32 rounded-2xl bg-white shadow-md overflow-hidden flex items-center justify-center border-2 border-gray-100">
+                <div className="w-32 h-32 rounded-2xl bg-card shadow-md overflow-hidden flex items-center justify-center border-2 border-border">
                   {profileImage ? (
                     <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-r from-indigo-300 to-purple-50 flex items-center justify-center text-gray-800 text-4xl font-bold">
+                    <div className="w-full h-full bg-gradient-to-r from-indigo-300 to-purple-50 flex items-center justify-center text-foreground text-4xl font-bold">
                       {getInitials(user?.first_name)}
                     </div>
                   )}
                 </div>
-                <div className="absolute -bottom-2 -right-2 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-2.5 shadow-lg group-hover:bg-indigo-100 transition">
-                  <Upload className="w-5 h-5 text-gray-800" />
+                <div className="absolute -bottom-2 -right-2 bg-muted border border-border rounded-xl p-2.5 shadow-lg hover:bg-accent transition">
+                  <Upload className="w-5 h-5 text-foreground" />
                 </div>
               </label>
               <input id="profile-upload" type="file" accept="image/*" onChange={handleProfileImageChange} className="hidden" />
@@ -202,14 +202,14 @@ export function Profile() {
                     onChange={(e) => setEditFirstName(e.target.value)}
                     placeholder="First name"
                     autoFocus
-                    className="text-2xl font-bold text-gray-900 border-b-2 border-indigo-400 bg-transparent focus:outline-none w-36"
+                    className="text-2xl font-bold text-foreground border-b-2 border-indigo-400 bg-transparent focus:outline-none w-36"
                   />
                   <input
                     type="text"
                     value={editLastName}
                     onChange={(e) => setEditLastName(e.target.value)}
                     placeholder="Last name"
-                    className="text-2xl font-bold text-gray-900 border-b-2 border-indigo-400 bg-transparent focus:outline-none w-36"
+                    className="text-2xl font-bold text-foreground border-b-2 border-indigo-400 bg-transparent focus:outline-none w-36"
                   />
                   <button
                     onClick={handleSaveName}
@@ -223,7 +223,7 @@ export function Profile() {
                   </button>
                   <button
                     onClick={handleCancelEditName}
-                    className="p-1.5 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200 transition"
+                    className="p-1.5 rounded-lg bg-muted text-muted-foreground hover:bg-accent transition"
                     title="Cancel"
                   >
                     <X className="w-4 h-4" />
@@ -231,12 +231,12 @@ export function Profile() {
                 </div>
               ) : (
                 <div className="flex items-center gap-2 mb-4 group">
-                  <h1 className="text-3xl font-bold text-gray-900">
+                  <h1 className="text-3xl font-bold text-foreground">
                     {user?.first_name || ''}{user?.last_name ? ` ${user.last_name}` : ''}
                   </h1>
                   <button
                     onClick={handleStartEditName}
-                    className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all"
+                    className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10 transition-all"
                     title="Edit name"
                   >
                     <Pencil className="w-4 h-4" />
@@ -246,25 +246,25 @@ export function Profile() {
 
               {/* Info Row */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="flex items-center space-x-3 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
+                <div className="flex items-center space-x-3 bg-muted rounded-xl px-4 py-3 border border-border">
                   <BadgeCheck className="w-5 h-5 text-indigo-600 shrink-0" />
                   <div>
-                    <p className="text-xs text-gray-500 font-medium">Designation</p>
-                    <p className="text-sm text-gray-900 font-semibold capitalize">{user?.role || '—'}</p>
+                    <p className="text-xs text-muted-foreground font-medium">Designation</p>
+                    <p className="text-sm text-foreground font-semibold capitalize">{user?.role || '—'}</p>
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-3 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
+                <div className="flex items-center space-x-3 bg-muted rounded-xl px-4 py-3 border border-border">
                   <Mail className="w-5 h-5 text-indigo-600 shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs text-gray-500 font-medium">Email</p>
-                    <p className="text-sm text-gray-900 font-semibold truncate">{user?.email}</p>
+                    <p className="text-xs text-muted-foreground font-medium">Email</p>
+                    <p className="text-sm text-foreground font-semibold truncate">{user?.email}</p>
                   </div>
                 </div>
 
                 <button
                   onClick={() => navigate('/resetPassword')}
-                  className="flex items-center justify-center space-x-2 px-4 py-3 bg-gradient-to-r from-indigo-50 to-purple-50 text-gray-800 rounded-xl hover:from-indigo-100 hover:to-purple-100 transition shadow-sm"
+                  className="flex items-center justify-center space-x-2 px-4 py-3 bg-muted text-foreground rounded-xl hover:bg-accent border border-border transition shadow-sm"
                 >
                   <Lock className="w-4 h-4" />
                   <span className="font-medium">Reset Password</span>
@@ -278,10 +278,10 @@ export function Profile() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
           {/* Enrolled Projects */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 flex flex-col max-h-[520px]">
+         <div className="bg-card rounded-2xl shadow-sm border border-border p-6 flex flex-col max-h-[520px]">
             <div className="flex items-center space-x-2 mb-5 shrink-0">
               <Briefcase className="w-5 h-5 text-indigo-600" />
-              <h2 className="text-lg font-semibold text-gray-900">Enrolled Projects</h2>
+              <h2 className="text-lg font-semibold text-foreground">Enrolled Projects</h2>
               {!loading && projects.length > 0 && (
                 <span className="ml-auto text-xs font-semibold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
                   {projects.length}
@@ -298,21 +298,21 @@ export function Profile() {
               {loading ? (
                 <div className="flex flex-col items-center justify-center py-8 gap-2">
                   <Loader2 className="w-6 h-6 text-indigo-400 animate-spin" />
-                  <p className="text-sm text-gray-400">Loading projects...</p>
+                 <p className="text-sm text-muted-foreground">Loading projects...</p>
                 </div>
               ) : projects.length > 0 ? (
                 projects.map((project) => (
                   <button
                     key={project.id}
                     onClick={() => navigate(`/projects/${project.id}`)}
-                    className="w-full text-left group px-4 py-3 bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 rounded-xl border border-indigo-100 hover:border-indigo-300 transition-all duration-150 hover:shadow-sm"
+                    className="w-full text-left group px-4 py-3 bg-muted hover:bg-accent rounded-xl border border-border hover:border-blue-500/30 transition-all duration-150 hover:shadow-sm"
                   >
                     <div className="flex justify-between items-center">
                       <div className="flex items-center gap-2 flex-1 min-w-0">
                         <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-bold text-white shrink-0 ${getProjectTypeColor(project.task_type)}`}>
                           {project.name.charAt(0).toUpperCase()}
                         </span>
-                        <p className="text-sm font-bold text-gray-900 truncate">{project.name}</p>
+                        <p className="text-sm font-bold text-foreground truncate">{project.name}</p>
                       </div>
                       <ArrowRight className="w-4 h-4 text-indigo-300 group-hover:text-indigo-600 transition-colors shrink-0 ml-2" />
                     </div>
@@ -320,11 +320,11 @@ export function Profile() {
                 ))
               ) : (
                 <div className="text-center py-10">
-                  <div className="inline-flex items-center justify-center w-12 h-12 bg-gray-100 rounded-xl mb-3">
-                    <Briefcase className="w-6 h-6 text-gray-400" />
+                  <div className="inline-flex items-center justify-center w-12 h-12 bg-muted rounded-xl mb-3">
+                    <Briefcase className="w-6 h-6 text-muted-foreground" />
                   </div>
-                  <p className="text-sm text-gray-500 font-medium">Not enrolled in any projects</p>
-                  <p className="text-xs text-gray-400 mt-1">Projects you're a member of will appear here</p>
+                  <p className="text-sm text-muted-foreground font-medium">Not enrolled in any projects</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">Projects you're a member of will appear here</p>
                 </div>
               )}
             </div>
@@ -334,13 +334,13 @@ export function Profile() {
           <div className="lg:col-span-2 space-y-6">
 
             {/* Skills Card */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
               <div className="flex items-center justify-between mb-5">
-                <h2 className="text-lg font-semibold text-gray-900">Skills</h2>
+                <h2 className="text-lg font-semibold text-foreground">Skills</h2>
                 {!isEditingSkills ? (
                   <button
                     onClick={() => setIsEditingSkills(true)}
-                    className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-indigo-50 to-purple-50 text-gray-800 text-sm font-medium rounded-xl hover:from-indigo-100 hover:to-purple-100 transition shadow-sm"
+                    className="flex items-center space-x-2 px-4 py-2 bg-muted text-foreground text-sm font-medium rounded-xl hover:bg-accent border border-border transition shadow-sm"
                   >
                     <Edit2 className="w-4 h-4" />
                     <span>Edit</span>
@@ -352,14 +352,14 @@ export function Profile() {
                       disabled={!canSaveSkills}
                       className={`px-4 py-2 text-sm font-medium rounded-xl transition ${canSaveSkills
                         ? 'bg-green-600 text-white hover:bg-green-700 cursor-pointer'
-                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'bg-muted text-muted-foreground cursor-not-allowed'
                         }`}
                     >
                       Save
                     </button>
                     <button
                       onClick={handleCancelEditSkills}
-                      className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-xl hover:bg-gray-300 transition"
+                      className="px-4 py-2 bg-muted text-muted-foreground text-sm font-medium rounded-xl hover:bg-accent transition"
                     >
                       Cancel
                     </button>
@@ -375,12 +375,12 @@ export function Profile() {
                     onChange={(e) => setNewSkill(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleAddSkill()}
                     placeholder="Add new skill"
-                    className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="flex-1 px-4 py-2.5 border border-border rounded-xl text-sm bg-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                   <button
                     onClick={handleAddSkill}
                     disabled={!newSkill.trim()}
-                    className="px-4 py-2.5 bg-gradient-to-r from-indigo-50 to-purple-50 text-gray-800 text-sm font-medium rounded-xl hover:from-indigo-100 hover:to-purple-100 transition flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-2.5 bg-muted text-foreground text-sm font-medium rounded-xl hover:bg-accent border border-border transition flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Plus className="w-4 h-4" />
                     <span>Add</span>
@@ -409,20 +409,20 @@ export function Profile() {
             </div>
 
             {/* Certificates Card */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
               <div className="flex items-center justify-between mb-5">
-                <h2 className="text-lg font-semibold text-gray-900">Certificates</h2>
-                <label htmlFor="certificate-upload" className="cursor-pointer flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-indigo-50 to-purple-50 text-gray-800 text-sm font-medium rounded-xl hover:from-indigo-100 hover:to-purple-100 transition shadow-sm">
+                <h2 className="text-lg font-semibold text-foreground">Certificates</h2>
+                <label htmlFor="certificate-upload" className="cursor-pointer flex items-center space-x-2 px-4 py-2 bg-muted text-foreground text-sm font-medium rounded-xl hover:bg-accent border border-border transition shadow-sm">
                   <Upload className="w-4 h-4" />
                   <span>Upload</span>
                 </label>
                 <input id="certificate-upload" type="file" accept=".pdf,.doc,.docx" onChange={handleCertificateUpload} className="hidden" />
               </div>
               <div className="text-center py-12">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-2xl mb-3">
-                  <Download className="w-8 h-8 text-gray-400" />
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-muted rounded-2xl mb-3">
+                  <Download className="w-8 h-8 text-muted-foreground" />
                 </div>
-                <p className="text-gray-500 text-sm">No certificates uploaded yet</p>
+                <p className="text-muted-foreground text-sm">No certificates uploaded yet</p>
               </div>
             </div>
           </div>

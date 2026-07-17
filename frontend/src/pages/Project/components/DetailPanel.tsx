@@ -21,7 +21,7 @@ export function DetailPanel({ project, onClose, onOpen }: DetailPanelProps) {
   const lightAccent = `${accentHex}cc`;
 
   return (
-    <div style={{ width: 305, minWidth: 305, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 10, padding: '18px 14px', overflow: 'auto', flexShrink: 0, boxShadow: '0 2px 8px rgba(16,24,40,.04)' }}>
+    <div style={{ width: 305, minWidth: 305, background: 'hsl(var(--card))', border: `1px solid ${LINE}`, borderRadius: 10, padding: '18px 14px', overflow: 'auto', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,.08)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: TEXT, lineHeight: 1.3, flex: 1, paddingRight: 8 }}>{project.name}</h3>
         <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: MUTED, fontSize: 22, lineHeight: 1, padding: 0, flexShrink: 0 }}>×</button>
@@ -39,7 +39,7 @@ export function DetailPanel({ project, onClose, onOpen }: DetailPanelProps) {
       <div style={{ display: 'flex', gap: 25, borderBottom: `1px solid ${LINE}`, marginBottom: 12 }}>
         {(['overview', 'activity', 'files'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13, color: tab === t ? accentHex : MUTED, borderBottom: tab === t ? `3px solid ${accentHex}` : '3px solid transparent', paddingBottom: 10, textTransform: 'capitalize' }}>
-            {t}{t === 'files' && <span style={{ background: '#f0f2f5', color: MUTED, borderRadius: 10, padding: '1px 6px', fontSize: 11, marginLeft: 4 }}>0</span>}
+            {t}{t === 'files' && <span style={{ background: 'hsl(var(--muted))', color: MUTED, borderRadius: 10, padding: '1px 6px', fontSize: 11, marginLeft: 4 }}>0</span>}
           </button>
         ))}
       </div>

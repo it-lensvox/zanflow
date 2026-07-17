@@ -43,7 +43,7 @@ export function RescheduleModal({
           type="datetime-local"
           value={newStart}
           onChange={e => setNewStart(e.target.value)}
-          style={{ width: '100%', padding: '10px 12px', border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 14, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' as const }}
+          style={{ width: '100%', padding: '10px 12px', border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 14, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' as const, background: 'hsl(var(--input))', color: 'hsl(var(--foreground))', colorScheme: 'light dark' as any }}
         />
         <div style={{ fontSize: 11, color: MUTED, marginTop: 6 }}>
           Duration: {eventDuration(event.start_time, event.end_time)} (will be preserved)

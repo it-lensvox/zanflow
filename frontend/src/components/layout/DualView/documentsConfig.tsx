@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  FileText, Folder, Info, Share2,Trash2, File, Clock, CheckCircle
+  FileText, Info, Share2,Trash2, File, Clock, CheckCircle
 } from 'lucide-react';
 import { TablePopover } from '@/components/common';
 import { formatRelativeTime } from '@/lib/utils';
@@ -23,7 +23,7 @@ const getDocIconColor = (name: string): string => {
   return map[ext] || '#6B7280';
 };
 
-const getExtBadgeColor = (name: string): string => {
+export const getExtBadgeColor = (name: string): string => {
   const ext = name?.split('.').pop()?.toLowerCase() || '';
   const map: Record<string, string> = { pdf: '#EF4444', doc: '#2563EB', docx: '#2563EB', xls: '#16A34A', xlsx: '#16A34A', csv: '#16A34A', ppt: '#EA580C', pptx: '#EA580C', png: '#7C3AED', jpg: '#7C3AED', jpeg: '#7C3AED', gif: '#7C3AED', svg: '#7C3AED', mp4: '#EC4899', mov: '#EC4899', avi: '#EC4899', js: '#F59E0B', ts: '#2563EB', jsx: '#0891B2', tsx: '#0891B2', py: '#3B82F6', json: '#F59E0B', zip: '#F59E0B', rar: '#F59E0B' };
   return map[ext] || '#6B7280';
@@ -127,13 +127,13 @@ function SharedColumnHeader() {
         style={{
           display: 'flex', alignItems: 'center', gap: 5,
           background: 'none', border: 'none', cursor: 'pointer',
-          padding: 0, fontSize: 12, fontWeight: 800, color: '#172033',
+          padding: 0, fontSize: 12, fontWeight: 800, color: 'hsl(var(--foreground))',
         }}
       >
         {mode === 'shared_with' ? 'Shared With' : 'Shared By'}
         {/* Chevron icon */}
         <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M3 5L6 8L9 5" stroke="#172033" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M3 5L6 8L9 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
 
@@ -142,7 +142,7 @@ function SharedColumnHeader() {
         <div
           style={{
             position: 'absolute', top: '100%', left: 0, zIndex: 999,
-            marginTop: 4, background: '#fff',
+            marginTop: 4, background: 'hsl(var(--popover))',
             border: '1px solid #e5e7eb', borderRadius: 8,
             boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
             minWidth: 140, overflow: 'hidden',
@@ -155,13 +155,13 @@ function SharedColumnHeader() {
             style={{
               width: '100%', textAlign: 'left', padding: '9px 14px',
               fontSize: 13, fontWeight: mode === 'shared_with' ? 700 : 400,
-              color: mode === 'shared_with' ? '#4169FF' : '#1a1a1a',
-              background: mode === 'shared_with' ? '#EEF2FF' : '#fff',
+              color: mode === 'shared_with' ? '#4169FF' : 'hsl(var(--foreground))',
+              background: mode === 'shared_with' ? '#4169FF18' : 'transparent',
               border: 'none', cursor: 'pointer', display: 'flex',
               alignItems: 'center', gap: 8,
             }}
-            onMouseEnter={e => { if (mode !== 'shared_with') e.currentTarget.style.background = '#f9fafb'; }}
-            onMouseLeave={e => { if (mode !== 'shared_with') e.currentTarget.style.background = '#fff'; }}
+            onMouseEnter={e => { if (mode !== 'shared_with') e.currentTarget.style.background = 'hsl(var(--accent))'; }}
+            onMouseLeave={e => { if (mode !== 'shared_with') e.currentTarget.style.background = 'transparent'; }}
           >
             {/* Checkmark for active */}
             {mode === 'shared_with'
@@ -177,13 +177,13 @@ function SharedColumnHeader() {
             style={{
               width: '100%', textAlign: 'left', padding: '9px 14px',
               fontSize: 13, fontWeight: mode === 'shared_by' ? 700 : 400,
-              color: mode === 'shared_by' ? '#4169FF' : '#1a1a1a',
-              background: mode === 'shared_by' ? '#EEF2FF' : '#fff',
+              color: mode === 'shared_by' ? '#4169FF' : 'hsl(var(--foreground))',
+              background: mode === 'shared_by' ? '#4169FF18' : 'transparent',
               border: 'none', cursor: 'pointer', display: 'flex',
               alignItems: 'center', gap: 8,
             }}
-            onMouseEnter={e => { if (mode !== 'shared_by') e.currentTarget.style.background = '#f9fafb'; }}
-            onMouseLeave={e => { if (mode !== 'shared_by') e.currentTarget.style.background = '#fff'; }}
+            onMouseEnter={e => { if (mode !== 'shared_by') e.currentTarget.style.background = 'hsl(var(--accent))'; }}
+            onMouseLeave={e => { if (mode !== 'shared_by') e.currentTarget.style.background = 'transparent'; }}
           >
             {mode === 'shared_by'
               ? <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#4169FF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -197,10 +197,10 @@ function SharedColumnHeader() {
   );
 }
 
-// ─── Avatar stack helper ──────────────────────────────────────────────────────
+// ─── Avatar stack helper
 function SharedUserAvatars({ users }: { users: DocumentShareUser[] }) {
   if (!users || users.length === 0) {
-    return <span style={{ fontSize: 12, color: '#d1d5db' }}>—</span>;
+    return <span style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))' }}>—</span>;
   }
   const shown = users.slice(0, 3);
   const extra = users.length - 3;
@@ -217,8 +217,7 @@ function SharedUserAvatars({ users }: { users: DocumentShareUser[] }) {
         const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
         return (
           <div key={u.id} title={name} style={{
-            // ✅ Same size as Owner avatar — 32x32
-            width: 32, height: 32, borderRadius: '50%', border: '2px solid #fff',
+            width: 32, height: 32, borderRadius: '50%', border: '2px solid hsl(var(--card))',
             marginLeft: i === 0 ? 0 : -8,
             background: u.avatar ? 'transparent' : grads[i % grads.length],
             display: 'grid', placeItems: 'center',
@@ -233,7 +232,7 @@ function SharedUserAvatars({ users }: { users: DocumentShareUser[] }) {
         );
       })}
       {extra > 0 && (
-        <div style={{ marginLeft: -8, background: '#98a2b3', color: '#fff', borderRadius: '50%', width: 32, height: 32, display: 'grid', placeItems: 'center', fontSize: 11, border: '2px solid #fff', fontWeight: 600 }}>
+        <div style={{ marginLeft: -8, background: '#98a2b3', color: '#fff', borderRadius: '50%', width: 32, height: 32, display: 'grid', placeItems: 'center', fontSize: 11, border: '2px solid hsl(var(--card))', fontWeight: 600 }}>
           +{extra}
         </div>
       )}
@@ -242,7 +241,7 @@ function SharedUserAvatars({ users }: { users: DocumentShareUser[] }) {
 }
 
 function SharedByAvatar({ user }: { user: DocumentShareUser | null | undefined }) {
-  if (!user) return <span style={{ fontSize: 12, color: '#d1d5db' }}>—</span>;
+  if (!user) return <span style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))' }}>—</span>;
   const name = user.full_name || user.username || '?';
   const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   return (
@@ -304,10 +303,10 @@ export const createDocumentsTableColumns = (
             const oc = getDocumentStatusConfig(opt.value);
             return (
               <div key={opt.value} className="px-3 py-2 cursor-pointer text-[12px] flex items-center gap-2" style={{ background: 'transparent' }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = '#f9fafb'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'hsl(var(--accent))'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                 onClick={() => handleStatusChange(opt.value)}>
                 {React.createElement(opt.icon, { className: 'w-3.5 h-3.5', style: { color: oc.text } })}
-                <span style={{ fontWeight: doc.status === opt.value ? 700 : 400, color: doc.status === opt.value ? '#4169FF' : '#1a1a1a' }}>{opt.label}</span>
+                <span style={{ fontWeight: doc.status === opt.value ? 700 : 400, color: doc.status === opt.value ? '#4169FF' : 'hsl(var(--foreground))' }}>{opt.label}</span>
                 {doc.status === opt.value && <svg className="w-3.5 h-3.5 ml-auto" style={{ color: '#4169FF' }} fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
               </div>
             );
@@ -320,7 +319,7 @@ export const createDocumentsTableColumns = (
   return [
     {
       key: 'name',
-      label: <span style={{ fontSize: 12, fontWeight: 800, color: '#172033' }}>Document</span>,
+      label: <span style={{ fontSize: 12, fontWeight: 800, color: 'hsl(var(--foreground))' }}>Document</span>,
       width: '350px',
       render: (doc: Document) => {
         const iconColor = getDocIconColor(doc.name);
@@ -328,25 +327,15 @@ export const createDocumentsTableColumns = (
         return (
           <div className="flex items-center justify-between w-full group/cell">
             <div className="flex items-center gap-2.5 min-w-0 pr-2">
-              {/* Colored doc icon matching HTML exactly */}
-              {(() => {
-                const color = getExtBadgeColor(doc.name || doc.original_file_name || '');
-                const label = (doc.name || doc.original_file_name || '').split('.').pop()?.toUpperCase()?.slice(0, 4) || 'FILE';
-                return (
-                  <div style={{ width: 32, height: 32, borderRadius: 6, background: `${color}18`, border: `1px solid ${color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <span style={{ fontSize: 9, fontWeight: 700, color, letterSpacing: '.04em', lineHeight: 1 }}>{label}</span>
-                  </div>
-                );
-              })()}
               <div className="flex flex-col min-w-0">
-                <span className="truncate" style={{ fontWeight: 500, fontSize: 14, color: '#1a1a1a' }} title={doc.name}>{doc.name}</span>
-                <span style={{ fontSize: 12, color: '#6b7280' }}>{doc.file_size ? `${(doc.file_size / (1024 * 1024)).toFixed(1)} MB` : ''}</span>
+                <span className="truncate" style={{ fontWeight: 500, fontSize: 14, color: 'hsl(var(--foreground))' }} title={doc.name}>{doc.name}</span>
+                <span style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))' }}>{doc.file_size ? `${(doc.file_size / (1024 * 1024)).toFixed(1)} MB` : ''}</span>
               </div>
             </div>
             <div className="opacity-0 group-hover/cell:opacity-100 transition-all duration-200 flex items-center gap-0.5 flex-shrink-0">
-              {onInfoClick && <button onClick={(e) => { e.stopPropagation(); onInfoClick(doc); }} className="p-1.5 rounded" style={{ color: '#6b7280' }} title="Document Info"><Info className="w-4 h-4" /></button>}
-              {onShareClick && <button onClick={(e) => { e.stopPropagation(); onShareClick(doc); }} className="p-1.5 rounded" style={{ color: '#6b7280' }} title="Share"><Share2 className="w-4 h-4" /></button>}
-              <button onClick={(e) => { e.stopPropagation(); onDeleteClick(e, doc); }} className="p-1.5 rounded" style={{ color: '#6b7280' }} title="Delete"><Trash2 className="w-4 h-4" /></button>
+              {onInfoClick && <button onClick={(e) => { e.stopPropagation(); onInfoClick(doc); }} className="p-1.5 rounded" style={{ color: 'hsl(var(--muted-foreground))' }} title="Document Info"><Info className="w-4 h-4" /></button>}
+              {onShareClick && <button onClick={(e) => { e.stopPropagation(); onShareClick(doc); }} className="p-1.5 rounded" style={{ color: 'hsl(var(--muted-foreground))' }} title="Share"><Share2 className="w-4 h-4" /></button>}
+              <button onClick={(e) => { e.stopPropagation(); onDeleteClick(e, doc); }} className="p-1.5 rounded" style={{ color: 'hsl(var(--muted-foreground))' }} title="Delete"><Trash2 className="w-4 h-4" /></button>
             </div>
           </div>
         );
@@ -354,7 +343,7 @@ export const createDocumentsTableColumns = (
     },
     {
       key: 'project',
-      label: <span style={{ fontSize: 13, fontWeight: 800, color: '#172033' }}>Project</span>,
+      label: <span style={{ fontSize: 13, fontWeight: 800, color: 'hsl(var(--foreground))' }}>Project</span>,
       render: (doc: Document) => {
         const name = doc.project_name || 'General';
         const display = name.length > 13 ? name.slice(0, 13) + '...' : name;
@@ -375,7 +364,6 @@ export const createDocumentsTableColumns = (
               overflow: 'hidden', whiteSpace: 'nowrap', display: 'inline-flex',
             }}
           >
-            <Folder className="w-3 h-3 flex-shrink-0" style={{ color: pHex }} />
             {display}
           </span>
         );
@@ -383,11 +371,11 @@ export const createDocumentsTableColumns = (
     },
     {
       key: 'labels',
-      label: <span style={{ fontSize: 12, fontWeight: 800, color: '#172033' }}>Tags</span>,
+      label: <span style={{ fontSize: 12, fontWeight: 800, color: 'hsl(var(--foreground))' }}>Tags</span>,
       width: '180px',
       render: (doc: Document) => {
         const labels = doc.labels || [];
-        if (labels.length === 0) return <span style={{ fontSize: 12, color: '#6b7280' }}>—</span>;
+        if (labels.length === 0) return <span style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))' }}>—</span>;
         const visible = labels.slice(0, 2);
         const extra = labels.length - 2;
         return (
@@ -428,8 +416,8 @@ export const createDocumentsTableColumns = (
                   fontSize: 11,
                   fontWeight: 500,
                   background: 'transparent',
-                  color: '#6B7280',
-                  border: '1px solid #D1D5DB'
+                  color: 'hsl(var(--muted-foreground))',
+                  border: '1px solid hsl(var(--border))'
                 }}
               >
                 +{extra}
@@ -441,15 +429,15 @@ export const createDocumentsTableColumns = (
     },
     {
       key: 'status',
-      label: <span style={{ fontSize: 12, fontWeight: 800, color: '#172033' }}>Status</span>,
+      label: <span style={{ fontSize: 12, fontWeight: 800, color: 'hsl(var(--foreground))' }}>Status</span>,
       width: '120px',
       render: (doc: Document) => <StatusDropdown doc={doc} />,
     },
     {
       key: 'updated_at',
-      label: <span style={{ fontSize: 12, fontWeight: 800, color: '#172033' }}>Updated</span>,
+      label: <span style={{ fontSize: 12, fontWeight: 800, color: 'hsl(var(--foreground))' }}>Updated</span>,
       width: '120px',
-      render: (doc: Document) => <span style={{ fontSize: 14, color: '#1a1a1a' }}>{formatRelativeTime(doc.updated_at)}</span>,
+      render: (doc: Document) => <span style={{ fontSize: 14, color: 'hsl(var(--foreground))' }}>{formatRelativeTime(doc.updated_at)}</span>,
     },
     {
       key: 'shared_with' as any,
@@ -537,95 +525,124 @@ interface DocumentGridCardProps {
   onDeleteClick: (e: React.MouseEvent, doc: Document) => void;
   onCardClick?: (doc: Document) => void;
   onShareClick?: (doc: Document) => void;
+  isSelected?: boolean;
+  onSelect?: (e: React.MouseEvent) => void;
 }
 
-export function DocumentGridCard({ document: doc, projectTaskType, onDeleteClick, onCardClick, onShareClick }: DocumentGridCardProps) {
-  const sc = getDocumentStatusConfig(doc.status);
- const accentHex  = getTypeHex(projectTaskType);
-  const fileName   = doc.name || doc.original_file_name || '';
-  const extColor   = getExtBadgeColor(fileName);
-  const extLabel   = fileName.split('.').pop()?.toUpperCase()?.slice(0, 4) || 'FILE';
+export function DocumentGridCard({ document: doc, projectTaskType, onDeleteClick, onCardClick, onShareClick, isSelected = false, onSelect }: DocumentGridCardProps) {
+  const sc        = getDocumentStatusConfig(doc.status);
+  const accentHex = getTypeHex(projectTaskType);
+  const fileName  = doc.name || doc.original_file_name || '';
+  const extLabel  = fileName.split('.').pop()?.toUpperCase()?.slice(0, 4) || 'FILE';
+  const fileSize  = doc.file_size ? `${(doc.file_size / (1024 * 1024)).toFixed(1)} MB` : null;
 
   return (
     <div
       onClick={() => onCardClick?.(doc)}
       className="group cursor-pointer"
       style={{
-        background: '#fff',
-        border: '1px solid #E6EBF2',
-        borderRadius: 12,
+        background: 'hsl(var(--card))',
+        border: '1px solid hsl(var(--border))',
+        borderRadius: 14,
         overflow: 'hidden',
         minWidth: 0,
         width: '100%',
-        position: 'relative',
         boxShadow: '0 1px 4px rgba(16,24,40,.06)',
-        transition: 'box-shadow .2s',
+        transition: 'box-shadow .2s, border-color .2s',
       }}
       onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 20px rgba(16,24,40,.12)'}
       onMouseLeave={e => e.currentTarget.style.boxShadow = '0 1px 4px rgba(16,24,40,.06)'}
     >
-      {/* ── Top accent bar  */}
+      {/* ── Top accent bar — matches ProjectGridCard */}
       <div style={{ height: 4, background: accentHex, width: '100%', flexShrink: 0 }} />
 
-      <div style={{ padding: '14px 16px 50px' }}>
-        {/* ── Row 1: Ext badge + file name + timestamp ── */}
+      <div style={{ padding: '14px 16px 16px' }}>
+
+        {/* ── Row 1: ext badge (selection toggle) + file name + status pill ── */}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, background: `${extColor}18`, border: `1px solid ${extColor}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: extColor, letterSpacing: '.04em', lineHeight: 1 }}>{extLabel}</span>
+          <div
+            onClick={onSelect ? e => { e.stopPropagation(); onSelect(e); } : undefined}
+            style={{
+              width: 32, height: 32, borderRadius: 7, flexShrink: 0,
+              background: isSelected ? accentHex : `${accentHex}18`,
+              border: isSelected ? `1.5px solid ${accentHex}` : `1px solid ${accentHex}30`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: onSelect ? 'pointer' : 'default',
+              transition: 'background 0.15s, border-color 0.15s',
+            }}
+          >
+            {isSelected
+              ? <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+              : <span style={{ fontSize: 9, fontWeight: 700, color: accentHex, letterSpacing: '.04em', lineHeight: 1 }}>{extLabel}</span>
+            }
           </div>
 
           <div style={{ flex: 1, minWidth: 0 }}>
-            {/* File name */}
-            <p style={{ margin: '0 0 2px', fontWeight: 700, fontSize: 14, color: '#172033', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <p style={{ margin: '0 0 5px', fontWeight: 700, fontSize: 16, color: 'hsl(var(--foreground))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {fileName || 'Untitled'}
             </p>
+            {/* Status pill  */}
+            <span className="inline-flex items-center rounded-full"
+              style={{ padding: '3px 10px', fontSize: 11, fontWeight: 600, background: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
+              {sc.label}
+            </span>
           </div>
-
-          <span style={{ fontSize: 11, color: '#667085', whiteSpace: 'nowrap', flexShrink: 0, paddingTop: 2 }}>
-            {formatRelativeTime(doc.updated_at)}
-          </span>
         </div>
 
-        {/* ── Description / tags */}
+        {/* ── Description area  */}
         {doc.labels && doc.labels.length > 0 ? (
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' as const, marginBottom: 8 }}>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' as const, marginBottom: 14 }}>
             {doc.labels.slice(0, 2).map(l => (
-              <span key={l.id} style={{ fontSize: 10, fontWeight: 500, padding: '2px 8px', borderRadius: 99, background: l.color ? `${l.color}18` : '#F3E8FF', color: l.color || '#7C3AED', border: `1px solid ${l.color ? `${l.color}30` : '#D8B4FE'}` }}>
+              <span key={l.id} style={{ fontSize: 11, fontWeight: 500, padding: '2px 8px', borderRadius: 99, background: l.color ? `${l.color}18` : '#F3E8FF', color: l.color || '#7C3AED', border: `1px solid ${l.color ? `${l.color}30` : '#D8B4FE'}` }}>
                 {l.name}
               </span>
             ))}
-            {doc.labels.length > 2 && <span style={{ fontSize: 10, color: '#667085', padding: '2px 4px' }}>+{doc.labels.length - 2}</span>}
+            {doc.labels.length > 2 && <span style={{ fontSize: 11, color: 'hsl(var(--muted-foreground))', padding: '2px 4px' }}>+{doc.labels.length - 2}</span>}
           </div>
+        ) : fileSize ? (
+          <p style={{ margin: '0 0 14px', fontSize: 13, color: 'hsl(var(--muted-foreground))', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as React.CSSProperties}>
+            {fileSize}
+          </p>
         ) : (
-          <div style={{ height: 26 }} />
+          <div style={{ height: 8 }} />
         )}
-      </div>
 
-      {/* ── Bottom bar: Share + Trash (left) · Status badge (right) ── */}
-      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px 10px' }}>
-        {/* Action buttons — visible on hover */}
-        <div className="opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center gap-0.5">
-          {onShareClick && (
-            <button onClick={e => { e.stopPropagation(); onShareClick(doc); }}
-              style={{ padding: 5, color: '#667085', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 6, display: 'flex' }}
-              onMouseEnter={e => e.currentTarget.style.background = '#F7F8FB'}
-              onMouseLeave={e => e.currentTarget.style.background = 'none'}>
-              <Share2 style={{ width: 14, height: 14 }} />
-            </button>
-          )}
-          <button onClick={e => { e.stopPropagation(); onDeleteClick(e, doc); }}
-            style={{ padding: 5, color: '#667085', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 6, display: 'flex' }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#FEE2E2'; (e.currentTarget as HTMLButtonElement).style.color = '#EF4444'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = '#667085'; }}>
-            <Trash2 style={{ width: 14, height: 14 }} />
-          </button>
+        {/* ── Progress bar area — mirrors ProjectGridCard's progress section */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+           <span style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))', fontWeight: 500 }}>Project</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: accentHex, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 140 }}>
+              {(doc as any).project_name || 'General'}
+            </span>
+          </div>
+         <div style={{ height: 6, background: 'hsl(var(--muted))', borderRadius: 99, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: '100%', background: `${accentHex}40`, borderRadius: 99 }} />
+          </div>
         </div>
 
-        {/* Status badge — always visible, bottom-right */}
-        <span className="inline-flex items-center rounded-full"
-          style={{ padding: '3px 10px', fontSize: 10, fontWeight: 600, background: sc.bg, color: sc.text, border: `1px solid ${sc.border}` }}>
-          {sc.label}
-        </span>
+        {/* ── Footer row — mirrors ProjectGridCard footer: left actions + right time */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all duration-200">
+            {onShareClick && (
+              <button onClick={e => { e.stopPropagation(); onShareClick(doc); }}
+                style={{ padding: 5, color: 'hsl(var(--muted-foreground))', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 6, display: 'flex' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'hsl(var(--accent))'}
+                onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                <Share2 style={{ width: 13, height: 13 }} />
+              </button>
+            )}
+            <button onClick={e => { e.stopPropagation(); onDeleteClick(e, doc); }}
+              style={{ padding: 5, color: 'hsl(var(--muted-foreground))', background: 'none', border: 'none', cursor: 'pointer', borderRadius: 6, display: 'flex' }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#FEE2E2'; (e.currentTarget as HTMLButtonElement).style.color = '#EF4444'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'none'; (e.currentTarget as HTMLButtonElement).style.color = 'hsl(var(--muted-foreground))'; }}>
+              <Trash2 style={{ width: 13, height: 13 }} />
+            </button>
+          </div>
+
+          <span style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))', whiteSpace: 'nowrap' }}>
+            {formatRelativeTime(doc.updated_at)}
+          </span>
+        </div>
       </div>
     </div>
   );

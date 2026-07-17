@@ -28,7 +28,7 @@ export function ProjectGridCard({ project, selected, onSelect, onFav, onClick }:
     <div
       onClick={onClick}
       style={{
-        background: '#fff',
+        background: 'hsl(var(--card))',
         border: `1px solid ${selected ? accentHex : LINE}`,
         borderRadius: 14,
         overflow: 'hidden',
@@ -77,7 +77,7 @@ export function ProjectGridCard({ project, selected, onSelect, onFav, onClick }:
                 padding: '2px 4px', borderRadius: 6, color: MUTED,
                 display: 'flex', alignItems: 'center',
               }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#F7F8FB')}
+              onMouseEnter={e => (e.currentTarget.style.background = 'hsl(var(--accent))')}
               onMouseLeave={e => (e.currentTarget.style.background = 'none')}
             >
               <MoreHorizontal size={17} />
@@ -87,8 +87,8 @@ export function ProjectGridCard({ project, selected, onSelect, onFav, onClick }:
                 <div style={{ position: 'fixed', inset: 0, zIndex: 10 }} onClick={e => { e.stopPropagation(); setMenuOpen(false); }} />
                 <div style={{
                   position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 50,
-                  background: '#fff', border: `1px solid ${LINE}`, borderRadius: 10,
-                  boxShadow: '0 8px 24px rgba(16,24,40,.12)', minWidth: 160, overflow: 'hidden',
+                  background: 'hsl(var(--popover))', border: `1px solid ${LINE}`, borderRadius: 10,
+                  boxShadow: '0 8px 24px rgba(0,0,0,.18)', minWidth: 160, overflow: 'hidden',
                 }}>
                   {[
                     { label: 'Open Project', action: (e: React.MouseEvent) => { e.stopPropagation(); setMenuOpen(false); onClick(); } },
@@ -96,7 +96,7 @@ export function ProjectGridCard({ project, selected, onSelect, onFav, onClick }:
                   ].map(item => (
                     <button key={item.label} onClick={item.action}
                       style={{ width: '100%', padding: '8px 12px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: TEXT, textAlign: 'left', fontFamily: 'inherit' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = '#F7F8FB')}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'hsl(var(--accent))')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                     >
                       {item.label}
@@ -130,7 +130,7 @@ export function ProjectGridCard({ project, selected, onSelect, onFav, onClick }:
               {(project as any).completion_percentage ?? 0}%
             </span>
           </div>
-          <div style={{ height: 6, background: '#F3F4F6', borderRadius: 99, overflow: 'hidden' }}>
+          <div style={{ height: 6, background: 'hsl(var(--muted))', borderRadius: 99, overflow: 'hidden' }}>
             <div style={{
               height: '100%',
               width: `${Math.min((project as any).completion_percentage ?? 0, 100)}%`,

@@ -54,7 +54,7 @@ export function NewDashboardModal({ onClose, onCreate }: Props) {
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div style={{
-        background: '#fff', borderRadius: 16, width: '100%', maxWidth: 440,
+        background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 16, width: '100%', maxWidth: 440,
         boxShadow: '0 20px 60px rgba(16,24,40,0.18)',
         display: 'flex', flexDirection: 'column',
       }}>
@@ -68,7 +68,7 @@ export function NewDashboardModal({ onClose, onCreate }: Props) {
             onClick={onClose}
             style={{
               width: 28, height: 28, borderRadius: 7, border: `1px solid ${LINE}`,
-              background: '#fff', cursor: 'pointer', display: 'flex',
+              background: 'hsl(var(--muted))', cursor: 'pointer', display: 'flex',
               alignItems: 'center', justifyContent: 'center',
             }}
           >
@@ -117,7 +117,7 @@ export function NewDashboardModal({ onClose, onCreate }: Props) {
                       display: 'flex', alignItems: 'center', gap: 12,
                       padding: '10px 14px', borderRadius: 10,
                       border: `1.5px solid ${selected ? BLUE : LINE}`,
-                      background: selected ? '#EEF4FF' : '#fff',
+                      background: selected ? `${BLUE}18` : 'hsl(var(--card))',
                       cursor: 'pointer', textAlign: 'left',
                       transition: 'all 0.12s', fontFamily: 'inherit',
                     }}
@@ -155,7 +155,7 @@ export function NewDashboardModal({ onClose, onCreate }: Props) {
             onClick={onClose}
             style={{
               height: 36, padding: '0 16px', borderRadius: 8,
-              border: `1px solid ${LINE}`, background: '#fff',
+              border: `1px solid ${LINE}`, background: 'hsl(var(--muted))',
               fontSize: 13, fontWeight: 600, color: TEXT,
               cursor: 'pointer', fontFamily: 'inherit',
             }}
