@@ -7,15 +7,55 @@ User = get_user_model()
 class UserSerializer(serializers.ModelSerializer):
     """
     Serializer for User model with simple skills list.
+    Includes platform_roles aggregated from RoleAssignment table
+    so GET /auth/users/ returns all platform roles per user.
     """
-    skills = serializers.JSONField(required=False)
+    skills          = serializers.JSONField(required=False)
+    platform_roles  = serializers.SerializerMethodField()
+
+    def get_platform_roles(self, obj):
+        """
+        Aggregate all active RoleAssignment rows for this user
+        across all platforms and return as a dict.
+
+        Example:
+            {
+                "pm":   "project_viewer",
+                "hrms": "employee",
+                "crm":  "support_agent"
+            }
+        """
+        try:
+            from apps.rbac.models import RoleAssignment
+            from django.utils import timezone
+            from django.db.models import Q
+
+            today = timezone.now().date()
+            assignments = (
+                RoleAssignment.objects
+                .filter(
+                    user_id         = obj.pk,
+                    valid_from__lte = today,
+                )
+                .filter(Q(valid_to__isnull=True) | Q(valid_to__gte=today))
+                .select_related("role")
+                .order_by("platform", "id")
+            )
+            result = {}
+            for a in assignments:
+                # First assignment per platform wins
+                if a.platform not in result:
+                    result[a.platform] = a.role.code
+            return result
+        except Exception:
+            return {}
 
     class Meta:
         model = User
         fields = [
             "id", "username", "email", "first_name", "last_name",
-            "role", "avatar", "skills", "is_active", "date_joined", "is_superuser",
-            "auth_provider",
+            "role", "avatar", "skills", "is_active", "date_joined",
+            "is_superuser", "auth_provider", "platform_roles",
         ]
         read_only_fields = ["id", "date_joined", "is_superuser", "auth_provider"]
 
@@ -250,12 +290,41 @@ class DyuksaTokenObtainPairSerializer(TokenObtainPairSerializer):
                 ).values_list("platform__key", flat=True)
             )
             token["platforms"] = platforms
+
+            # ── Platform roles ────────────────────────────────────────────
+            # Each platform role comes from RoleAssignment table.
+            # This tells HRMS/CRM what the user can do inside that product.
+            # e.g. platform_roles = { "hrms": "hr_admin", "pm": "owner" }
+            try:
+                from apps.rbac.models import RoleAssignment
+                from django.utils import timezone
+                from django.db.models import Q
+                today = timezone.now().date()
+                assignments = (
+                    RoleAssignment.objects
+                    .filter(
+                        user_id         = user.pk,
+                        valid_from__lte = today,
+                    )
+                    .filter(Q(valid_to__isnull=True) | Q(valid_to__gte=today))
+                    .select_related("role")
+                    .order_by("platform", "id")
+                )
+                platform_roles = {}
+                for a in assignments:
+                    if a.platform not in platform_roles:
+                        platform_roles[a.platform] = a.role.code
+                token["platform_roles"] = platform_roles
+            except Exception:
+                token["platform_roles"] = {}
+
         else:
             # Superuser or admin account with no org — grant no platform access
             # via JWT (they use the Django admin panel directly instead)
-            token["org_id"]   = None
-            token["org_slug"] = None
-            token["org_name"] = None
-            token["platforms"] = []
+            token["org_id"]        = None
+            token["org_slug"]      = None
+            token["org_name"]      = None
+            token["platforms"]     = []
+            token["platform_roles"] = {}
 
         return token

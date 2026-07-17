@@ -58,6 +58,7 @@ LOCAL_APPS = [
     "apps.daily_updates.apps.DailyUpdatesConfig",
     "apps.ai_agent.apps.AiAgentConfig",
     "apps.dashboard",
+    "apps.rbac",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -168,10 +169,12 @@ _cors_origins = config(
         "http://127.0.0.1:5173,"
         # LAN IPs (development)
         "http://192.168.1.121:5173,"
-        "http://192.168.1.15:3001,"
+        "http://192.168.1.15:3001," 
         "http://192.168.1.160:3001,"
         "http://192.168.1.11:5173,"
         "http://192.168.1.188:8000,"
+        "http://192.168.1.15:5173,"
+        "http://192.168.1.14:5173,"
         # Dyuksa production domains
         "https://pm.dyuksa.com,"
         "https://hrms.dyuksa.com,"
@@ -183,8 +186,15 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_HEADERS = list(default_headers) + [
     "x-workspace-id",
+    "x-internal-token",
 ]
 STATIC_API_TOKEN = config("STATIC_API_TOKEN", default=None)
+
+# ── Internal cross-product API token ──────────────────────────────
+# Used for server-to-server calls between Dyuksa products (HRMS, CRM etc.)
+# Generate with: python -c "import secrets; print(secrets.token_hex(32))"
+# Must be identical in PM .env AND HRMS .env AND CRM .env
+INTERNAL_API_TOKEN = config("INTERNAL_API_TOKEN", default="")
 # Django REST Framework
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [

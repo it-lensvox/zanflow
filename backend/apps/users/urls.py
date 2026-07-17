@@ -10,6 +10,8 @@ from .views import (
     ChangeUserRoleView, ForgotPasswordView, VerifyOTPView, SetNewPasswordView,
     AuthenticatedResetPasswordView, SendInvitationView, VerifyInvitationTokenView,
     AcceptInvitationView, ContactUsView, WorkspaceSafeTokenRefreshView, SocialAuthView,
+    # PLATFORM_SEPARATION — move these to Central System project on separation
+    InviteEmployeeView, CreateEmployeeView, OffboardEmployeeView, LicensedProductsView,
 )
 from . import views
 
@@ -42,4 +44,13 @@ urlpatterns = [
     path("contact/",               ContactUsView.as_view(),                     name="contact-us"),
     path("social-auth/",           SocialAuthView.as_view(),                    name="social-auth"),
     path("token/verify/",          TokenVerifyView.as_view(),                   name="token-verify"),   # ← new: HRMS/CRM can verify tokens
+
+    # ── PLATFORM ONBOARDING ── PLATFORM_SEPARATION ───────────────────────────
+    # Move these to Central System project when codebase is separated.
+    # Search tag: PLATFORM_SEPARATION
+    path("products/",                           LicensedProductsView.as_view(),   name="licensed-products"),
+    path("employees/invite/",                   InviteEmployeeView.as_view(),     name="employee-invite"),
+    path("employees/create/",                   CreateEmployeeView.as_view(),     name="employee-create"),
+    path("employees/<int:pk>/offboard/",        OffboardEmployeeView.as_view(),   name="employee-offboard"),
+    # ── END PLATFORM ONBOARDING ──────────────────────────────────────────────
 ]
