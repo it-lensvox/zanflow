@@ -29,7 +29,52 @@ class WorkspaceSafeTokenRefreshView(TokenRefreshView):
     The refresh token payload is sufficient for this specific endpoint.
     """
     authentication_classes = []  
-    
+
+
+class LogoutView(APIView):
+    """
+    POST /api/v1/auth/logout/
+
+    Blacklists the supplied refresh token so it can no longer be used
+    to obtain new access tokens.  The mobile/web client should discard
+    both tokens from local storage after calling this endpoint.
+
+    Request body:
+        { "refresh": "<refresh_token>" }
+
+    Returns 205 Reset Content on success (signals the client to clear state).
+    Returns 400 if the token is missing, already blacklisted, or invalid.
+
+    Authentication: not required — the refresh token itself is the credential.
+    This mirrors the behaviour of TokenRefreshView (no JWT auth needed).
+    """
+
+    authentication_classes = []          # refresh token is the credential
+    permission_classes     = [permissions.AllowAny]
+
+    def post(self, request):
+        from rest_framework_simplejwt.tokens import RefreshToken
+        from rest_framework_simplejwt.exceptions import TokenError
+
+        refresh_token = request.data.get("refresh")
+        if not refresh_token:
+            return Response(
+                {"detail": "refresh token is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+        except TokenError as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(status=status.HTTP_205_RESET_CONTENT)
+
+
 class RegisterView(generics.CreateAPIView):
     """
     Register a new user.

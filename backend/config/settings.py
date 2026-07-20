@@ -16,7 +16,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config("SECRET_KEY", default="django-insecure-dev-key-change-in-production")
 DEBUG = config("DEBUG", default=True, cast=bool)
 # ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1,192.168.1.12").split(",")
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", "192.168.1.17"," 192.168.1.229", "*"]
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", "192.168.1.17","192.168.1.229", "*"]
 
 
 # Application definition
@@ -176,6 +176,7 @@ _cors_origins = config(
         "http://192.168.1.15:5173,"
         "http://192.168.1.15:8081,"
         "http://192.168.1.14:5173,"
+        "http://192.168.1.17:5173,"
         # Dyuksa production domains
         "https://pm.dyuksa.com,"
         "https://hrms.dyuksa.com,"

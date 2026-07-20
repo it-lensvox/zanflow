@@ -264,8 +264,14 @@ class DyuksaTokenObtainPairSerializer(TokenObtainPairSerializer):
         token = super().get_token(user)
 
         # ── Basic user claims ─────────────────────────────────────────────
-        token["email"] = user.email
-        token["role"]  = user.role
+        # Explicitly cast to int — simplejwt sets user_id from the PK which
+        # is always an integer, but some JSON serialisers coerce it to a
+        # string.  Forcing int here ensures HRMS/CRM never need a defensive cast.
+        token["user_id"]    = int(user.pk)
+        token["email"]      = user.email
+        token["role"]       = user.role
+        token["first_name"] = user.first_name
+        token["last_name"]  = user.last_name
 
         # ── Organisation claims ───────────────────────────────────────────
         # Guard against users with no organisation (e.g. superuser created
