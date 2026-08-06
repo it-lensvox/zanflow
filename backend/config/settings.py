@@ -12,6 +12,11 @@ from corsheaders.defaults import default_headers
 # Build paths
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# ── Load .env BEFORE any config() calls ───────────────────────────────
+# .env lives one level above backend: ZanFlow/ZanFlow/.env
+# This MUST come before SECRET_KEY so the correct value is loaded.
+load_dotenv(BASE_DIR.parent / '.env')
+
 # Security
 SECRET_KEY = config("SECRET_KEY", default="django-insecure-dev-key-change-in-production")
 DEBUG = config("DEBUG", default=True, cast=bool)
@@ -224,9 +229,17 @@ SIMPLE_JWT = {
     "REFRESH_TOKEN_LIFETIME": timedelta(
         days=config("JWT_REFRESH_TOKEN_LIFETIME_DAYS", default=7, cast=int)
     ),
-    "ROTATE_REFRESH_TOKENS": False,
+    "ROTATE_REFRESH_TOKENS":    False,
     "BLACKLIST_AFTER_ROTATION": False,
-    "AUTH_HEADER_TYPES": ("Bearer",),
+    "AUTH_HEADER_TYPES":        ("Bearer",),
+
+    # ← CHANGE THIS LINE:
+    # Before: config("SECRET_KEY", ...)
+    # After:  config("DYUKSA_JWT_SECRET", ...)
+    "SIGNING_KEY": config(
+        "DYUKSA_JWT_SECRET",
+        default="django-insecure-dev-key-change-in-production"
+    ),
 }
 
 # API Documentation
@@ -236,8 +249,7 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
 }
-env_path = BASE_DIR.parent / '.env'
-load_dotenv(env_path)
+# load_dotenv moved to top of settings.py — before SECRET_KEY is read
 
 # AWS S3 Settings
 USE_S3 = config("USE_S3", default=True, cast=bool)

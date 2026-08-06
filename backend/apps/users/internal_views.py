@@ -90,3 +90,108 @@ class InternalUserListView(APIView):
         ).order_by("id")
 
         return Response(list(users))
+
+class UserCreatedWebhookView(APIView):
+    """
+    POST /api/v1/internal/webhook/user-created/
+
+    Called by Central when a new user is created and PM portal
+    grant is assigned. PM uses this to ensure the user has a
+    workspace_member role assignment in the PM RoleAssignment table.
+
+    Since PM and Central share the same database — the user record
+    already exists. This webhook triggers the role assignment only.
+
+    Payload:
+        {
+            "user_id":    123,
+            "email":      "ravi@lensvox.com",
+            "first_name": "Ravi",
+            "last_name":  "Kumar",
+            "org_id":     1,
+            "designation": "Software Developer"
+        }
+
+    Response:
+        200 { "status": "provisioned", "role": "workspace_member" }
+        200 { "status": "already_exists" }
+        401 { "error": "Unauthorized" }
+        400 { "error": "..." }
+    """
+    authentication_classes = []
+    permission_classes     = []
+
+    def post(self, request):
+        if not InternalTokenPermission.is_valid(request):
+            return Response(
+                {"error": "Invalid or missing X-Internal-Token."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        user_id = request.data.get("user_id")
+        org_id  = request.data.get("org_id")
+
+        if not user_id or not org_id:
+            return Response(
+                {"error": "user_id and org_id are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            from apps.rbac.models import Role, RoleAssignment
+            from django.utils import timezone
+
+            today = timezone.now().date()
+
+            # Find workspace_member role
+            role = Role.objects.filter(
+                tenant_id = None,
+                code      = "workspace_member",
+                platform  = "pm",
+            ).first()
+
+            if not role:
+                return Response(
+                    {
+                        "status":  "skipped",
+                        "reason":  "workspace_member role not seeded yet. "
+                                   "Run: python manage.py seed_pm_roles",
+                    },
+                    status=status.HTTP_200_OK,
+                )
+
+            # Assign workspace_member at org scope
+            _, created = RoleAssignment.objects.get_or_create(
+                user_id    = user_id,
+                role       = role,
+                platform   = "pm",
+                scope_type = "organization",
+                scope_id   = org_id,
+                defaults   = {
+                    "valid_from":  today,
+                    "valid_to":    None,
+                    "assigned_by": None,
+                },
+            )
+
+            import logging
+            logging.getLogger(__name__).info(
+                "pm: %s workspace_member for user_id=%s org_id=%s",
+                "assigned" if created else "already existed",
+                user_id, org_id,
+            )
+
+            return Response({
+                "status": "provisioned" if created else "already_exists",
+                "role":   "workspace_member",
+            })
+
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(
+                "pm: Failed to provision user_id=%s: %s", user_id, e
+            )
+            return Response(
+                {"error": f"Provisioning failed: {e}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

@@ -257,16 +257,26 @@ def on_user_created(sender, instance, created, **kwargs):
             ).values_list("platform__key", flat=True)
         )
 
-        # Default role per platform for all new users
-        default_roles = {
-            "hrms": "employee",
+        # ── TEMPORARY default role assignment ─────────────────────────────
+        # Add platform here when it is NOT yet self-sufficient.
+        # Remove platform once it manages its own roles via webhook.
+        #
+        # HOW TO REMOVE A PRODUCT FROM THIS BLOCK:
+        #   1. Product seeds its own roles
+        #   2. Product implements webhook receiver
+        #   3. Confirm PlatformRoleCache is being populated
+        #   4. Remove the product from TEMPORARY_DEFAULT_ROLES below
+        #   5. Delete the product roles from Central DB
+        #
+        TEMPORARY_DEFAULT_ROLES = {
+            "hrms": "employee",          # TEMP — remove when HRMS team ready
+            "pm":   "workspace_member",  # TEMP — remove when PM webhook live
         }
 
-        for platform_key, role_code in default_roles.items():
+        for platform_key, role_code in TEMPORARY_DEFAULT_ROLES.items():
             if platform_key not in active_platforms:
                 continue  # org does not have this platform
 
-            # Find the template role (tenant_id=None = Dyuksa template)
             role = Role.objects.filter(
                 tenant_id = None,
                 code      = role_code,
@@ -276,7 +286,6 @@ def on_user_created(sender, instance, created, **kwargs):
             if not role:
                 continue  # role not seeded yet — skip silently
 
-            # Create assignment — skip if already exists
             RoleAssignment.objects.get_or_create(
                 user_id    = instance.pk,
                 role       = role,
@@ -284,15 +293,100 @@ def on_user_created(sender, instance, created, **kwargs):
                 scope_type = "organization",
                 scope_id   = org_id,
                 defaults   = {
-                    "valid_from":   today,
-                    "valid_to":     None,
-                    "assigned_by":  None,
+                    "valid_from":  today,
+                    "valid_to":    None,
+                    "assigned_by": None,
                 },
             )
 
     except Exception as e:
         import logging
         logging.getLogger(__name__).warning(
-            "rbac: Failed to auto-assign platform roles for user pk=%s: %s",
-            instance.pk, e
+            "rbac: TEMPORARY role assignment failed for user pk=%s: %s",
+            instance.pk, e,
         )
+
+# ── Role changed — notify Central ─────────────────────────────────────
+#
+# PERMANENT signal. Fires every time a PM RoleAssignment changes.
+# Central updates PlatformRoleCache so the next JWT is always accurate.
+#
+# This is the industry-standard approach used by Atlassian and Okta:
+#   Product owns role data
+#   Product pushes changes to Central via webhook
+#   Central caches the current role
+#   JWT reads from cache — always accurate, no two sources of truth
+
+@receiver(post_save, sender="rbac.RoleAssignment")
+def notify_central_role_change(sender, instance, **kwargs):
+    """
+    Fires to Central every time a PM RoleAssignment row is saved.
+
+    This covers:
+    - New role assignment created (new user, role upgrade)
+    - Existing assignment updated (valid_to set = role expired)
+
+    Central endpoint: POST /api/v1/internal/role-changed/
+    Header: X-Internal-Token: {INTERNAL_API_TOKEN}
+
+    Runs in a background thread — NEVER blocks the request.
+    If Central is down — fails silently and is logged.
+    Central will re-sync from PlatformRoleCache on next user login.
+    """
+    import threading
+    import requests
+    from django.conf import settings
+    from django.utils import timezone
+    from django.db.models import Q
+
+    def _notify():
+        try:
+            central_url = getattr(settings, "CENTRAL_URL", "").rstrip("/")
+            token       = getattr(settings, "INTERNAL_API_TOKEN", "")
+
+            if not central_url or not token:
+                return  # not configured — skip silently
+
+            # Find the currently active role for this user on pm platform
+            # (handles both new assignment and expiry cases correctly)
+            today  = timezone.now().date()
+            active = (
+                instance.__class__.objects
+                .filter(
+                    user_id    = instance.user_id,
+                    platform   = "pm",
+                    valid_from__lte = today,
+                )
+                .filter(
+                    Q(valid_to__isnull=True) | Q(valid_to__gte=today)
+                )
+                .select_related("role")
+                .order_by("-valid_from")
+                .first()
+            )
+
+            role_code = active.role.code if active else None
+
+            requests.post(
+                f"{central_url}/api/v1/internal/role-changed/",
+                json={
+                    "user_id":    instance.user_id,
+                    "platform":   "pm",
+                    "role_code":  role_code,
+                    "org_id":     getattr(instance, "scope_id", None),
+                    "changed_by": getattr(instance, "assigned_by_id", None),
+                    "timestamp":  timezone.now().isoformat(),
+                },
+                headers={"X-Internal-Token": token},
+                timeout=3,
+            )
+
+        except Exception:
+            import logging
+            logging.getLogger(__name__).warning(
+                "rbac: Failed to notify Central of PM role change "
+                "for user_id=%s. Central will re-sync on next login.",
+                instance.user_id,
+            )
+
+    threading.Thread(target=_notify, daemon=True).start()
