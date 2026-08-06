@@ -118,8 +118,7 @@ function PageLoader() {
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { hasPMRole, isLoading } = useAuth();
-  const isAuthorized = hasPMRole(['pm_admin', 'workspace_admin', 'workspace_member', 'project_admin', 'project_manager', 'project_member']);
-
+  const isAuthorized = hasPMRole(['pm_admin', 'workspace_admin', 'workspace_member']);
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">

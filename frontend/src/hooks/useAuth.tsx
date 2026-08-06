@@ -172,6 +172,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return !!role && roles.includes(role);
   };
 
+  /** Check if pmRole allows workspace-level write access */
+  const canManageWorkspace = (): boolean =>
+    ['pm_admin', 'workspace_admin'].includes(getPMRole() || '');
+
+  /** Check if pmRole allows creating tasks */
+  const canCreateTask = (): boolean =>
+    ['pm_admin', 'workspace_admin'].includes(getPMRole() || '');
+
   return (
     <AuthContext.Provider
       value={{

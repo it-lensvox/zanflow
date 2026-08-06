@@ -58,9 +58,13 @@ export function getPMRoleFromToken(): string | null {
 export async function getProjectRole(projectId: number): Promise<string | null> {
   const token = localStorage.getItem('access_token');
   if (!token) return null;
+  const workspaceId = localStorage.getItem('active_workspace_id') || '1';
   try {
     const res = await fetch(`/api/v1/rbac/assignments/?project_id=${projectId}`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'X-Workspace-ID': workspaceId,
+      },
     });
     const data = await res.json();
     return data.role ?? null;

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { getProjectRole } from '@/utils/auth';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Save, Trash2, Plus, X, Tags, Settings, AlertTriangle, FolderKanban, Users, Tag } from 'lucide-react';
@@ -24,6 +25,23 @@ const PRESET_COLORS = [
 
 export function ProjectSettings() {
   const { id } = useParams<{ id: string }>();
+  const [projectRole, setProjectRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (id) {
+      getProjectRole(Number(id)).then(setProjectRole);
+    }
+  }, [id]);
+
+  const canDeleteProject = projectRole === 'project_admin' ||
+    ['pm_admin', 'workspace_admin'].includes(
+      (() => { try { const t = localStorage.getItem('access_token'); return t ? JSON.parse(atob(t.split('.')[1]))?.platform_roles?.pm : null; } catch { return null; } })() || ''
+    );
+
+  const canEditSettings = projectRole === 'project_admin' || projectRole === 'project_manager' ||
+    ['pm_admin', 'workspace_admin'].includes(
+      (() => { try { const t = localStorage.getItem('access_token'); return t ? JSON.parse(atob(t.split('.')[1]))?.platform_roles?.pm : null; } catch { return null; } })() || ''
+    );
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 

@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
-import { Link } from 'react-router-dom';
+import { getProjectRole } from '@/utils/auth';
+import { useParams, Link } from 'react-router-dom';
 import {
   ArrowLeft, Loader2, Upload, List, Grid3X3, Settings, Copy, Check,
   Search, FileText, Info, X, Calendar, User, NotebookPen, Pencil, Plus, Trash2
@@ -217,6 +218,23 @@ function DocumentFilterBar({
 
 // ─── Main Unified Component 
 export function TaskDetails() {
+  const { id } = useParams<{ id: string }>();
+  const [projectRole, setProjectRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (id) {
+      getProjectRole(Number(id)).then(role => {
+        setProjectRole(role);
+      });
+    }
+  }, [id]);
+
+  const pmRole = (() => { try { const t = localStorage.getItem('access_token'); return t ? JSON.parse(atob(t.split('.')[1]))?.platform_roles?.pm : null; } catch { return null; } })();
+  const effectiveRole = projectRole || pmRole;
+  const canCreateTask = ['pm_admin','workspace_admin','project_admin','project_manager','project_member'].includes(effectiveRole || '');
+  const canAssignTask = ['pm_admin','workspace_admin','project_admin','project_manager'].includes(effectiveRole || '');
+  const canDeleteTask = ['pm_admin','workspace_admin','project_admin','project_manager'].includes(effectiveRole || '');
+  const isReadOnly = effectiveRole === 'project_viewer';
   const ctx = useProjectDetails();
   useDocumentPreviewKeyboard(() => ctx.setPreviewDocument(null));
 

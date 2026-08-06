@@ -319,7 +319,7 @@ export function QuickCreateButton() {
         selectedDate={new Date()}
         selectedHour={null}
         event={null}
-        currentUser={user ? { id: user.id, role: user.role ?? '' } : null}
+        currentUser={user ? { id: user.id, role: (() => { try { const t = localStorage.getItem('access_token'); return t ? JSON.parse(atob(t.split('.')[1]))?.platform_roles?.pm ?? '' : ''; } catch { return ''; } })() } : null}
         allEvents={[]}
         dyuksaEventData={activeModal === 'meeting' ? {
           eventType: 'Meeting',

@@ -38,7 +38,8 @@ export const createUserTableColumns = ({ onRoleClick, onDeleteClick }: UserTable
       label: 'Role',
       width: '140px',
       render: (user: AppUser) => {
-        const config = getRoleColorConfig(user.role);
+        const pmRole = (() => { try { const t = localStorage.getItem('access_token'); return t ? JSON.parse(atob(t.split('.')[1]))?.platform_roles?.pm : null; } catch { return null; } })();
+        const config = getRoleColorConfig(user.platform_roles?.pm || pmRole || user.role);
         return (
           <div
             onClick={(e) => { e.stopPropagation(); onRoleClick(user); }}

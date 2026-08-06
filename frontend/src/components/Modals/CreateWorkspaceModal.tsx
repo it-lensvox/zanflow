@@ -329,7 +329,9 @@ return ReactDOM.createPortal(
                         <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: TEXT }}>{fullName}</p>
                         <p style={{ margin: 0, fontSize: 11, color: MUTED }}>{user.email}</p>
                       </div>
-                      <span style={{ fontSize: 11, color: MUTED, textTransform: 'capitalize' }}>{user.role}</span>
+                      <span style={{ fontSize: 11, color: MUTED, textTransform: 'capitalize' }}>
+                        {(() => { try { const t = localStorage.getItem('access_token'); return t ? JSON.parse(atob(t.split('.')[1]))?.platform_roles?.pm : user.role; } catch { return user.role; } })()}
+                      </span>
                     </div>
                   );
                 })}

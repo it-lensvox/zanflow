@@ -190,7 +190,7 @@ export const Calendar: React.FC = () => {
                             onCreateEventAtTime={(date, hour) => { c.setSelectedDate(date); c.setSelectedHour(hour); c.setIsEventModalOpen(true); }}
                             viewMode={c.viewMode as 'day' | 'work_week' | 'week'}
                             updateEvent={c.updateEventMutation}
-                            currentUser={c.user ? { id: c.user.id, role: c.user.role ?? '' } : null}
+                            currentUser={c.user ? { id: c.user.id, role: (() => { try { const t = localStorage.getItem('access_token'); return t ? JSON.parse(atob(t.split('.')[1]))?.platform_roles?.pm ?? '' : ''; } catch { return ''; } })() } : null}
                             onAcceptInvitation={c.handleAcceptInvitation}
                             onDeclineInvitation={c.handleDeclineClick}
                             onRescheduleInvitation={c.handleRescheduleClick}
@@ -209,7 +209,7 @@ export const Calendar: React.FC = () => {
                         onTaskClick={c.handleTaskClick}
                         onEventClick={c.handleEventClick}
                         onClose={() => c.setSelectedDate(null)}
-                        currentUser={c.user ? { id: c.user.id, role: c.user.role ?? '' } : null}
+                        currentUser={c.user ? { id: c.user.id, role: (() => { try { const t = localStorage.getItem('access_token'); return t ? JSON.parse(atob(t.split('.')[1]))?.platform_roles?.pm ?? '' : ''; } catch { return ''; } })() } : null}
                         onOpenEventModal={() => c.setIsEventModalOpen(true)}
                         onAcceptInvitation={c.handleAcceptInvitation}
                         onDeclineInvitation={c.handleDeclineClick}
@@ -311,7 +311,7 @@ export const Calendar: React.FC = () => {
                 selectedDate={c.selectedDate}
                 selectedHour={c.selectedHour}
                 event={c.selectedEvent}
-                currentUser={c.user ? { id: c.user.id, role: c.user.role ?? '' } : null}
+                currentUser={c.user ? { id: c.user.id, role: (() => { try { const t = localStorage.getItem('access_token'); return t ? JSON.parse(atob(t.split('.')[1]))?.platform_roles?.pm ?? '' : ''; } catch { return ''; } })() } : null}
                 allEvents={c.events}
                 onAcceptInvitation={c.handleAcceptInvitation}
                 onDeclineInvitation={c.handleDeclineClick}

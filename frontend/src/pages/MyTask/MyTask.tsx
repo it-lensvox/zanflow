@@ -23,7 +23,6 @@ export const MyTask: React.FC = () => {
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [showBulkDeleteDenied, setShowBulkDeleteDenied] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
-  // Grid selection mode — activated on double-click, exits when all deselected
   const [isGridSelectionMode, setIsGridSelectionMode] = useState(false);
 
   // Exit grid selection mode when all tasks are deselected
@@ -125,7 +124,7 @@ export const MyTask: React.FC = () => {
         setSearchQuery={t.setSearchQuery}
         viewMode={t.viewMode}
         setViewMode={t.setViewMode}
-        canCreate={(() => { try { const t2 = localStorage.getItem('access_token'); const p = JSON.parse(atob(t2!.split('.')[1])); const r = p?.platform_roles?.pm; return ['pm_admin','workspace_admin','project_admin','project_manager','project_member'].includes(r); } catch { return false; } })()}
+        canCreate={(() => { try { const t2 = localStorage.getItem('access_token'); const p = JSON.parse(atob(t2!.split('.')[1])); const r = p?.platform_roles?.pm; return r !== 'project_viewer' && !!r; } catch { return false; } })()}
         onCreateTask={() => t.navigate('/taskboard/create')}
         onAITask={() => t.setShowAITaskModal(true)}
       />

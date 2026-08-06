@@ -149,8 +149,6 @@ export function useMyTask() {
     let filtered = raw;
     const pmRole = (() => { try { const t = localStorage.getItem('access_token'); return t ? JSON.parse(atob(t.split('.')[1]))?.platform_roles?.pm : null; } catch { return null; } })();
     if (pmRole === 'pm_admin' || pmRole === 'workspace_admin') {
-    } else if (pmRole === 'workspace_member') {
-      filtered = raw.filter(t => t.assigned_to.includes(user?.id ?? -1));
     } else {
       filtered = raw.filter(t => t.assigned_to.includes(user?.id ?? -1));
     }

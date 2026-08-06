@@ -29,7 +29,7 @@ const CustomModal: React.FC<{ isOpen: boolean; onClose: () => void; children: Re
 };
 
 const ChangeRoleModal: React.FC<{ user: AppUser; isOpen: boolean; onClose: () => void; queryClient: any }> = ({ user, isOpen, onClose, queryClient }) => {
-  const [newRole, setNewRole] = useState<string>(user.role as string || 'workspace_member');
+  const [newRole, setNewRole] = useState<string>(user.platform_roles?.pm || user.role as string || 'workspace_member');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const roles: string[] = ['pm_admin', 'workspace_admin', 'workspace_member'];
   const changeRoleMutation = useMutation({
@@ -97,7 +97,7 @@ const ChangeRoleModal: React.FC<{ user: AppUser; isOpen: boolean; onClose: () =>
               console.error("Save failed:", error);
             }
           }}
-          disabled={newRole === (user.role || 'workspace_member') || changeRoleMutation.isPending}
+          disabled={newRole === (user.platform_roles?.pm || user.role || 'workspace_member') || changeRoleMutation.isPending}
         >
           {changeRoleMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save changes'}
         </Button>
