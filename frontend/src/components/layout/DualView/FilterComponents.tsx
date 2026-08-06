@@ -43,7 +43,7 @@ export interface SearchFilterProps {
 }
 
 export const SearchFilter: React.FC<SearchFilterProps> = ({
-    columnKey,
+    columnKey: _columnKey,
     placeholder,
     value,
     onChange,
@@ -81,7 +81,7 @@ export interface ListFilterProps {
 }
 
 export const ListFilter: React.FC<ListFilterProps> = ({
-    columnKey,
+    columnKey: _columnKey,
     options,
     selectedValue,
     onSelect,
@@ -142,7 +142,7 @@ export interface DateFilterProps {
 }
 
 export const DateFilter: React.FC<DateFilterProps> = ({
-    columnKey,
+    columnKey: _columnKey,
     value,
     onChange,
     onClear,

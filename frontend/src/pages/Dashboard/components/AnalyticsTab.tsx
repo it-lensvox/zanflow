@@ -98,7 +98,7 @@ interface AnalyticsTabProps {
 
 export function AnalyticsTab({
   tasksLoading, projectsLoading,
-  totalTasks, completedTasks, overdueTasks, completionRate, avgCycleTime,
+  totalTasks, overdueTasks, completionRate, avgCycleTime,
   donut, donutTotal, leaderboard, throughputData, totalThroughput,
   chartSeries, chartLabels, selectedMonth, setSelectedMonth,
   showChartMonthPicker, setShowChartMonthPicker, projectCount, navigate,

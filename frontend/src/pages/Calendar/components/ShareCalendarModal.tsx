@@ -3,13 +3,6 @@ import ReactDOM from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { X, Search, Copy, Check, Link2, Users, ChevronDown, Trash2, Globe, Lock, Loader2, Download } from 'lucide-react';
 import { usersApi, eventApi, calendarShareApi, calendarLinkApi } from '@/services/api';
-interface SharedUser {
-    id: number;
-    first_name: string;
-    last_name: string;
-    email?: string;
-    permission: 'view' | 'edit' | 'full';
-}
 
 interface ShareCalendarModalProps {
     isOpen: boolean;
@@ -55,7 +48,7 @@ export const ShareCalendarModal: React.FC<ShareCalendarModalProps> = ({
     const sharesArray = Array.isArray(sharesData) ? sharesData : (sharesData?.results || []);
     const myShares = sharesArray.filter((share: any) => share.owner === currentUserId);
 
-    const { mutate: createShare, isPending: isCreating } = useMutation({
+    const { mutate: createShare, isPending: _isCreating } = useMutation({
         mutationFn: calendarShareApi.create,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['calendar-shares'] });

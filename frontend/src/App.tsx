@@ -4,7 +4,6 @@ import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { ThemeProvider } from '@/hooks/useTheme';
 import { Layout } from '@/components/layout';
-import type { User as AppUser } from '@/types';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 import { projectsApi, notificationSocket, gatewaySocket } from '@/services/api';
@@ -118,9 +117,8 @@ function PageLoader() {
 }
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { isAllowed, isLoading, isAuthenticated } = useAuth();
-  const ALLOWED_ROLES: AppUser['role'][] = ['admin', 'manager', 'annotator', 'developer'];
-  const isAuthorized = isAllowed(ALLOWED_ROLES);
+  const { hasPMRole, isLoading } = useAuth();
+  const isAuthorized = hasPMRole(['pm_admin', 'workspace_admin', 'workspace_member', 'project_admin', 'project_manager', 'project_member']);
 
   if (isLoading) {
     return (

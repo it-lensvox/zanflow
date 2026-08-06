@@ -49,7 +49,7 @@ const statusOptions: { value: DocumentStatus; label: string; icon: any }[] = [
 ];
 
 // --- Tag colors (HTML exact — with colored borders) ---
-const getTagStyle = (name: string): { bg: string; color: string; border: string } => {
+const _getTagStyle = (name: string): { bg: string; color: string; border: string } => {
   const n = name.toLowerCase();
   if (n.includes('contract')) return { bg: '#F3E8FF', color: '#7C3AED', border: '#D8B4FE' };
   if (n.includes('legal')) return { bg: '#D1FAE5', color: '#059669', border: '#6EE7B7' };
@@ -73,12 +73,12 @@ const avatarGradients = [
   'linear-gradient(135deg, #10B981 0%, #059669 100%)',
   'linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)',
 ];
-const getAvatarGradient = (name: string): string => {
+const _getAvatarGradient = (name: string): string => {
   let hash = 0;
   for (let i = 0; i < (name || '').length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
   return avatarGradients[Math.abs(hash) % avatarGradients.length];
 };
-const getInitials = (name: string): string => {
+const _getInitials = (name: string): string => {
   if (!name) return 'U';
   const parts = name.trim().split(/\s+/);
   return parts.length >= 2 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : name.slice(0, 2).toUpperCase();
@@ -322,8 +322,8 @@ export const createDocumentsTableColumns = (
       label: <span style={{ fontSize: 12, fontWeight: 800, color: 'hsl(var(--foreground))' }}>Document</span>,
       width: '350px',
       render: (doc: Document) => {
-        const iconColor = getDocIconColor(doc.name);
-        const ext = doc.name?.split('.').pop()?.toUpperCase() || '';
+        const _iconColor = getDocIconColor(doc.name);
+        const _ext = doc.name?.split('.').pop()?.toUpperCase() || '';
         return (
           <div className="flex items-center justify-between w-full group/cell">
             <div className="flex items-center gap-2.5 min-w-0 pr-2">

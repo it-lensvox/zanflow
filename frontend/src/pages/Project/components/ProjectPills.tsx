@@ -1,4 +1,4 @@
-import { STATUS_MAP, MUTED } from '../projectConstants';
+import { STATUS_MAP } from '../projectConstants';
 import { getProjectTypeConfig } from '@/config/projectTypeConfig';
 import { AvatarStack } from '@/components/ui/AvatarStack';
 

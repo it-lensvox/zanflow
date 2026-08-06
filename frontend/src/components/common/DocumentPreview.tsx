@@ -150,7 +150,7 @@ export const DocumentPreview: React.FC<DocumentPreviewProps> = ({
                     setTextContent(text);
                     setLoading(false);
                 })
-                .catch(err => {
+                .catch(_err => {
                     setError('Failed to load file content');
                     setLoading(false);
                 });

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Search, X, FolderKanban, CheckSquare, FileText, Calendar, MessageSquare, Users } from 'lucide-react';
+import { Search, X, FolderKanban, CheckSquare, FileText, Calendar, MessageSquare } from 'lucide-react';
 import { taskApi, projectsApi, documentsApi, agentApi } from '@/services/api';
 import { DocumentPreview } from '@/components/common/DocumentPreview';
 import type { AgentSearchResponse, AgentSearchMember } from '@/types';

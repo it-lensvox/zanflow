@@ -215,7 +215,7 @@ function WorkspaceCard({ activeWorkspace, userRole }: { activeWorkspace: any; us
   const [showAddMember, setShowAddMember] = useState(false);
   const [addSearch, setAddSearch] = useState('');
   const [selectedUser, setSelectedUser] = useState<any>(null);
-  const [selectedRole, setSelectedRole] = useState('viewer');
+  const [selectedRole, setSelectedRole] = useState('workspace_member');
   const [isAdding, setIsAdding] = useState(false);
   const [removingUserId, setRemovingUserId] = useState<number | null>(null);
   const [updatingRoleId, setUpdatingRoleId] = useState<number | null>(null);
@@ -227,7 +227,8 @@ function WorkspaceCard({ activeWorkspace, userRole }: { activeWorkspace: any; us
   const [dropdownAnchor, setDropdownAnchor] = useState<{ top: number; right: number } | null>(null);
 
   const workspaceId = activeWorkspace?.id;
-  const isAdminOrManager = ['admin', 'manager'].includes(activeWorkspace?.my_role || userRole);
+  const pmRole = (() => { try { const t = localStorage.getItem('access_token'); return t ? JSON.parse(atob(t.split('.')[1]))?.platform_roles?.pm : null; } catch { return null; } })();
+  const isAdminOrManager = ['pm_admin', 'workspace_admin'].includes(pmRole || '') || ['admin', 'manager'].includes(activeWorkspace?.my_role || userRole);
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
   const { data: wsDetails, isLoading: wsLoading, refetch: refetchWs } = useQuery({
@@ -594,11 +595,9 @@ function WorkspaceCard({ activeWorkspace, userRole }: { activeWorkspace: any; us
                 <label style={{ display: 'block', fontSize: 14, fontWeight: 600, color: TEXT_SECONDARY, marginBottom: 6 }}>Role</label>
                 <select value={selectedRole} onChange={e => setSelectedRole(e.target.value)}
                   style={{ width: '100%', padding: '8px 10px', border: `1px solid ${BORDER}`, borderRadius: 8, fontSize: 16, color: TEXT_PRIMARY, outline: 'none', background: 'hsl(var(--input))' }}>
-                  <option value="admin">Admin</option>
-                  <option value="manager">Manager</option>
-                  <option value="developer">Developer</option>
-                  <option value="annotator">Annotator</option>
-                  <option value="viewer">Viewer</option>
+                  <option value="pm_admin">PM Admin</option>
+                  <option value="workspace_admin">Workspace Admin</option>
+                  <option value="workspace_member">Workspace Member</option>
                 </select>
               </div>
             </div>
@@ -660,7 +659,7 @@ function WorkspaceCard({ activeWorkspace, userRole }: { activeWorkspace: any; us
             minWidth: 140,
             overflow: 'hidden',
           }}>
-            {(['viewer', 'annotator', 'developer', 'manager', 'admin'] as const).map((role) => {
+            {(['workspace_member', 'workspace_admin', 'pm_admin', 'project_member', 'project_manager', 'project_admin', 'project_viewer'] as const).map((role) => {
               const rs = getRoleConfig(role);
               const activeMember = filteredMembers.find((m: any) => m.user_id === openRoleDropdownId);
               const isActive = activeMember?.role === role;

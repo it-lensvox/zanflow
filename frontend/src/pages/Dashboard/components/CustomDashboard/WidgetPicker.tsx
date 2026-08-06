@@ -1,5 +1,5 @@
 import { X, BarChart2, PieChart, TrendingUp, CheckSquare, Clock, Table2, FolderKanban, FileText, AlertTriangle } from 'lucide-react';
-import { BLUE, LINE, TEXT, MUTED, BG } from '../../index';
+import { LINE, TEXT, MUTED, BG } from '../../index';
 import type { WidgetType, WidgetSize } from '@/types';
 
 interface WidgetMeta {

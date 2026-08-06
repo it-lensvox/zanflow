@@ -194,7 +194,7 @@ export function useTodayTab(allTasks: DashboardTask[]) {
 
   // Upcoming deadlines: next 7 days
   const upcomingDeadlines = useMemo(() => {
-    const weekOut = new Date(today.getTime() + 7 * 86400000);
+    const _weekOut = new Date(today.getTime() + 7 * 86400000);
     return myTasks
       .filter(t => t.end_date && t.status !== 'completed' && t.status !== 'deployed')
       .sort((a, b) => new Date(a.end_date).getTime() - new Date(b.end_date).getTime())

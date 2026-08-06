@@ -11,7 +11,7 @@ interface AITaskProps {
     fixedProjectId?: number;
 }
 
-export const AITask: React.FC<AITaskProps> = ({ onClose, onGenerate, fixedProjectId }) => {
+export const AITask: React.FC<AITaskProps> = ({ onClose, onGenerate: _onGenerate, fixedProjectId }) => {
     const navigate = useNavigate();
     const [selectedProjects, setSelectedProjects] = useState<number[]>(fixedProjectId ? [fixedProjectId] : []);
     const [projectDropdownOpen, setProjectDropdownOpen] = useState(false);

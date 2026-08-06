@@ -277,7 +277,7 @@ function SuggestionRow({
   onRemoveAssignee: (id: number)             => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const sc = STATUS_OPTS.find(o => o.value === suggestion.status) ?? STATUS_OPTS[0];
+  const _sc = STATUS_OPTS.find(o => o.value === suggestion.status) ?? STATUS_OPTS[0];
   useEffect(() => {
     if (suggestion.isEditing) inputRef.current?.focus();
   }, [suggestion.isEditing]);

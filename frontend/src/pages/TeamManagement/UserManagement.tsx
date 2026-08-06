@@ -29,9 +29,9 @@ const CustomModal: React.FC<{ isOpen: boolean; onClose: () => void; children: Re
 };
 
 const ChangeRoleModal: React.FC<{ user: AppUser; isOpen: boolean; onClose: () => void; queryClient: any }> = ({ user, isOpen, onClose, queryClient }) => {
-  const [newRole, setNewRole] = useState<AppUser['role']>(user.role);
+  const [newRole, setNewRole] = useState<string>(user.role as string || 'workspace_member');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const roles: AppUser['role'][] = ['admin', 'manager', 'annotator', 'viewer', 'developer'];
+  const roles: string[] = ['pm_admin', 'workspace_admin', 'workspace_member'];
   const changeRoleMutation = useMutation({
     mutationFn: (role: AppUser['role']) => usersApi.updateRole(user.id, role),
     onSuccess: () => {
@@ -92,12 +92,12 @@ const ChangeRoleModal: React.FC<{ user: AppUser; isOpen: boolean; onClose: () =>
           className="bg-[#1a1f2e] text-white hover:bg-[#252b3d]"
           onClick={async () => {
             try {
-              await changeRoleMutation.mutateAsync(newRole);
+              await changeRoleMutation.mutateAsync(newRole as any);
             } catch (error) {
               console.error("Save failed:", error);
             }
           }}
-          disabled={newRole === user.role || changeRoleMutation.isPending}
+          disabled={newRole === (user.role || 'workspace_member') || changeRoleMutation.isPending}
         >
           {changeRoleMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save changes'}
         </Button>
@@ -107,7 +107,7 @@ const ChangeRoleModal: React.FC<{ user: AppUser; isOpen: boolean; onClose: () =>
 };
 
 const AddUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient: any }> = ({ isOpen, onClose, queryClient }) => {
-  const [form, setForm] = useState({ username: '', email: '', password: '', confirmPassword: '', firstName: '', lastName: '', role: 'viewer' as AppUser['role'] });
+  const [form, setForm] = useState({ username: '', email: '', password: '', confirmPassword: '', firstName: '', lastName: '', role: 'workspace_member' as string });
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [errors, setErrors] = useState<{ username?: string; email?: string; password?: string; confirmPassword?: string }>({});
   const [showSuccess, setShowSuccess] = useState(false);
@@ -117,7 +117,7 @@ const AddUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient
   // Inside AddUserModal, add this:
   useEffect(() => {
     if (!isOpen) {
-      setForm({ username: '', email: '', password: '', confirmPassword: '', firstName: '', lastName: '', role: 'viewer' });
+      setForm({ username: '', email: '', password: '', confirmPassword: '', firstName: '', lastName: '', role: 'workspace_member' });
       setErrors({});
     }
   }, [isOpen]);
@@ -162,7 +162,7 @@ const AddUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient
       setShowSuccess(true);
       setTimeout(() => {
         setShowSuccess(false);
-        setForm({ username: '', email: '', password: '', confirmPassword: '', firstName: '', lastName: '', role: 'viewer' });
+        setForm({ username: '', email: '', password: '', confirmPassword: '', firstName: '', lastName: '', role: 'workspace_member' });
         setErrors({});
         onClose();
       }, 2500);
@@ -251,7 +251,7 @@ const AddUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient
 
             {isDropdownOpen && (
               <div className="border border-border rounded-md mt-1 bg-popover overflow-hidden shadow-sm">
-                {['admin', 'manager', 'annotator', 'viewer', 'developer'].map((role) => (<div
+                {['pm_admin', 'workspace_admin', 'workspace_member'].map((role) => (<div
                   key={role}
                   className="px-3 py-2 text-sm hover:bg-accent text-foreground cursor-pointer capitalize"
                   onClick={() => {
@@ -342,7 +342,7 @@ const AddUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient
               password_confirm: form.confirmPassword,
               first_name: form.firstName,
               last_name: form.lastName,
-              role: form.role,
+              role: form.role as any,
             });
           }}
           disabled={createUserMutation.isPending}
@@ -370,7 +370,7 @@ const InviteUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryCli
 
   const [form, setForm] = useState({
     email: '',
-    role: 'viewer' as AppUser['role'],
+    role: 'workspace_member' as string,
     workspace_id: activeWorkspaceId as number | null,
   });
 
@@ -396,7 +396,7 @@ const InviteUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryCli
       setTimeout(() => {
         setShowSuccess(false);
         onClose();
-        setForm({ email: '', role: 'viewer', workspace_id: null });
+        setForm({ email: '', role: 'workspace_member', workspace_id: null });
       }, 2500);
     },
     onError: (error: any) => {
@@ -440,7 +440,7 @@ const InviteUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryCli
             </div>
             {isDropdownOpen && (
               <div className="border border-border rounded-md mt-1 bg-popover overflow-hidden shadow-sm">
-                {(['admin', 'manager', 'annotator', 'viewer', 'developer'] as AppUser['role'][]).map((role) => (
+                {(['pm_admin', 'workspace_admin', 'workspace_member'] as string[]).map((role) => (
                   <div
                     key={role}
                     className="px-3 py-2 text-sm hover:bg-accent text-foreground cursor-pointer capitalize"
@@ -494,7 +494,7 @@ const InviteUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryCli
       </div> 
 
       <div className="flex justify-end gap-3 pt-6 mt-2 border-t">
-        <Button variant="outline" className="px-6" onClick={() => { onClose(); setForm({ email: '', role: 'viewer', workspace_id: activeWorkspaceId }); setErrors({}); }}>Cancel</Button>
+        <Button variant="outline" className="px-6" onClick={() => { onClose(); setForm({ email: '', role: 'workspace_member', workspace_id: activeWorkspaceId }); setErrors({}); }}>Cancel</Button>
         <Button
           className="px-6 bg-[#1a1f2e] text-white hover:bg-[#252b3d]"
           onClick={() => {
@@ -504,7 +504,7 @@ const InviteUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryCli
             }
             inviteUserMutation.mutate({
               email: form.email,
-              role: form.role,
+              role: form.role as any,
               workspace_id: form.workspace_id,
             });
           }}
@@ -546,7 +546,6 @@ export function UserManagement() {
   const [isInviteUserModalOpen, setIsInviteUserModalOpen] = useState(false);
   const [roleChangeUser, setRoleChangeUser] = useState<AppUser | null>(null);
   const [userToDelete, setUserToDelete] = useState<AppUser | null>(null);
-  const viewMode = 'table' as const;
 
   const { data: usersData, isLoading } = useQuery<PaginatedResponse<AppUser>, Error>({
     queryKey: ['users'],

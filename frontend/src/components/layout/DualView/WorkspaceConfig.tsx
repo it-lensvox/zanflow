@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { Badge } from '@/components/common';
 import type { TableColumn } from '@/components/layout/DualView';
-import type { Tenant, OrgAdmin, OrgRecentUser } from '@/types';
+import type { Tenant, OrgAdmin } from '@/types';
 import { Trash2 } from 'lucide-react';
 import { organizationsApi } from '@/services/api';
 
-// ─── Admin Cell ───────────────────────────────────────────────────────────────
+// ─── Admin Cell 
 
 const AdminCell = ({ admins }: { admins: OrgAdmin[] }) => {
   if (!admins || admins.length === 0) {
@@ -20,34 +19,8 @@ const AdminCell = ({ admins }: { admins: OrgAdmin[] }) => {
   );
 };
 
-// ─── Recent Active Users Cell ─────────────────────────────────────────────────
 
-const RecentUsersCell = ({ users }: { users: OrgRecentUser[] }) => {
-  if (!users || users.length === 0) {
-    return <span className="text-gray-400 text-[11px]">None</span>;
-  }
-  return (
-    <div className="flex -space-x-1.5">
-      {users.slice(0, 3).map((u) => (
-        <div
-          key={u.id}
-          title={`${u.username} (${u.role})`}
-          className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-[10px] font-bold text-indigo-700 ring-1 ring-white"
-        >
-          {u.username.charAt(0).toUpperCase()}
-        </div>
-      ))}
-      {users.length > 3 && (
-        <div className="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center text-[10px] font-bold text-white ring-1 ring-white">
-          +{users.length - 3}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ─── Stats Cell ───────────────────────────────────────────────────────────────
-
+// ─── Stats Cell 
 interface StatItemProps {
   label: string;
   value: number;

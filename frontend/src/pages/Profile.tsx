@@ -11,8 +11,8 @@ export function Profile() {
 
   // Profile image
   const [profileImage, setProfileImage] = useState<string | null>((user as any)?.avatar || null);
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [_isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [_avatarError, setAvatarError] = useState<string | null>(null);
 
   // Projects
   const [projects, setProjects] = useState<any[]>([]);

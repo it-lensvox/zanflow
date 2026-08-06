@@ -1,23 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { X, Search, Copy, Check, Link2, Users, ChevronDown, Trash2, Globe, Lock, Loader2, Download } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import { X, Search, Copy, Check, Link2, Users, ChevronDown, Trash2, Globe, Lock, Loader2, Download, Calendar } from 'lucide-react';
 import { usersApi, eventApi, calendarShareApi, calendarLinkApi } from '@/services/api';
-
-interface SharedUser {
-    id: number;
-    first_name: string;
-    last_name: string;
-    email?: string;
-    permission: 'view' | 'edit' | 'full';
-}
 
 interface ShareCalendarModalProps {
     isOpen: boolean;
     onClose: () => void;
     currentUserId: number;
 }
-
-// ... rest of your component
 
 export const ShareCalendarModal: React.FC<ShareCalendarModalProps> = ({
     isOpen,
@@ -53,7 +44,7 @@ export const ShareCalendarModal: React.FC<ShareCalendarModalProps> = ({
     const sharesArray = Array.isArray(sharesData) ? sharesData : (sharesData?.results || []);
     const myShares = sharesArray.filter((share: any) => share.owner === currentUserId);
 
-    const { mutate: createShare, isPending: isCreating } = useMutation({
+    const { mutate: createShare, isPending: _isCreating } = useMutation({
         mutationFn: calendarShareApi.create,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['calendar-shares'] });
@@ -524,3 +515,86 @@ export const ShareCalendarModal: React.FC<ShareCalendarModalProps> = ({
         </div>
     );
 };
+
+// ── Public shared calendar page — rendered at /calendar/shared/:token ──────────
+export function SharedCalendarView() {
+  const { token } = useParams<{ token: string }>();
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['public-calendar', token],
+    queryFn: () => calendarLinkApi.getPublicCalendar(token!),
+    enabled: !!token,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 text-center p-8">
+        <div className="text-5xl">📅</div>
+        <h1 className="text-2xl font-bold text-gray-900">Calendar not found</h1>
+        <p className="text-gray-500 max-w-sm">
+          This calendar link may have expired or been revoked by its owner.
+        </p>
+      </div>
+    );
+  }
+
+  const events: any[] = data.events ?? [];
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-4xl mx-auto px-4 py-10">
+        <div className="mb-8 flex items-center gap-3">
+          <div className="p-3 bg-indigo-100 rounded-xl">
+            <Calendar className="w-6 h-6 text-indigo-600" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {data.owner_name ? `${data.owner_name}'s Calendar` : 'Shared Calendar'}
+            </h1>
+            <p className="text-sm text-gray-500">Read-only public view</p>
+          </div>
+        </div>
+
+        {events.length === 0 ? (
+          <div className="text-center py-16 text-gray-400">
+            <div className="text-4xl mb-3">🗓️</div>
+            <p className="text-lg font-medium">No upcoming events</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {events.map((event: any) => (
+              <div key={event.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-start gap-4">
+                <div className="flex-shrink-0 text-center bg-indigo-50 rounded-lg px-3 py-2 min-w-[56px]">
+                  <p className="text-xs text-indigo-500 font-semibold uppercase">
+                    {new Date(event.start_time).toLocaleDateString('en-US', { month: 'short' })}
+                  </p>
+                  <p className="text-xl font-bold text-indigo-700">
+                    {new Date(event.start_time).getDate()}
+                  </p>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-900 truncate">{event.title}</p>
+                  <p className="text-sm text-gray-500 mt-0.5">
+                    {new Date(event.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                    {' — '}
+                    {new Date(event.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                  {event.location && (
+                    <p className="text-xs text-gray-400 mt-1 truncate">📍 {event.location}</p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

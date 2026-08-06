@@ -1,23 +1,30 @@
 // User Types 
+export type PMWorkspaceRole = 'pm_admin' | 'workspace_admin' | 'workspace_member';
+export type PMProjectRole = 'project_admin' | 'project_manager' | 'project_member' | 'project_viewer';
+export type PMRole = PMWorkspaceRole | PMProjectRole;
+
 export interface User {
   id: number;
   username: string;
   email: string;
   first_name: string;
   last_name: string;
-  role: 'admin' | 'manager' | 'annotator' | 'viewer' | 'developer';
+  /** @deprecated Use platform_roles.pm from JWT for workspace scope; fetch /api/v1/rbac/assignments/?project_id=X for project scope */
+  role?: 'admin' | 'manager' | 'annotator' | 'viewer' | 'developer';
   avatar?: string;
   is_active: boolean;
   is_superuser?: boolean;
   date_joined: string;
   skills?: string[];
+  platform_roles?: { pm?: PMWorkspaceRole; [key: string]: string | undefined };
 }
 
 export interface InviteUserPayload {
   email: string;
-  role: 'admin' | 'manager' | 'annotator' | 'viewer' | 'developer';
-  workspace_id?: number | null; 
+  role: PMWorkspaceRole | 'admin' | 'manager' | 'annotator' | 'viewer' | 'developer';
+  workspace_id?: number | null;
 }
+
 
 export interface InviteUserResponse {
   detail: string;
@@ -26,7 +33,7 @@ export interface InviteUserResponse {
 // Invite Accept (Setup Account page)
 export interface InviteVerifyResponse {
   email: string;
-  role: 'admin' | 'manager' | 'annotator' | 'viewer' | 'developer';
+  role: PMWorkspaceRole | 'admin' | 'manager' | 'annotator' | 'viewer' | 'developer';
 }
 
 export interface InviteAcceptPayload {
@@ -184,6 +191,7 @@ export interface Task {
   assigned_to_user_details: User[];
   assigned_by: number;
   assigned_by_user_details?: User;
+  created_by?: number;
   status: 'pending' | 'backlog' | 'in_progress' | 'completed' | 'deployed' | 'deferred' | 'review' | string;
   labels?: Label[];
   links?: TaskLink[];

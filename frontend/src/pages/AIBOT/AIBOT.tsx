@@ -1,4 +1,4 @@
-import { Sparkles, Minus } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { useAIBot }       from './hooks/useAIBot';
 import { HistoryPanel }   from './components/HistoryPanel';
 import { ChatArea }       from './components/ChatArea';

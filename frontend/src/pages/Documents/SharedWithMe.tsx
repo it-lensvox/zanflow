@@ -108,10 +108,9 @@ function SidePanel({ doc, onClose, onOpenFull }: { doc: Document; onClose: () =>
   );
 }
 
-// ─── Main page ────────────────────────────────────────────────────────────────
+// ─── Main page 
 export function SharedWithMe() {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const { unreadCount } = useNotifications();
 
   const highlightDocId = searchParams.get('highlight') || '';
@@ -121,7 +120,7 @@ export function SharedWithMe() {
   const [previewDoc, setPreviewDoc] = useState<{ url: string; fileName: string; fileType?: string } | null>(null);
   const rowsPerPage = 25;
 
-  // ── Fetch shared documents ──────────────────────────────────────────────────
+  // ── Fetch shared documents
   const { data, isLoading } = useQuery({
     queryKey: ['documents-shared-with-me', currentPage],
     queryFn: () => documentsApi.sharedWithMe({ page: currentPage }),
@@ -134,12 +133,12 @@ export function SharedWithMe() {
   const hasNext = !!data?.next;
   const hasPrev = !!data?.previous;
 
-  // ── Filter by search ────────────────────────────────────────────────────────
+  // ── Filter by search 
   const filtered = allDocs.filter(d =>
     !searchTerm || (d.original_file_name || d.name || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // ── Open full preview ───────────────────────────────────────────────────────
+  // ── Open full preview 
   const handleOpenFull = async (doc: Document) => {
     try {
       const res = await documentsApi.getDownloadUrl(doc.project, { document_id: doc.id });
@@ -157,7 +156,7 @@ export function SharedWithMe() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#fff', overflow: 'hidden' }}>
 
-      {/* ── TOP BAR ────────────────────────────────────────────────────────── */}
+      {/* ── TOP BAR  */}
       <div style={{ flexShrink: 0, background: '#fff', borderBottom: `1px solid ${LINE}`, padding: '16px 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
           <div>
@@ -186,7 +185,7 @@ export function SharedWithMe() {
         </div>
       </div>
 
-      {/* ── CONTENT ────────────────────────────────────────────────────────── */}
+      {/* ── CONTENT  */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
@@ -284,7 +283,7 @@ export function SharedWithMe() {
             )}
           </div>
 
-          {/* ── PAGINATION ─────────────────────────────────────────────────── */}
+          {/* ── PAGINATION  */}
           {totalCount > 0 && (
             <Pagination
               currentPage={currentPage}
@@ -297,7 +296,7 @@ export function SharedWithMe() {
           )}
         </div>
 
-        {/* ── SIDE PANEL ─────────────────────────────────────────────────────── */}
+        {/* ── SIDE PANEL  */}
         {selectedDoc && (
           <SidePanel
             doc={selectedDoc}

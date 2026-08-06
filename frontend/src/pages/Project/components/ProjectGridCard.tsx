@@ -15,14 +15,14 @@ interface ProjectGridCardProps {
   onClick: () => void;
 }
 
-export function ProjectGridCard({ project, selected, onSelect, onFav, onClick }: ProjectGridCardProps) {
+export function ProjectGridCard({ project, selected, onSelect: _onSelect, onFav, onClick }: ProjectGridCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const taskType = (project as any).task_type || '';
   const accentHex = getTypeHex(taskType);
-  const tintBg = getTypeBg(taskType);
+  const _tintBg = getTypeBg(taskType);
   const members = (project as any).members || [];
   const docCount = (project as any).document_count ?? 0;
-  const initial = (project.name?.[0] || '?').toUpperCase();
+  const _initial = (project.name?.[0] || '?').toUpperCase();
 
   return (
     <div

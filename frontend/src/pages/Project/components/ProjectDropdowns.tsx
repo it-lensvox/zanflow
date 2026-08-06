@@ -3,7 +3,10 @@ import React from 'react';
 import { BLUE, LINE, MUTED, TEXT } from '@/pages/MyTask/pages/CreateTask/createTaskConstants';
 
 export const PROJECT_ROLES = [
-  { label: 'Manager',            value: 'manager' },
+  { label: 'Project Admin',   value: 'project_admin' },
+  { label: 'Project Manager', value: 'project_manager' },
+  { label: 'Project Member',  value: 'project_member' },
+  { label: 'Project Viewer',  value: 'project_viewer' },
   { label: 'Frontend Developer', value: 'frontend' },
   { label: 'Backend Developer',  value: 'backend' },
   { label: 'Testing Engineer',   value: 'tester' },

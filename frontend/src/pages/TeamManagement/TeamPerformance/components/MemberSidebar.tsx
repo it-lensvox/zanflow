@@ -1,4 +1,3 @@
-import React from 'react';
 import { Users } from 'lucide-react';
 import type { TeamMember } from '../index';
 import { LINE, TEXT, MUTED, BLUE } from '@/config/tokens';

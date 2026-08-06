@@ -100,8 +100,8 @@ export function CreateTeamModal({ isOpen, onClose, onSuccess }: CreateTeamModalP
   const [isSubmitting,         setIsSubmitting]         = useState(false);
   const [error,                setError]                = useState<string | null>(null);
   const memberDropdownRef    = useRef<HTMLDivElement>(null);
-  const teamTypeRef          = useRef<HTMLDivElement>(null);
-  const [typeDropRect,  setTypeDropRect]  = useState<DOMRect | null>(null);
+  const _teamTypeRef         = useRef<HTMLDivElement>(null);
+  const [_typeDropRect, _setTypeDropRect] = useState<DOMRect | null>(null);
   const [memberDropRect, setMemberDropRect] = useState<DOMRect | null>(null);
   const { user } = useAuth();
   const { data: teamTypeChoices, isLoading: isLoadingTeamTypes } = useQuery({

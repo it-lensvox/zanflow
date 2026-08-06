@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { FileText, Loader2, Paperclip, Pencil, Bold, Italic, List, ListOrdered, NotebookPen, Trash2 } from 'lucide-react';
-import { cn, formatRelativeTime } from '@/lib/utils';
+import { formatRelativeTime } from '@/lib/utils';
 import { quickNotesApi } from '@/services/api';
 import DeleteModal from '@/components/common/Deletemodal';
 import { DocumentPreview } from '@/components/common/DocumentPreview';

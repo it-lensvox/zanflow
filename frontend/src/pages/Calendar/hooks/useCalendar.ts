@@ -200,8 +200,9 @@ export function useCalendar() {
     const tasks = useMemo(() => {
         if (!tasksData || !user) return [];
         const allTasks = tasksData.pages.flatMap((page: any) => page.results || page.tasks || page);
-        if (user.role === 'admin') return allTasks;
-        if (user.role === 'manager') return allTasks.filter((t: Task) => t.assigned_by === user.id || t.assigned_to.includes(user.id));
+        const pmRole = (() => { try { const t = localStorage.getItem('access_token'); return t ? JSON.parse(atob(t.split('.')[1]))?.platform_roles?.pm : null; } catch { return null; } })();
+        if (pmRole === 'pm_admin' || pmRole === 'workspace_admin') return allTasks;
+        if (pmRole === 'workspace_member') return allTasks.filter((t: Task) => t.assigned_to.includes(user.id));
         return allTasks.filter((t: Task) => t.assigned_to.includes(user.id));
     }, [tasksData, user]);
 

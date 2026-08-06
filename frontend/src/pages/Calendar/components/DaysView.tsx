@@ -35,7 +35,7 @@ export const DaysView: React.FC<DaysViewProps> = ({
     onRescheduleInvitation,
     isAccepting,
     onEventContextMenu,
-    seenEventIds,
+    seenEventIds: _seenEventIds,
     renderStatusDot,
 }) => {
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
@@ -388,7 +388,6 @@ export const DaysView: React.FC<DaysViewProps> = ({
                                     )}
                                     {positionedEvents.map(({ event, effectiveStart, effectiveEnd, orderIndex, totalOverlaps }) => {
                                         const startMinutes = (effectiveStart.getHours() * 60) + effectiveStart.getMinutes();
-                                        const endMinutes = (effectiveEnd.getHours() * 60) + effectiveEnd.getMinutes();
                                         const topOffset = startMinutes * (64 / 60);
                                         const eventHeight = 32;
                                         const widthPercent = 100 / totalOverlaps;

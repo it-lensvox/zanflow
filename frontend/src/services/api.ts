@@ -2,15 +2,15 @@ import axios, { InternalAxiosRequestConfig } from 'axios';
 import type {
   AuthTokens, User as AppUser, PaginatedResponse, PaginatedProjectsResponse, GetUploadUrlPayload, GetUploadUrlResponse, ConfirmUploadResponse, GetDownloadUrlPayload, ConfirmUploadPayload, GetDownloadUrlResponse, AllDocumentsResponse,
   TaskComment, CreateTaskCommentPayload, AITaskSuggestionResponse, AITaskSuggestionPayload, ProjectCreatePayload, Label, DocumentStatus, ChatMessage, ChatRoom, ChatRoomMessagesResponse, CreatePrivateChatPayload,
-  GatewaySendMessagePayload, GatewayIncomingMessage, RefineTextPayload, RefineTextResponse, TaskResponse, TeamTypeChoicesResponse, PinTaskResponse, CreateTeamPayload, ProjectChatRoom, TeamChatRoom, ChatUnreadResponse, 
+  GatewaySendMessagePayload, GatewayIncomingMessage, RefineTextPayload, RefineTextResponse, TaskResponse, TeamTypeChoicesResponse, PinTaskResponse, CreateTeamPayload, ProjectChatRoom, TeamChatRoom, ChatUnreadResponse,
   NotificationData, NotificationCallback, Team, ThreadRoom, ThreadSession, ThreadStorage, ThreadUIMessage, CreateThreadRoomPayload, WSJoinRoomCommand, WSSendMessageCommand, WSIncomingThreadMessage, WSUnreadUpdateSignal, ThreadMessagesResponse,
   InviteUserPayload, InviteUserResponse, InviteVerifyResponse, InviteAcceptPayload, InviteAcceptResponse, OrganizationSignupPayload, OrganizationSignupResponse, ProjectStatus,
   DailyUpdate, DailyUpdatePayload, DailyUpdateListResponse, TaskFilterParams, Event as CalendarEventType, SocialAuthPayload, SocialAuthResponse,
 } from '@/types';
 
 export const API_URL = (import.meta as any).env.VITE_API_URL || 'http://192.168.1.17:8000/api/v1';
+export const CENTRAL_URL = (import.meta as any).env.VITE_CENTRAL_URL || 'http://192.168.1.17:8001/api/v1';
 const WS_GATEWAY_URL = (import.meta as any).env.VITE_WS_GATEWAY_URL || 'ws://192.168.1.17:8000/ws/gateway';
-const WS_AI_BOT_URL = (import.meta as any).env.VITE_WS_AI_BOT_URL || 'ws://192.168.1.17:8000/ws/ai-bot/';
 
 export const api = axios.create({
   baseURL: API_URL,
@@ -83,9 +83,6 @@ const isAuthError = (error: any): boolean => {
     ) {
       return true;
     }
-
-    // Everything else is a permission error (don't refresh)
-    // e.g. "Only admins can create workspaces", "You are not a member"
     return false;
   }
 
@@ -99,12 +96,15 @@ api.interceptors.response.use(
 
     if (isAuthError(error) && !originalRequest._retry) {
       if (originalRequest.url?.includes('/auth/refresh')) {
-        stopProactiveRefresh(); 
-        localStorage.clear();  
-        window.location.href = '/login';
+        stopProactiveRefresh();
+        if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/signup')) {
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
+          localStorage.removeItem('active_workspace_id');
+          window.location.href = '/login';
+        }
         return Promise.reject(error);
       }
-
       originalRequest._retry = true;
 
       // If already refreshing, queue this request and wait
@@ -126,6 +126,7 @@ api.interceptors.response.use(
           throw new Error('No refresh token');
         }
 
+        // Token refresh on PM — shared DB and SECRET_KEY
         const response = await axios.post(`${API_URL}/auth/refresh/`, {
           refresh: refreshToken
         });
@@ -155,8 +156,12 @@ api.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null);
         stopProactiveRefresh();
-        localStorage.clear();
-        window.location.href = '/login';
+        if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/signup')) {
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
+          localStorage.removeItem('active_workspace_id');
+          window.location.href = '/login';
+        }
         return Promise.reject(refreshError);
       } finally {
         isRefreshingToken = false;
@@ -219,6 +224,7 @@ function scheduleProactiveRefresh() {
       const refreshToken = localStorage.getItem('refresh_token');
       if (!refreshToken) return;
 
+      // Token refresh stays on PM — same DB and SECRET_KEY as Central
       const response = await axios.post(`${API_URL}/auth/refresh/`, {
         refresh: refreshToken
       });
@@ -258,7 +264,8 @@ export const authApi = {
   login: async (username: string, password: string) => {
     localStorage.removeItem('active_workspace_id');
     delete api.defaults.headers.common['X-Workspace-ID'];
-    const response = await api.post<AuthTokens>('/auth/login/', {
+    // Login via Central — PM does not issue tokens
+    const response = await axios.post<AuthTokens>(`${CENTRAL_URL}/auth/login/`, {
       username,
       password,
     });
@@ -282,17 +289,16 @@ export const authApi = {
   },
 
   sendOtp: async (email: string) => {
-    const response = await api.post('/organizations/signup/send-otp/', { email });
+    // OTP sent via Central
+    const response = await axios.post(`${CENTRAL_URL}/auth/send-otp/`, { email });
     return response.data;
   },
 
   register: async (data: OrganizationSignupPayload): Promise<OrganizationSignupResponse> => {
-    // 💡 Add these two lines here as well!
     localStorage.removeItem('active_workspace_id');
     delete api.defaults.headers.common['X-Workspace-ID'];
-
-    const response = await api.post<OrganizationSignupResponse>(
-      '/organizations/signup/',
+    const response = await axios.post<OrganizationSignupResponse>(
+      `${CENTRAL_URL}/auth/register/`,
       data
     );
     setTokens(response.data.tokens);
@@ -305,18 +311,13 @@ export const authApi = {
     return response.data;
   },
 
-  /**
-   * Add a platform (e.g. "pm") to an existing Dyuksa account.
-   * Called when signup returns 409 EMAIL_ALREADY_EXISTS and the
-   * user confirms they want to add PM to their existing account.
-   */
   addPlatform: async (email: string, password: string, platform: string) => {
-    const response = await api.post('/organizations/add-platform/', {
+    // Add platform via Central
+    const response = await axios.post(`${CENTRAL_URL}/auth/add-platform/`, {
       email,
       password,
       platform,
     });
-    // Response contains new tokens with updated platforms array
     if (response.data.access) {
       setTokens({ access: response.data.access, refresh: response.data.refresh });
       localStorage.setItem('access_token', response.data.access);
@@ -350,12 +351,11 @@ export const authApi = {
   },
 
   forgotPassword: async (email: string) => {
-    const response = await api.post('/auth/forgot-password/', { email });
+    const response = await axios.post(`${CENTRAL_URL}/auth/forgot-password/`, { email });
     return response.data;
   },
-
-  verifyOTP: async (email: string, otp: string,) => {
-    const response = await api.post('/auth/verify-otp/', { email, otp });
+  verifyOTP: async (email: string, otp: string) => {
+    const response = await axios.post(`${CENTRAL_URL}/auth/verify-otp/`, { email, otp });
     return response.data;
   },
 
@@ -365,7 +365,7 @@ export const authApi = {
     password: string;
     password_confirm: string;
   }) => {
-    const response = await api.post('/auth/set-new-password/', data);
+    const response = await axios.post(`${CENTRAL_URL}/auth/set-new-password/`, data);
     return response.data;
   },
 
@@ -375,7 +375,11 @@ export const authApi = {
     new_password: string;
     confirm_new_password: string;
   }) => {
-    const response = await api.post('/auth/reset-password/', data);
+    // Change password via Central
+    const token = localStorage.getItem('access_token');
+    const response = await axios.post(`${CENTRAL_URL}/auth/reset-password/`, data, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     return response.data;
   },
 
@@ -541,7 +545,7 @@ export const documentsApi = {
     const response = await api.delete(`/documents/${documentId}/labels/${labelId}/`);
     return response.data;
   },
-  
+
   // Get all project and task documents with optional task filtering
   getAllDocuments: async (projectId: number, taskId?: number) => {
     const url = `/documents/project/${projectId}/all/`;
@@ -928,11 +932,11 @@ export const organizationsApi = {
     // Normalise: lift org fields to top level, merge with the rest
     return {
       ...raw.organization,
-      stats:           raw.stats,
-      users:           raw.users           ?? [],
+      stats: raw.stats,
+      users: raw.users ?? [],
       recent_projects: raw.recent_projects ?? [],
-      recent_tasks:    raw.recent_tasks    ?? [],
-      platforms:       raw.platforms       ?? [],
+      recent_tasks: raw.recent_tasks ?? [],
+      platforms: raw.platforms ?? [],
     };
   },
 
@@ -984,24 +988,26 @@ export const usersApi = {
   },
 
   invite: async (data: InviteUserPayload): Promise<InviteUserResponse> => {
-    const response = await api.post<InviteUserResponse>('/auth/invite/send/', data);
-    return response.data;
-  },
-
-  // Invite Accept (Setup Account page)
-
-  // Called on page load — no auth token needed, uses plain axios
-  verifyInvite: async (token: string): Promise<InviteVerifyResponse> => {
-    const response = await axios.get<InviteVerifyResponse>(
-      `${API_URL}/auth/invite/verify/${token}/`
+    // Invitations sent via Central
+    const token = localStorage.getItem('access_token');
+    const response = await axios.post<InviteUserResponse>(
+      `${CENTRAL_URL}/auth/invite/send/`,
+      data,
+      { headers: { Authorization: `Bearer ${token}` } }
     );
     return response.data;
   },
 
-  // Called on form submit — no auth token needed, uses plain axios
+  verifyInvite: async (token: string): Promise<InviteVerifyResponse> => {
+    const response = await axios.get<InviteVerifyResponse>(
+      `${CENTRAL_URL}/auth/invite/verify/${token}/`
+    );
+    return response.data;
+  },
+
   acceptInvite: async (data: InviteAcceptPayload): Promise<InviteAcceptResponse> => {
     const response = await axios.post<InviteAcceptResponse>(
-      `${API_URL}/auth/invite/accept/`,
+      `${CENTRAL_URL}/auth/invite/accept/`,
       data
     );
     return response.data;
@@ -1344,7 +1350,7 @@ export class NotificationWebSocketService {
         this.isConnecting = false;
       };
 
-      this.ws.onclose = (event) => {
+      this.ws.onclose = (_event) => {
         this.isConnecting = false;
         this.attemptReconnect();
       };
@@ -1578,7 +1584,7 @@ export const threadsApi = {
   // Convert backend message from messages API to UI format
   convertBackendMessageToUI: (
     backendMsg: ThreadMessagesResponse['messages'][0],
-    currentUserId?: number
+    _currentUserId?: number
   ): ThreadUIMessage => {
     // Determine sender type - CRITICAL: Use is_own_message from backend
     let senderType: 'user' | 'system' | 'other' = 'other';
@@ -1705,10 +1711,10 @@ export const agentApi = {
   },
 
   stream: async (
-    payload:   import('@/types').AgentQueryPayload,
-    onChunk:   (text: string) => void,
-    onDone:    (event: import('@/types').AgentStreamDone) => void,
-    onError?:  (err: string) => void,
+    payload: import('@/types').AgentQueryPayload,
+    onChunk: (text: string) => void,
+    onDone: (event: import('@/types').AgentStreamDone) => void,
+    onError?: (err: string) => void,
   ): Promise<void> => {
     const tokens = getTokens();
     const workspaceId = localStorage.getItem('active_workspace_id') || '1';
@@ -1716,10 +1722,10 @@ export const agentApi = {
     const response = await fetch(
       `${API_URL}/agent/query/stream/`,
       {
-        method:  'POST',
+        method: 'POST',
         headers: {
-          'Content-Type':   'application/json',
-          'Authorization':  `Bearer ${tokens?.access ?? ''}`,
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${tokens?.access ?? ''}`,
           'X-Workspace-ID': workspaceId,
         },
         body: JSON.stringify(payload),
@@ -1731,9 +1737,9 @@ export const agentApi = {
       return;
     }
 
-    const reader  = response.body.getReader();
+    const reader = response.body.getReader();
     const decoder = new TextDecoder();
-    let   buffer  = '';
+    let buffer = '';
 
     while (true) {
       const { done, value } = await reader.read();
@@ -1741,7 +1747,7 @@ export const agentApi = {
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
-      buffer = lines.pop() ?? ''; 
+      buffer = lines.pop() ?? '';
 
       for (const line of lines) {
         const trimmed = line.trim();
@@ -1751,7 +1757,7 @@ export const agentApi = {
         try {
           const event = JSON.parse(jsonStr) as import('@/types').AgentStreamEvent;
           if (event.type === 'chunk') onChunk(event.text);
-          if (event.type === 'done')  onDone(event);
+          if (event.type === 'done') onDone(event);
         } catch { }
       }
     }
@@ -2041,25 +2047,6 @@ export const calendarLinkApi = {
   },
 };
 
-interface Workspace {
-  id: number;
-  name: string;
-  slug: string;
-  description?: string;
-  is_default: boolean;
-  is_active: boolean;
-  member_count: number;
-  role: 'admin' | 'manager' | 'viewer' | 'annotator' | 'developer' | null;
-  created_by?: number;
-  created_at: string;
-  updated_at: string;
-}
-
-interface WorkspacesResponse {
-  active_workspace_id: number;
-  workspaces: Workspace[];
-}
-
 export const workspaceApi = {
   getActiveWorkspaceId: (): number | null => {
     const id = localStorage.getItem('active_workspace_id');
@@ -2193,9 +2180,26 @@ export const workspaceApi = {
   }
 };
 
-// ✅ Auto-start proactive refresh if user is already logged
-if (localStorage.getItem('access_token')) {
-  startProactiveRefresh();
+// Auto-start proactive refresh only if token is still valid (not expired)
+const _bootToken = localStorage.getItem('access_token');
+if (_bootToken) {
+  try {
+    const _payload = JSON.parse(atob(_bootToken.split('.')[1]));
+    const _expMs = (_payload.exp || 0) * 1000;
+    if (_expMs > Date.now()) {
+      // Token still valid — start proactive refresh
+      startProactiveRefresh();
+    } else {
+      // Token already expired — clear silently, don't redirect (user may be on /login)
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('active_workspace_id');
+    }
+  } catch {
+    // Bad token — clear silently
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+  }
 }
 
 export const dashboardApi = {
@@ -2217,7 +2221,7 @@ export const dashboardApi = {
 // ── Social Auth API
 export const socialAuthApi = {
   authenticate: (payload: SocialAuthPayload): Promise<SocialAuthResponse> =>
-    api.post<SocialAuthResponse>('/auth/social-auth/', payload).then((res) => res.data),
+    axios.post<SocialAuthResponse>(`${CENTRAL_URL}/auth/social-auth/`, payload).then((res) => res.data),
 };
 
 // ── Custom Dashboards API
@@ -2249,6 +2253,18 @@ export const customDashboardsApi = {
 
   remove: async (id: number): Promise<void> => {
     await api.delete(`/dashboard/custom/${id}/`);
+  },
+};
+
+// RBAC API — fetch project-level role for current user
+export const rbacApi = {
+  getProjectRole: async (projectId: number): Promise<string | null> => {
+    try {
+      const response = await api.get(`/rbac/assignments/`, { params: { project_id: projectId } });
+      return response.data?.role ?? null;
+    } catch {
+      return null;
+    }
   },
 };
 

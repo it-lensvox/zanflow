@@ -68,7 +68,7 @@ export function useCustomDashboards() {
 
   // ── Set default — backend handles resetting others
   const setDefaultDashboard = useCallback(async (id: number) => {
-    const updated = await customDashboardsApi.update(id, { is_default: true });
+    await customDashboardsApi.update(id, { is_default: true });
     // Re-fetch all so is_default states are in sync with backend
     const all = await customDashboardsApi.getAll();
     setDashboards(all);

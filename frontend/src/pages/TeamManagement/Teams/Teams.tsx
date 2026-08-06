@@ -8,7 +8,7 @@ import { CreateTeamModal } from './components/Createteammodal';
 import { useTeams }             from './hooks/useTeams';
 import { TeamGridCard }         from './components/TeamGridCard';
 import { getTeamsTableColumns } from './components/TeamsTableColumns';
-import { TEXT, MUTED, LINE, BG } from '@/config/tokens';
+import { TEXT, MUTED, LINE } from '@/config/tokens';
 import type { Team } from '@/types';
 
 

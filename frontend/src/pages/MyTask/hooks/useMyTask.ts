@@ -56,7 +56,7 @@ export function useMyTask() {
   // ── Server-side filters from URL query params (e.g. /taskboard/pending?priority=critical&project_id=1)
   const priorityParam = searchParams.get('priority') || undefined;
   const projectIdParam = searchParams.get('project_id') || undefined;
-  const labelNameParam = searchParams.get('label_name') || undefined;
+  const _labelNameParam = searchParams.get('label_name') || undefined;
   const statusParam = activeFilter !== 'ALL' ? activeFilter.toLowerCase() : undefined;
   const urlStatusRedirectRef = useRef<string | null>(null);
   const statusFromUrl = searchParams.get('status');
@@ -131,7 +131,6 @@ export function useMyTask() {
         priority: priorityParam,
         project_id: projectIdParam,
       });
-      console.log(`[TaskBoard] page=${currentPage} fetched=${res.results.length} total=${res.count}`);
       return res;
     },
     enabled: !!user && !pendingStatusRedirect,
@@ -148,9 +147,11 @@ export function useMyTask() {
   const tasks = useMemo(() => {
     const raw: Task[] = (pageData as any)?.results ?? [];
     let filtered = raw;
-    if (user?.role === 'manager') {
-      filtered = raw.filter(t => t.assigned_by === user.id || t.assigned_to.includes(user.id));
-    } else if (user?.role !== 'admin') {
+    const pmRole = (() => { try { const t = localStorage.getItem('access_token'); return t ? JSON.parse(atob(t.split('.')[1]))?.platform_roles?.pm : null; } catch { return null; } })();
+    if (pmRole === 'pm_admin' || pmRole === 'workspace_admin') {
+    } else if (pmRole === 'workspace_member') {
+      filtered = raw.filter(t => t.assigned_to.includes(user?.id ?? -1));
+    } else {
       filtered = raw.filter(t => t.assigned_to.includes(user?.id ?? -1));
     }
     return filtered.map(t => ({ ...t, status_label: (t.status || '').toLowerCase().replace(/_/g, ' ') }));

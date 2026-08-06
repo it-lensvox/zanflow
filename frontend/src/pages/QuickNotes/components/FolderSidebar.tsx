@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { Plus, Folder, FolderKanban, ChevronRight, ChevronDown, MoreVertical } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { projectsApi } from '@/services/api';
 import { getTypeHex } from '@/pages/Project/projectConstants';
 import DeleteModal from '@/components/common/Deletemodal';

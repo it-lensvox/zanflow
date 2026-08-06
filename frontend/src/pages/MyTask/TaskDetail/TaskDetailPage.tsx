@@ -53,7 +53,7 @@ function TaskDetailPageInner({ task, onDelete }: { task: Task; onDelete: (id: nu
     const { user } = useAuth();
     const [childTask, setChildTask] = useState<Task | null>(null);
     const detail = useTaskDetail({ task, onDelete, onClose: undefined, onTaskUpdated: undefined });
-    const { isSaving, hasUnsavedChanges, isEditingTitle, setIsEditingTitle, editableTitle, setEditableTitle, handleSave, setShowDeleteConfirm, setShowNotAdminPopup } = detail;
+    const { isSaving, hasUnsavedChanges, isEditingTitle, setIsEditingTitle, editableTitle, setEditableTitle, handleSave, setShowDeleteConfirm, setShowNotAdminPopup: _setShowNotAdminPopup } = detail;
 
     return (
         <div style={{ background: T.bg, minHeight: '100vh', fontFamily: '-apple-system,BlinkMacSystemFont,"Inter",system-ui,sans-serif' }}>
@@ -86,7 +86,7 @@ function TaskDetailPageInner({ task, onDelete }: { task: Task; onDelete: (id: nu
                             {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                             {isSaving ? 'Saving…' : 'Save changes'}
                         </button>
-                        {(user?.role === 'admin' || task.assigned_by === user?.id) && (
+                        {(() => { try { const t = localStorage.getItem('access_token'); const p = JSON.parse(atob(t!.split('.')[1])); const r = p?.platform_roles?.pm; return (r === 'pm_admin' || r === 'workspace_admin' || task.assigned_by === user?.id) && task.created_by !== user?.id; } catch { return false; } })() && (
                             <button onClick={() => setShowDeleteConfirm(true)}
                                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 8, border: `1px solid ${T.line}`, background: 'hsl(var(--muted))', color: T.muted, cursor: 'pointer' }}
                                 onMouseEnter={e => { e.currentTarget.style.background = '#fef2f2'; e.currentTarget.style.color = '#dc2626'; e.currentTarget.style.borderColor = '#fecaca'; }}

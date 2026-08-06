@@ -510,7 +510,7 @@ interface TaskTableColumnsProps {
   navigate: ReturnType<typeof useNavigate>;
 }
 
-export const createTasksTableColumns = ({ onTaskClick, queryClient, user, navigate, dateField = 'end_date', personField = 'assigned_to', selectionProps }: TaskTableColumnsProps & { dateField?: 'end_date' | 'start_date' | 'created_at'; personField?: 'assigned_to' | 'created_by' | 'updated_by' }): TableColumn<Task>[] => {
+export const createTasksTableColumns = ({ onTaskClick: _onTaskClick, queryClient, user: _user, navigate: _navigate, dateField = 'end_date', personField = 'assigned_to', selectionProps }: TaskTableColumnsProps & { dateField?: 'end_date' | 'start_date' | 'created_at'; personField?: 'assigned_to' | 'created_by' | 'updated_by' }): TableColumn<Task>[] => {
 
   const updateAllTaskListCaches = (updatedTask: Task) => {
     const allTaskListQueries = queryClient.getQueryCache().findAll({ queryKey: ['tasks-list'], exact: false });
@@ -765,7 +765,7 @@ export const createTasksTableColumns = ({ onTaskClick, queryClient, user, naviga
    const { resolvedTheme } = useTheme();
     return (
       <div className="border border-border rounded px-1.5 py-1 bg-card hover:border-blue-400 transition-all" onClick={(e) => e.stopPropagation()}>
-        {user?.role === 'admin' || user?.role === 'manager' ? (
+        {(() => { try { const t = localStorage.getItem('access_token'); const p = JSON.parse(atob(t!.split('.')[1])); const r = p?.platform_roles?.pm; return r === 'pm_admin' || r === 'workspace_admin'; } catch { return false; } })() ? (
           <input
             type="date"
             value={task[field]?.split('T')[0] || ''}

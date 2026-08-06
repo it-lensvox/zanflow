@@ -13,7 +13,7 @@ interface Workspace {
   is_default: boolean;
   is_active: boolean;
   member_count: number;
-  role: 'admin' | 'manager' | 'member';
+  role: 'pm_admin' | 'workspace_admin' | 'workspace_member' | 'admin' | 'manager' | 'member';
   created_by?: number;
   created_at: string;
   updated_at: string;
@@ -45,8 +45,6 @@ export function WorkspaceSwitcher({ onCreateWorkspace }: WorkspaceSwitcherProps)
 
   useEffect(() => {
     if (workspaces.length > 0) {
-      workspaces.forEach((w: Workspace) => {
-      });
     }
   }, [workspaces, user]);
 
@@ -67,7 +65,7 @@ export function WorkspaceSwitcher({ onCreateWorkspace }: WorkspaceSwitcherProps)
       setIsSwitching(false);
     }
   };
-  
+
 
   const handleDeleteClick = (workspace: Workspace, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -76,7 +74,8 @@ export function WorkspaceSwitcher({ onCreateWorkspace }: WorkspaceSwitcherProps)
     setIsOpen(false);
     setDeleteConfirmText('');
   };
-  
+  void handleDeleteClick;
+
 
   const handleDeleteConfirm = async () => {
     if (!workspaceToDelete) return;
@@ -84,7 +83,7 @@ export function WorkspaceSwitcher({ onCreateWorkspace }: WorkspaceSwitcherProps)
     setIsDeleting(true);
 
     try {
-      const result = await workspaceApi.deleteWorkspace(workspaceToDelete.id);
+      await workspaceApi.deleteWorkspace(workspaceToDelete.id);
 
       // If we deleted the active workspace, switch to default
       if (workspaceToDelete.id === activeWorkspaceId) {
@@ -110,19 +109,11 @@ export function WorkspaceSwitcher({ onCreateWorkspace }: WorkspaceSwitcherProps)
   };
 
   const canDeleteWorkspace = (workspace: Workspace): boolean => {
-    // Rule 1: Can't delete default workspace
-    if (workspace.is_default) {
-      return false;
-    }
-    
-    // Rule 2: Can only delete if you created it
-    if (workspace.created_by && user?.id) {
-      return workspace.created_by === user.id;
-    }
-    
-    // If created_by is missing, don't show delete
+    if (workspace.is_default) return false;
+    if (workspace.created_by && user?.id) return workspace.created_by === user.id;
     return false;
   };
+  void canDeleteWorkspace;
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -177,7 +168,6 @@ export function WorkspaceSwitcher({ onCreateWorkspace }: WorkspaceSwitcherProps)
                 <div className="max-h-[180px] overflow-y-auto">
                   {workspaces.map((workspace: Workspace) => {
                     const isActive = workspace.id === activeWorkspaceId;
-                    const canDelete = canDeleteWorkspace(workspace);
 
                     return (
                       <div
@@ -201,7 +191,7 @@ export function WorkspaceSwitcher({ onCreateWorkspace }: WorkspaceSwitcherProps)
                               )}
                             </div>
                             <div className="flex items-center gap-2 mt-0.5">
-                            <Users className="w-2.5 h-2.5 text-muted-foreground" />
+                              <Users className="w-2.5 h-2.5 text-muted-foreground" />
                               <span className="text-[10px] text-muted-foreground">
                                 {workspace.member_count} members
                               </span>
@@ -216,7 +206,7 @@ export function WorkspaceSwitcher({ onCreateWorkspace }: WorkspaceSwitcherProps)
                           )}
                         </button>
 
-                        
+
                         {/* {canDelete && (
                           <button
                             onClick={(e) => handleDeleteClick(workspace, e)}
@@ -231,8 +221,8 @@ export function WorkspaceSwitcher({ onCreateWorkspace }: WorkspaceSwitcherProps)
                   })}
                 </div>
 
-                
-                {activeWorkspace && ['admin', 'manager'].includes(activeWorkspace.role) && (
+
+                {activeWorkspace && ['pm_admin', 'workspace_admin', 'admin', 'manager'].includes(activeWorkspace.role) && (
                   <button
                     onClick={() => {
                       setIsOpen(false);
@@ -251,107 +241,107 @@ export function WorkspaceSwitcher({ onCreateWorkspace }: WorkspaceSwitcherProps)
       </div>
 
       {/* Delete Confirmation Dialog */}
-{showDeleteConfirm && workspaceToDelete && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000]">
-    <div className="bg-card border border-border rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
-          <Trash2 className="w-6 h-6 text-red-600" />
-        </div>
-        <div>
-          <h3 className="text-lg font-semibold text-foreground">Delete Workspace?</h3>
-          <p className="text-sm text-muted-foreground">This action cannot be undone</p>
-        </div>
-      </div>
+      {showDeleteConfirm && workspaceToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000]">
+          <div className="bg-card border border-border rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                <Trash2 className="w-6 h-6 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">Delete Workspace?</h3>
+                <p className="text-sm text-muted-foreground">This action cannot be undone</p>
+              </div>
+            </div>
 
-      <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-        <p className="text-sm text-red-800 font-medium mb-2">
-          You are about to permanently delete "{workspaceToDelete.name}"
-        </p>
-        <p className="text-xs text-red-700">
-          This will permanently delete:
-        </p>
-        <ul className="text-xs text-red-700 list-disc list-inside mt-1 space-y-0.5">
-          <li>All projects in this workspace</li>
-          <li>All tasks and documents</li>
-          <li>All team data and chat rooms</li>
-          <li>All workspace members will lose access</li>
-        </ul>
-      </div>
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-800 font-medium mb-2">
+                You are about to permanently delete "{workspaceToDelete.name}"
+              </p>
+              <p className="text-xs text-red-700">
+                This will permanently delete:
+              </p>
+              <ul className="text-xs text-red-700 list-disc list-inside mt-1 space-y-0.5">
+                <li>All projects in this workspace</li>
+                <li>All tasks and documents</li>
+                <li>All team data and chat rooms</li>
+                <li>All workspace members will lose access</li>
+              </ul>
+            </div>
 
-      {/* ✅ Confirmation Input Section */}
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-foreground mb-2">
-          Type <span className="font-semibold text-red-600">"{workspaceToDelete.name}"</span> to confirm:
-        </label>
-        <div className="relative">
-          <input
-            type="text"
-            value={deleteConfirmText}
-            onChange={(e) => setDeleteConfirmText(e.target.value)}
-            placeholder={workspaceToDelete.name}
-            className="w-full px-3 py-2 pr-10 border border-border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 text-sm bg-input text-foreground"
-            autoFocus
-          />
-          {/* ✅ Validation Icon */}
-          <div className="absolute right-3 top-1/2 -translate-y-1/2">
-            {deleteConfirmText.length > 0 && (
-              <>
-                {deleteConfirmText === workspaceToDelete.name ? (
-                  <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
-                    <Check className="w-3 h-3 text-white" />
-                  </div>
+            {/* ✅ Confirmation Input Section */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Type <span className="font-semibold text-red-600">"{workspaceToDelete.name}"</span> to confirm:
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder={workspaceToDelete.name}
+                  className="w-full px-3 py-2 pr-10 border border-border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 text-sm bg-input text-foreground"
+                  autoFocus
+                />
+                {/* ✅ Validation Icon */}
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  {deleteConfirmText.length > 0 && (
+                    <>
+                      {deleteConfirmText === workspaceToDelete.name ? (
+                        <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
+                          <Check className="w-3 h-3 text-white" />
+                        </div>
+                      ) : (
+                        <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center">
+                          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+              {deleteConfirmText.length > 0 && deleteConfirmText !== workspaceToDelete.name && (
+                <p className="mt-1 text-xs text-red-600">
+                  Workspace name does not match
+                </p>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setWorkspaceToDelete(null);
+                  setDeleteConfirmText('');
+                }}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2 border border-border rounded-lg text-sm font-medium text-foreground bg-muted hover:bg-accent transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                disabled={isDeleting || deleteConfirmText !== workspaceToDelete.name}
+                className="flex-1 px-4 py-2 bg-red-600 rounded-lg text-sm font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isDeleting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Deleting...
+                  </>
                 ) : (
-                  <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center">
-                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </div>
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    Delete Permanently
+                  </>
                 )}
-              </>
-            )}
+              </button>
+            </div>
           </div>
         </div>
-        {deleteConfirmText.length > 0 && deleteConfirmText !== workspaceToDelete.name && (
-          <p className="mt-1 text-xs text-red-600">
-            Workspace name does not match
-          </p>
-        )}
-      </div>
-
-      <div className="flex gap-3">
-        <button
-          onClick={() => {
-            setShowDeleteConfirm(false);
-            setWorkspaceToDelete(null);
-            setDeleteConfirmText('');
-          }}
-          disabled={isDeleting}
-          className="flex-1 px-4 py-2 border border-border rounded-lg text-sm font-medium text-foreground bg-muted hover:bg-accent transition-colors disabled:opacity-50"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={handleDeleteConfirm}
-          disabled={isDeleting || deleteConfirmText !== workspaceToDelete.name}
-          className="flex-1 px-4 py-2 bg-red-600 rounded-lg text-sm font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-        >
-          {isDeleting ? (
-            <>
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Deleting...
-            </>
-          ) : (
-            <>
-              <Trash2 className="w-4 h-4" />
-              Delete Permanently
-            </>
-          )}
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+      )}
     </>
   );
 }

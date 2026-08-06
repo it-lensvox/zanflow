@@ -1,4 +1,3 @@
-import React from 'react';
 import { TablePopover } from '@/components/common';
 import { AvatarStack } from '@/components/ui/AvatarStack';
 import { MUTED } from '@/config/tokens';

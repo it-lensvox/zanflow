@@ -94,7 +94,7 @@ function ProjectCard({ id, name, type, tasks, status }: ProjectCardProps) {
 // ─── Note Card 
 interface NoteCardProps { id: number; title: string; preview?: string; folder?: string; }
 
-function NoteCard({ id, title, preview, folder }: NoteCardProps) {
+function NoteCard({ title, preview, folder }: NoteCardProps) {
   const navigate = useNavigate();
   return (
     <div onClick={() => navigate('/quick-notes')} style={{

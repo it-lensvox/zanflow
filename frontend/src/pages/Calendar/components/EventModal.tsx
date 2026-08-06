@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-    ChevronLeft, ChevronRight, Calendar as CalendarIcon, Users, ClipboardList,
-    CheckSquare, Clock, MapPin, Video, X, CalendarPlus, Trash2, Check, XCircle,
+    ChevronLeft, ChevronRight, Calendar as CalendarIcon, Users,
+    CheckSquare, Clock, MapPin, Video, X, Trash2, Check, XCircle,
     RefreshCw, Crown, Loader2,
 } from 'lucide-react';
 import { eventApi, usersApi } from '@/services/api';
-import type { Event as CalendarEventType, InvitationStatus } from '@/types';
-import { MONTHS, getStatusBadgeColors, getStatusLabel } from '../calendarConstants';
+import type { Event as CalendarEventType } from '@/types';
+import { getStatusBadgeColors, getStatusLabel } from '../calendarConstants';
 
 interface EventModalProps {
     isOpen: boolean;
@@ -40,7 +40,7 @@ export const EventModal: React.FC<EventModalProps> = ({
     selectedHour,
     event,
     currentUser,
-    allEvents,
+    allEvents: _allEvents,
     onAcceptInvitation,
     onDeclineInvitation,
     onRescheduleInvitation,

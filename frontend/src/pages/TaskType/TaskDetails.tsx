@@ -357,7 +357,7 @@ export function TaskDetails() {
     setPastedJson(text);
   };
 
-  const handlePasteUpload = async () => {
+  const _handlePasteUpload = async () => {
     if (!pastedJson.trim()) return;
 
     // Quick frontend validation to catch syntax errors before hitting the API

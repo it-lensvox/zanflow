@@ -319,7 +319,7 @@ export function QuickCreateButton() {
         selectedDate={new Date()}
         selectedHour={null}
         event={null}
-        currentUser={user ? { id: user.id, role: user.role } : null}
+        currentUser={user ? { id: user.id, role: user.role ?? '' } : null}
         allEvents={[]}
         dyuksaEventData={activeModal === 'meeting' ? {
           eventType: 'Meeting',

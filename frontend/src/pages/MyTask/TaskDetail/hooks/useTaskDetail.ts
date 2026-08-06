@@ -70,7 +70,8 @@ export function useTaskDetail({ task, onClose, onDelete, onTaskUpdated }: UseTas
     const statusDropdownRef  = useRef<HTMLDivElement>(null);
     const addUserDropdownRef = useRef<HTMLDivElement>(null);
     const attachmentContainerRef = useRef<HTMLDivElement>(null);
-    const canEditDates = ['admin', 'manager'].includes(user?.role || '');
+    const pmRole = (() => { try { const t = localStorage.getItem('access_token'); return t ? JSON.parse(atob(t.split('.')[1]))?.platform_roles?.pm : null; } catch { return null; } })();
+    const canEditDates = pmRole === 'pm_admin' || pmRole === 'workspace_admin';
 
     // ── Queries 
     const { data: fullTaskDetails } = useQuery<any>({

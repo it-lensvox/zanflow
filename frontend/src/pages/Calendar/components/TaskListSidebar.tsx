@@ -11,7 +11,7 @@ import { getStatusConfig } from '@/components/layout/DualView/taskConfig';
 import {
     toISODate, formatDateForUpdate, serializeContent, parseContent,
     EMPTY_FORM, getEventStatusColors, getStatusBadgeColors, getStatusLabel,
-    getPriorityColor, requiresAction, type UpdateFormFields,
+    getPriorityColor, type UpdateFormFields,
 } from '../calendarConstants';
 
 interface TaskListSidebarProps {
@@ -63,7 +63,8 @@ export const TaskListSidebar: React.FC<TaskListSidebarProps> = ({
     };
     const [form, setForm] = useState<UpdateFormFields>(EMPTY_FORM);
 
-    const isAdminOrManager = currentUser?.role === 'admin' || currentUser?.role === 'manager';
+    const pmRole = (() => { try { const t = localStorage.getItem('access_token'); return t ? JSON.parse(atob(t.split('.')[1]))?.platform_roles?.pm : null; } catch { return null; } })();
+    const isAdminOrManager = pmRole === 'pm_admin' || pmRole === 'workspace_admin';
     const dateStr = selectedDate ? toISODate(selectedDate) : '';
 
     const { data: myUpdate, isLoading: loadingMyUpdate } = useQuery<DailyUpdate | null>({

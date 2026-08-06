@@ -2,7 +2,6 @@ import { useEffect, useState, } from 'react';
 import { useNavigate, } from 'react-router-dom';
 import { Button, Input, Card, CardHeader, CardTitle, CardContent } from '@/components/common';
 import { authApi, startProactiveRefresh } from '@/services/api';
-import { hasPMAccess } from '@/utils/auth';
 import type { OrganizationSignupPayload } from '@/types';
 import { SocialAuthButtons } from '@/components/auth/SocialAuthButtons';
 import { CompanyNameModal } from '@/components/auth/CompanyNameModal';

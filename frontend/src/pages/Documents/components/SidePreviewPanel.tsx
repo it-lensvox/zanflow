@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { FileText, X, Folder, ExternalLink, ZoomIn, ZoomOut, Clock, MessageSquare, Plus, SortDesc, Move, Share, Pencil } from 'lucide-react';
+import { FileText, X, Folder, ExternalLink, Clock, MessageSquare, Plus, SortDesc, Move, Share, Pencil } from 'lucide-react';
 import { documentsApi, usersApi } from '@/services/api';
 import { getDocStatusConfig, getFileExtColor } from '@/config/documentConfig';
 import type { Document } from '@/types';
@@ -73,7 +73,7 @@ export function SidePreviewPanel({ doc, previewUrl, onClose, onOpenFull }: SideP
     catch { alert('Failed to add comment. Please try again.'); }
   };
 
-  const handleDeleteComment = async (commentId: number) => {
+  const _handleDeleteComment = async (commentId: number) => {
     if (!confirm('Are you sure you want to delete this comment?')) return;
     try { await documentsApi.deleteComment(doc.id, commentId); queryClient.invalidateQueries({ queryKey: ['document-comments', doc.id] }); }
     catch { alert('Failed to delete comment. Please try again.'); }

@@ -1,4 +1,3 @@
-import React from 'react';
 import { GridView, GridViewProps } from './GridView';
 import { TableView, TableViewProps } from './TableView';
 import { ViewMode } from './useViewMode';

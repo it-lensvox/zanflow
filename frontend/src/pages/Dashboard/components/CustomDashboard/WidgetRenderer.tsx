@@ -51,7 +51,7 @@ export function WidgetRenderer({ widget, isEditMode, isDragging, db, onRemove, o
   const [showSizeMenu, setShowSizeMenu] = useState(false);
   const sizeRef = useRef<HTMLDivElement>(null);
 
-  const meta = WIDGET_META.find(m => m.type === widget.type);
+  WIDGET_META.find(m => m.type === widget.type);
 
   const renderContent = () => {
     switch (widget.type) {

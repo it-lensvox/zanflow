@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { ExternalLink, Trash2, X, Save, Edit3, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTaskDetail } from '../hooks/useTaskDetail';
-import { TaskDetailContent, TaskDetailConfirms, T, type TaskDetailContentProps } from './TaskDetailContent';
+import { TaskDetailContent, TaskDetailConfirms, T } from './TaskDetailContent';
 import type { Task } from '@/types';
 import { taskApi } from '@/services/api';
 
@@ -31,7 +31,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ task, onClose,
         }
     }, []);
     const detail = useTaskDetail({ task, onClose, onDelete, onTaskUpdated });
-    const { user, isSaving, hasUnsavedChanges, isEditingTitle, setIsEditingTitle, editableTitle, setEditableTitle, handleSave, showDeleteConfirm, setShowDeleteConfirm, setShowNotAdminPopup } = detail;
+    const { user, isSaving, hasUnsavedChanges, isEditingTitle, setIsEditingTitle, editableTitle, setEditableTitle, handleSave, showDeleteConfirm: _showDeleteConfirm, setShowDeleteConfirm, setShowNotAdminPopup } = detail;
 
     useEffect(() => { document.body.style.overflow = 'hidden'; return () => { document.body.style.overflow = 'unset'; }; }, []);
 

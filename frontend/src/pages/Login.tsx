@@ -1,66 +1,17 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { Button, Input, Card, CardHeader, CardTitle, CardContent } from '@/components/common';
-import { getCredentials } from '@/services/authStorage';
-import { authApi, api } from '@/services/api';
-import { API_URL } from '@/services/api';
+import { authApi, api, CENTRAL_URL } from '@/services/api';
 import { SocialAuthButtons } from '@/components/auth/SocialAuthButtons';
 import { useSocialAuth } from '@/hooks/useSocialAuth';
 
 
-// Toast Notification Component
-function Toast({ message, type, onClose }: { message: string; type: 'success' | 'error'; onClose: () => void }) {
-  return (
-    <div className="fixed top-4 right-4 z-[100] animate-in slide-in-from-top-5 duration-300">
-      <div className={`rounded-lg shadow-lg p-4 min-w-[300px] max-w-md ${type === 'success'
-        ? 'bg-green-50 border border-green-200'
-        : 'bg-red-50 border border-red-200'
-        }`}>
-        <div className="flex items-start gap-3">
-          <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${type === 'success' ? 'bg-green-500' : 'bg-red-500'
-            }`}>
-            {type === 'success' ? (
-              <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            ) : (
-              <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            )}
-          </div>
-          <div className="flex-1">
-            <p className={`text-sm font-medium ${type === 'success' ? 'text-green-900' : 'text-red-900'
-              }`}>
-              {message}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className={`flex-shrink-0 ${type === 'success'
-              ? 'text-green-400 hover:text-green-600'
-              : 'text-red-400 hover:text-red-600'
-              }`}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function Login() {
-  const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { login } = useAuth();
-  const savedCredentials = getCredentials();
-  const [username, setUsername] = useState(savedCredentials?.username || '');
-  const [password, setPassword] = useState(savedCredentials?.password || '');
+  const { loginWithUser } = useAuth();
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -71,7 +22,6 @@ export function Login() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const { loginWithUser } = useAuth();
   const { isLoading: isSocialLoading, handleGoogleSuccess, handleGoogleError, handleMicrosoftLogin } =
     useSocialAuth({ mode: 'login', loginWithUser });
 
@@ -111,13 +61,13 @@ export function Login() {
     }
   }
 
-  const handleSetNewPassword = async () => {
+ const handleSetNewPassword = async () => {
     try {
       await authApi.setNewPassword({
         email: forgotEmail,
         reset_token: resetToken,
         password: newPassword,
-        password_confirm: confirmPassword
+        password_confirm: confirmPassword,
       });
       showToast("Password has been reset successfully!", "success");
       setTimeout(() => {
@@ -138,62 +88,49 @@ export function Login() {
     e.preventDefault();
     setError('');
     setIsLoading(true);
-
     try {
-      const response = await fetch(`${API_URL}/auth/login/`, {
+      const response = await fetch(`${CENTRAL_URL}/auth/login/`, {
         method: 'POST',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: username,
-          password: password
-        })
+        body: JSON.stringify({ username, password }),
       });
 
       const data = await response.json();
 
-      if (response.ok && data.access) {
-        // ✅ Save tokens
-        localStorage.setItem('access_token', data.access);
-        localStorage.setItem('refresh_token', data.refresh);
-
-        // ✅ FETCH WORKSPACES AND SET DEFAULT
-        try {
-          // Set auth header for axios before making the call
-          api.defaults.headers.common['Authorization'] = `Bearer ${data.access}`;
-
-          const workspacesResponse = await api.get('/organizations/workspaces/');
-          const workspacesData = workspacesResponse.data;
-
-          // Handle array response
-          let workspaces = Array.isArray(workspacesData) ? workspacesData : workspacesData.workspaces;
-
-          if (workspaces && workspaces.length > 0) {
-            // Use stored ID if valid, otherwise default workspace
-            const defaultWorkspace = workspaces.find((w: any) => w.is_default);
-            const activeId = defaultWorkspace?.id || workspaces[0]?.id;
-
-            if (activeId) {
-              localStorage.setItem('active_workspace_id', String(activeId));
-              api.defaults.headers.common['X-Workspace-ID'] = String(activeId);
-            }
-          }
-        } catch (wsError) {
-          console.warn('Could not fetch workspaces, will load on dashboard:', wsError);
-        }
-
-        try {
-          await login(username, password);
-        } catch (err) {
-          console.error('Failed to fetch user data:', err);
-          queryClient.clear();
-          window.location.href = '/dashboard';
-        }
-      } else {
+      if (!response.ok) {
         setError(data.detail || 'Invalid username or password');
+        return;
       }
-    } catch (err: any) {
-      console.error('Login error:', err);
+      localStorage.setItem('access_token', data.access);
+      localStorage.setItem('refresh_token', data.refresh);
+      api.defaults.headers.common['Authorization'] = `Bearer ${data.access}`;
+      api.defaults.headers.common['X-Workspace-ID'] = '1';
+      localStorage.setItem('active_workspace_id', '1');
+
+      try {
+        const workspacesResponse = await api.get('/organizations/workspaces/');
+        const wsData = workspacesResponse.data;
+        const workspaces = Array.isArray(wsData) ? wsData : (wsData.workspaces || []);
+        const defaultWs = workspaces.find((w: any) => w.is_default) || workspaces[0];
+        if (defaultWs?.id) {
+          localStorage.setItem('active_workspace_id', String(defaultWs.id));
+          api.defaults.headers.common['X-Workspace-ID'] = String(defaultWs.id);
+        }
+      } catch (wsErr) {
+        console.warn('▶ Step 3 failed (workspace):', wsErr);
+      }
+
+      try {
+        const userData = await authApi.getMe();
+        loginWithUser(userData);
+      } catch (meErr) {
+        console.warn('▶ Step 4 failed (/auth/me/):', meErr);
+      }
+
+      navigate('/dashboard');
+
+    } catch (err) {
+      console.error('▶ Login caught error:', err);
       setError('Network error. Please try again.');
     } finally {
       setIsLoading(false);
@@ -219,7 +156,9 @@ export function Login() {
             <div className="space-y-2">
               <Input
                 id="username"
+                name="username"
                 type="text"
+                autoComplete="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Email or Username"
@@ -229,7 +168,9 @@ export function Login() {
             <div className="space-y-2 relative">
               <Input
                 id="password"
+                name="password"
                 type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
@@ -264,10 +205,13 @@ export function Login() {
                 Forgot password?
               </button>
             </div>
-           <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? 'Signing in...' : 'Sign in'}
             </Button>
+          </form>
 
+          {/* Social auth OUTSIDE form — Google SDK must not be inside a form */}
+          <div className="space-y-3 mt-4">
             <SocialAuthButtons
               mode="login"
               isLoading={isSocialLoading}
@@ -286,7 +230,7 @@ export function Login() {
                 Sign Up
               </button>
             </p>
-          </form>
+          </div>
         </CardContent>
       </Card>
       {showForgotPassword && (
@@ -317,8 +261,8 @@ export function Login() {
               {/* Inline Notification */}
               {toast && (
                 <div className={`mb-4 flex items-start gap-3 rounded-lg p-3 animate-in fade-in zoom-in duration-200 ${toast.type === 'success'
-                    ? 'bg-green-50 text-green-900 border border-green-200'
-                    : 'bg-red-50 text-red-900 border border-red-200'
+                  ? 'bg-green-50 text-green-900 border border-green-200'
+                  : 'bg-red-50 text-red-900 border border-red-200'
                   }`}>
                   <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${toast.type === 'success' ? 'bg-green-500' : 'bg-red-500'
                     }`}>
@@ -390,13 +334,6 @@ export function Login() {
                   >
                     Submit
                   </Button>
-                  <SocialAuthButtons
-                    mode="login"
-                    isLoading={isSocialLoading}
-                    onGoogleSuccess={handleGoogleSuccess}
-                    onGoogleError={handleGoogleError}
-                    onMicrosoftClick={handleMicrosoftLogin}
-                  />
                 </div>
               )}
             </CardContent>

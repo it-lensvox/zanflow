@@ -4,7 +4,6 @@ import axios from 'axios';
 import { authApi, getTokens, setTokens, API_URL } from '@/services/api';
 import { saveCredentials, clearCredentials } from '@/services/authStorage';
 import { hasPMAccess } from '@/utils/auth';
-
 import type { User, AuthTokens } from '@/types';
 
 interface AuthContextType {
@@ -13,8 +12,8 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
-  hasRole: (role: User['role']) => boolean;
-  isAllowed: (roles: User['role'][]) => boolean;
+  pmRole: string | null;
+  hasPMRole: (roles: string[]) => boolean;
   loginWithUser: (user: User) => void;
 }
 
@@ -136,7 +135,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (username: string, password: string) => {
     await authApi.login(username, password);
-    saveCredentials(username, password);
 
     // Platform guard: check JWT before fetching user or navigating
     if (!hasPMAccess()) {
@@ -155,19 +153,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     navigate('/login');
   };
 
-
-
-  const hasRole = (role: User['role']) => {
-    const result = user?.role === role;
-    return result;
+  // Read workspace-level PM role from JWT
+  const getPMRole = (): string | null => {
+    const token = localStorage.getItem('access_token');
+    if (!token) return null;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload?.platform_roles?.pm ?? null;
+    } catch {
+      return null;
+    }
   };
 
-  // Check if user role is in the allowed roles
-  const isAllowed = (roles: User['role'][]) => {
-    const userRole = user?.role;
-    const result = !!userRole && roles.includes(userRole);
-    return result;
-  }
+  const pmRole = getPMRole();
+
+  const hasPMRole = (roles: string[]): boolean => {
+    const role = getPMRole();
+    return !!role && roles.includes(role);
+  };
 
   return (
     <AuthContext.Provider
@@ -177,8 +180,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!user,
         login,
         logout,
-        hasRole,
-        isAllowed,
+        pmRole,
+        hasPMRole,
         loginWithUser,
       }}
     >

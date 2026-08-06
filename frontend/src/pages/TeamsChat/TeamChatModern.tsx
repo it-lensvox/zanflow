@@ -16,7 +16,7 @@ import { DocumentThumbnail, DocumentPreview } from '@/components/common/Document
 import { useTeamChat } from '@/hooks/useTeamChat';
 
 // ─── MemberListContent 
-function MemberListContent({ roomId, roomType }: { roomId: string; roomType: 'team' | 'project' }) {
+function MemberListContent({ roomId }: { roomId: string; roomType?: 'team' | 'project' }) {
   const { data: roomDetails, isLoading } = useQuery({
     queryKey: ['chat-room-details', roomId],
     queryFn: () => chatApi.getRoomDetails(roomId),

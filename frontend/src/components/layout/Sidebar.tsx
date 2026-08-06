@@ -23,8 +23,8 @@ import {
   DialogFooter,
 } from '@/components/common/diaog';
 
-const ADMIN_ROLES = ['admin', 'manager', 'annotator', 'superuser', 'developer'];
-interface Workspace {
+const ADMIN_ROLES = ['pm_admin', 'workspace_admin'];
+interface _Workspace {
   id: number;
   name: string;
   slug: string;
@@ -89,8 +89,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const { unreadCount, chatUnreadCount } = useNotifications();
-  // const [chatUnreadCount, setChatUnreadCount] = useState<number>(0);
+  const { chatUnreadCount } = useNotifications();
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] = useState(false);
 
@@ -140,54 +139,47 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
     }
   }, [location.pathname]);
   const isAdminOpen = activeAccordion === 'admin';
-  const isChatsOpen = activeAccordion === 'chats';
 
   const [isTeamsOpen, setIsTeamsOpen] = useState(location.pathname.startsWith('/admin/teams'));
-  const [activeSection, setActiveSection] = useState<'chats' | 'projects' | 'teams' | 'unread' | null>(null);
-  const toggleSection = (section: 'chats' | 'projects' | 'teams' | 'unread') =>
-    setActiveSection(prev => (prev === section ? null : section));
 
   // Fetch workspaces
-  const { data: workspacesData } = useQuery({
+  useQuery({
     queryKey: ['workspaces'],
     queryFn: workspaceApi.getWorkspaces,
   });
+  //  const _activeWorkspace = useMemo(() => {
+  //   if (!workspacesData?.workspaces) return undefined;
 
-  const storedWorkspaceId = workspaceApi.getActiveWorkspaceId();
+  //   // Try 1: Find by active_workspace_id from response
+  //   let workspace = workspacesData.workspaces.find(
+  //     (w: Workspace) => w.id === workspacesData.active_workspace_id
+  //   );
 
-  const activeWorkspace = useMemo(() => {
-    if (!workspacesData?.workspaces) return undefined;
+  //   // Try 2: Find by localStorage ID
+  //   if (!workspace && storedWorkspaceId) {
+  //     workspace = workspacesData.workspaces.find(
+  //       (w: Workspace) => w.id === storedWorkspaceId
+  //     );
+  //   }
 
-    // Try 1: Find by active_workspace_id from response
-    let workspace = workspacesData.workspaces.find(
-      (w: Workspace) => w.id === workspacesData.active_workspace_id
-    );
+  //   // Try 3: Find default workspace
+  //   if (!workspace) {
+  //     workspace = workspacesData.workspaces.find((w: Workspace) => w.is_default);
+  //   }
 
-    // Try 2: Find by localStorage ID
-    if (!workspace && storedWorkspaceId) {
-      workspace = workspacesData.workspaces.find(
-        (w: Workspace) => w.id === storedWorkspaceId
-      );
-    }
+  //   // Try 4: Use first workspace
+  //   if (!workspace) {
+  //     workspace = workspacesData.workspaces[0];
+  //   }
 
-    // Try 3: Find default workspace
-    if (!workspace) {
-      workspace = workspacesData.workspaces.find((w: Workspace) => w.is_default);
-    }
+  //   // Update localStorage
+  //   if (workspace && workspace.id !== storedWorkspaceId) {
+  //     localStorage.setItem('active_workspace_id', String(workspace.id));
+  //   }
 
-    // Try 4: Use first workspace
-    if (!workspace) {
-      workspace = workspacesData.workspaces[0];
-    }
-
-    // Update localStorage
-    if (workspace && workspace.id !== storedWorkspaceId) {
-      localStorage.setItem('active_workspace_id', String(workspace.id));
-    }
-
-    return workspace;
-  }, [workspacesData, storedWorkspaceId]);
-  const { data: allRoomsData } = useQuery<ChatRoomListItem[]>({
+  //   return workspace;
+  // }, [workspacesData, storedWorkspaceId]);
+  useQuery<ChatRoomListItem[]>({
     queryKey: ['sidebar-all-chat-rooms'],
     queryFn: () => chatApi.getAllRooms(),
     staleTime: 0,
@@ -195,24 +187,25 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
     enabled: isExpanded,
   });
 
-  const sidebarPrivateRooms = useMemo<ChatRoomListItem[]>(() =>
-    (allRoomsData || []).filter(r => r.room_type === 'private'),
-    [allRoomsData]
-  );
-  const sidebarProjectRooms = useMemo<ChatRoomListItem[]>(() =>
-    (allRoomsData || []).filter(r => r.room_type === 'project'),
-    [allRoomsData]
-  );
-  const sidebarTeamRooms = useMemo<ChatRoomListItem[]>(() =>
-    (allRoomsData || []).filter(r => r.room_type === 'team'),
-    [allRoomsData]
-  );
-  const sidebarUnreadRooms = useMemo<ChatRoomListItem[]>(() =>
-    (allRoomsData || []).filter(r => r.unread_count > 0 && r.room_type !== 'thread'),
-    [allRoomsData]
-  );
+  // const _sidebarPrivateRooms = useMemo<ChatRoomListItem[]>(() =>
+  //   (allRoomsData || []).filter(r => r.room_type === 'private'),
+  //   [allRoomsData]
+  // );
+  // const _sidebarProjectRooms = useMemo<ChatRoomListItem[]>(() =>
+  //   (allRoomsData || []).filter(r => r.room_type === 'project'),
+  //   [allRoomsData]
+  // );
+  // const _sidebarTeamRooms = useMemo<ChatRoomListItem[]>(() =>
+  //   (allRoomsData || []).filter(r => r.room_type === 'team'),
+  //   [allRoomsData]
+  // );
+  // const _sidebarUnreadRooms = useMemo<ChatRoomListItem[]>(() =>
+  //   (allRoomsData || []).filter(r => r.unread_count > 0 && r.room_type !== 'thread'),
+  //   [allRoomsData]
+  // );
 
-  const showAdmin = user?.role && ADMIN_ROLES.includes(user.role);
+  const { pmRole } = useAuth();
+  const showAdmin = !!pmRole && ADMIN_ROLES.includes(pmRole);
   const isSuperuser = !!user?.is_superuser;
 
   const { data: projectsData } = useQuery({

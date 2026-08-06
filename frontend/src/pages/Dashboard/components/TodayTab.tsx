@@ -208,7 +208,6 @@ function sortTasks(tasks: DashboardTask[], sortBy: SortBy): DashboardTask[] {
 
 // ── Helper: filter tasks by focus tab
 function filterByFocusTab(tasks: DashboardTask[], filter: FocusFilter, today: Date): DashboardTask[] {
-  const now = new Date();
   if (filter === 'today') {
     const tomorrow = new Date(today.getTime() + 86400000);
     return tasks.filter(t => !t.end_date || new Date(t.end_date) < tomorrow);
@@ -452,7 +451,7 @@ export function TodayTab({
             </div>
             {/* Filter pills */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 2, background: BG, borderRadius: 8, padding: 3 }}>
-              {(['today', 'this_week', 'assigned'] as FocusFilter[]).map((f, i) => (
+              {(['today', 'this_week', 'assigned'] as FocusFilter[]).map((f) => (
                 <button
                   key={f}
                   onClick={() => setFocusFilter(f)}

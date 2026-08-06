@@ -9,7 +9,6 @@ import { GlobalSearchTrigger } from '@/components/GlobalSearch';
 import { Bell, HelpCircle } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useAuth } from '@/hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
 import logoImage from '../../public/assets/logo.png';
 import { QuickCreateButton } from '@/components/QuickCreateButton';
 import { cn } from '@/lib/utils';
@@ -72,8 +71,7 @@ export function Layout() {
   const [isActivityOpen, setIsActivityOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const { unreadCount } = useNotifications();
-  const { user } = useAuth();
-  const navigate = useNavigate();
+  const { } = useAuth();
   const location = useLocation();
   const faviconImgRef = useRef<HTMLImageElement | null>(null);
   const pageTitle = getPageTitle(location.pathname);

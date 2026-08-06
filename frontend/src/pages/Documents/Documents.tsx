@@ -30,18 +30,18 @@ import { DocumentPreview } from '@/components/common/DocumentPreview';
 import { DocumentShareModal } from '@/pages/Documents/DocumentShareModal';
 
 // ─── Design tokens 
-const TEXT  = 'hsl(var(--foreground))';
+const TEXT = 'hsl(var(--foreground))';
 const MUTED = 'hsl(var(--muted-foreground))';
-const LINE  = 'hsl(var(--border))';
-const BLUE  = '#4169FF';
+const LINE = 'hsl(var(--border))';
+const BLUE = '#4169FF';
 
 // ─── Static config 
 const FILE_TYPE_OPTIONS = [
-  { value: '',      label: 'All Types', ext: '',     color: '' },
-  { value: 'pdf',   label: 'PDF',       ext: 'PDF',  color: '#EF4444' },
-  { value: 'image', label: 'Image',     ext: 'IMG',  color: '#7C3AED' },
-  { value: 'json',  label: 'JSON',      ext: 'JSON', color: '#F59E0B' },
-  { value: 'text',  label: 'Text',      ext: 'TXT',  color: '#2563EB' },
+  { value: '', label: 'All Types', ext: '', color: '' },
+  { value: 'pdf', label: 'PDF', ext: 'PDF', color: '#EF4444' },
+  { value: 'image', label: 'Image', ext: 'IMG', color: '#7C3AED' },
+  { value: 'json', label: 'JSON', ext: 'JSON', color: '#F59E0B' },
+  { value: 'text', label: 'Text', ext: 'TXT', color: '#2563EB' },
 ];
 
 export function Documents() {
@@ -77,13 +77,13 @@ export function Documents() {
   const [sidebarPreviewUrl, setSidebarPreviewUrl] = useState<string | null>(null);
   const [moveConfirmModal, setMoveConfirmModal] = useState<{ isOpen: boolean; documentIds: string[]; targetName: string; targetProjectId: number; targetFolderId: string | null } | null>(null);
   const [toast, setToast] = useState<{ isOpen: boolean; type: 'success' | 'error'; message: string } | null>(null);
-  const [currentPage,        setCurrentPage]        = useState(1);
-  const [sortBy,             setSortBy]             = useState<'updated_at' | 'created_at'>('updated_at');
-  const [rowsPerPage,        setRowsPerPage]        = useState(20);
-  const [showProjectDrop,    setShowProjectDrop]    = useState(false);
-  const [showTypeDrop,       setShowTypeDrop]       = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, _setSortBy] = useState<'updated_at' | 'created_at'>('updated_at');
+  const [rowsPerPage, _setRowsPerPage] = useState(20);
+  const [showProjectDrop, setShowProjectDrop] = useState(false);
+  const [showTypeDrop, setShowTypeDrop] = useState(false);
   const { viewMode, setViewMode } = useViewMode({ defaultMode: 'table' });
- const [gridSelectionMode, setGridSelectionMode] = useState(false);
+  const [gridSelectionMode, setGridSelectionMode] = useState(false);
 
   React.useEffect(() => { setCurrentPage(1); }, [projectFilter, fileTypeFilter, searchTerm]);
   React.useEffect(() => { queryClient.invalidateQueries({ queryKey: ['documents'] }); }, []);
@@ -150,8 +150,8 @@ export function Documents() {
   const allDocs = showSharedWithMe ? sharedWithMeDocs : (allDocumentsData?.results || allDocumentsData || []);
   const allDocsForTree = allDocumentsForTree?.results || allDocumentsForTree || [];
   const totalCount = (allDocumentsData as any)?.count || 0;
-  const hasNextPage = !!(allDocumentsData as any)?.next;
-  const hasPreviousPage = !!(allDocumentsData as any)?.previous;
+  const _hasNextPage = !!(allDocumentsData as any)?.next;
+  const _hasPreviousPage = !!(allDocumentsData as any)?.previous;
   const projectLookup = projects.reduce((acc: Record<number, string>, p: Project) => { acc[p.id] = p.name; return acc; }, {});
   const projectTypeLookup = projects.reduce((acc: Record<number, string>, p: Project) => { acc[p.id] = (p as any).task_type || ''; return acc; }, {});
   const currentProjectName = projectFilter ? projects.find(p => String(p.id) === projectFilter)?.name || projectFilter : '';
@@ -178,10 +178,10 @@ export function Documents() {
 
   // ── Column sort/filter (reuses useTableFilters, same as Projects) ──────────
   const docFilterConfig = [
-    { key: 'name',         type: 'search' as const },
+    { key: 'name', type: 'search' as const },
     { key: 'project_name', type: 'search' as const },
-    { key: 'status',       type: 'list'   as const },
-    { key: 'updated_at',   type: 'date'   as const },
+    { key: 'status', type: 'list' as const },
+    { key: 'updated_at', type: 'date' as const },
   ];
   const {
     filteredData: columnFilteredDocuments,
@@ -315,7 +315,7 @@ export function Documents() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         <span style={{ flex: 1, fontSize: 12, fontWeight: 800, color: TEXT }}>{label}</span>
         {onSort && (
-         <button onClick={e => { e.stopPropagation(); onSort(columnKey); }} style={{ background: isSorted ? `${BLUE}18` : 'none', border: 'none', cursor: 'pointer', padding: '2px 3px', borderRadius: 4, display: 'flex', alignItems: 'center', color: isSorted ? BLUE : MUTED }}>
+          <button onClick={e => { e.stopPropagation(); onSort(columnKey); }} style={{ background: isSorted ? `${BLUE}18` : 'none', border: 'none', cursor: 'pointer', padding: '2px 3px', borderRadius: 4, display: 'flex', alignItems: 'center', color: isSorted ? BLUE : MUTED }}>
             <SortIcon size={11} />
           </button>
         )}
@@ -348,7 +348,7 @@ export function Documents() {
       if (col.key === 'status') return {
         ...col, width: '130px',
         label: <DocThHeader label="Status" columnKey="status" onSort={handleTableSort} onFilter={handleFilter}
-          filterContent={<ListFilter columnKey="status" options={[{value:'draft',label:'Draft'},{value:'in_review',label:'In Review'},{value:'approved',label:'Approved'},{value:'archived',label:'Archived'}]} selectedValue={columnFilters['status'] || ''} onSelect={v => { setColumnFilters(p => ({ ...p, status: v })); setActiveFilterKey(null); }} onClear={() => { clearFilter('status'); setActiveFilterKey(null); }} isActive={activeFilterKey === 'status'} containerRef={filterContainerRef} />}
+          filterContent={<ListFilter columnKey="status" options={[{ value: 'draft', label: 'Draft' }, { value: 'in_review', label: 'In Review' }, { value: 'approved', label: 'Approved' }, { value: 'archived', label: 'Archived' }]} selectedValue={columnFilters['status'] || ''} onSelect={v => { setColumnFilters(p => ({ ...p, status: v })); setActiveFilterKey(null); }} onClear={() => { clearFilter('status'); setActiveFilterKey(null); }} isActive={activeFilterKey === 'status'} containerRef={filterContainerRef} />}
         />,
       };
       if (col.key === 'updated_at') return {
@@ -375,7 +375,7 @@ export function Documents() {
     <div className="flex w-full h-full min-h-0">
       <div className="flex-1 min-w-0 flex flex-col h-full overflow-hidden" style={{ background: 'hsl(var(--background))' }}>
 
-       {/* ── TOPBAR ── */}
+        {/* ── TOPBAR ── */}
         <div className="flex-shrink-0 px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40" style={{ background: 'hsl(var(--card))', borderBottom: `1px solid ${LINE}`, paddingTop: 16, paddingBottom: 16 }}>
 
           {/* Title row */}

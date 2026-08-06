@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Plus, FileText, MoreVertical, Search } from 'lucide-react';
-import { cn, formatRelativeTime } from '@/lib/utils';
+import { formatRelativeTime } from '@/lib/utils';
 import DeleteModal from '@/components/common/Deletemodal';
 import { AttachProjectModal } from './AttachProjectModal';
 import type { QuickNote } from '@/types';

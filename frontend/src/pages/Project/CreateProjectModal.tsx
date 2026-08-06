@@ -7,7 +7,7 @@ import type { User as AppUser, ProjectCreatePayload, ProjectStatus } from '@/typ
 import { PROJECT_TYPE_OPTIONS as TASK_TYPES } from '@/config/projectTypeConfig';
 import { Modal, ModalHeader } from '@/components/common/Modal';
 import { FormField } from '@/pages/MyTask/pages/CreateTask/components/FormField';
-import { BLUE, LINE, MUTED, TEXT, BG, INPUT_STYLE, CARD_STYLE } from '@/pages/MyTask/pages/CreateTask/createTaskConstants';
+import { BLUE, LINE, MUTED, TEXT, INPUT_STYLE, CARD_STYLE } from '@/pages/MyTask/pages/CreateTask/createTaskConstants';
 import { STATUS_MAP } from '@/pages/Project/projectConstants';
 import { PROJECT_ROLES, DropdownTrigger, DropdownList, DropdownItem } from '@/pages/Project/components/ProjectDropdowns';
 
@@ -17,7 +17,7 @@ interface CreateProjectModalProps {
     navigateOnSuccess?: boolean;
 }
 
-export function CreateProjectModal({ isOpen, onClose, navigateOnSuccess = false }: CreateProjectModalProps) {
+export function CreateProjectModal({ isOpen, onClose, navigateOnSuccess: _navigateOnSuccess = false }: CreateProjectModalProps) {
     const queryClient = useQueryClient();
     const navigate = useNavigate();
     const [formData, setFormData] = useState({
@@ -43,7 +43,7 @@ export function CreateProjectModal({ isOpen, onClose, navigateOnSuccess = false 
     const roleTriggerRef = useRef<HTMLDivElement>(null);
     const [error, setError] = useState('');
 
-    const { data: usersData, isLoading: usersLoading } = useQuery({
+    const { data: usersData, isLoading: _usersLoading } = useQuery({
         queryKey: ['allUsers'],
         queryFn: usersApi.listAll,
         select: (data: AppUser[]) =>
@@ -103,7 +103,7 @@ export function CreateProjectModal({ isOpen, onClose, navigateOnSuccess = false 
         });
     };
 
-    const handleChange = (
+    const _handleChange = (
         e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
     ) => {
         setFormData((prev) => ({
@@ -112,7 +112,7 @@ export function CreateProjectModal({ isOpen, onClose, navigateOnSuccess = false 
         }));
     };
 
-    const handleDescriptionChange = (html: string) => {
+    const _handleDescriptionChange = (html: string) => {
         setFormData((prev) => ({
             ...prev,
             description: html,

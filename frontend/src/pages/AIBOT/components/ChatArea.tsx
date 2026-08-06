@@ -26,7 +26,7 @@ const SUGGESTIONS = [
   { icon: <FileText style={{ width: 13, height: 13 }} />,     label: 'Standup',  text: 'Summarise my open tasks for today\'s standup',          accent: '#0891b2' },
 ];
 
-export function ChatArea({ messages, isTyping, historyLoading, input, setInput, onSend, onKeyDown, onNewConversation, messagesEndRef, inputRef, onCloseChat }: ChatAreaProps) {
+export function ChatArea({ messages, isTyping, historyLoading, input, setInput, onSend, onKeyDown, messagesEndRef, inputRef, onCloseChat }: ChatAreaProps) {
   const isEmpty = messages.length === 0;
 
   return (

@@ -50,7 +50,7 @@ interface MiniWindowProps {
   onFlushAndMaximize: (pendingContent: string) => void;
 }
 
-function MiniWindow({ selectedNote, isReadOnly = false, getNoteTitle, onClose, onMaximize, onNewNote, onNewFolder, onUpdateNote, onFlushAndMaximize }: MiniWindowProps) {
+function MiniWindow({ selectedNote, isReadOnly = false, getNoteTitle, onClose, onNewNote, onNewFolder, onUpdateNote, onFlushAndMaximize }: MiniWindowProps) {
   const [localContent, setLocalContent] = useState(selectedNote?.content ?? '');
   const debounceRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const textareaRef  = useRef<HTMLTextAreaElement>(null);

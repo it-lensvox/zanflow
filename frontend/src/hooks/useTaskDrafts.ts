@@ -22,7 +22,6 @@ export interface TaskDraftData {
 
 const STORAGE_KEY = 'task_drafts_v1';
 const AUTOSAVE_DELAY_MS = 600;
-const isDraftBeingCreated = new Set<string>();
 
 function loadDrafts(): TaskDraftData[] {
     try {

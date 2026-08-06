@@ -69,10 +69,10 @@ export interface TaskDetailContentProps {
 // ── Shared body sections
 export function TaskDetailContent({ detail, task, onChildTaskClick }: TaskDetailContentProps) {
     const {
-        user, canEditDates, resolvedTaskId,
+        user: _user, canEditDates, resolvedTaskId: _resolvedTaskId,
         selectedStatus, setSelectedStatus,
         showStatusDropdown, setShowStatusDropdown,
-        hasUnsavedChanges, setHasUnsavedChanges,
+        hasUnsavedChanges: _hasUnsavedChanges, setHasUnsavedChanges,
         isEditingDescription, setIsEditingDescription,
         editableDescription, setEditableDescription,
         assignedMembersOpen, setAssignedMembersOpen,
@@ -84,15 +84,15 @@ export function TaskDetailContent({ detail, task, onChildTaskClick }: TaskDetail
         startDate, setStartDate, endDate, setEndDate,
         durationTime, setDurationTime,
         uploadingDocs,
-        deleteAttachmentConfirm, setDeleteAttachmentConfirm,
+        deleteAttachmentConfirm: _deleteAttachmentConfirm, setDeleteAttachmentConfirm,
         newComment, setNewComment,
         childTasksOpen, setChildTasksOpen,
         statusDropdownRef, addUserDropdownRef, attachmentContainerRef,
         comments, displayAttachments, childTasks, childTasksLoading,
         isFetchingNextPage, aiSuggestions,
-        addCommentMutation, deleteMutation,
+        addCommentMutation, deleteMutation: _deleteMutation,
         handleAddLink, removeLink,
-        handleFileSelect, handleAttachmentClick, handleDeleteAttachment,
+        handleFileSelect, handleAttachmentClick, handleDeleteAttachment: _handleDeleteAttachment,
     } = detail;
 
     const sc = getStatusConfig(selectedStatus);

@@ -48,7 +48,7 @@ export function ProjectSettings() {
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
   const [taskTypeDropdownOpen, setTaskTypeDropdownOpen] = useState(false);
- const userDropdownRef = useRef<HTMLDivElement>(null);
+  const userDropdownRef = useRef<HTMLDivElement>(null);
   const roleDropdownRef = useRef<HTMLDivElement>(null);
   const taskTypeDropdownRef = useRef<HTMLDivElement>(null);
   const taskTypeTriggerRef = useRef<HTMLDivElement>(null);
@@ -56,8 +56,8 @@ export function ProjectSettings() {
   const userTriggerRef = useRef<HTMLDivElement>(null);
   const roleTriggerRef = useRef<HTMLDivElement>(null);
   const [newLabel, setNewLabel] = useState({ name: '', color: '#3b82f6' });
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [_showDeleteConfirm, _setShowDeleteConfirm] = useState(false);
+  const [_deleteConfirmText, _setDeleteConfirmText] = useState('');
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -71,7 +71,7 @@ export function ProjectSettings() {
     enabled: !!id,
   });
 
-  const { data: usersData, isLoading: usersLoading } = useQuery({
+  const { data: usersData, isLoading: _usersLoading } = useQuery({
     queryKey: ['allUsers'],
     queryFn: usersApi.listAll,
     select: (data: AppUser[]) =>
@@ -113,11 +113,11 @@ export function ProjectSettings() {
       // Invalidate project specific data
       queryClient.invalidateQueries({ queryKey: ['project', id] });
       queryClient.invalidateQueries({ queryKey: ['projects'] });
-      
+
       // --- NEW: Invalidate chat rooms to sync the updated project name instantly ---
       queryClient.invalidateQueries({ queryKey: ['project-chat-rooms'] });
       queryClient.invalidateQueries({ queryKey: ['sidebar-all-chat-rooms'] });
-      
+
       setIsFormDirty(false);
     },
   });
@@ -251,9 +251,9 @@ export function ProjectSettings() {
   const labels = project.labels || [];
 
   // Determine if the current user has owner privileges
-  const isOwner = project?.created_by?.id === currentUser?.id || 
-                  project?.created_by === currentUser?.id || 
-                  project?.members?.some((m: any) => m.user?.id === currentUser?.id && m.role === 'owner');
+  const isOwner = project?.created_by?.id === currentUser?.id ||
+    project?.created_by === currentUser?.id ||
+    project?.members?.some((m: any) => m.user?.id === currentUser?.id && m.role === 'owner');
 
   const selectedTypeConfig = TASK_TYPES.find(t => t.value === formData.task_type);
   const selectedStatusConfig = STATUS_MAP[formData.status];
@@ -281,9 +281,9 @@ export function ProjectSettings() {
       {/* Tabs  */}
       <div style={{ display: 'flex', gap: 4, borderBottom: `1px solid ${LINE}`, padding: '0 24px', background: 'hsl(var(--card))' }}>
         {([
-          { key: 'general', label: 'General',              icon: <Settings size={13} /> },
-          { key: 'labels',  label: `Labels (${labels.length})`, icon: <Tags size={13} /> },
-          { key: 'danger',  label: 'Danger Zone',          icon: <AlertTriangle size={13} /> },
+          { key: 'general', label: 'General', icon: <Settings size={13} /> },
+          { key: 'labels', label: `Labels (${labels.length})`, icon: <Tags size={13} /> },
+          { key: 'danger', label: 'Danger Zone', icon: <AlertTriangle size={13} /> },
         ] as const).map(tab => (
           <button key={tab.key} onClick={() => setActiveTab(tab.key)}
             style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '14px 12px', fontSize: 13, fontWeight: 600, border: 'none', background: 'none', cursor: 'pointer', color: activeTab === tab.key ? (tab.key === 'danger' ? '#ef4444' : BLUE) : MUTED, borderBottom: `2px solid ${activeTab === tab.key ? (tab.key === 'danger' ? '#ef4444' : BLUE) : 'transparent'}`, transition: 'all .15s', marginBottom: -1 }}>
@@ -294,7 +294,7 @@ export function ProjectSettings() {
 
       <div style={{ padding: 24, background: BG, display: 'flex', flexDirection: 'column', gap: 20, fontFamily: '-apple-system,BlinkMacSystemFont,"Inter",system-ui,sans-serif' }}>
 
-     {/* ── General Tab ── */}
+        {/* ── General Tab ── */}
         {activeTab === 'general' && (
           <>
             {/* Core Details card */}
@@ -346,7 +346,7 @@ export function ProjectSettings() {
                   </FormField>
                 </div>
 
-              <div ref={statusDropdownRef}>
+                <div ref={statusDropdownRef}>
                   <FormField label="Status">
                     <DropdownTrigger
                       label={selectedStatusConfig?.label}
@@ -419,7 +419,7 @@ export function ProjectSettings() {
 
                 {/* Add new member row */}
                 <div style={{ display: 'flex', gap: 8 }}>
-                 <div style={{ flex: 1 }} ref={userDropdownRef}>
+                  <div style={{ flex: 1 }} ref={userDropdownRef}>
                     <DropdownTrigger label={tempUser ? usersData?.find(u => u.value === tempUser)?.label : undefined} placeholder="Select member…" onClick={() => setUserDropdownOpen(v => !v)} open={userDropdownOpen} triggerRef={userTriggerRef} />
                     {userDropdownOpen && (
                       <DropdownList triggerRef={userTriggerRef}>
@@ -582,7 +582,7 @@ export function ProjectSettings() {
         isDeleting={removeMemberMutation.isPending}
       />
 
-     {showErrorModal && (
+      {showErrorModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in zoom-in duration-200">
           <div className="bg-background border rounded-lg shadow-xl max-w-md w-full p-6 space-y-4 mx-4">
             <div className="flex items-center gap-3 text-destructive">

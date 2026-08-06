@@ -1,4 +1,4 @@
-import { API_URL } from './api';
+import './api';
 
 // Helper to get active workspace ID
 export const getActiveWorkspaceId = (): string | null => {

@@ -52,7 +52,7 @@ export function DocumentCreate() {
         initial_gt_data,
         file_type,
         original_file_name,
-      });
+      } as any);
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['documents', { project: projectId }] });
@@ -96,7 +96,6 @@ export function DocumentCreate() {
       // Step 2: Upload File directly to S3 using the pre-signed URL/fields
       await documentsApi.uploadFileToS3(s3Url, s3Fields, file);
       // Step 3: CONFIRM UPLOAD original_file_name
-      const fileNameWithoutPath = file_key.split('/').pop() || file.name;
       const confirmResponse = await documentsApi.confirmUpload(projectIdNum, {
         file_key: file_key,
         file_name: file.name,

@@ -12,7 +12,7 @@ import { NotificationsPage }  from '../NotificationsPage';
 import { TaskBoardHeader }    from './components/TaskBoardHeader';
 import { FieldSwitcherDropdown } from './components/FieldSwitcherDropdown';
 import { useMyTask }          from './hooks/useMyTask';
-import { DATE_FIELD_OPTIONS, PERSON_FIELD_OPTIONS, LINE } from './taskBoardConstants';
+import { DATE_FIELD_OPTIONS, PERSON_FIELD_OPTIONS } from './taskBoardConstants';
 import type { Task } from '@/types';
 
 export const MyTask: React.FC = () => {
@@ -125,7 +125,7 @@ export const MyTask: React.FC = () => {
         setSearchQuery={t.setSearchQuery}
         viewMode={t.viewMode}
         setViewMode={t.setViewMode}
-        canCreate={['admin', 'manager', 'annotator'].includes(t.user?.role || '')}
+        canCreate={(() => { try { const t2 = localStorage.getItem('access_token'); const p = JSON.parse(atob(t2!.split('.')[1])); const r = p?.platform_roles?.pm; return ['pm_admin','workspace_admin','project_admin','project_manager','project_member'].includes(r); } catch { return false; } })()}
         onCreateTask={() => t.navigate('/taskboard/create')}
         onAITask={() => t.setShowAITaskModal(true)}
       />

@@ -17,7 +17,7 @@ export interface UserWithActivity extends User {
 export function useTeamChat() {
   const { user: currentUser } = useAuth();
   const navigate = useNavigate();
-  const { projectId: urlProjectId, roomId: urlRoomId, tab: urlTab } = useParams<{ projectId: string; roomId: string; tab: string }>();
+  const { projectId: urlProjectId, roomId: urlRoomId } = useParams<{ projectId: string; roomId: string; tab: string }>();
   const queryClient = useQueryClient();
 
   // ─── UI State ───
@@ -70,8 +70,8 @@ export function useTeamChat() {
   const isGatewayInitialized = useRef(false);
   const activeRoomRef = useRef<ChatRoom | null>(null);
   const selectedUserIdRef = useRef<number | null>(null);
-  const justLeftRoomRef = useRef<string | null>(null);   
-const justLeftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const justLeftRoomRef = useRef<string | null>(null);
+  const justLeftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     selectedUserIdRef.current = selectedUserId;
@@ -266,7 +266,7 @@ const justLeftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     // Cache miss — fetch directly so switching between members always works
     chatApi.getRoomDetails(urlRoomId).then(room => {
       if (room) activate(room);
-    }).catch(() => {});
+    }).catch(() => { });
 
   }, [urlRoomId, urlProjectId, privateRoomsData, currentUser?.id]);
   // Sort Teams by Last Message Time
@@ -984,13 +984,13 @@ const justLeftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleUserSelect = (userId: number) => {
     if (selectedUserId === userId) return;
     const leavingRoomId = selectedUserId ? userRoomMap.get(selectedUserId) : null;
-  if (leavingRoomId) {
-    justLeftRoomRef.current = leavingRoomId;
-    if (justLeftTimerRef.current) clearTimeout(justLeftTimerRef.current);
-    justLeftTimerRef.current = setTimeout(() => {
-      justLeftRoomRef.current = null;
-    }, 3000); // suppress unread signals for 3s after leaving
-  }
+    if (leavingRoomId) {
+      justLeftRoomRef.current = leavingRoomId;
+      if (justLeftTimerRef.current) clearTimeout(justLeftTimerRef.current);
+      justLeftTimerRef.current = setTimeout(() => {
+        justLeftRoomRef.current = null;
+      }, 3000); // suppress unread signals for 3s after leaving
+    }
     setSelectedProjectRoom(null);
     setSelectedTeamRoom(null);
     setSelectedUserId(userId);
@@ -1090,11 +1090,11 @@ const justLeftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     setOpenMenuMessageId(null);
   };
 
-  const handleForward = (message: ChatMessage) => { setOpenMenuMessageId(null); };
-  const handleCopyLink = (message: ChatMessage) => { setOpenMenuMessageId(null); };
-  const handleSaveMessage = (message: ChatMessage) => { setOpenMenuMessageId(null); };
-  const handlePinMessage = (message: ChatMessage) => { setOpenMenuMessageId(null); };
-  const handleMarkAsUnread = (message: ChatMessage) => { setOpenMenuMessageId(null); };
+  const handleForward = (_message: ChatMessage) => { setOpenMenuMessageId(null); };
+  const handleCopyLink = (_message: ChatMessage) => { setOpenMenuMessageId(null); };
+  const handleSaveMessage = (_message: ChatMessage) => { setOpenMenuMessageId(null); };
+  const handlePinMessage = (_message: ChatMessage) => { setOpenMenuMessageId(null); };
+  const handleMarkAsUnread = (_message: ChatMessage) => { setOpenMenuMessageId(null); };
 
   const handleDeleteMessage = (messageId: string | number) => {
     if (!activeRoom?.id) return;
@@ -1376,7 +1376,7 @@ const justLeftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toggleFavouriteMutation = useMutation({
     mutationFn: ({ roomId, isFavourite }: { roomId: string; isFavourite: boolean }) =>
       chatApi.updateRoomSettings(roomId, { is_favourite: isFavourite }),
-    onSuccess: async (response, { roomId, isFavourite }) => {
+    onSuccess: async (_response, { roomId }) => {
       const updatedRoomDetails = await chatApi.getRoomDetails(roomId);
       queryClient.setQueryData(['chat-room-details', roomId], updatedRoomDetails);
       queryClient.invalidateQueries({ queryKey: ['private-chat-rooms'] });

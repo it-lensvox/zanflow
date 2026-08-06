@@ -11,7 +11,7 @@ import DeleteModal from '@/components/common/Deletemodal';
 // MAIN COMPONENT
 export default function Threads({ projectId, projectName }: ThreadsProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
+  const [_showHistory, setShowHistory] = useState(false);
   const [lastExpandedTime, setLastExpandedTime] = useState<number>(Date.now());
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
@@ -30,7 +30,7 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const historyRef = useRef<HTMLDivElement>(null);
+  const _historyRef = useRef<HTMLDivElement>(null);
 
   // GET CURRENT USER ID
   useEffect(() => {
@@ -198,7 +198,7 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
       }
     };
 
-    ws.onerror = (error) => {
+    ws.onerror = (_error) => {
       setWsConnected(false);
     };
 
@@ -261,7 +261,7 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
         setSessions(prev =>
           prev.map(session => {
             if (session.id === activeSessionId) {
-              const existingIds = new Set(session.messages.map(m => m.id));
+              const _existingIds = new Set(session.messages.map(m => m.id));
               const wsOnlyMessages = session.messages.filter(m =>
                 !uiMessages.some(apiMsg => apiMsg.id === m.id)
               );
@@ -436,7 +436,7 @@ export default function Threads({ projectId, projectName }: ThreadsProps) {
     setDeletePermissionDenied(false);
   }, []);
 
-  const updateSessionTitle = useCallback((sessionId: string, newTitle: string) => {
+  const _updateSessionTitle = useCallback((sessionId: string, newTitle: string) => {
     setSessions(prev =>
       prev.map(session =>
         session.id === sessionId

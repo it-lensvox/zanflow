@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Bell, Calendar, ChevronDown, LayoutDashboard, ListTodo, BarChart2, Star, Moon, Search, HelpCircle, Plus, Pencil, Trash2, MoreHorizontal } from 'lucide-react';
+import { Bell, Calendar, ChevronDown, LayoutDashboard, ListTodo, BarChart2, Star, Search, HelpCircle, Plus, Pencil, Trash2, MoreHorizontal } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { NotificationsPage } from '@/pages/NotificationsPage';
 import { CreateProjectModal } from '@/pages/Project/CreateProjectModal';

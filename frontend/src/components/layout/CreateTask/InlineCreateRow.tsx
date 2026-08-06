@@ -38,7 +38,7 @@ export const InlineCreateRow: React.FC<InlineCreateRowProps> = ({ columns, onCan
     startDate: '',
   });
 
-  const [activeField, setActiveField] = useState<FieldKey>(fixedProjectId ? 'heading' : 'project');
+  const [_activeField, setActiveField] = useState<FieldKey>(fixedProjectId ? 'heading' : 'project');
   const fieldOrder: FieldKey[] = fixedProjectId
     ? ALL_FIELD_ORDER.filter((f) => f !== 'project')
     : ALL_FIELD_ORDER;
