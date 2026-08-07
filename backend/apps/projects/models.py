@@ -80,16 +80,15 @@ class ProjectMembership(models.Model):
     """
     
     class Role(models.TextChoices):
-        OWNER = "owner", "Owner"
-        ADMIN = "admin", "Admin"
-        MANAGER = "manager", "Manager"
-        FRONTEND = "frontend", "Frontend Developer"
-        BACKEND = "backend", "Backend Developer"
-        TESTER = "tester", "Testing Engineer"
-        DEVOPS = "devops", "DevOps Engineer"
-        SOCIAL_MEDIA = "social_media", "Social Media"
-        VIEWER = "viewer", "Viewer"
-        MEMBER = "member", "Member" 
+        # New PM role system — aligned with Dyuksa RBAC
+        # project_admin   → full control within this project
+        # project_manager → manage tasks and team, no destructive access
+        # project_member  → day-to-day contributor
+        # project_viewer  → read-only access
+        PROJECT_ADMIN   = "project_admin",   "Project Admin"
+        PROJECT_MANAGER = "project_manager", "Project Manager"
+        PROJECT_MEMBER  = "project_member",  "Project Member"
+        PROJECT_VIEWER  = "project_viewer",  "Project Viewer"
     
     project = models.ForeignKey(Project, on_delete=models.CASCADE)
     user = models.ForeignKey(django_settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
@@ -97,7 +96,7 @@ class ProjectMembership(models.Model):
     role = models.CharField(
         max_length=20, 
         choices=Role.choices, 
-        default=Role.VIEWER
+        default=Role.PROJECT_VIEWER
     )
     
     joined_at = models.DateTimeField(auto_now_add=True)

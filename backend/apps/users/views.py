@@ -9,6 +9,11 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from apps.organizations.authentication import (
+    WorkspaceJWTAuthentication,
+    WorkspaceStaticTokenAuthentication,
+    CentralJWTAuthentication,
+)
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from django.shortcuts import get_object_or_404
 from .serializers import UserRoleUpdateSerializer, ContactMessageSerializer
@@ -122,9 +127,12 @@ class UserCreateView(generics.CreateAPIView):
 class MeView(APIView):
     """
     Get current user profile.
+    Does not require workspace context — user profile is org-scoped.
+    Uses CentralJWTAuthentication (resolves by central_user_id, no workspace needed).
     """
+    authentication_classes = [CentralJWTAuthentication]
     permission_classes = [permissions.IsAuthenticated]
-    
+
     def get(self, request):
         serializer = UserSerializer(request.user)
         return Response(serializer.data)
@@ -178,7 +186,7 @@ class ChangeUserRoleView(APIView):
     """
     Endpoint to change a user's role with strict hierarchy rules.
     """
-    authentication_classes = [JWTAuthentication]
+    authentication_classes = [WorkspaceJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def patch(self, request, user_id):

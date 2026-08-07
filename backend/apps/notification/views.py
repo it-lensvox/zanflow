@@ -10,6 +10,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from apps.organizations.authentication import (
+    WorkspaceJWTAuthentication,
+    WorkspaceStaticTokenAuthentication,
+)
 # Import your custom authentication if needed
 from apps.users.auth import StaticTokenAuthentication
 
@@ -59,7 +63,7 @@ class NotificationListView(APIView):
         - page: Page number (default: 1)
         - limit: Items per page (default: 50)
     """
-    authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
+    authentication_classes = [WorkspaceStaticTokenAuthentication, WorkspaceJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -158,7 +162,7 @@ class NotificationDetailView(APIView):
     GET: Retrieve a single notification.
     DELETE: Delete a notification.
     """
-    authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
+    authentication_classes = [WorkspaceStaticTokenAuthentication, WorkspaceJWTAuthentication]
     permission_classes = [IsAuthenticated]
     
     def get(self, request, notification_id):
@@ -196,7 +200,7 @@ class NotificationMarkReadView(APIView):
         
     If notification_ids is not provided, marks all notifications as read.
     """
-    authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
+    authentication_classes = [WorkspaceStaticTokenAuthentication, WorkspaceJWTAuthentication]
     permission_classes = [IsAuthenticated]
     
     def post(self, request, notification_id=None):
@@ -270,7 +274,7 @@ class NotificationMarkUnreadView(APIView):
     """
     POST: Mark a notification as unread.
     """
-    authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
+    authentication_classes = [WorkspaceStaticTokenAuthentication, WorkspaceJWTAuthentication]
     permission_classes = [IsAuthenticated]
     
     def post(self, request, notification_id):
@@ -292,7 +296,7 @@ class NotificationUnreadCountView(APIView):
     """
     GET: Get count of unread notifications.
     """
-    authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
+    authentication_classes = [WorkspaceStaticTokenAuthentication, WorkspaceJWTAuthentication]
     permission_classes = [IsAuthenticated]
     
     def get(self, request):
@@ -307,7 +311,7 @@ class NotificationCountView(APIView):
     """
     GET: Get detailed notification counts (total, unread, by type).
     """
-    authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
+    authentication_classes = [WorkspaceStaticTokenAuthentication, WorkspaceJWTAuthentication]
     permission_classes = [IsAuthenticated]
     
     def get(self, request):
@@ -338,7 +342,7 @@ class NotificationDeleteAllView(APIView):
     DELETE: Delete all notifications for the CURRENT workspace only.
     Uses X-Workspace-ID header to scope the deletion.
     """
-    authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
+    authentication_classes = [WorkspaceStaticTokenAuthentication, WorkspaceJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def delete(self, request):
@@ -371,7 +375,7 @@ class NotificationPreferencesView(APIView):
     GET: Retrieve user's notification preferences.
     PUT/PATCH: Update user's notification preferences.
     """
-    authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
+    authentication_classes = [WorkspaceStaticTokenAuthentication, WorkspaceJWTAuthentication]
     permission_classes = [IsAuthenticated]
     
     def get(self, request):
@@ -422,7 +426,7 @@ class UnreadNotificationsView(APIView):
     GET: List only unread notifications.
     Convenience endpoint for quickly fetching unread notifications.
     """
-    authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
+    authentication_classes = [WorkspaceStaticTokenAuthentication, WorkspaceJWTAuthentication]
     permission_classes = [IsAuthenticated]
     
     def get(self, request):
