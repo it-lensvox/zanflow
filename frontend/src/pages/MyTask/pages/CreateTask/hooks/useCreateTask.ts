@@ -92,6 +92,7 @@ export function useCreateTask({
   const projectSearchInputRef = useRef<HTMLInputElement>(null);
 
   // ── Queries ──
+  console.log('🔨 [CreateTask] hook mounted | fixedProjectId:', fixedProjectId, '| draftId:', draftId, '| isModal:', isModal);
   const { data: usersData, isLoading: usersLoading, error: usersError } = useQuery({
     queryKey: ['users'],
     queryFn: usersApi.list,
@@ -182,6 +183,7 @@ export function useCreateTask({
     fetchProjectData();
   }, [selectedProjects]);
 
+  console.log('🔨 [CreateTask] usersData:', (usersData as any)?.results?.length ?? (usersData as any)?.length ?? usersData, '| usersError:', usersError?.message, '| projectsData:', (projectsData as any)?.results?.length ?? (projectsData as any)?.length);
   // Handle load errors
   useEffect(() => {
     if (usersError || projectsError) {
@@ -363,7 +365,7 @@ export function useCreateTask({
     } satisfies Task;
 
     const previousTasksSnapshot = queryClient.getQueryCache()
-      .findAll({ queryKey: ['tasks'] })
+      .findAll({ queryKey: ['tasks'], exact: false })
       .map(q => ({ key: q.queryKey, data: queryClient.getQueryData(q.queryKey) }));
 
     const injectOptimistic = (old: any) => {
@@ -382,19 +384,18 @@ export function useCreateTask({
         };
       }
       if (Array.isArray(old)) return [optimisticTask, ...old];
-      // Cache miss — seed with just this task
       return { count: 1, next: null, previous: null, results: [optimisticTask] };
     };
 
-    queryClient.getQueryCache().findAll({ queryKey: ['tasks'] }).forEach(query => {
+    queryClient.getQueryCache().findAll({ queryKey: ['tasks'], exact: false }).forEach(query => {
       queryClient.setQueryData(query.queryKey, injectOptimistic);
     });
-
     setShowSuccessView(true);
     if (isModal && onSuccess) {
       onSuccess(optimisticTask);
     } else {
       const fromCalendar = location.state?.startDate !== undefined;
+      await queryClient.invalidateQueries({ queryKey: ['tasks'], exact: false });
       navigate(fromCalendar ? '/calendar' : '/taskboard');
     }
 
@@ -416,8 +417,7 @@ export function useCreateTask({
       const apiResponse = await taskApi.create(formData);
       const createdTask: Task = apiResponse?.task || apiResponse;
 
-      // Replace optimistic entry with real server task across ALL task cache entries
-      queryClient.getQueryCache().findAll({ queryKey: ['tasks'] }).forEach(query => {
+      queryClient.getQueryCache().findAll({ queryKey: ['tasks'], exact: false }).forEach(query => {
         queryClient.setQueryData(query.queryKey, (old: any) => {
           // New per-page shape
           if (old?.results && Array.isArray(old.results)) {
@@ -466,9 +466,10 @@ export function useCreateTask({
           queryClient.setQueryData(key, data);
         });
       } else {
-        queryClient.invalidateQueries({ queryKey: ['tasks'] });
+        queryClient.invalidateQueries({ queryKey: ['tasks'], exact: false });
       }
-      queryClient.invalidateQueries({ queryKey: ['tasks-list'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks-list'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['tasks'], exact: false });
       console.error('❌ [CreateTask] Upload failed:', err);
       setError(err.response?.data?.message || 'Failed to create task. Please check your inputs.');
       setLoading(false);

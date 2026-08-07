@@ -143,17 +143,10 @@ export function useMyTask() {
     setCurrentPage(1);
   }, [statusParam, priorityParam, projectIdParam]);
 
-  // ── Role-filter the current page results
   const tasks = useMemo(() => {
     const raw: Task[] = (pageData as any)?.results ?? [];
-    let filtered = raw;
-    const pmRole = (() => { try { const t = localStorage.getItem('access_token'); return t ? JSON.parse(atob(t.split('.')[1]))?.platform_roles?.pm : null; } catch { return null; } })();
-    if (pmRole === 'pm_admin' || pmRole === 'workspace_admin') {
-    } else {
-      filtered = raw.filter(t => t.assigned_to.includes(user?.id ?? -1));
-    }
-    return filtered.map(t => ({ ...t, status_label: (t.status || '').toLowerCase().replace(/_/g, ' ') }));
-  }, [pageData, user]);
+    return raw.map(t => ({ ...t, status_label: (t.status || '').toLowerCase().replace(/_/g, ' ') }));
+  }, [pageData]);
 
   const totalCount = (pageData as any)?.count ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));

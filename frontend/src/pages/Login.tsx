@@ -88,49 +88,98 @@ export function Login() {
     e.preventDefault();
     setError('');
     setIsLoading(true);
+
     try {
+      // ── STEP 1: Central login ──────────────────────────────────
+      console.log('🔐 [1] POST', `${CENTRAL_URL}/auth/login/`, { username });
+
       const response = await fetch(`${CENTRAL_URL}/auth/login/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
       });
-
       const data = await response.json();
+
+      console.log('🔐 [1] Response:', response.status, data.access ? '✅ token OK' : '❌ no token', data.detail || data);
 
       if (!response.ok) {
         setError(data.detail || 'Invalid username or password');
         return;
       }
+
+      // ── STEP 2: Store tokens ───────────────────────────────────
+      console.log('🔐 [2] Storing tokens in localStorage');
       localStorage.setItem('access_token', data.access);
       localStorage.setItem('refresh_token', data.refresh);
       api.defaults.headers.common['Authorization'] = `Bearer ${data.access}`;
-      api.defaults.headers.common['X-Workspace-ID'] = '1';
-      localStorage.setItem('active_workspace_id', '1');
+
+      // Decode JWT to show what's inside
+      try {
+        const jwtPayload = JSON.parse(atob(data.access.split('.')[1]));
+        console.log('🔐 [2] JWT payload:', {
+          user_id: jwtPayload.user_id,
+          username: jwtPayload.username,
+          platforms: jwtPayload.platforms,
+          platform_roles: jwtPayload.platform_roles,
+          org_id: jwtPayload.org_id,
+          exp: new Date(jwtPayload.exp * 1000).toISOString(),
+        });
+      } catch { console.warn('🔐 [2] Could not decode JWT'); }
+
+      // ── STEP 3: Fetch workspaces from PM ───────────────────────
+      console.log('🔐 [3] GET /organizations/workspaces/ (X-Workspace-ID: 0)');
+      api.defaults.headers.common['X-Workspace-ID'] = '0';
 
       try {
         const workspacesResponse = await api.get('/organizations/workspaces/');
         const wsData = workspacesResponse.data;
         const workspaces = Array.isArray(wsData) ? wsData : (wsData.workspaces || []);
         const defaultWs = workspaces.find((w: any) => w.is_default) || workspaces[0];
+        console.log('🔐 [3] ✅ Workspaces:', workspaces.length, '| default id:', defaultWs?.id);
         if (defaultWs?.id) {
           localStorage.setItem('active_workspace_id', String(defaultWs.id));
           api.defaults.headers.common['X-Workspace-ID'] = String(defaultWs.id);
         }
-      } catch (wsErr) {
-        console.warn('▶ Step 3 failed (workspace):', wsErr);
+      } catch (wsErr: any) {
+        console.warn('🔐 [3] ❌ Workspaces failed:', wsErr?.response?.status, wsErr?.response?.data);
+        delete api.defaults.headers.common['X-Workspace-ID'];
       }
+
+      // ── STEP 4: Fetch user profile from PM ────────────────────
+      console.log('🔐 [4] GET /auth/me/ | X-Workspace-ID:', api.defaults.headers.common['X-Workspace-ID']);
 
       try {
         const userData = await authApi.getMe();
+        console.log('🔐 [4] ✅ /auth/me/ user:', userData?.id, userData?.username);
         loginWithUser(userData);
-      } catch (meErr) {
-        console.warn('▶ Step 4 failed (/auth/me/):', meErr);
+      } catch (meErr: any) {
+        console.warn('🔐 [4] ❌ /auth/me/ failed:', meErr?.response?.status, meErr?.response?.data);
+        // Fallback: build user from JWT
+        try {
+          const token = localStorage.getItem('access_token');
+          if (token) {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            console.log('🔐 [4] Fallback: setting user from JWT', payload.username);
+            loginWithUser({
+              id: payload.user_id,
+              username: payload.username,
+              email: payload.email,
+              first_name: payload.first_name,
+              last_name: payload.last_name,
+              is_active: true,
+              date_joined: new Date().toISOString(),
+              platform_roles: payload.platform_roles,
+            } as any);
+          }
+        } catch { /* silent */ }
       }
 
+      // ── STEP 5: Navigate ───────────────────────────────────────
+      console.log('🔐 [5] Navigating to /dashboard');
       navigate('/dashboard');
 
     } catch (err) {
-      console.error('▶ Login caught error:', err);
+      console.error('🔐 ❌ Login error:', err);
       setError('Network error. Please try again.');
     } finally {
       setIsLoading(false);

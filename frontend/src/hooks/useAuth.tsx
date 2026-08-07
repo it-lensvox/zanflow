@@ -2,8 +2,8 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef, Re
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { authApi, getTokens, setTokens, API_URL } from '@/services/api';
-import { saveCredentials, clearCredentials } from '@/services/authStorage';
-import { hasPMAccess } from '@/utils/auth';
+import { clearCredentials } from '@/services/authStorage';
+import { hasPMAccess, decodeTokenPayload } from '@/utils/auth';
 import type { User, AuthTokens } from '@/types';
 
 interface AuthContextType {
@@ -26,11 +26,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const initAuth = async () => {
+      // getTokens() reads from 'zanflow_tokens' key
+      // but login also saves to 'access_token' key directly
+      // — check BOTH so page refresh works correctly
       const tokens = getTokens();
+      const directAccessToken = localStorage.getItem('access_token');
+      const directRefreshToken = localStorage.getItem('refresh_token');
 
-      if (tokens?.access) {
-        // Platform guard on every boot — covers direct URL access and page refresh
-        if (!hasPMAccess()) {
+      console.log('🔑 [initAuth] zanflow_tokens:', !!tokens?.access, '| direct access_token:', !!directAccessToken);
+
+      // If tokens exist in direct keys but not in zanflow_tokens, sync them
+      if (!tokens?.access && directAccessToken) {
+        console.log('🔑 [initAuth] Syncing direct tokens into zanflow_tokens');
+        setTokens({ access: directAccessToken, refresh: directRefreshToken || '' });
+      }
+
+      const accessToken = tokens?.access || directAccessToken;
+
+      if (accessToken) {
+       // Platform guard — only block if token explicitly excludes pm
+        const payload = decodeTokenPayload(accessToken);
+        const platformsField = payload?.platforms;
+        if (Array.isArray(platformsField) && platformsField.length > 0 && !platformsField.includes('pm')) {
           setIsLoading(false);
           navigate('/no-access');
           return;
@@ -39,10 +56,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const userData = await authApi.getMe();
           setUser(userData);
         } catch (error: any) {
-          if (error.response?.status !== 401 && error.response?.status !== 403) {
+          if (error.response?.status === 403 || error.response?.status === 401) {
+            // Set a minimal user from JWT payload so app can load
+            if (payload) {
+              setUser({
+                id: payload.user_id,
+                username: payload.username,
+                email: payload.email,
+                first_name: payload.first_name,
+                last_name: payload.last_name,
+                is_active: true,
+                date_joined: new Date().toISOString(),
+                platform_roles: payload.platform_roles,
+              } as any);
+            } else {
+              setUser(null);
+            }
+          } else {
             setUser(null);
           }
-          setUser(null);
         }
       } else {
       }
@@ -159,7 +191,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!token) return null;
     try {
       const payload = JSON.parse(atob(token.split('.')[1]));
-      return payload?.platform_roles?.pm ?? null;
+      const pmRole = payload?.platform_roles?.pm;
+      if (!pmRole && Array.isArray(payload?.platforms) && payload.platforms.includes('pm')) {
+        return 'workspace_member';
+      }
+      return pmRole ?? null;
     } catch {
       return null;
     }
@@ -169,16 +205,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const hasPMRole = (roles: string[]): boolean => {
     const role = getPMRole();
-    return !!role && roles.includes(role);
+    const result = !!role && roles.includes(role);
+    console.log('🔑 [hasPMRole] pmRole from JWT:', role, '| checking against:', roles, '| result:', result);
+    return result;
   };
-
-  /** Check if pmRole allows workspace-level write access */
-  const canManageWorkspace = (): boolean =>
-    ['pm_admin', 'workspace_admin'].includes(getPMRole() || '');
-
-  /** Check if pmRole allows creating tasks */
-  const canCreateTask = (): boolean =>
-    ['pm_admin', 'workspace_admin'].includes(getPMRole() || '');
 
   return (
     <AuthContext.Provider

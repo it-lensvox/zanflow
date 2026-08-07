@@ -117,8 +117,18 @@ function PageLoader() {
 }
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { hasPMRole, isLoading } = useAuth();
-  const isAuthorized = hasPMRole(['pm_admin', 'workspace_admin', 'workspace_member']);
+  const { hasPMRole, isLoading, isAuthenticated } = useAuth();
+  const isAuthorized = hasPMRole(['pm_admin', 'workspace_admin', 'workspace_member', 'project_admin', 'project_manager', 'project_member']);
+
+  // DEBUG — remove after fix confirmed
+  console.log('🛡️ [AdminRoute]', {
+    isLoading,
+    isAuthenticated,
+    isAuthorized,
+    pmRole: (() => { try { const t = localStorage.getItem('access_token'); return t ? JSON.parse(atob(t.split('.')[1]))?.platform_roles?.pm : 'NO TOKEN'; } catch { return 'DECODE ERROR'; } })(),
+    platform_roles: (() => { try { const t = localStorage.getItem('access_token'); return t ? JSON.parse(atob(t.split('.')[1]))?.platform_roles : null; } catch { return null; } })(),
+  });
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -128,6 +138,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!isAuthorized) {
+    console.error('🛡️ [AdminRoute] NOT AUTHORIZED — redirecting to /. pmRole must be one of: pm_admin, workspace_admin, workspace_member, project_admin, project_manager, project_member');
     return <Navigate to="/" replace />;
   }
 

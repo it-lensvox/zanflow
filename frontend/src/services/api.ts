@@ -60,28 +60,33 @@ const processQueue = (error: any, token: string | null = null) => {
   failedRequestsQueue = [];
 };
 
-// Check if a 403 is an auth issue (expired token) vs a permission issue
 const isAuthError = (error: any): boolean => {
   const status = error.response?.status;
 
-  // 401 is always an auth issue
+  // 401 is always an auth error — trigger refresh
   if (status === 401) return true;
 
-  // For 403, check the response body to distinguish auth vs permission
+  // 403 — only treat as auth error if the token itself is invalid/expired
+  // A plain 403 (permission denied) must NOT trigger a refresh — the token is valid,
+  // the user just lacks permission. Refreshing will give the same 403 and cause a loop.
   if (status === 403) {
     const data = error.response?.data;
     const detail = (data?.detail || '').toLowerCase();
     const code = data?.code || '';
 
-    // These indicate expired/missing token (should refresh)
+    // Only these specific codes mean the token is bad (refresh needed)
     if (
-      code === 'not_authenticated' ||
       code === 'token_not_valid' ||
-      detail.includes('authentication credentials were not provided') ||
       detail.includes('token not valid') ||
       detail.includes('token is invalid or expired')
     ) {
       return true;
+    }
+    if (
+      code === 'not_authenticated' ||
+      detail.includes('authentication credentials were not provided')
+    ) {
+      return false;
     }
     return false;
   }
@@ -94,9 +99,14 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    console.warn('🟡 [interceptor] Error:', error.response?.status, originalRequest.url, '| body:', JSON.stringify(error.response?.data)?.slice(0, 120), '| isAuthError:', isAuthError(error));
+
     if (isAuthError(error) && !originalRequest._retry) {
       if (originalRequest.url?.includes('/auth/refresh')) {
         stopProactiveRefresh();
+        console.error('🔴 [interceptor] /auth/refresh/ itself failed:', error.response?.status, error.response?.data);
+        console.error('🔴 [interceptor] refresh token was:', localStorage.getItem('refresh_token')?.slice(0, 30));
+        // Only clear and redirect if NOT on login/signup
         if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/signup')) {
           localStorage.removeItem('access_token');
           localStorage.removeItem('refresh_token');
@@ -122,14 +132,16 @@ api.interceptors.response.use(
 
       try {
         const refreshToken = localStorage.getItem('refresh_token');
+        console.log('🔵 [interceptor] Attempting refresh. Has refresh token:', !!refreshToken, '| URL:', `${API_URL}/auth/refresh/`);
         if (!refreshToken) {
+          console.error('🔴 [interceptor] No refresh token in localStorage — cannot refresh');
           throw new Error('No refresh token');
         }
 
-        // Token refresh on PM — shared DB and SECRET_KEY
         const response = await axios.post(`${API_URL}/auth/refresh/`, {
           refresh: refreshToken
         });
+        console.log('🟢 [interceptor] Refresh SUCCESS. New token starts with:', response.data?.access?.slice(0, 20));
 
         const { access, refresh } = response.data;
 
@@ -153,13 +165,15 @@ api.interceptors.response.use(
         // Retry the original request
         originalRequest.headers['Authorization'] = `Bearer ${access}`;
         return api(originalRequest);
-      } catch (refreshError) {
+      } catch (refreshError: any) {
         processQueue(refreshError, null);
         stopProactiveRefresh();
+        console.error('🔴 [interceptor] Refresh FAILED:', refreshError?.response?.status, refreshError?.response?.data, refreshError?.message);
         if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/signup')) {
           localStorage.removeItem('access_token');
           localStorage.removeItem('refresh_token');
           localStorage.removeItem('active_workspace_id');
+          console.error('🔴 [interceptor] Redirecting to /login');
           window.location.href = '/login';
         }
         return Promise.reject(refreshError);
@@ -173,16 +187,29 @@ api.interceptors.response.use(
 );
 
 export const getTokens = (): AuthTokens | null => {
+  // Check zanflow_tokens first, fallback to direct keys
   const tokens = localStorage.getItem(TOKEN_KEY);
-  return tokens ? JSON.parse(tokens) : null;
+  if (tokens) {
+    try { return JSON.parse(tokens); } catch { /* corrupted — fall through */ }
+  }
+  // Fallback: read from direct keys (set by login flow)
+  const access = localStorage.getItem('access_token');
+  const refresh = localStorage.getItem('refresh_token');
+  if (access) return { access, refresh: refresh || '' };
+  return null;
 };
 
 export const setTokens = (tokens: AuthTokens): void => {
   localStorage.setItem(TOKEN_KEY, JSON.stringify(tokens));
+  // Keep direct keys in sync — used by axios interceptor and initAuth
+  localStorage.setItem('access_token', tokens.access);
+  if (tokens.refresh) localStorage.setItem('refresh_token', tokens.refresh);
 };
 
 export const clearTokens = (): void => {
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('refresh_token');
 };
 
 // ═══════════════════════════════════════════════════════════════════
@@ -241,8 +268,9 @@ function scheduleProactiveRefresh() {
 
       // Schedule next refresh
       scheduleProactiveRefresh();
-    } catch (error) {
-      console.warn('Proactive refresh failed, will retry on next API call');
+    } catch (error: any) {
+      console.error('🔴 [proactiveRefresh] Failed:', error?.response?.status, error?.response?.data, error?.message);
+      console.error('🔴 [proactiveRefresh] refresh token was:', localStorage.getItem('refresh_token')?.slice(0, 30));
     }
   }, refreshIn);
 }
@@ -288,9 +316,11 @@ export const authApi = {
     window.location.href = '/login';
   },
 
-  sendOtp: async (email: string) => {
-    // OTP sent via Central
-    const response = await axios.post(`${CENTRAL_URL}/auth/send-otp/`, { email });
+ sendOtp: async (email: string) => {
+    const response = await axios.post(
+      `${CENTRAL_URL}/organizations/signup/send-otp/`,
+      { email }
+    );
     return response.data;
   },
 
@@ -298,11 +328,19 @@ export const authApi = {
     localStorage.removeItem('active_workspace_id');
     delete api.defaults.headers.common['X-Workspace-ID'];
     const response = await axios.post<OrganizationSignupResponse>(
-      `${CENTRAL_URL}/auth/register/`,
+      `${CENTRAL_URL}/organizations/signup/`,
       data
     );
-    setTokens(response.data.tokens);
-    api.defaults.headers.common['Authorization'] = `Bearer ${response.data.tokens.access}`;
+    const { tokens, workspace } = response.data;
+    localStorage.setItem('access_token', tokens.access);
+    localStorage.setItem('refresh_token', tokens.refresh);
+    // Store the actual workspace id returned by signup — never hardcode 1
+    if (workspace?.id) {
+      localStorage.setItem('active_workspace_id', String(workspace.id));
+      api.defaults.headers.common['X-Workspace-ID'] = String(workspace.id);
+    }
+    setTokens(tokens);
+    api.defaults.headers.common['Authorization'] = `Bearer ${tokens.access}`;
     return response.data;
   },
 
@@ -312,17 +350,16 @@ export const authApi = {
   },
 
   addPlatform: async (email: string, password: string, platform: string) => {
-    // Add platform via Central
-    const response = await axios.post(`${CENTRAL_URL}/auth/add-platform/`, {
+    const response = await axios.post(`${CENTRAL_URL}/organizations/add-platform/`, {
       email,
       password,
       platform,
     });
-    if (response.data.access) {
-      setTokens({ access: response.data.access, refresh: response.data.refresh });
-      localStorage.setItem('access_token', response.data.access);
-      localStorage.setItem('refresh_token', response.data.refresh);
-      api.defaults.headers.common['Authorization'] = `Bearer ${response.data.access}`;
+    if (response.data.tokens) {
+      localStorage.setItem('access_token', response.data.tokens.access);
+      localStorage.setItem('refresh_token', response.data.tokens.refresh);
+      setTokens(response.data.tokens);
+      api.defaults.headers.common['Authorization'] = `Bearer ${response.data.tokens.access}`;
     }
     return response.data;
   },
@@ -1686,7 +1723,7 @@ export const agentApi = {
 
   // list all sessions for current user
   listSessions: async (): Promise<import('@/types').AgentSession[]> => {
-    const workspaceId = localStorage.getItem('active_workspace_id') || '1';
+   const workspaceId = localStorage.getItem('active_workspace_id') || '';
     const response = await api.get('/agent/sessions/', {
       headers: { 'X-Workspace-ID': workspaceId },
     });
@@ -1717,7 +1754,7 @@ export const agentApi = {
     onError?: (err: string) => void,
   ): Promise<void> => {
     const tokens = getTokens();
-    const workspaceId = localStorage.getItem('active_workspace_id') || '1';
+    const workspaceId = localStorage.getItem('active_workspace_id') || '';
 
     const response = await fetch(
       `${API_URL}/agent/query/stream/`,

@@ -454,22 +454,48 @@ export interface AuthTokens {
   refresh: string;
 }
 
+export type SignupStep = 1 | 2 | 3 | 'success';
+
+export type SignupProductKey = 'pm' | 'hrms' | 'crm' | 'ims';
+
+export interface SignupProduct {
+  key: SignupProductKey;
+  name: string;
+  description: string;
+  icon: string;
+  locked: boolean;
+}
+
 export interface OrganizationSignupPayload {
   company_name: string;
   admin_email: string;
   password: string;
   password_confirm: string;
   otp: string;
+  platform: 'pm';
+  products: SignupProductKey[];
 }
 
 export interface OrganizationSignupResponse {
   message: string;
-  organization: {
-    id: number;
-    name: string;
-    slug: string;
-  };
+  organization: { id: number; name: string; slug: string; };
+  workspace: { id: number; name: string; };
   user: Pick<User, 'id' | 'username' | 'email' | 'role'>;
+  platforms: SignupProductKey[];
+  tokens: AuthTokens;
+}
+
+export interface SignupEmailExistsResponse {
+  code: 'EMAIL_ALREADY_EXISTS';
+  detail: string;
+  existing_platforms: SignupProductKey[];
+  can_add_platform: boolean;
+  signup_platform: 'pm';
+}
+
+export interface AddPlatformResponse {
+  message: string;
+  platforms: SignupProductKey[];
   tokens: AuthTokens;
 }
 
