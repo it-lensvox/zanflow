@@ -33,6 +33,9 @@ urlpatterns = [
         path("agent/", include("apps.ai_agent.urls")),
         path("dashboard/", include("apps.dashboard.urls")),
         # path("ai-ops/", include("apps.ai_ops.urls")),
+        # Internal cross-product APIs — called by HRMS, CRM etc.
+        path("internal/", include("apps.users.internal_urls")),
+        path("rbac/", include("apps.rbac.urls")),
     ])),
     
     # API Documentation

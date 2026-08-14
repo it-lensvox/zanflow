@@ -3,6 +3,10 @@ from rest_framework.response import Response
 from rest_framework import status, permissions
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from apps.organizations.authentication import (
+    WorkspaceJWTAuthentication,
+    WorkspaceStaticTokenAuthentication,
+)
 from django.shortcuts import get_object_or_404
 from apps.projects.models import Project
 from .services import TaskAIService, CalendarAgentService
@@ -12,7 +16,7 @@ from datetime import date
 from apps.users.auth import StaticTokenAuthentication
 from rest_framework.parsers import MultiPartParser, FormParser
 class SuggestTaskAIView(APIView):
-    authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
+    authentication_classes = [WorkspaceStaticTokenAuthentication, WorkspaceJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -100,7 +104,7 @@ class SuggestTaskAIView(APIView):
 
         return Response(response_data, status=status.HTTP_200_OK)
 class RefineTaskTextView(APIView):
-    authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
+    authentication_classes = [WorkspaceStaticTokenAuthentication, WorkspaceJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -123,7 +127,7 @@ class DyuksaChatAgentView(APIView):
     Dedicated endpoint for the Dyuksa AI bot to prevent mixing AI logic 
     with standard chat/thread logic.
     """
-    authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
+    authentication_classes = [WorkspaceStaticTokenAuthentication, WorkspaceJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request):

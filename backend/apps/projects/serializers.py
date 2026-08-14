@@ -164,7 +164,7 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         ProjectMembership.objects.get_or_create(
             project=project,
             user=user,
-            defaults={"role": ProjectMembership.Role.OWNER}
+            defaults={"role": ProjectMembership.Role.PROJECT_ADMIN}
         )
         
         # Add the dynamic roles — only allow users from the same organization

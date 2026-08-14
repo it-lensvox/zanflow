@@ -17,6 +17,10 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from apps.organizations.authentication import (
+    WorkspaceJWTAuthentication,
+    WorkspaceStaticTokenAuthentication,
+)
 
 from apps.organizations.mixins import WorkspaceAPIView
 from apps.users.auth import StaticTokenAuthentication
@@ -120,7 +124,7 @@ class AISuggestChildTasksView(WorkspaceAPIView):
     Supports a future `feature_type` field so the same endpoint can power
     AI-generated checklists, acceptance criteria, estimates, etc.
     """
-    authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
+    authentication_classes = [WorkspaceStaticTokenAuthentication, WorkspaceJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request, task_id):
@@ -208,7 +212,7 @@ class ChildTaskListView(WorkspaceAPIView):
 
     Returns all direct child tasks for the given parent task.
     """
-    authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
+    authentication_classes = [WorkspaceStaticTokenAuthentication, WorkspaceJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request, task_id):
@@ -259,7 +263,7 @@ class BatchCreateChildTasksView(WorkspaceAPIView):
     Creates multiple child tasks in one request.
     Supports partial success: failed tasks are reported without blocking the rest.
     """
-    authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
+    authentication_classes = [WorkspaceStaticTokenAuthentication, WorkspaceJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     # Valid choices mirrored from Task model

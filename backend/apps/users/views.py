@@ -9,6 +9,11 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from apps.organizations.authentication import (
+    WorkspaceJWTAuthentication,
+    WorkspaceStaticTokenAuthentication,
+    CentralJWTAuthentication,
+)
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from django.shortcuts import get_object_or_404
 from .serializers import UserRoleUpdateSerializer, ContactMessageSerializer
@@ -29,7 +34,52 @@ class WorkspaceSafeTokenRefreshView(TokenRefreshView):
     The refresh token payload is sufficient for this specific endpoint.
     """
     authentication_classes = []  
-    
+
+
+class LogoutView(APIView):
+    """
+    POST /api/v1/auth/logout/
+
+    Blacklists the supplied refresh token so it can no longer be used
+    to obtain new access tokens.  The mobile/web client should discard
+    both tokens from local storage after calling this endpoint.
+
+    Request body:
+        { "refresh": "<refresh_token>" }
+
+    Returns 205 Reset Content on success (signals the client to clear state).
+    Returns 400 if the token is missing, already blacklisted, or invalid.
+
+    Authentication: not required — the refresh token itself is the credential.
+    This mirrors the behaviour of TokenRefreshView (no JWT auth needed).
+    """
+
+    authentication_classes = []          # refresh token is the credential
+    permission_classes     = [permissions.AllowAny]
+
+    def post(self, request):
+        from rest_framework_simplejwt.tokens import RefreshToken
+        from rest_framework_simplejwt.exceptions import TokenError
+
+        refresh_token = request.data.get("refresh")
+        if not refresh_token:
+            return Response(
+                {"detail": "refresh token is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+        except TokenError as exc:
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(status=status.HTTP_205_RESET_CONTENT)
+
+
 class RegisterView(generics.CreateAPIView):
     """
     Register a new user.
@@ -77,9 +127,12 @@ class UserCreateView(generics.CreateAPIView):
 class MeView(APIView):
     """
     Get current user profile.
+    Does not require workspace context — user profile is org-scoped.
+    Uses CentralJWTAuthentication (resolves by central_user_id, no workspace needed).
     """
+    authentication_classes = [CentralJWTAuthentication]
     permission_classes = [permissions.IsAuthenticated]
-    
+
     def get(self, request):
         serializer = UserSerializer(request.user)
         return Response(serializer.data)
@@ -133,7 +186,7 @@ class ChangeUserRoleView(APIView):
     """
     Endpoint to change a user's role with strict hierarchy rules.
     """
-    authentication_classes = [JWTAuthentication]
+    authentication_classes = [WorkspaceJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def patch(self, request, user_id):
@@ -501,6 +554,12 @@ class AcceptInvitationView(APIView):
         invitation.is_used = True
         invitation.save()
 
+        # PLATFORM_SEPARATION — assign RBAC roles for products in invite link
+        from apps.organizations.services import EmployeeOnboardingService
+        products = [p.strip() for p in request.data.get("products", "hrms").split(",") if p.strip()]
+        EmployeeOnboardingService.on_invite_accepted(user=user, products=products)
+        # END PLATFORM_SEPARATION
+
         return Response({"detail": "Account setup successful. You can now log in."}, status=status.HTTP_201_CREATED)
     
 class ContactUsView(APIView):
@@ -772,3 +831,297 @@ class SocialAuthView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PLATFORM ONBOARDING VIEWS                                  PLATFORM_SEPARATION
+#
+# When the Dyuksa codebase is separated, move these three views to the
+# Central System project. The service layer (EmployeeOnboardingService in
+# apps/organizations/services.py) moves with them.
+# ─────────────────────────────────────────────────────────────────────────────
+
+class InviteEmployeeView(APIView):  # PLATFORM_SEPARATION
+    """
+    POST /api/v1/auth/employees/invite/
+
+    Product-aware invite. Same as SendInvitationView but also accepts
+    a products list and validates it against the org's license.
+
+    Payload:
+    {
+        "email":         "priya@lensvox.com",
+        "products":      ["hrms", "pm"],
+        "role":          "annotator",       (optional — PM role, default annotator)
+        "designation":   "HR Manager",     (optional)
+        "department_id": 3,                (optional — dept scope for HRMS)
+        "workspace_id":  1                 (optional)
+    }
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from apps.organizations.services import EmployeeOnboardingService
+
+        if not _is_platform_admin(request.user):
+            return Response(
+                {"error": "Only Owner or Org Admin can invite employees."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        email         = request.data.get("email")
+        products      = request.data.get("products", [])
+        role          = request.data.get("role", "annotator")
+        designation   = request.data.get("designation")
+        department_id = request.data.get("department_id")
+        workspace_id  = request.data.get("workspace_id")
+
+        if not email:
+            return Response({"error": "email is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not products or not isinstance(products, list):
+            return Response(
+                {"error": "products must be a list e.g. ['hrms', 'pm']"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            result = EmployeeOnboardingService.invite_employee(
+                invited_by    = request.user,
+                email         = email,
+                products      = products,
+                role          = role,
+                workspace_id  = workspace_id,
+                designation   = designation,
+                department_id = department_id,
+            )
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            {"message": f"Invite sent to {email}.", **result},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class CreateEmployeeView(APIView):  # PLATFORM_SEPARATION
+    """
+    POST /api/v1/auth/employees/create/
+
+    Create employee directly. Account created immediately with temp password.
+    Welcome email sent with credentials and product list.
+
+    Payload:
+    {
+        "first_name":         "Priya",
+        "last_name":          "Sharma",
+        "email":              "priya@lensvox.com",
+        "products":           ["hrms", "pm"],
+        "role":               "annotator",    (optional)
+        "designation":        "HR Manager",   (optional)
+        "department_id":      3,              (optional)
+        "workspace_id":       1,              (optional)
+        "send_welcome_email": true            (optional, default true)
+    }
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from apps.organizations.services import EmployeeOnboardingService
+
+        if not _is_platform_admin(request.user):
+            return Response(
+                {"error": "Only Owner or Org Admin can create employees."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        email              = request.data.get("email")
+        products           = request.data.get("products", [])
+        first_name         = request.data.get("first_name", "")
+        last_name          = request.data.get("last_name", "")
+        role               = request.data.get("role", "annotator")
+        designation        = request.data.get("designation")
+        department_id      = request.data.get("department_id")
+        workspace_id       = request.data.get("workspace_id")
+        send_welcome_email = request.data.get("send_welcome_email", True)
+
+        # Password — HR Admin sets directly, no temp password
+        password         = request.data.get("password", "")
+        password_confirm = request.data.get("password_confirm", "")
+
+        # Per-product roles — e.g. {"hrms": "hr_admin", "pm": "project_viewer"}
+        # If not provided, defaults to lowest role per product
+        product_roles = request.data.get("product_roles", {})
+
+        if not email:
+            return Response({"error": "email is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not products or not isinstance(products, list):
+            return Response(
+                {"error": "products must be a list e.g. ['hrms', 'pm']"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not password:
+            return Response({"error": "password is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if password != password_confirm:
+            return Response({"error": "Passwords do not match."}, status=status.HTTP_400_BAD_REQUEST)
+        if len(password) < 8:
+            return Response({"error": "Password must be at least 8 characters."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            result = EmployeeOnboardingService.create_employee(
+                created_by         = request.user,
+                first_name         = first_name,
+                last_name          = last_name,
+                email              = email,
+                products           = products,
+                password           = password,
+                product_roles      = product_roles if product_roles else None,
+                role               = role,
+                designation        = designation,
+                department_id      = department_id,
+                workspace_id       = workspace_id,
+                send_welcome_email = send_welcome_email,
+            )
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(
+            {"message": "Employee created successfully.", **result},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class OffboardEmployeeView(APIView):  # PLATFORM_SEPARATION
+    """
+    POST /api/v1/auth/employees/<id>/offboard/
+
+    Process an employee exit. Revokes all product access on last working day.
+    One call covers PM, HRMS, and CRM simultaneously.
+
+    Payload:
+    {
+        "last_working_day": "2026-08-15"
+    }
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        from apps.organizations.services import EmployeeOnboardingService
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+
+        if not _is_platform_admin(request.user):
+            return Response(
+                {"error": "Only Owner or Org Admin can offboard employees."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        last_working_day = request.data.get("last_working_day")
+        if not last_working_day:
+            return Response(
+                {"error": "last_working_day is required. Format: YYYY-MM-DD"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            user = User.objects.get(pk=pk, organization=request.user.organization)
+        except User.DoesNotExist:
+            return Response(
+                {"error": "Employee not found in your organisation."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if user.pk == request.user.pk:
+            return Response(
+                {"error": "You cannot offboard yourself."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            result = EmployeeOnboardingService.offboard_employee(
+                user             = user,
+                last_working_day = last_working_day,
+                offboarded_by    = request.user,
+            )
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(result, status=status.HTTP_200_OK)
+
+
+class LicensedProductsView(APIView):  # PLATFORM_SEPARATION
+    """
+    GET /api/v1/auth/products/
+
+    Returns products the current org is licensed for.
+    Used by the invite/create form to populate the product picker.
+
+    Response:
+    {
+        "products": [
+            {"key": "hrms", "name": "Human Resources", "is_active": true},
+            {"key": "pm",   "name": "Project Management", "is_active": true}
+        ]
+    }
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from apps.organizations.models import PlatformAccess
+
+        org = request.user.organization
+        if not org:
+            return Response({"products": []})
+
+        accesses = PlatformAccess.objects.filter(
+            organization        = org,
+            is_active           = True,
+            platform__is_active = True,
+        ).select_related("platform").order_by("platform__key")
+
+        from apps.rbac.models import Role
+
+        products = []
+        for a in accesses:
+            # Get all available roles for this product sorted from lowest to highest
+            roles = list(
+                Role.objects.filter(
+                    platform    = a.platform.key,
+                    tenant_id   = None,
+                    role_class  = "functional",
+                ).values("code", "display_name").order_by("id")
+            )
+            # If no functional roles, fall back to all roles for this platform
+            if not roles:
+                roles = list(
+                    Role.objects.filter(
+                        platform  = a.platform.key,
+                        tenant_id = None,
+                    ).exclude(role_class="platform").values("code", "display_name").order_by("id")
+                )
+
+            products.append({
+                "key":          a.platform.key,
+                "name":         a.platform.name,
+                "is_active":    a.is_active,
+                "roles":        roles,          # available roles for this product
+                "default_role": roles[0]["code"] if roles else None,  # lowest role
+            })
+
+        return Response({"products": products})
+
+
+def _is_platform_admin(user) -> bool:  # PLATFORM_SEPARATION
+    """Returns True if user is Owner or Org Admin via RBAC or old PM role."""
+    from django.utils import timezone
+    from django.db.models import Q
+    from apps.rbac.models import RoleAssignment
+    today = timezone.now().date()
+    has_rbac = RoleAssignment.objects.filter(
+        user_id          = user.pk,
+        role__code__in   = ["owner", "org_admin"],
+        role__role_class = "platform",
+        valid_from__lte  = today,
+    ).filter(
+        Q(valid_to__isnull=True) | Q(valid_to__gte=today)
+    ).exists()
+    return has_rbac or getattr(user, "role", None) == "admin" or getattr(user, "is_superuser", False)

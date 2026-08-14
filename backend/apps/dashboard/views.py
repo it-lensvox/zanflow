@@ -4,6 +4,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from apps.organizations.authentication import (
+    WorkspaceJWTAuthentication,
+    WorkspaceStaticTokenAuthentication,
+    CentralJWTAuthentication,
+)
 
 from .models import CustomDashboard, UserPreference
 from .serializers import CustomDashboardSerializer, UserPreferenceSerializer
@@ -20,7 +25,7 @@ class UserPreferenceView(APIView):
         Unknown keys are ignored; omitted keys are left untouched.
         Returns the full updated preferences object.
     """
-    authentication_classes = [JWTAuthentication]
+    authentication_classes = [CentralJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def _get_or_init(self, user):

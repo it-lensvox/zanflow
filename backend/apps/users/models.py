@@ -59,8 +59,26 @@ class User(AbstractUser):
         blank=True,
         db_index=True,
     )
+
+    # ── CENTRAL SSO ────────────────────────────────────────────────────────
+    # ID of this user in Dyuksa Central backend (the single identity provider).
+    # JWT carries Central's user_id. PM resolves the local user via this field.
+    # Never use User.objects.get(id=jwt_user_id) — always use central_user_id.
+    # Set by: UserCreatedWebhookView when Central fires user-created webhook.
+    # Set by: apply_central_user_ids migration command for existing PM users.
+    central_user_id = models.IntegerField(
+        null=True,
+        blank=True,
+        unique=True,
+        db_index=True,
+        help_text=(
+            "User ID from Dyuksa Central backend. "
+            "JWT user_id is resolved against this field — not the local id. "
+            "Set when user is provisioned via Central webhook or migration."
+        ),
+    )
     # ──────────────────────────────────────────────────────────────────────
-    
+
     class Meta:
         db_table = "users"
         ordering = ["username"]

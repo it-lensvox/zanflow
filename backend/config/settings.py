@@ -12,11 +12,16 @@ from corsheaders.defaults import default_headers
 # Build paths
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# ── Load .env BEFORE any config() calls ───────────────────────────────
+# .env lives one level above backend: ZanFlow/ZanFlow/.env
+# This MUST come before SECRET_KEY so the correct value is loaded.
+load_dotenv(BASE_DIR.parent / '.env')
+
 # Security
 SECRET_KEY = config("SECRET_KEY", default="django-insecure-dev-key-change-in-production")
 DEBUG = config("DEBUG", default=True, cast=bool)
 # ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1,192.168.1.12").split(",")
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", "192.168.1.17"," 192.168.1.229", "*"]
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", "192.168.1.17","192.168.1.229", "*"]
 
 
 # Application definition
@@ -58,6 +63,7 @@ LOCAL_APPS = [
     "apps.daily_updates.apps.DailyUpdatesConfig",
     "apps.ai_agent.apps.AiAgentConfig",
     "apps.dashboard",
+    "apps.rbac",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -168,10 +174,14 @@ _cors_origins = config(
         "http://127.0.0.1:5173,"
         # LAN IPs (development)
         "http://192.168.1.121:5173,"
-        "http://192.168.1.15:3001,"
+        "http://192.168.1.15:3001," 
         "http://192.168.1.160:3001,"
         "http://192.168.1.11:5173,"
         "http://192.168.1.188:8000,"
+        "http://192.168.1.15:5173,"
+        "http://192.168.1.15:8081,"
+        "http://192.168.1.14:5173,"
+        "http://192.168.1.17:5173,"
         # Dyuksa production domains
         "https://pm.dyuksa.com,"
         "https://hrms.dyuksa.com,"
@@ -183,8 +193,15 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_HEADERS = list(default_headers) + [
     "x-workspace-id",
+    "x-internal-token",
 ]
 STATIC_API_TOKEN = config("STATIC_API_TOKEN", default=None)
+
+# ── Internal cross-product API token ──────────────────────────────
+# Used for server-to-server calls between Dyuksa products (HRMS, CRM etc.)
+# Generate with: python -c "import secrets; print(secrets.token_hex(32))"
+# Must be identical in PM .env AND HRMS .env AND CRM .env
+INTERNAL_API_TOKEN = config("INTERNAL_API_TOKEN", default="")
 # Django REST Framework
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
@@ -212,9 +229,17 @@ SIMPLE_JWT = {
     "REFRESH_TOKEN_LIFETIME": timedelta(
         days=config("JWT_REFRESH_TOKEN_LIFETIME_DAYS", default=7, cast=int)
     ),
-    "ROTATE_REFRESH_TOKENS": False,
+    "ROTATE_REFRESH_TOKENS":    False,
     "BLACKLIST_AFTER_ROTATION": False,
-    "AUTH_HEADER_TYPES": ("Bearer",),
+    "AUTH_HEADER_TYPES":        ("Bearer",),
+
+    # ← CHANGE THIS LINE:
+    # Before: config("SECRET_KEY", ...)
+    # After:  config("DYUKSA_JWT_SECRET", ...)
+    "SIGNING_KEY": config(
+        "DYUKSA_JWT_SECRET",
+        default="django-insecure-dev-key-change-in-production"
+    ),
 }
 
 # API Documentation
@@ -224,8 +249,7 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
 }
-env_path = BASE_DIR.parent / '.env'
-load_dotenv(env_path)
+# load_dotenv moved to top of settings.py — before SECRET_KEY is read
 
 # AWS S3 Settings
 USE_S3 = config("USE_S3", default=True, cast=bool)
