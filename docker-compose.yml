@@ -1,28 +1,10 @@
 services:
-  db:
-    image: postgres:16-alpine
-    container_name: zanflow-db-1
-    restart: unless-stopped
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    environment:
-      POSTGRES_DB: zanflow
-      POSTGRES_USER: zanflow
-      POSTGRES_PASSWORD: zanflow
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U zanflow"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   redis:
     image: redis:7-alpine
-    container_name: zanflow-redis
+    container_name: flow-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -30,12 +12,11 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
-
   backend:
     build:
       context: ./backend
       dockerfile: ../docker/Dockerfile.backend
-    container_name: zanflow-backend-1
+    container_name: flow-backend
     restart: unless-stopped
     env_file:
       - ./backend/.env
@@ -43,28 +24,23 @@ services:
       - ./backend:/app
       - backend_static:/app/staticfiles
     ports:
-      - "8000:8000"
+      - "8001:8000"
     depends_on:
-      db:
-        condition: service_healthy
       redis:
         condition: service_healthy
     command: >
       sh -c "python manage.py migrate &&
              daphne -b 0.0.0.0 -p 8000 config.asgi:application"
-
   frontend:
     build:
       context: ./frontend
       dockerfile: ../docker/Dockerfile.frontend
-    container_name: zanflow-frontend-1
+    container_name: flow-frontend
     restart: unless-stopped
     ports:
       - "3001:80"
     depends_on:
       - backend
-
 volumes:
-  postgres_data:
   backend_static:
   redis_data:
