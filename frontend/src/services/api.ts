@@ -145,7 +145,7 @@ api.interceptors.response.use(
 
         const { access, refresh } = response.data;
 
-        // ✅ Save to individual keys (used by axios interceptor)
+        // ✅ Save to individual keys
         localStorage.setItem('access_token', access);
         if (refresh) {
           localStorage.setItem('refresh_token', refresh);

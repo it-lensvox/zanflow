@@ -19,13 +19,13 @@ export const MyTask: React.FC = () => {
   const location = useLocation();
   const t = useMyTask();
 
-  const isBoard = location.pathname.startsWith('/taskboard') && !location.pathname.endsWith('/create');
+  const normalizedPath = location.pathname.replace(/\/+$/, '');
+  const isBoard = normalizedPath.includes('/taskboard') && !normalizedPath.endsWith('/create');
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [showBulkDeleteDenied, setShowBulkDeleteDenied] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [isGridSelectionMode, setIsGridSelectionMode] = useState(false);
 
-  // Exit grid selection mode when all tasks are deselected
   React.useEffect(() => {
     if (isGridSelectionMode && t.selectedTaskIds.size === 0) {
       setIsGridSelectionMode(false);
@@ -38,8 +38,6 @@ export const MyTask: React.FC = () => {
   };
 
   const handleBulkDeleteClick = () => {
-    // Mirror the same permission check used in TaskDetailModal:
-    // user?.id === task.assigned_by (the creator)
     const unauthorised = t.filteredTasks
       .filter((task: Task) => t.selectedTaskIds.has(task.id))
       .some((task: Task) => task.assigned_by !== t.user?.id);

@@ -125,7 +125,7 @@ export function useMyTask() {
     isFetching,
   } = useQuery({
     queryKey: ['tasks', statusParam, priorityParam, projectIdParam, currentPage],
-    queryFn:  async () => {
+    queryFn: async () => {
       const res = await taskApi.listPaginated(currentPage, {
         status: statusParam,
         priority: priorityParam,
@@ -225,8 +225,9 @@ export function useMyTask() {
     if (!hookFilteredTasks) return [];
     return hookFilteredTasks
       .filter(task => {
-        if (!task?.status) return false;
-        const matchesFilter = activeFilter === 'ALL' || task.status.toUpperCase() === activeFilter;
+        if (!task) return false;
+        const taskStatus = (task.status || '').toUpperCase();
+        const matchesFilter = activeFilter === 'ALL' || taskStatus === activeFilter;
         const q = searchQuery.trim().toLowerCase();
         const matchesSearch = !q ||
           (task.heading || '').toLowerCase().includes(q) ||
