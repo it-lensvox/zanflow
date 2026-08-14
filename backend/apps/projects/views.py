@@ -251,7 +251,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         is_owner_member = instance.members.through.objects.filter(
             project=instance, 
             user=user, 
-            role='owner'
+            role='project_admin'
         ).exists()
 
         if not (is_creator or is_owner_member):
@@ -431,7 +431,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         is_system_manager = request.user.is_manager or request.user.is_superuser
         is_creator = project.created_by == request.user
         is_owner = project.members.through.objects.filter(
-            project=project, user=request.user, role='owner'
+            project=project, user=request.user, role='project_admin'
         ).exists()
 
         if not (is_system_manager or is_creator or is_owner):
@@ -443,7 +443,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         membership, created = ProjectMembership.objects.get_or_create(
             project=project,
             user=serializer.validated_data["user"],
-            defaults={"role": serializer.validated_data.get("role", ProjectMembership.Role.MEMBER)},
+            defaults={"role": serializer.validated_data.get("role", ProjectMembership.Role.PROJECT_MEMBER)},
         )
         
         if not created:
@@ -473,7 +473,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         is_owner_member = project.members.through.objects.filter(
             project=project, 
             user=request.user, 
-            role='owner'
+            role='project_admin'
         ).exists()
 
         if not (is_creator or is_owner_member):
@@ -499,7 +499,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         is_system_manager = request.user.is_manager or request.user.is_superuser
         is_creator = project.created_by == request.user
         is_owner = project.members.through.objects.filter(
-            project=project, user=request.user, role='owner'
+            project=project, user=request.user, role='project_admin'
         ).exists()
 
         if not (is_system_manager or is_creator or is_owner):

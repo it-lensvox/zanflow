@@ -7,6 +7,10 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from apps.groundtruth.models import Document
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from apps.organizations.authentication import (
+    WorkspaceJWTAuthentication,
+    WorkspaceStaticTokenAuthentication,
+)
 from django.shortcuts import get_object_or_404
 from django.db.models import Count, Q
 from django.db.models import Count, Q, Case, When, Value, BooleanField
@@ -28,7 +32,7 @@ from apps.notification.services import (
     notify_task_assignees_added
 )
 class AllUsersListView(WorkspaceAPIView):
-    authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
+    authentication_classes = [WorkspaceStaticTokenAuthentication, WorkspaceJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -62,7 +66,7 @@ class AllUsersListView(WorkspaceAPIView):
         }, status=status.HTTP_200_OK)
 
 class TaskListCreateView(WorkspaceAPIView):
-    authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
+    authentication_classes = [WorkspaceStaticTokenAuthentication, WorkspaceJWTAuthentication]
     permission_classes = [IsAuthenticated]
     parser_classes = (MultiPartParser, FormParser)
 
@@ -149,7 +153,7 @@ class TaskListCreateView(WorkspaceAPIView):
 
 
 class TaskRetrieveUpdateView(WorkspaceAPIView):
-    authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
+    authentication_classes = [WorkspaceStaticTokenAuthentication, WorkspaceJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request, task_id):
@@ -270,7 +274,7 @@ class TaskRetrieveUpdateView(WorkspaceAPIView):
         )
     # --------------------------
 class UserPerformanceView(WorkspaceAPIView):
-    authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
+    authentication_classes = [WorkspaceStaticTokenAuthentication, WorkspaceJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request, user_id):
@@ -306,7 +310,7 @@ class UserPerformanceView(WorkspaceAPIView):
         }, status=status.HTTP_200_OK)
 class TaskCommentListCreateView(WorkspaceListCreateAPIView):
     serializer_class = TaskCommentSerializer
-    authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
+    authentication_classes = [WorkspaceStaticTokenAuthentication, WorkspaceJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
@@ -338,7 +342,7 @@ class TaskCommentListCreateView(WorkspaceListCreateAPIView):
         serializer.save(user=self.request.user, task=task)
 
 class TaskAttachmentDeleteView(WorkspaceAPIView):
-    authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
+    authentication_classes = [WorkspaceStaticTokenAuthentication, WorkspaceJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def delete(self, request, pk):
@@ -375,7 +379,7 @@ class TaskPinToggleView(WorkspaceAPIView):
     """
     POST: Toggles the pin status of a task for the requesting user.
     """
-    authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
+    authentication_classes = [WorkspaceStaticTokenAuthentication, WorkspaceJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def post(self, request, task_id):
@@ -476,7 +480,7 @@ def convert_description_to_html(text: str) -> str:
 
 
 class TaskBulkUploadView(WorkspaceAPIView):
-    authentication_classes = [StaticTokenAuthentication, JWTAuthentication]
+    authentication_classes = [WorkspaceStaticTokenAuthentication, WorkspaceJWTAuthentication]
     permission_classes = [IsAuthenticated]
     parser_classes = (MultiPartParser, FormParser)
 

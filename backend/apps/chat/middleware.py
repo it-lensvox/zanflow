@@ -88,12 +88,24 @@ class JWTAuthMiddleware(BaseMiddleware):
                 logger.warning("JWT token missing user_id claim")
                 return AnonymousUser()
             
-            # Fetch user from database
-            user = User.objects.get(id=user_id)
-            
+            # Fetch user from PM DB via central_user_id
+            # JWT carries Central's user_id — resolve via central_user_id field
+            # NOT User.objects.get(id=user_id) — that would use PM local id
+            try:
+                user = User.objects.get(central_user_id=user_id)
+            except User.DoesNotExist:
+                logger.warning(
+                    f"WebSocket: Central user_id={user_id} has no PM mirror. "
+                    f"Webhook may not have fired yet."
+                )
+                return AnonymousUser()
+
             # Check if user is active
             if not user.is_active:
-                logger.warning(f"Inactive user attempted WebSocket connection: {user_id}")
+                logger.warning(
+                    f"Inactive user attempted WebSocket connection: "
+                    f"central_user_id={user_id} pm_id={user.id}"
+                )
                 return AnonymousUser()
             
             logger.debug(f"WebSocket authenticated user: {user.username}")

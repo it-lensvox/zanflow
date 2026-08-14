@@ -75,12 +75,104 @@ class WorkspaceContextMixin:
 
 
 class WorkspaceJWTAuthentication(WorkspaceContextMixin, JWTAuthentication):
+    """
+    JWT authentication that:
+    1. Validates JWT signature using shared DYUKSA_JWT_SECRET
+    2. Resolves the user via central_user_id (NOT local pk)
+       JWT carries Central's user_id → we look up User.central_user_id
+    3. Sets organisation and workspace context for TenantManager
+    """
+
+    def get_user(self, validated_token):
+        """
+        Override SimpleJWT's get_user to resolve by central_user_id.
+
+        JWT payload carries user_id from Central DB.
+        PM resolves the local User via central_user_id field.
+
+        This means PM's local user.id (auto-increment) can differ from
+        Central's user_id — no id collision issues.
+        """
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+
+        central_user_id = validated_token.get("user_id")
+        if not central_user_id:
+            return None
+
+        try:
+            user = User.objects.get(central_user_id=central_user_id)
+            if not user.is_active:
+                logger.warning(
+                    "Central user_id=%s found in PM DB (pm_id=%s) "
+                    "but is_active=False",
+                    central_user_id, user.id,
+                )
+                return None
+            return user
+        except User.DoesNotExist:
+            # User not provisioned in PM yet — log and return None
+            logger.warning(
+                "Central user_id=%s has no PM mirror. "
+                "Webhook may not have fired yet.",
+                central_user_id,
+            )
+            return None
+        except Exception as e:
+            logger.error(
+                "Error resolving central_user_id=%s: %s",
+                central_user_id, e,
+            )
+            return None
+
     def authenticate(self, request):
         result = super().authenticate(request)
         if result is not None:
             user, token = result
             self.set_workspace_context(request, user)
         return result
+
+
+class CentralJWTAuthentication(JWTAuthentication):
+    """
+    Resolves user via central_user_id (same as WorkspaceJWTAuthentication)
+    but does NOT require or set workspace context.
+
+    Use this for views that only need to identify the user
+    but do NOT filter data by workspace:
+      - UserPreferenceView (dashboard preferences)
+      - ChangeUserRoleView
+      - Any view that uses user directly without TenantManager
+
+    WorkspaceJWTAuthentication should be used for views that
+    query TenantModel data (projects, tasks, workspaces etc.)
+    """
+
+    def get_user(self, validated_token):
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+
+        central_user_id = validated_token.get("user_id")
+        if not central_user_id:
+            return None
+
+        try:
+            user = User.objects.get(central_user_id=central_user_id)
+            if not user.is_active:
+                return None
+            return user
+        except User.DoesNotExist:
+            logger.warning(
+                "CentralJWT: central_user_id=%s not found in PM DB.",
+                central_user_id,
+            )
+            return None
+        except Exception as e:
+            logger.error(
+                "CentralJWT: Error resolving central_user_id=%s: %s",
+                central_user_id, e,
+            )
+            return None
 
 
 class WorkspaceStaticTokenAuthentication(WorkspaceContextMixin, StaticTokenAuthentication):
