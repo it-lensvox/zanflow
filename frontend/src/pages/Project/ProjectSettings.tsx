@@ -13,7 +13,7 @@ import { Modal, ModalHeader } from '@/components/common/Modal';
 import { FormField } from '@/pages/MyTask/pages/CreateTask/components/FormField';
 import { BLUE, LINE, MUTED, TEXT, BG, INPUT_STYLE, CARD_STYLE } from '@/pages/MyTask/pages/CreateTask/createTaskConstants';
 import { STATUS_MAP } from '@/pages/Project/projectConstants';
-import { PROJECT_ROLES, DropdownTrigger, DropdownList, DropdownItem } from '@/pages/Project/components/ProjectDropdowns';
+import { PROJECT_ROLES, PROJECT_ROLE_LABELS, DropdownTrigger, DropdownList, DropdownItem } from '@/pages/Project/components/ProjectDropdowns';
 
 const PRESET_COLORS = [
   '#ef4444', '#f97316', '#f59e0b', '#eab308',
@@ -271,8 +271,7 @@ export function ProjectSettings() {
   // Determine if the current user has owner privileges
   const isOwner = project?.created_by?.id === currentUser?.id ||
     project?.created_by === currentUser?.id ||
-    project?.members?.some((m: any) => m.user?.id === currentUser?.id && m.role === 'owner');
-
+    project?.members?.some((m: any) => m.user?.id === currentUser?.id && m.role === 'project_admin');
   const selectedTypeConfig = TASK_TYPES.find(t => t.value === formData.task_type);
   const selectedStatusConfig = STATUS_MAP[formData.status];
 
@@ -411,7 +410,7 @@ export function ProjectSettings() {
                   <div style={{ border: `1px solid ${LINE}`, borderRadius: 8, overflow: 'hidden', marginBottom: 10 }}>
                     {project.members.map((member: any, index: number) => {
                       const displayName = member.full_name || member.user?.full_name || (member.user?.first_name && member.user?.last_name ? `${member.user.first_name} ${member.user.last_name}` : member.user?.username) || '—';
-                      const roleLabel = PROJECT_ROLES.find(r => r.value === member.role)?.label || member.role || '—';
+                      const roleLabel = PROJECT_ROLE_LABELS[member.role] || member.role || '—';
                       return (
                         <div key={member.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderBottom: index !== project.members.length - 1 ? `1px solid ${LINE}` : 'none', background: 'hsl(var(--card))' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -468,7 +467,7 @@ export function ProjectSettings() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
                     {assignedTo.map(assignment => {
                       const user = usersData?.find(u => u.value === assignment.userId);
-                      const roleLabel = PROJECT_ROLES.find(r => r.value === assignment.role)?.label;
+                      const roleLabel = PROJECT_ROLE_LABELS[assignment.role] || assignment.role;
                       if (!user) return null;
                       return (
                         <div key={assignment.userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, border: `1px solid ${LINE}`, background: 'hsl(var(--muted))' }}>

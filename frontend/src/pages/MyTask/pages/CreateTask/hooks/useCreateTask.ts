@@ -170,7 +170,8 @@ export function useCreateTask({
             projectsApi.get(selectedProjects[0]),
           ]);
           setProjectLabels(labelsData.results || []);
-          setProjectMembers(projectDetails.members || []);
+          const members = projectDetails.assigned_members || projectDetails.members || [];
+          setProjectMembers(members);
         } catch (err) {
           console.error('Failed to fetch project data:', err);
         }
