@@ -1,0 +1,47 @@
+{
+  "run_id": "run_2026-06-25_11-06-35_openai25",
+  "model": "openai25",
+  "run_at": "2026-06-25T11:06:42.112317",
+  "endpoint": "http://192.168.1.164:8000/api/v1/agent/query/",
+  "workspace_id": "1",
+  "total": 1,
+  "passed": 1,
+  "failed": 0,
+  "partial": 0,
+  "pass_rate": 100.0,
+  "avg_latency_ms": 5865,
+  "category_breakdown": {
+    "task_action": {
+      "pass": 1,
+      "partial": 0,
+      "fail": 0,
+      "dry-run": 0,
+      "total": 1
+    }
+  },
+  "results": [
+    {
+      "id": "Q002",
+      "category": "task_action",
+      "difficulty": "medium",
+      "query": "create a task called Deploy v2 with urgent priority due 2026-07-01 and assign to me in ZanFlow",
+      "expected_tool": "create_task",
+      "actual_tool_called": "create_task",
+      "actual_response": "Task 'Deploy v2' has been added to ZanFlow with urgent priority, due 2026-07-01.",
+      "actual_tool_result": {
+        "success": true,
+        "task_id": 1120,
+        "heading": "Deploy v2",
+        "status": "pending",
+        "priority": "urgent",
+        "project_name": "ZanFlow",
+        "assigned_to": [
+          "harshitshukla@lensvox.com"
+        ]
+      },
+      "latency_ms": 5865,
+      "status": "pass",
+      "failure_reason": null
+    }
+  ]
+}

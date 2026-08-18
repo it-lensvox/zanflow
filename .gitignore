@@ -1,3 +1,7 @@
+# macOS
+.DS_Store
+**/.DS_Store
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -5,6 +9,7 @@ __pycache__/
 
 # C extensions
 *.so
+.DS_Store
 
 # Distribution / packaging
 .Python
@@ -135,6 +140,10 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
+# Django media & uploads
+backend/media/
+media/
+
 # Environments
 .env
 .envrc
@@ -207,3 +216,6 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 frontend/node_modules/
+.DS_Store
+.DS_Store
+**/.DS_Store

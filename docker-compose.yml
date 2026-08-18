@@ -1,8 +1,8 @@
-version: '3.8'
-
 services:
   db:
     image: postgres:16-alpine
+    container_name: zanflow-db-1
+    restart: unless-stopped
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:
@@ -13,47 +13,58 @@ services:
       - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U zanflow"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: zanflow-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
       retries: 5
 
   backend:
     build:
       context: ./backend
       dockerfile: ../docker/Dockerfile.backend
+    container_name: zanflow-backend-1
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
     volumes:
       - ./backend:/app
       - backend_static:/app/staticfiles
     ports:
       - "8000:8000"
-    environment:
-      - DEBUG=True
-      - DATABASE_URL=postgres://zanflow:zanflow@db:5432/zanflow
-      - SECRET_KEY=dev-secret-key-change-in-production
-      - ALLOWED_HOSTS=localhost,127.0.0.1,backend
-      - CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     command: >
       sh -c "python manage.py migrate &&
-             python manage.py runserver 0.0.0.0:8000"
+             daphne -b 0.0.0.0 -p 8000 config.asgi:application"
 
   frontend:
     build:
       context: ./frontend
       dockerfile: ../docker/Dockerfile.frontend
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
+    container_name: zanflow-frontend-1
+    restart: unless-stopped
     ports:
-      - "5173:5173"
-    environment:
-      - VITE_API_URL=http://localhost:8000/api/v1
+      - "3001:80"
     depends_on:
       - backend
-    command: npm run dev -- --host
 
 volumes:
   postgres_data:
   backend_static:
+  redis_data:

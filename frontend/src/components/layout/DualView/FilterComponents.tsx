@@ -1,0 +1,251 @@
+import React from 'react';
+import ReactDOM from 'react-dom';
+import { ColumnFilters } from '@/hooks/useTableFilters';
+
+function FilterPortal({ anchorRef, children }: { anchorRef?: React.RefObject<HTMLDivElement>; children: React.ReactNode }) {
+  const [rect, setRect] = React.useState<DOMRect | null>(null);
+
+  React.useEffect(() => {
+    const el = anchorRef?.current;
+    if (!el) return;
+    setRect(el.getBoundingClientRect());
+
+    const onResize = () => setRect(el.getBoundingClientRect());
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [anchorRef]);
+
+  if (!rect) return null;
+
+  return ReactDOM.createPortal(
+    <div
+      data-filter-portal="true"
+      style={{
+        position: 'fixed',
+        top: rect.bottom + 4,
+        left: rect.left,
+        minWidth: Math.max(rect.width, 160),
+        zIndex: 99999,
+      }}
+    >
+      {children}
+    </div>,
+    document.body,
+  );
+}
+
+export interface SearchFilterProps {
+    columnKey: string;
+    placeholder: string;
+    value: string;
+    onChange: (value: string) => void;
+    isActive: boolean;
+}
+
+export const SearchFilter: React.FC<SearchFilterProps> = ({
+    columnKey: _columnKey,
+    placeholder,
+    value,
+    onChange,
+    isActive,
+}) => {
+    if (!isActive) return null;
+
+    return (
+        <input
+            autoFocus
+            className="w-full bg-white text-[11px] font-normal border border-blue-400 rounded px-1.5 py-0.5 outline-none focus:ring-1 focus:ring-blue-500"
+            placeholder={placeholder}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+        />
+    );
+};
+
+export interface ListFilterOption {
+    value: string;
+    label: string;
+    icon?: React.ReactNode;
+    className?: string;
+}
+
+export interface ListFilterProps {
+    columnKey: string;
+    options: ListFilterOption[];
+    selectedValue: string;
+    onSelect: (value: string) => void;
+    onClear: () => void;
+    isActive: boolean;
+    containerRef?: React.RefObject<HTMLDivElement>;
+}
+
+export const ListFilter: React.FC<ListFilterProps> = ({
+    columnKey: _columnKey,
+    options,
+    selectedValue,
+    onSelect,
+    onClear,
+    isActive,
+    containerRef,
+}) => {
+    if (!isActive) return null;
+
+    const dropdown = (
+        <div
+            onMouseDown={e => e.stopPropagation()}
+            onClick={e => e.stopPropagation()}
+            className="bg-white border border-[#dfe1e6] shadow-xl rounded-lg py-1"
+        >
+            <div className="flex flex-col" style={{ maxHeight: 280, overflowY: 'auto' }}>
+                {options.map((option) => (
+                    <div
+                        key={option.value}
+                        className={`px-3 py-2 hover:bg-gray-50 cursor-pointer text-[12px] flex items-center gap-2 ${option.className || ''}`}
+                        onMouseDown={e => e.stopPropagation()}
+                        onClick={() => onSelect(option.value)}
+                    >
+                        {option.icon && <span className="w-3.5 h-3.5 flex-shrink-0">{option.icon}</span>}
+                        <span className={`font-medium ${selectedValue === option.value ? 'text-blue-600' : ''}`}>
+                            {option.label}
+                        </span>
+                    </div>
+                ))}
+            </div>
+            <button
+                className="mt-1 px-3 py-1 text-[10px] text-red-500 hover:bg-red-50 w-full text-left border-t border-gray-100"
+                onMouseDown={e => e.stopPropagation()}
+                onClick={onClear}
+            >
+                Clear Filter
+            </button>
+        </div>
+    );
+
+    if (containerRef) {
+        return <FilterPortal anchorRef={containerRef}>{dropdown}</FilterPortal>;
+    }
+
+    return (
+        <div className="absolute top-full left-0 mt-2 min-w-[160px] z-[110]">
+            {dropdown}
+        </div>
+    );
+};
+export interface DateFilterProps {
+    columnKey: string;
+    value: string;
+    onChange: (value: string) => void;
+    onClear: () => void;
+    isActive: boolean;
+    containerRef?: React.RefObject<HTMLDivElement>;
+}
+
+export const DateFilter: React.FC<DateFilterProps> = ({
+    columnKey: _columnKey,
+    value,
+    onChange,
+    onClear,
+    isActive,
+    containerRef,
+}) => {
+    if (!isActive) return null;
+
+    const dropdown = (
+        <div
+            onMouseDown={e => e.stopPropagation()}
+            onClick={e => e.stopPropagation()}
+            className="bg-white border border-[#dfe1e6] shadow-xl rounded-lg py-1"
+        >
+            <div className="p-2">
+                <input
+                    type="date"
+                    autoFocus
+                    value={value}
+                    className="w-full text-[12px] border-none p-0 outline-none cursor-pointer"
+                    style={{ colorScheme: 'light' }}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        e.currentTarget.showPicker?.();
+                    }}
+                    onChange={(e) => onChange(e.target.value)}
+                />
+            </div>
+            <button
+                className="mt-1 px-3 py-1 text-[10px] text-red-500 hover:bg-red-50 w-full text-left border-t border-gray-100"
+                onMouseDown={e => e.stopPropagation()}
+                onClick={onClear}
+            >
+                Clear Filter
+            </button>
+        </div>
+    );
+
+    if (containerRef) {
+        return <FilterPortal anchorRef={containerRef}>{dropdown}</FilterPortal>;
+    }
+
+    return (
+        <div className="absolute top-full left-0 mt-2 min-w-[160px] z-[110]">
+            {dropdown}
+        </div>
+    );
+};
+
+export interface FilterHeaderWrapperProps {
+    children: React.ReactNode;
+    columnLabel: React.ReactNode;
+    filterType: 'search' | 'list' | 'date' | 'none';
+    isActive: boolean;
+    filterContent?: React.ReactNode;
+}
+
+export const FilterHeaderWrapper: React.FC<FilterHeaderWrapperProps> = ({
+    children,
+    columnLabel,
+    filterType,
+    isActive,
+    filterContent,
+}) => {
+    return (
+        <div className="relative w-full flex flex-col min-h-[40px] justify-end pb-1">
+            {filterType === 'search' && isActive && (
+                <div className="mb-1 w-full">
+                    {children}
+                </div>
+            )}
+            <span className="truncate text-[14px] font-bold tracking-wide text-gray-700">
+                {columnLabel}
+            </span>
+            {(filterType === 'list' || filterType === 'date') && isActive && filterContent}
+        </div>
+    );
+};
+
+
+export interface ActiveFilterBadgeProps {
+    count: number;
+    onClearAll: () => void;
+}
+
+export const ActiveFilterBadge: React.FC<ActiveFilterBadgeProps> = ({ count, onClearAll }) => {
+    if (count === 0) return null;
+
+    return (
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-md text-[12px]">
+            <span className="text-blue-700 font-medium">
+                {count} {count === 1 ? 'filter' : 'filters'} active
+            </span>
+            <button
+                onClick={onClearAll}
+                className="text-blue-600 hover:text-blue-800 underline font-medium"
+            >
+                Clear all
+            </button>
+        </div>
+    );
+};
+
+export const countActiveFilters = (filters: ColumnFilters): number => {
+    return Object.values(filters).filter((value) => value !== '').length;
+};

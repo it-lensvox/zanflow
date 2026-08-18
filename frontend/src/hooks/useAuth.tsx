@@ -1,7 +1,10 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { authApi, getTokens, clearTokens } from '@/services/api';
-import type { User } from '@/types';
+import axios from 'axios';
+import { authApi, getTokens, setTokens, API_URL } from '@/services/api';
+import { clearCredentials } from '@/services/authStorage';
+import { hasPMAccess, decodeTokenPayload } from '@/utils/auth';
+import type { User, AuthTokens } from '@/types';
 
 interface AuthContextType {
   user: User | null;
@@ -9,6 +12,9 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
+  pmRole: string | null;
+  hasPMRole: (roles: string[]) => boolean;
+  loginWithUser: (user: User) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -20,32 +26,188 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const initAuth = async () => {
+      // getTokens() reads from 'zanflow_tokens' key
+      // but login also saves to 'access_token' key directly
+      // — check BOTH so page refresh works correctly
       const tokens = getTokens();
-      if (tokens?.access) {
+      const directAccessToken = localStorage.getItem('access_token');
+      const directRefreshToken = localStorage.getItem('refresh_token');
+
+      console.log('🔑 [initAuth] zanflow_tokens:', !!tokens?.access, '| direct access_token:', !!directAccessToken);
+
+      // If tokens exist in direct keys but not in zanflow_tokens, sync them
+      if (!tokens?.access && directAccessToken) {
+        console.log('🔑 [initAuth] Syncing direct tokens into zanflow_tokens');
+        setTokens({ access: directAccessToken, refresh: directRefreshToken || '' });
+      }
+
+      const accessToken = tokens?.access || directAccessToken;
+
+      if (accessToken) {
+       // Platform guard — only block if token explicitly excludes pm
+        const payload = decodeTokenPayload(accessToken);
+        const platformsField = payload?.platforms;
+        if (Array.isArray(platformsField) && platformsField.length > 0 && !platformsField.includes('pm')) {
+          setIsLoading(false);
+          navigate('/no-access');
+          return;
+        }
         try {
           const userData = await authApi.getMe();
           setUser(userData);
-        } catch {
-          clearTokens();
+        } catch (error: any) {
+          if (error.response?.status === 403 || error.response?.status === 401) {
+            // Set a minimal user from JWT payload so app can load
+            if (payload) {
+              setUser({
+                id: payload.user_id,
+                username: payload.username,
+                email: payload.email,
+                first_name: payload.first_name,
+                last_name: payload.last_name,
+                is_active: true,
+                date_joined: new Date().toISOString(),
+                platform_roles: payload.platform_roles,
+              } as any);
+            } else {
+              setUser(null);
+            }
+          } else {
+            setUser(null);
+          }
         }
+      } else {
       }
       setIsLoading(false);
     };
-
     initAuth();
   }, []);
 
+  // Listen for token expiry events from API interceptor
+  useEffect(() => {
+    const handleTokenExpired = () => {
+      setUser(null);
+      navigate('/login');
+    };
+    window.addEventListener('auth:token-expired', handleTokenExpired);
+    return () => {
+      window.removeEventListener('auth:token-expired', handleTokenExpired);
+    };
+  }, [navigate]);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleTokenRefresh = useCallback(() => {
+    // Clear any existing timer
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = null;
+    }
+
+    const tokens = getTokens();
+    if (!tokens?.access) return;
+
+    try {
+      // Decode JWT payload to get expiry time
+      const payloadBase64 = tokens.access.split('.')[1];
+      const payload = JSON.parse(atob(payloadBase64));
+      const expiresAtMs = payload.exp * 1000;
+      const now = Date.now();
+
+      // Refresh 5 minutes before expiry
+      const REFRESH_BUFFER_MS = 5 * 60 * 1000;
+      const delay = expiresAtMs - now - REFRESH_BUFFER_MS;
+
+      if (delay <= 0) {
+        performTokenRefresh();
+        return;
+      }
+
+      // Don't capture refresh token in closure — read fresh from localStorage when timer fires
+      refreshTimerRef.current = setTimeout(() => {
+        performTokenRefresh();
+      }, delay);
+    } catch {
+      // If JWT decoding fails, don't schedule (interceptor will handle it)
+    }
+  }, []);
+
+  const performTokenRefresh = useCallback(async () => {
+    // Always read the LATEST tokens from localStorage to avoid using a stale/blacklisted refresh token
+    const currentTokens = getTokens();
+    if (!currentTokens?.refresh) return;
+
+    try {
+      const response = await axios.post<AuthTokens>(`${API_URL}/auth/refresh/`, {
+        refresh: currentTokens.refresh,
+      });
+      const newTokens = response.data;
+      setTokens(newTokens);
+
+      // Schedule the next refresh for the new token
+      scheduleTokenRefresh();
+    } catch {
+      // Refresh failed silently - the response interceptor will handle it
+      // on the next API call
+    }
+  }, [scheduleTokenRefresh]);
+
+
+  // Schedule refresh whenever the user changes (login/logout)
+  useEffect(() => {
+    return () => {
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
+      }
+    };
+  }, []);
+
+  const loginWithUser = (userData: User) => {
+    setUser(userData);
+  };
+
   const login = async (username: string, password: string) => {
     await authApi.login(username, password);
+
+    // Platform guard: check JWT before fetching user or navigating
+    if (!hasPMAccess()) {
+      navigate('/no-access');
+      return;
+    }
+
     const userData = await authApi.getMe();
     setUser(userData);
     navigate('/');
   };
-
   const logout = () => {
     authApi.logout();
+    clearCredentials();
     setUser(null);
     navigate('/login');
+  };
+
+  // Read workspace-level PM role from JWT
+  const getPMRole = (): string | null => {
+    const token = localStorage.getItem('access_token');
+    if (!token) return null;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const pmRole = payload?.platform_roles?.pm;
+      if (!pmRole && Array.isArray(payload?.platforms) && payload.platforms.includes('pm')) {
+        return 'workspace_member';
+      }
+      return pmRole ?? null;
+    } catch {
+      return null;
+    }
+  };
+
+  const pmRole = getPMRole();
+
+  const hasPMRole = (roles: string[]): boolean => {
+    const role = getPMRole();
+    const result = !!role && roles.includes(role);
+    console.log('🔑 [hasPMRole] pmRole from JWT:', role, '| checking against:', roles, '| result:', result);
+    return result;
   };
 
   return (
@@ -56,6 +218,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!user,
         login,
         logout,
+        pmRole,
+        hasPMRole,
+        loginWithUser,
       }}
     >
       {children}
