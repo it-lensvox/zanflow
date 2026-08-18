@@ -85,9 +85,10 @@ export interface ProjectMember {
   id: number;
   user: UserMinimal;
   full_name: string;
-  role: 'owner' | 'member';
+  role: 'project_admin' | 'project_manager' | 'project_member' | 'project_viewer' | string;
   joined_at: string;
 }
+
 //  In create task load project name from project list API
 export interface ProjectMinimal {
   id: number;

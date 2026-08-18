@@ -7,12 +7,24 @@ export const PROJECT_ROLES = [
   { label: 'Project Manager', value: 'project_manager' },
   { label: 'Project Member',  value: 'project_member' },
   { label: 'Project Viewer',  value: 'project_viewer' },
-  { label: 'Frontend Developer', value: 'frontend' },
-  { label: 'Backend Developer',  value: 'backend' },
-  { label: 'Testing Engineer',   value: 'tester' },
-  { label: 'DevOps Engineer',    value: 'devops' },
-  { label: 'Social Media',       value: 'social_media' },
 ];
+
+export const PROJECT_ROLE_LABELS: Record<string, string> = {
+  project_admin:   'Project Admin',
+  project_manager: 'Project Manager',
+  project_member:  'Project Member',
+  project_viewer:  'Project Viewer',
+  owner:       'Project Admin',
+  admin:       'Project Admin',
+  manager:     'Project Manager',
+  member:      'Project Member',
+  viewer:      'Project Viewer',
+  frontend:    'Project Member',
+  backend:     'Project Member',
+  tester:      'Project Member',
+  devops:      'Project Member',
+  social_media:'Project Member',
+};
 
 export const ChevronDown = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"

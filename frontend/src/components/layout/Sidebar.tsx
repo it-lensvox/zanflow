@@ -32,7 +32,7 @@ interface _Workspace {
   is_default: boolean;
   is_active: boolean;
   member_count: number;
-  role: 'admin' | 'manager' | 'member';
+  role: string;
   created_by?: number;
   created_at: string;
   updated_at: string;

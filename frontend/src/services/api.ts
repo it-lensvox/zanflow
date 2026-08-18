@@ -468,6 +468,10 @@ export const projectsApi = {
     const response = await api.get<PaginatedResponse<Label>>(`/projects/${projectId}/labels/`);
     return response.data;
   },
+   getMembers: async (projectId: number) => {
+    const response = await api.get(`/projects/${projectId}/`);
+    return (response.data.assigned_members || response.data.members || []) as import('@/types').ProjectMember[];
+  },
   addMember: async (projectId: number, data: { user_id: number; role: string }) => {
     const response = await api.post(`/projects/${projectId}/add-member/`, data);
     return response.data;

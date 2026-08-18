@@ -9,7 +9,7 @@ import { Modal, ModalHeader } from '@/components/common/Modal';
 import { FormField } from '@/pages/MyTask/pages/CreateTask/components/FormField';
 import { BLUE, LINE, MUTED, TEXT, INPUT_STYLE, CARD_STYLE } from '@/pages/MyTask/pages/CreateTask/createTaskConstants';
 import { STATUS_MAP } from '@/pages/Project/projectConstants';
-import { PROJECT_ROLES, DropdownTrigger, DropdownList, DropdownItem } from '@/pages/Project/components/ProjectDropdowns';
+import { PROJECT_ROLES, PROJECT_ROLE_LABELS, DropdownTrigger, DropdownList, DropdownItem } from '@/pages/Project/components/ProjectDropdowns';
 
 interface CreateProjectModalProps {
     isOpen: boolean;
@@ -93,7 +93,7 @@ export function CreateProjectModal({ isOpen, onClose, navigateOnSuccess: _naviga
         }
         const assigned_members = assignedTo.map(assignment => ({
             user_id: assignment.userId,
-            role: assignment.role || 'member'
+            role: assignment.role || 'project_member'
         }));
 
         createMutation.mutate({
@@ -336,7 +336,7 @@ export function CreateProjectModal({ isOpen, onClose, navigateOnSuccess: _naviga
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                             {assignedTo.map(assignment => {
                                 const user = usersData?.find(u => u.value === assignment.userId);
-                                const roleLabel = PROJECT_ROLES.find(r => r.value === assignment.role)?.label;
+                                const roleLabel = PROJECT_ROLE_LABELS[assignment.role] || assignment.role;
                                 if (!user) return null;
                                 return (
                                     <div key={assignment.userId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, border: `1px solid hsl(var(--border))`, background: 'hsl(var(--muted))' }}>
