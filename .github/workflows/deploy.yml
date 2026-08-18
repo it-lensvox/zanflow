@@ -30,9 +30,15 @@ jobs:
             git pull origin ${{ github.ref_name }}
             
             echo "🔧 Setting production URLs in api.ts..."
+            sed -i "s|http://192.168.1.17:8001/api/v1|https://zanflow.lensvox.com/api/v1|g" frontend/src/services/api.ts
+            sed -i "s|http://192.168.1.17:8001|https://zanflow.lensvox.com|g" frontend/src/services/api.ts
+            sed -i "s|http://192.168.1.17:8000|https://zanflow.lensvox.com|g" frontend/src/services/api.ts
+            sed -i "s|ws://192.168.1.17:8001|wss://zanflow.lensvox.com|g" frontend/src/services/api.ts
+            sed -i "s|http://localhost:8001|https://zanflow.lensvox.com|g" frontend/src/services/api.ts
             sed -i "s|http://localhost:8000/api/v1|https://zanflow.lensvox.com/api/v1|g" frontend/src/services/api.ts
             sed -i "s|http://localhost:8000|https://zanflow.lensvox.com|g" frontend/src/services/api.ts
             sed -i "s|ws://localhost:8000|wss://zanflow.lensvox.com|g" frontend/src/services/api.ts
+          
             
             echo "🔧 Setting production build script..."
             sed -i 's|"build": "tsc && vite build"|"build": "vite build"|g' frontend/package.json
