@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Upload, Edit2, X, Plus, Download, Lock, Mail, Briefcase, ArrowRight, Loader2, Check, Pencil, BadgeCheck } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { getRoleConfig } from '@/config/roleConfig';
 import { projectsApi, authApi } from '@/services/api';
 import { useNavigate } from 'react-router-dom';
 import { getProjectTypeColor } from '@/config/projectTypeConfig';
 
 export function Profile() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, pmRole } = useAuth();
 
   // Profile image
   const [profileImage, setProfileImage] = useState<string | null>((user as any)?.avatar || null);
@@ -250,7 +251,7 @@ export function Profile() {
                   <BadgeCheck className="w-5 h-5 text-indigo-600 shrink-0" />
                   <div>
                     <p className="text-xs text-muted-foreground font-medium">Designation</p>
-                    <p className="text-sm text-foreground font-semibold capitalize">{user?.role || '—'}</p>
+                    <p className="text-sm text-foreground font-semibold capitalize">{getRoleConfig(pmRole ?? user?.role).label || '—'}</p>
                   </div>
                 </div>
 
