@@ -549,7 +549,15 @@ export function UserManagement() {
 
   const { data: usersData, isLoading } = useQuery<PaginatedResponse<AppUser>, Error>({
     queryKey: ['users'],
-    queryFn: () => usersApi.list(),
+    queryFn: async () => {
+      const users = await usersApi.listAll();
+      return {
+        count: users.length,
+        next: null,
+        previous: null,
+        results: users,
+      } as PaginatedResponse<AppUser>;
+    },
     staleTime: 0,
     refetchOnMount: 'always'
   });
@@ -559,7 +567,7 @@ export function UserManagement() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['users'] }); setUserToDelete(null); },
   });
 
-  const users = usersData?.results || [];
+  const users = Array.isArray(usersData) ? usersData : (usersData as any)?.results || [];
 
   return (
     <div className="flex w-full min-h-screen bg-background px-4 sm:px-8 md:px-12 lg:px-16 xl:px-24 2xl:px-40 pt-6 pb-8">

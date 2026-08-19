@@ -18,14 +18,14 @@ export function AddMembersDropdown({ team, onMemberAdded }: Props) {
   const buttonRef   = React.useRef<HTMLButtonElement>(null);
 
   const { data: usersData, isLoading } = useQuery({
-    queryKey: ['users'],
-    queryFn: usersApi.list,
+    queryKey: ['users-all'],
+    queryFn: usersApi.listAll, // GET /tasksite/all-users/ — returns all users
     staleTime: Infinity,
   });
 
   const allUsers = React.useMemo(() => {
     if (!usersData) return [];
-    const data = (usersData as any).results || usersData;
+    const data = (usersData as any).users || (usersData as any)?.results || usersData;
     return Array.isArray(data) ? data : [];
   }, [usersData]);
 

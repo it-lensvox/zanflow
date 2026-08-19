@@ -80,8 +80,8 @@ export const InlineCreateRow: React.FC<InlineCreateRowProps> = ({ columns, onCan
 
   // Fetch users
   const { data: usersData } = useQuery({
-    queryKey: ['users'],
-    queryFn: usersApi.list,
+    queryKey: ['users-all'],
+    queryFn: usersApi.listAll, // GET /tasksite/all-users/ — returns all users
     staleTime: Infinity,
   });
 
@@ -94,7 +94,7 @@ export const InlineCreateRow: React.FC<InlineCreateRowProps> = ({ columns, onCan
 
   const allUsers = React.useMemo(() => {
     if (!usersData) return [];
-    const data = (usersData as any).results || usersData;
+    const data = (usersData as any).users || (usersData as any)?.results || usersData;
     return Array.isArray(data) ? data.map((user: any) => ({
       id: user.id,
       label: user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : user.username,
@@ -216,7 +216,7 @@ export const InlineCreateRow: React.FC<InlineCreateRowProps> = ({ columns, onCan
         email: '',
         first_name: u.first_name || u.label.split(' ')[0] || '',
         last_name: u.last_name || u.label.split(' ').slice(1).join(' ') || '',
-        role: 'project_member' as const,
+        role: 'annotator' as const,
         is_active: true,
         date_joined: new Date().toISOString(),
       }));

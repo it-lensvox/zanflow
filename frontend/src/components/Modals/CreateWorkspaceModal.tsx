@@ -56,14 +56,14 @@ export function CreateWorkspaceModal({ isOpen, onClose }: CreateWorkspaceModalPr
 
   // Fetch users list
   const { data: usersData } = useQuery({
-    queryKey: ['users-for-workspace'],
-    queryFn: () => usersApi.list(),
+    queryKey: ['users-for-workspace-all'],
+    queryFn: () => usersApi.listAll(),
     enabled: isOpen,
   });
 
   if (!isOpen) return null;
 
-  const allUsers = usersData?.results || [];
+  const allUsers = (usersData as any)?.users || (usersData as any)?.results || [];
 
   // Filter out current user and already selected members
   const availableUsers = allUsers.filter((u: any) =>

@@ -92,8 +92,8 @@ export function useTeamChat() {
 
   // 1. Fetch Users List 
   const { data: usersData, isLoading: isLoadingUsers } = useQuery({
-    queryKey: ['team-chat-users'],
-    queryFn: () => usersApi.list(),
+    queryKey: ['team-chat-users-all'],
+    queryFn: () => usersApi.listAll(), // GET /tasksite/all-users/
   });
 
   // ─── 1b. Fetch Project Rooms
@@ -327,7 +327,7 @@ export function useTeamChat() {
 
   // Sync Unread API data with local state & Map Private Rooms to Users
   useEffect(() => {
-    if (unreadData?.by_room && usersData?.results && currentUser) {
+    if (unreadData?.by_room && usersData && currentUser) {
       let updatesNeeded = false;
       const newUnreadMap = new Map(unreadCounts);
       const newRoomUserMap = new Map(roomUserMap);
@@ -344,7 +344,7 @@ export function useTeamChat() {
           const names = data.name.replace('Chat: ', '').split(' & ');
           const otherUsername = names.find(n => n !== currentUser.username);
           if (otherUsername) {
-            const user = usersData.results.find(u => u.username === otherUsername);
+            const user = usersData.find(u => u.username === otherUsername);
             if (user) {
               if (!newRoomUserMap.has(roomId)) {
                 newRoomUserMap.set(roomId, user.id);
@@ -380,7 +380,7 @@ export function useTeamChat() {
 
   // Sync Private Rooms data 
   useEffect(() => {
-    if (privateRoomsData && currentUser && usersData?.results) {
+    if (privateRoomsData && currentUser && usersData) {
       let updatesNeeded = false;
       const newRoomUserMap = new Map(roomUserMap);
       const newUserRoomMap = new Map(userRoomMap);
@@ -834,8 +834,8 @@ export function useTeamChat() {
 
   //  Users 
   const users = useMemo(() => {
-    if (!usersData?.results) return [];
-    return usersData.results.filter(u => u.id !== currentUser?.id && u.is_active);
+    if (!usersData || !Array.isArray(usersData)) return [];
+    return usersData.filter(u => u.id !== currentUser?.id && u.is_active);
   }, [usersData, currentUser?.id]);
 
   const usersWithActivity = useMemo((): UserWithActivity[] => {
