@@ -13,7 +13,7 @@ interface Workspace {
   is_default: boolean;
   is_active: boolean;
   member_count: number;
-  role: 'pm_admin' | 'workspace_admin' | 'workspace_member' | 'admin' | 'manager' | 'member';
+  role: 'pm_admin' | 'workspace_admin' | 'workspace_member' | string;
   created_by?: number;
   created_at: string;
   updated_at: string;
@@ -222,7 +222,7 @@ export function WorkspaceSwitcher({ onCreateWorkspace }: WorkspaceSwitcherProps)
                 </div>
 
 
-                {activeWorkspace && ['pm_admin', 'workspace_admin', 'admin', 'manager'].includes(activeWorkspace.role) && (
+                {activeWorkspace && ['pm_admin', 'workspace_admin'].includes(activeWorkspace.role) && (
                   <button
                     onClick={() => {
                       setIsOpen(false);

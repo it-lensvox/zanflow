@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
+import { getRoleConfig } from '@/config/roleConfig';
 import { projectsApi, teamsApi, chatApi, workspaceApi } from '@/services/api';
 import type { ChatRoomListItem } from '@/types';
 import type { Project } from '@/types';
@@ -517,7 +518,7 @@ export function Sidebar({ onMobileClose }: { onMobileClose?: () => void }) {
           {isExpanded && (
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">{user?.first_name} {user?.last_name}</p>
-              <p className="truncate text-xs text-muted-foreground capitalize">{user?.role}</p>
+              <p className="truncate text-xs text-muted-foreground capitalize">{getRoleConfig(pmRole ?? user?.role).label}</p>
             </div>
           )}
         </div>

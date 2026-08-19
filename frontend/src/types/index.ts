@@ -9,8 +9,8 @@ export interface User {
   email: string;
   first_name: string;
   last_name: string;
-  /** @deprecated Use platform_roles.pm from JWT for workspace scope; fetch /api/v1/rbac/assignments/?project_id=X for project scope */
-  role?: 'admin' | 'manager' | 'annotator' | 'viewer' | 'developer';
+  /** @deprecated Use platform_roles.pm from JWT. This field reflects the legacy PM workspace role. */
+  role?: 'admin' | 'manager' | 'annotator' | 'viewer' | 'developer' | string;
   avatar?: string;
   is_active: boolean;
   is_superuser?: boolean;
@@ -21,7 +21,8 @@ export interface User {
 
 export interface InviteUserPayload {
   email: string;
-  role: PMWorkspaceRole | 'admin' | 'manager' | 'annotator' | 'viewer' | 'developer';
+  /** PM workspace role to assign. Use PMWorkspaceRole values. */
+  role?: PMWorkspaceRole;
   workspace_id?: number | null;
 }
 
@@ -33,7 +34,7 @@ export interface InviteUserResponse {
 // Invite Accept (Setup Account page)
 export interface InviteVerifyResponse {
   email: string;
-  role: PMWorkspaceRole | 'admin' | 'manager' | 'annotator' | 'viewer' | 'developer';
+  role: PMWorkspaceRole | string;
 }
 
 export interface InviteAcceptPayload {
@@ -1863,4 +1864,3 @@ export interface SocialAuthResponse {
     slug: string;
   };
 }
-
