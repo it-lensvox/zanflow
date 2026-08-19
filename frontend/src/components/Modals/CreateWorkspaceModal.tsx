@@ -81,7 +81,7 @@ export function CreateWorkspaceModal({ isOpen, onClose }: CreateWorkspaceModalPr
     const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username;
     setSelectedMembers((prev) => [
       ...prev,
-      { user_id: user.id, username: user.username, full_name: fullName, role: 'viewer' },
+      { user_id: user.id, username: user.username, full_name: fullName, role: 'workspace_member' },
     ]);
     setMemberSearch('');
     setShowMemberDropdown(false);

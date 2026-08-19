@@ -324,7 +324,7 @@ const AddUserModal: React.FC<{ isOpen: boolean; onClose: () => void; queryClient
       <div className="flex justify-end gap-3 pt-6 mt-2 border-t">
         <Button variant="outline" className="px-6" onClick={() => {
           setErrors({});
-          setForm({ username: '', email: '', password: '', confirmPassword: '', firstName: '', lastName: '', role: 'viewer' });
+          setForm({ username: '', email: '', password: '', confirmPassword: '', firstName: '', lastName: '', role: 'workspace_member' });
           onClose();
         }}>Cancel</Button>
         <Button

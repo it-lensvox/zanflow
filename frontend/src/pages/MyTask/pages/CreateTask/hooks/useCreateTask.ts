@@ -338,7 +338,7 @@ export function useCreateTask({
         email: '',
         first_name: u.label.split(' ')[0] || '',
         last_name: u.label.split(' ').slice(1).join(' ') || '',
-        role: 'annotator' as const,
+        role: 'project_member' as const,
         is_active: true,
         date_joined: new Date().toISOString(),
       }));

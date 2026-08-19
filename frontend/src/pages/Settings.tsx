@@ -200,8 +200,7 @@ function SettingsCard({
 
 interface Workspace {
   id: number; name: string; slug: string; description?: string;
-  is_default: boolean; is_active: boolean; member_count: number;
-  role: 'admin' | 'manager' | 'viewer' | 'annotator' | 'developer';
+  is_default: boolean; is_active: boolean; member_count: number
   created_by?: number; created_at: string; updated_at: string;
 }
 
@@ -228,7 +227,9 @@ function WorkspaceCard({ activeWorkspace, userRole }: { activeWorkspace: any; us
 
   const workspaceId = activeWorkspace?.id;
   const pmRole = (() => { try { const t = localStorage.getItem('access_token'); return t ? JSON.parse(atob(t.split('.')[1]))?.platform_roles?.pm : null; } catch { return null; } })();
-  const isAdminOrManager = ['pm_admin', 'workspace_admin'].includes(pmRole || '') || ['admin', 'manager'].includes(activeWorkspace?.my_role || userRole);
+  // Check admin/manager using new platform roles only
+  const isAdminOrManager = ['pm_admin', 'workspace_admin'].includes(pmRole || '') ||
+    ['pm_admin', 'workspace_admin'].includes(activeWorkspace?.my_role || '');
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
   const { data: wsDetails, isLoading: wsLoading, refetch: refetchWs } = useQuery({
