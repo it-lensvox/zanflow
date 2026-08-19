@@ -1,63 +1,46 @@
 services:
-  db:
-    image: postgres:16-alpine
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    environment:
-      POSTGRES_DB: zanflow
-      POSTGRES_USER: zanflow
-      POSTGRES_PASSWORD: zanflow
+  redis:
+    image: redis:7-alpine
+    container_name: flow-redis
+    restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U zanflow"]
-      interval: 5s
-      timeout: 5s
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
       retries: 5
-
   backend:
     build:
       context: ./backend
       dockerfile: ../docker/Dockerfile.backend
-
-    # ✅ CORRECT: backend-only env
+    container_name: flow-backend
+    restart: unless-stopped
     env_file:
       - ./backend/.env
-
     volumes:
       - ./backend:/app
       - backend_static:/app/staticfiles
-
     ports:
-      - "8000:8000"
-
+      - "8001:8000"
     depends_on:
-      db:
+      redis:
         condition: service_healthy
-
     command: >
       sh -c "python manage.py migrate &&
-             python manage.py runserver 0.0.0.0:8000"
-
+             daphne -b 0.0.0.0 -p 8000 config.asgi:application"
   frontend:
     build:
       context: ./frontend
       dockerfile: ../docker/Dockerfile.frontend
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
+    container_name: flow-frontend
+    restart: unless-stopped
     ports:
-      - "3001:3001"
-
-    # ❌ NO root .env here
-    environment:
-      - VITE_API_URL=http://localhost:8000/api/v1
-      - VITE_API_BASE_URL=http://localhost:8000
-
+      - "3001:80"
     depends_on:
       - backend
-    command: npm run dev -- --host --port 3001
-
 volumes:
-  postgres_data:
   backend_static:
+  redis_data:

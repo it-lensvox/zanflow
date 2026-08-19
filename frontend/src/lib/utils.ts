@@ -47,45 +47,91 @@ export function formatFileSize(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-export function getStatusColor(status: string): string {
-  const colors: Record<string, string> = {
-    // Document status
-    draft: 'bg-gray-100 text-gray-800',
-    in_review: 'bg-yellow-100 text-yellow-800',
-    approved: 'bg-green-100 text-green-800',
-    archived: 'bg-gray-100 text-gray-600',
-    // Test status
-    pending: 'bg-gray-100 text-gray-800',
-    running: 'bg-blue-100 text-blue-800',
-    completed: 'bg-green-100 text-green-800',
-    failed: 'bg-red-100 text-red-800',
-    cancelled: 'bg-gray-100 text-gray-600',
-    // Test result
-    pass: 'bg-green-100 text-green-800',
-    fail: 'bg-red-100 text-red-800',
-    error: 'bg-orange-100 text-orange-800',
-    skipped: 'bg-gray-100 text-gray-600',
-    // Issue status
-    open: 'bg-blue-100 text-blue-800',
-    in_progress: 'bg-yellow-100 text-yellow-800',
-    resolved: 'bg-green-100 text-green-800',
-    closed: 'bg-gray-100 text-gray-600',
-    wont_fix: 'bg-gray-100 text-gray-600',
-  };
-  return colors[status] || 'bg-gray-100 text-gray-800';
-}
-
-export function getPriorityColor(priority: string): string {
-  const colors: Record<string, string> = {
-    low: 'bg-gray-100 text-gray-800',
-    medium: 'bg-blue-100 text-blue-800',
-    high: 'bg-orange-100 text-orange-800',
-    critical: 'bg-red-100 text-red-800',
-  };
-  return colors[priority] || 'bg-gray-100 text-gray-800';
-}
-
 export function truncate(str: string, length: number): string {
   if (str.length <= length) return str;
   return str.slice(0, length) + '...';
 }
+
+export function plainTextToHtml(text: string): string {
+  // Already HTML — don't double-process
+  if (/<[a-z][\s\S]*>/i.test(text)) return text;
+
+  const applyInline = (s: string) =>
+    s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+  const result: string[] = [];
+  let inUl = false;
+  let inOl = false;
+
+  const closeOpenLists = () => {
+    if (inUl) { result.push('</ul>'); inUl = false; }
+    if (inOl) { result.push('</ol>'); inOl = false; }
+  };
+
+  // Split on explicit newlines first
+  const lines = text.split('\n');
+
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+
+    if (line.trim() === '') {
+      closeOpenLists();
+      result.push('<p style="margin:0 0 8px"></p>');
+      continue;
+    }
+
+    // Bullet list
+    const bulletMatch = line.match(/^(\s*)([-•*])\s+(.+)/);
+    if (bulletMatch) {
+      if (inOl) { result.push('</ol>'); inOl = false; }
+      if (!inUl) { result.push('<ul style="margin:0 0 8px;padding-left:20px">'); inUl = true; }
+      result.push(`<li>${applyInline(bulletMatch[3])}</li>`);
+      continue;
+    }
+
+    // Numbered list
+    const numberedMatch = line.match(/^(\s*)\d+[.)]\s+(.+)/);
+    if (numberedMatch) {
+      if (inUl) { result.push('</ul>'); inUl = false; }
+      if (!inOl) { result.push('<ol style="margin:0 0 8px;padding-left:20px">'); inOl = true; }
+      result.push(`<li>${applyInline(numberedMatch[2])}</li>`);
+      continue;
+    }
+
+    // Long prose paragraph — split at sentence boundaries into readable chunks.
+    // Heuristic: ". " followed by a capital letter = new sentence.
+    // Group every 2 sentences into one paragraph for readability.
+    closeOpenLists();
+
+    const trimmed = line.trim();
+    const sentences = trimmed
+      .split(/(?<=[.!?])\s+(?=[A-Z])/)
+      .map(s => s.trim())
+      .filter(Boolean);
+
+    if (sentences.length <= 2) {
+      // Short enough — one paragraph
+      result.push(`<p style="margin:0 0 8px">${applyInline(trimmed)}</p>`);
+    } else {
+      // Group into paragraphs of 2 sentences each
+      for (let i = 0; i < sentences.length; i += 2) {
+        const chunk = sentences.slice(i, i + 2).join(' ');
+        result.push(`<p style="margin:0 0 8px">${applyInline(chunk)}</p>`);
+      }
+    }
+  }
+
+  closeOpenLists();
+  return result.join('');
+}
+
+// Strips HTML tags from a string and returns clean, readable plain text.
+export function stripHtml(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s{2,}/g, ' ') 
+    .trim();
+}
+
+// getProjectTypeColor moved to src/config/projectTypeConfig.ts
+export { getProjectTypeColor } from '@/config/projectTypeConfig';

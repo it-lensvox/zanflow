@@ -1,0 +1,407 @@
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { useNavigate, useLocation, useOutletContext, useSearchParams } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/hooks/useAuth';
+import { taskApi, usersApi, projectsApi } from '@/services/api';
+import { useTableFilters, ColumnFilterConfig } from '@/hooks/useTableFilters';
+import { statusOptions, priorityOptions } from '@/components/layout/DualView/taskConfig';
+import { useNotifications } from '@/hooks/useNotifications';
+import type { Task } from '@/types';
+import { DATE_FIELD_OPTIONS, PERSON_FIELD_OPTIONS } from '../taskBoardConstants';
+
+// ─── Cache sanity guard 
+function sanitiseTaskCache(queryClient: ReturnType<typeof useQueryClient>) {
+  const existing = queryClient.getQueryData(['tasks']);
+  if (!existing) return;
+  const hasPages = Array.isArray((existing as any).pages);
+  const isValid =
+    typeof existing === 'object' &&
+    hasPages &&
+    (existing as any).pages.every(
+      (p: any) => p && typeof p === 'object' && Array.isArray(p.results)
+    );
+  if (!isValid) {
+    queryClient.removeQueries({ queryKey: ['tasks'] });
+  }
+}
+
+export function useMyTask() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const { unreadCount } = useNotifications();
+
+  sanitiseTaskCache(queryClient);
+
+  // ── UI state
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
+  const [dateField, setDateField] = useState<'end_date' | 'start_date' | 'created_at'>('end_date');
+  const [personField, setPersonField] = useState<'assigned_to' | 'created_by' | 'updated_by'>('assigned_to');
+  const [showDateFieldDropdown, setShowDateFieldDropdown] = useState(false);
+  const [showPersonFieldDropdown, setShowPersonFieldDropdown] = useState(false);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [showAITaskModal, setShowAITaskModal] = useState(false);
+  const [isInlineCreating, setIsInlineCreating] = useState(false);
+
+  const dateTriggerRef = useRef<HTMLButtonElement>(null);
+  const personTriggerRef = useRef<HTMLButtonElement>(null);
+
+  // Active status filter from URL path
+  const activeFilter = location.pathname.split('/').filter(Boolean)[1]?.toUpperCase() || 'ALL';
+
+  // ── Server-side filters from URL query params (e.g. /taskboard/pending?priority=critical&project_id=1)
+  const priorityParam = searchParams.get('priority') || undefined;
+  const projectIdParam = searchParams.get('project_id') || undefined;
+  const _labelNameParam = searchParams.get('label_name') || undefined;
+  const statusParam = activeFilter !== 'ALL' ? activeFilter.toLowerCase() : undefined;
+  const urlStatusRedirectRef = useRef<string | null>(null);
+  const statusFromUrl = searchParams.get('status');
+  const pendingStatusRedirect = !!statusFromUrl && location.pathname !== `/taskboard/${statusFromUrl.toLowerCase()}` && urlStatusRedirectRef.current !== statusFromUrl;
+
+  // ── Outlet context
+  const outletContext = useOutletContext<{
+    isActivityOpen: boolean;
+    setIsActivityOpen: (v: boolean) => void;
+  } | null>();
+  const isActivityOpen = outletContext?.isActivityOpen ?? false;
+  const setIsActivityOpen = outletContext?.setIsActivityOpen ?? (() => { });
+
+  // ── Close person dropdown on outside click 
+  useEffect(() => {
+    if (!showPersonFieldDropdown) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (personTriggerRef.current?.contains(target)) return;
+      if (document.querySelector('[data-person-dropdown="true"]')?.contains(target)) return;
+      setShowPersonFieldDropdown(false);
+      setDropdownPos(null);
+    };
+    const t = setTimeout(() => document.addEventListener('mousedown', handler), 0);
+    return () => { clearTimeout(t); document.removeEventListener('mousedown', handler); };
+  }, [showPersonFieldDropdown]);
+
+  // ── Close date dropdown on outside click
+  useEffect(() => {
+    if (!showDateFieldDropdown) return;
+    const handler = () => { setShowDateFieldDropdown(false); setDropdownPos(null); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showDateFieldDropdown]);
+
+  // ── Data: users list 
+  const { data: usersData } = useQuery({
+    queryKey: ['all-users'],
+    queryFn: () => usersApi.listAll(),
+    enabled: !!user,
+  });
+
+  // ── Data: projects (for project type colour lookup)
+  const { data: projectsData } = useQuery({
+    queryKey: ['projects'],
+    queryFn: () => projectsApi.list(),
+    staleTime: 60_000,
+  });
+
+  const projectTypeLookup = useMemo(() => {
+    const raw = projectsData?.results || projectsData || [];
+    const arr = Array.isArray(raw) ? raw : [];
+    return arr.reduce((acc: Record<number, string>, p: any) => {
+      acc[p.id] = p.task_type || '';
+      return acc;
+    }, {} as Record<number, string>);
+  }, [projectsData]);
+
+  const PAGE_SIZE = 20;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // ── Data: explicit page-by-page fetching
+  const {
+    data: pageData,
+    isLoading: loading,
+    isFetching,
+  } = useQuery({
+    queryKey: ['tasks', statusParam, priorityParam, projectIdParam, currentPage],
+    queryFn: async () => {
+      const res = await taskApi.listPaginated(currentPage, {
+        status: statusParam,
+        priority: priorityParam,
+        project_id: projectIdParam,
+      });
+      return res;
+    },
+    enabled: !!user && !pendingStatusRedirect,
+    staleTime: 1000 * 60 * 2,
+    placeholderData: (prev: any) => prev,
+  });
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusParam, priorityParam, projectIdParam]);
+
+  const tasks = useMemo(() => {
+    const raw: Task[] = (pageData as any)?.results ?? [];
+    return raw.map(t => ({ ...t, status_label: (t.status || '').toLowerCase().replace(/_/g, ' ') }));
+  }, [pageData]);
+
+  const totalCount = (pageData as any)?.count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const hasNextPage = currentPage < totalPages;
+  const hasPrevPage = currentPage > 1;
+  // sentinel ref kept for API compatibility — no longer used for infinite scroll
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const isFetchingNextPage = isFetching;
+
+  // ── Column filter config 
+  const filterConfig: ColumnFilterConfig[] = [
+    { key: 'project', type: 'search', searchFields: ['project_details', 'name'] },
+    { key: 'heading', type: 'search' },
+    { key: 'labels', type: 'search' },
+    { key: 'status', type: 'list', listOptions: statusOptions.map(o => ({ value: o.value.toUpperCase(), label: o.label })) },
+    { key: 'priority', type: 'list', listOptions: priorityOptions.map(o => ({ value: o.value, label: o.label })) },
+    { key: dateField, type: 'date' },
+  ];
+
+  const {
+    filteredData: hookFilteredTasks,
+    handleSort,
+    columnFilters,
+    setColumnFilters,
+    clearFilter,
+    activeFilterKey,
+    setActiveFilterKey,
+    filterContainerRef,
+  } = useTableFilters<Task>({
+    data: tasks,
+    columns: filterConfig,
+    globalSearchFields: ['heading', 'description', 'status', 'priority', 'project_name', 'status_label'],
+  });
+
+  useEffect(() => {
+    if (!statusFromUrl) return;
+    if (urlStatusRedirectRef.current === statusFromUrl) return;
+    const targetPath = `/taskboard/${statusFromUrl.toLowerCase()}`;
+    if (location.pathname === targetPath) return;
+    urlStatusRedirectRef.current = statusFromUrl;
+    navigate({ pathname: targetPath, search: location.search }, { replace: true });
+  }, [statusFromUrl, location.pathname, location.search, navigate]);
+
+  const urlFiltersAppliedRef = useRef(false);
+  useEffect(() => {
+    if (urlFiltersAppliedRef.current) return;
+    if (!searchParams.toString()) return;
+    if (!projectsData) return;
+    urlFiltersAppliedRef.current = true;
+
+    const projectIdParam = searchParams.get('project_id');
+    const priorityParam = searchParams.get('priority');
+    const labelNameParam = searchParams.get('label_name');
+
+    setColumnFilters(prev => {
+      const next = { ...prev };
+      if (projectIdParam) {
+        const projectsArr = (projectsData as any)?.results || (Array.isArray(projectsData) ? projectsData : []);
+        const matchedProject = projectsArr.find((p: any) => String(p.id) === projectIdParam);
+        if (matchedProject) next.project = matchedProject.name;
+      }
+      if (priorityParam) {
+        next.priority = priorityParam;
+      }
+      return next;
+    });
+
+    // Label filter 
+    if (labelNameParam) {
+      setSearchQuery(labelNameParam);
+    }
+  }, [searchParams, projectsData, location.pathname, location.search, navigate, setColumnFilters]);
+
+  // ── Final filtered list
+  const filteredTasks = useMemo(() => {
+    if (!hookFilteredTasks) return [];
+    return hookFilteredTasks
+      .filter(task => {
+        if (!task) return false;
+        const taskStatus = (task.status || '').toUpperCase();
+        const matchesFilter = activeFilter === 'ALL' || taskStatus === activeFilter;
+        const q = searchQuery.trim().toLowerCase();
+        const matchesSearch = !q ||
+          (task.heading || '').toLowerCase().includes(q) ||
+          (task.status || '').toLowerCase().replace(/_/g, ' ').includes(q) ||
+          (task.project_details?.name || '').toLowerCase().includes(q) ||
+          (task.description || '').replace(/<[^>]*>/g, '').toLowerCase().includes(q) ||
+          (task.priority || '').toLowerCase().includes(q) ||
+          (task.labels || []).some((l: any) => (l.name || l.label || '').toLowerCase().includes(q));
+        const assigneeVal = columnFilters['assigned_to'];
+        const matchesAssignee = !assigneeVal
+          || (assigneeVal === '__empty__'
+            ? (task.assigned_to || []).length === 0
+            : (task.assigned_to || []).map(String).includes(String(assigneeVal)));
+
+        const createdByVal = columnFilters['created_by'];
+        const matchesCreatedBy = !createdByVal
+          || (createdByVal === '__empty__'
+            ? !task.assigned_by || task.assigned_by === 0
+            : String(task.assigned_by) === String(createdByVal));
+        const labelsVal = columnFilters['labels'];
+        const matchesLabel = !labelsVal || (task.labels || []).some(
+          (l: any) => (l.name || l.label || '').toLowerCase().includes(String(labelsVal).toLowerCase())
+        );
+        return matchesFilter && matchesSearch && matchesAssignee && matchesCreatedBy && matchesLabel;
+      })
+      .map(task => ({
+        ...task,
+        project_task_type: projectTypeLookup[(task.project as any)] || projectTypeLookup[task.project_details?.id as any] || '',
+      }));
+  }, [hookFilteredTasks, activeFilter, searchQuery, columnFilters, projectTypeLookup]);
+
+  // ── Task event handlers 
+  const handleTaskClick = useCallback((task: Task) => setSelectedTask(task), []);
+  const handleCloseTaskDetail = useCallback(() => setSelectedTask(null), []);
+
+  const handleSelectedTaskUpdate = useCallback((updatedTask: Task) => {
+    queryClient.setQueryData(
+      ['tasks', statusParam, priorityParam, projectIdParam, currentPage],
+      (old: any) => {
+        if (!old?.results) return old;
+        return { ...old, results: old.results.map((t: Task) => t.id === updatedTask.id ? { ...t, ...updatedTask } : t) };
+      }
+    );
+    setSelectedTask(updatedTask);
+  }, [queryClient, statusParam, priorityParam, projectIdParam, currentPage]);
+
+  // ── Bulk task selection 
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<number>>(new Set());
+
+  const toggleTaskSelect = useCallback((taskId: number) => {
+    setSelectedTaskIds(prev => {
+      const next = new Set(prev);
+      next.has(taskId) ? next.delete(taskId) : next.add(taskId);
+      return next;
+    });
+  }, []);
+
+  const toggleAllTasks = useCallback((visibleTasks: Task[]) => {
+    setSelectedTaskIds(prev => {
+      const allSelected = visibleTasks.every(t => prev.has(t.id));
+      return allSelected ? new Set() : new Set(visibleTasks.map(t => t.id));
+    });
+  }, []);
+
+  const handleBulkDeleteTasks = useCallback(async () => {
+    const ids = [...selectedTaskIds];
+    if (ids.length === 0) return;
+    // Optimistic removal from the current page cache only
+    queryClient.setQueryData(
+      ['tasks', statusParam, priorityParam, projectIdParam, currentPage],
+      (old: any) => {
+        if (!old?.results) return old;
+        return { ...old, results: old.results.filter((t: Task) => !ids.includes(t.id)) };
+      }
+    );
+    setSelectedTask(null);
+    setSelectedTaskIds(new Set());
+    await Promise.all(ids.map(taskId =>
+      taskApi.delete(taskId).catch(() =>
+        // On error, refetch only the current page — not all cached pages
+        queryClient.invalidateQueries({
+          queryKey: ['tasks', statusParam, priorityParam, projectIdParam, currentPage],
+          exact: true,
+        })
+      )
+    ));
+  }, [selectedTaskIds, queryClient, statusParam, priorityParam, projectIdParam, currentPage]);
+
+  const handleDeleteTask = useCallback(async (id: number) => {
+    // Optimistic removal from current page only
+    queryClient.setQueryData(
+      ['tasks', statusParam, priorityParam, projectIdParam, currentPage],
+      (old: any) => {
+        if (!old?.results) return old;
+        return { ...old, results: old.results.filter((t: Task) => t.id !== id) };
+      }
+    );
+    setSelectedTask(null);
+    try {
+      await taskApi.delete(id);
+    } catch {
+      queryClient.invalidateQueries({
+        queryKey: ['tasks', statusParam, priorityParam, projectIdParam, currentPage],
+        exact: true,
+      });
+    }
+  }, [queryClient, statusParam, priorityParam, projectIdParam, currentPage]);
+
+  const handleFilter = useCallback((key: string) => {
+    setShowDateFieldDropdown(false);
+    setActiveFilterKey(prev => prev === key ? null : key);
+  }, [setActiveFilterKey]);
+
+  const handleAITaskGenerate = useCallback(async (_projectId: number, _description: string) => { }, []);
+
+  const openDateDropdown = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (dateTriggerRef.current) {
+      const r = dateTriggerRef.current.getBoundingClientRect();
+      setDropdownPos({ top: r.bottom + window.scrollY + 4, left: r.left + window.scrollX });
+    }
+    setShowDateFieldDropdown(v => !v);
+  };
+
+  const openPersonDropdown = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (personTriggerRef.current) {
+      const r = personTriggerRef.current.getBoundingClientRect();
+      setDropdownPos({ top: r.bottom + window.scrollY + 4, left: r.left + window.scrollX });
+    }
+    setShowPersonFieldDropdown(v => !v);
+  };
+
+  const activeDateLabel = DATE_FIELD_OPTIONS.find(o => o.value === dateField)?.label ?? 'Due Date';
+  const activePersonLabel = PERSON_FIELD_OPTIONS.find(o => o.value === personField)?.label ?? 'Assignee';
+
+  return {
+    // auth / routing
+    user, navigate, location, activeFilter,
+    isActivityOpen, setIsActivityOpen, unreadCount,
+    // view
+    viewMode, setViewMode,
+    // fields
+    dateField, setDateField, activeDateLabel,
+    personField, setPersonField, activePersonLabel,
+    // dropdown state
+    showDateFieldDropdown, setShowDateFieldDropdown,
+    showPersonFieldDropdown, setShowPersonFieldDropdown,
+    dropdownPos, setDropdownPos,
+    dateTriggerRef, personTriggerRef,
+    openDateDropdown, openPersonDropdown,
+    // data
+    usersData, loading,
+    filteredTasks,
+    // filter
+    searchQuery, setSearchQuery,
+    columnFilters, setColumnFilters, clearFilter,
+    activeFilterKey, setActiveFilterKey, filterContainerRef,
+    handleSort, handleFilter,
+    // tasks
+    selectedTask, handleTaskClick, handleCloseTaskDetail,
+    handleSelectedTaskUpdate, handleDeleteTask,
+    selectedTaskIds, toggleTaskSelect, toggleAllTasks, handleBulkDeleteTasks,
+    handleAITaskGenerate,
+    // modals
+    showAITaskModal, setShowAITaskModal,
+    isInlineCreating, setIsInlineCreating,
+    // scroll
+    sentinelRef,
+    currentPage, setCurrentPage,
+    totalCount, totalPages,
+    hasNextPage, hasPrevPage,
+    isFetchingNextPage,
+    // cache
+    queryClient,
+  };
+}

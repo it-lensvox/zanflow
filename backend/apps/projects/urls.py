@@ -62,6 +62,11 @@ urlpatterns = [
         views.ProjectViewSet.as_view({"delete": "remove_member"}), 
         name="project-remove-member"
     ),
+    path(
+    "<int:pk>/members/<int:user_id>/update-role/", 
+    views.ProjectViewSet.as_view({"patch": "update_member_role"}), 
+    name="project-update-member-role"
+    ),
 
     # --- Standard Router URLs (CRUD) ---
     path("", include(router.urls)),

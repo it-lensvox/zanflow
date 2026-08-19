@@ -1,19 +1,19 @@
-export { Dashboard } from './Dashboard';
+export { Dashboard } from './Dashboard/Dashboard';
 export { Login } from './Login';
-export { Projects } from './Projects';
-export { ProjectCreate } from './ProjectCreate';
-// export { ProjectDetail } from './ProjectDetail';
-export { DocumentCreate } from './DocumentCreate';
-export { DocumentDetail } from './DocumentDetail';
-export { UserManagement } from './userManagement/UserManagement'
+export { Projects } from './Project/Projects';
+export { DocumentCreate } from './Documents/DocumentCreate';
 export { MyTask } from './MyTask/MyTask';
-export { CreateTask } from './MyTask/CreateTask'
-export { TeamPerformance } from './MyTask/TeamPerformance';
+export { CreateTask } from './MyTask/pages/CreateTask/CreateTask'
+export { Teams } from './TeamManagement/Teams/Teams';
+export { UserManagement } from './TeamManagement/UserManagement'
+export { TeamPerformance } from './TeamManagement/TeamPerformance/TeamPerformance';
 export { TaskDetails } from './TaskType/TaskDetails'
-export { PdfVsHtmlViewer } from './Tools/PdfVsHTML/PdfVsHtmlViewer';
-// export { SuperscriptChecker } from './SuperscriptChecker';
-export { PdfJson } from './Tools/JsonViewer/PdfJson';
-export { ContentCreation } from './TaskType/ContentCreation';
-export { Documents } from './Documents';
-export { ProjectSettings } from './ProjectSettings';
-
+export { Documents } from './Documents/Documents';
+export { ProjectSettings } from './Project/ProjectSettings';
+export { Sidebar } from '../components/layout/Sidebar';
+export { Calendar } from './Calendar/Calendar';
+export { NotificationsPage } from './NotificationsPage';
+export { Profile } from  './Profile'
+export { ResetPassword } from './ResetPassword'
+export { TeamChatModern } from './TeamsChat/TeamChatModern'
+export { Settings } from './Settings'

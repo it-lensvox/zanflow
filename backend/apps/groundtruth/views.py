@@ -1,16 +1,33 @@
 """
 Views for Ground Truth app.
 """
+import os
+import re
+import mimetypes
+from django.shortcuts import get_object_or_404
 from django.conf import settings  # Import settings for AWS URL construction
 from django_filters import rest_framework as filters
-from rest_framework import generics, permissions, status, viewsets
+from rest_framework import generics, permissions, status, viewsets, serializers
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
-
+from rest_framework.exceptions import PermissionDenied
+import boto3
+from rest_framework.views import APIView
+from apps.tasksite.models import TaskAttachment
 from apps.audit.services import get_object_history, log_action
-
-from .models import Document, DocumentComment, GTVersion
+from django.db.models import Q, Count, F
+from .models import Document, DocumentComment, GTVersion, DocumentShare, Folder, Label
+from django.contrib.contenttypes.models import ContentType
+from django.contrib.auth import get_user_model
+from apps.notification.models import Notification
+from apps.notification.serializers import NotificationSerializer
+from apps.audit.services import log_action
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+from .serializers import DocumentShareSerializer
+from apps.projects.models import Project
+from django.utils import timezone
 from .serializers import (
     DocumentBulkImportSerializer,
     DocumentCommentSerializer,
@@ -21,16 +38,26 @@ from .serializers import (
     GTVersionListSerializer,
     GTVersionSerializer,
     VersionDiffSerializer,
+    FolderSerializer,
+    LabelSerializer
 )
 from .services import approve_gt_version, compute_gt_diff, submit_for_review
+from django.db.models import Count, Q
 
 
 class DocumentFilter(filters.FilterSet):
     """
     Filter for documents.
     """
-    project = filters.NumberFilter(field_name="project_id")
+    # 1. Make sure this uses the custom method
+    project = filters.NumberFilter(method="filter_by_project_or_share")
     status = filters.ChoiceFilter(choices=Document.Status.choices)
+
+    # 2. Make sure this exact method exists inside the class
+    def filter_by_project_or_share(self, queryset, name, value):
+        return queryset.filter(
+            Q(project_id=value) | Q(shares__shared_project_id=value)
+        ).distinct()
     file_type = filters.ChoiceFilter(choices=Document.FileType.choices)
     created_after = filters.DateTimeFilter(field_name="created_at", lookup_expr="gte")
     created_before = filters.DateTimeFilter(field_name="created_at", lookup_expr="lte")
@@ -39,26 +66,149 @@ class DocumentFilter(filters.FilterSet):
         model = Document
         fields = ["project", "status", "file_type"]
 
+class LabelViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for fetching and managing project labels/tags.
+    """
+    serializer_class = LabelSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
+    def get_queryset(self):
+        user = self.request.user
+        
+        # Security: Only fetch labels that belong to projects 
+        # where the user is either the creator or a member.
+        queryset = Label.objects.filter(
+            Q(project__created_by=user) | Q(project__members=user)
+        )
+        
+        # Optional: Filter by a specific project if the frontend passes ?project_id=1
+        project_id = self.request.query_params.get('project_id')
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+            
+        return queryset.distinct()
+
+    def perform_create(self, serializer):
+        # In case the frontend later wants a feature to *create* new tags 
+        # from the modal, this handles it automatically!
+        serializer.save()
 class DocumentViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for Document CRUD operations.
+    ViewSet for Document CRUD operations with restricted visibility.
     """
-    queryset = Document.objects.select_related(
-        "project", "created_by", "current_gt_version"
-    ).prefetch_related("versions")
+    def get_queryset(self):
+        user = self.request.user
+
+        # 1. BASE SECURITY: Only fetch documents from projects the user owns or is a member of.
+        queryset = Document.objects.filter(
+            Q(project__created_by=user) | Q(project__members=user)
+        )
+
+        # ============ NEW: PREFETCH RELATED ============
+        # Pre-loads the shares and the associated users to keep the API blazing fast
+        # and avoid the N+1 query problem for the new shared_with/shared_by fields
+        queryset = queryset.prefetch_related(
+            'shares__shared_with', 
+            'shares__created_by'
+        )
+        # ===============================================
+
+        if self.action != 'list':
+            return queryset.distinct()
+        
+
+        # 2. PROJECT FILTER: Scope down to a specific project if requested by the frontend
+        project_id = self.request.query_params.get('project')
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+
+        # 3. FOLDER FILTER: The smart directory routing
+        folder_id = self.request.query_params.get('folder')
+        
+        if folder_id:
+            # If the frontend passes a folder UUID, return ONLY documents inside that specific folder
+            queryset = queryset.filter(folder_id=folder_id)
+        else:
+            # If no folder is specified, only return "root" level documents.
+            queryset = queryset.filter(folder__isnull=True)
+
+        return queryset.distinct()
+    
+    @action(detail=False, methods=["post"], url_path="bulk-add-labels")
+    def bulk_add_labels(self, request):
+        """
+        Bulk add labels to multiple documents.
+        Payload: {"document_ids": ["uuid1", "uuid2"], "label_ids": [1, 2]}
+        """
+        document_ids = request.data.get("document_ids", [])
+        label_ids = request.data.get("label_ids", [])
+
+        if not isinstance(document_ids, list) or not isinstance(label_ids, list):
+            return Response(
+                {"error": "document_ids and label_ids must be lists", "status": 400},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 1. Fetch Labels and Validate
+        labels = list(Label.objects.filter(id__in=label_ids))
+        if len(labels) != len(label_ids):
+            found_ids = [label.id for label in labels]
+            invalid_ids = list(set(label_ids) - set(found_ids))
+            return Response({
+                "error": "Invalid label IDs",
+                "invalid_ids": invalid_ids,
+                "status": 400
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # 2. Fetch Documents (get_queryset handles permissions automatically!)
+        # Any document_id requested that the user doesn't have access to is silently ignored.
+        documents = self.get_queryset().filter(id__in=document_ids)
+        
+        updated_docs = []
+        for doc in documents:
+            # .add() automatically skips duplicates!
+            doc.labels.add(*labels) 
+            updated_docs.append(doc)
+
+            # Audit Log for each document
+            log_action(
+                doc, 
+                "labels_added", 
+                change_summary=f"Added {len(labels)} labels",
+                user=request.user
+            )
+
+        # 3. Bulk update the 'updated_at' timestamp for all modified documents
+        valid_doc_ids = [doc.id for doc in updated_docs]
+        Document.objects.filter(id__in=valid_doc_ids).update(
+            updated_at=timezone.now(),
+            updated_by=request.user
+        )
+
+        # 4. Serialize the updated documents to return to the frontend
+        # We re-fetch to ensure the ManyToMany prefetch is clean
+        final_docs = self.get_queryset().filter(id__in=valid_doc_ids).prefetch_related('labels')
+        serializer = DocumentSerializer(final_docs, many=True)
+
+        return Response({
+            "success": True,
+            "updated_count": len(updated_docs),
+            "documents": serializer.data
+        }, status=status.HTTP_200_OK)
+    
+    # 2. Re-add the serializer logic to fix the AssertionError
+    def get_serializer_class(self):
+        if self.action == "create":
+            return DocumentCreateSerializer
+        return DocumentSerializer
+
+    # --- Standard ViewSet Configurations ---
     filterset_class = DocumentFilter
     search_fields = ["name", "description"]
     ordering_fields = ["name", "created_at", "updated_at", "status"]
     ordering = ["-created_at"]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
-    
-    def get_serializer_class(self):
-        if self.action == "create":
-            return DocumentCreateSerializer
-        if self.action == "retrieve":
-            return DocumentDetailSerializer
-        return DocumentSerializer
     
     # --- MODIFIED CREATE METHOD ---
     def create(self, request, *args, **kwargs):
@@ -122,9 +272,27 @@ class DocumentViewSet(viewsets.ModelViewSet):
         log_action(document, "create", new_value={"name": document.name})
     
     def perform_update(self, serializer):
-        old_data = DocumentSerializer(self.get_object()).data
-        document = serializer.save(updated_by=self.request.user)
-        log_action(document, "update", old_value=old_data)
+        # 1. Grab the current document BEFORE saving to see its old status
+        instance = self.get_object()
+        old_status = instance.status
+
+        # 2. Save the new changes
+        # (Assuming your UserStampedModel automatically uses the updated_by field)
+        updated_document = serializer.save(updated_by=self.request.user)
+        
+        # 3. Did the status change?
+        new_status = updated_document.status
+        
+        if old_status != new_status:
+            # 4. Create the Audit Log!
+            log_action(
+                updated_document,   # Passed positionally (no 'target=')
+                "status_change",    # Passed positionally (no 'action=')
+                old_value={"status": old_status},
+                new_value={"status": new_status},
+                change_summary=f"Document status changed from '{old_status}' to '{new_status}'",
+                user=self.request.user,
+            )
     
     @action(detail=True, methods=["post"], url_path="upload-source")
     def upload_source(self, request, pk=None):
@@ -240,51 +408,24 @@ class DocumentViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=["post"], url_path="submit-for-review")
     def submit_review(self, request, pk=None):
-        """
-        Submit document for review.
-        """
         document = self.get_object()
-        
-        if not document.latest_version:
-            return Response(
-                {"detail": "Document has no GT versions"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        
-        document = submit_for_review(document, request.user)
+        document.status = Document.Status.IN_REVIEW
+        document.updated_by = request.user
+        document.save()
         return Response(DocumentSerializer(document).data)
     
     @action(detail=True, methods=["post"])
     def approve(self, request, pk=None):
-        """
-        Approve document's latest GT version.
-        """
         document = self.get_object()
-        version_id = request.data.get("version_id")
-        
-        if version_id:
-            try:
-                version = document.versions.get(id=version_id)
-            except GTVersion.DoesNotExist:
-                return Response(
-                    {"detail": "Version not found"},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-        else:
-            version = document.latest_version
-            if not version:
-                return Response(
-                    {"detail": "Document has no GT versions"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-        
-        version = approve_gt_version(version, request.user)
-        return Response(GTVersionSerializer(version).data)
+        document.status = Document.Status.APPROVED
+        document.updated_by = request.user
+        document.save()
+        return Response(DocumentSerializer(document).data)
     
     @action(detail=True, methods=["get"])
-    def history(self, request, pk=None):
+    def activity(self, request, pk=None):
         """
-        Get audit history for document.
+        Get activity/audit log for document formatted for frontend.
         """
         document = self.get_object()
         history = get_object_history(document)
@@ -292,14 +433,40 @@ class DocumentViewSet(viewsets.ModelViewSet):
         from apps.audit.models import AuditLog
         from rest_framework import serializers as drf_serializers
         
-        class AuditSerializer(drf_serializers.ModelSerializer):
-            user = drf_serializers.StringRelatedField()
+        class ActivitySerializer(drf_serializers.ModelSerializer):
+            user = drf_serializers.SerializerMethodField()
+            type = drf_serializers.CharField(source='action')
+            description = drf_serializers.CharField(source='change_summary')
+            created_at = drf_serializers.DateTimeField(source='timestamp')
+            metadata = drf_serializers.SerializerMethodField()
             
             class Meta:
                 model = AuditLog
-                fields = ["id", "user", "action", "change_summary", "timestamp"]
+                fields = ["id", "type", "description", "user", "created_at", "metadata"]
+
+            def get_user(self, obj):
+                user = obj.user
+                if not user:
+                    return None
+                return {
+                    "id": user.id,
+                    "full_name": f"{user.first_name} {user.last_name}".strip() or user.username,
+                    "email": user.email
+                }
+                
+            def get_metadata(self, obj):
+                meta = {}
+                # Map Django audit values to frontend expected metadata format
+                if obj.old_value:
+                    for k, v in obj.old_value.items():
+                        meta[f"old_{k}"] = v
+                if obj.new_value:
+                    for k, v in obj.new_value.items():
+                        meta[f"new_{k}"] = v
+                return meta
         
-        return Response(AuditSerializer(history, many=True).data)
+        # Wrapped in "results" to match frontend array expectation
+        return Response({"results": ActivitySerializer(history, many=True).data})
     
     @action(detail=False, methods=["post"], url_path="bulk-import")
     def bulk_import(self, request):
@@ -340,7 +507,33 @@ class DocumentViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED,
         )
 
+    @action(detail=False, methods=["get"], url_path="shared-with-me")
+    def shared_with_me(self, request):
+        user = request.user
+        
+        # 1. Fetch documents shared directly with the user OR with a project they belong to
+        queryset = Document.objects.filter(
+            Q(shares__shared_with=user) |
+            Q(shares__shared_project__members=user) |
+            Q(shares__shared_project__created_by=user)
+        ).distinct()
 
+        # 2. Pre-fetch relationships for performance and sort by newest
+        queryset = queryset.prefetch_related(
+            'shares__shared_with', 
+            'shares__created_by',
+            'project'
+        ).order_by('-created_at')
+
+        # 3. Apply standard pagination (returns "count", "next", "previous", "results")
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+    
 class DocumentCommentViewSet(viewsets.ModelViewSet):
     """
     ViewSet for document comments.
@@ -348,17 +541,63 @@ class DocumentCommentViewSet(viewsets.ModelViewSet):
     serializer_class = DocumentCommentSerializer
     
     def get_queryset(self):
+        user = self.request.user
+        # 1. Grab the document ID from the URL (/documents/<document_pk>/comments/)
         document_id = self.kwargs.get("document_pk")
-        return DocumentComment.objects.filter(
-            document_id=document_id
-        ).select_related("created_by")
+        
+        # 2. Query COMMENTS, not Documents, filtered by the specific document
+        queryset = DocumentComment.objects.filter(document_id=document_id)
+
+        # 3. Security: Only show comments if the user has access to the document's project
+        return queryset.filter(
+            Q(document__project__created_by=user) | Q(document__project__members=user)
+        ).distinct()
     
     def perform_create(self, serializer):
         document_id = self.kwargs.get("document_pk")
-        serializer.save(
+        user = self.request.user
+        
+        # 1. Save the comment (Django automatically saves the mentions array here!)
+        comment = serializer.save(
             document_id=document_id,
-            created_by=self.request.user,
+            created_by=user,
         )
+        
+        document = comment.document
+
+        # 2. Create Activity Log
+        log_action(document, "commented", change_summary="Comment added", user=user)
+
+        # 3. Process Notifications (Read straight from the database now)
+        mentioned_users = comment.mentions.exclude(id=user.id)
+        
+        if mentioned_users.exists():
+            channel_layer = get_channel_layer()
+            
+            for target_user in mentioned_users:
+                # Create Notification
+                notification = Notification.objects.create(
+                    recipient=target_user,
+                    actor=user,
+                    title="Mentioned in a Comment",
+                    message=f"{user.first_name or user.username} mentioned you in '{document.name}'.",
+                    notification_type=getattr(Notification.NotificationType, 'MENTION', 'comment'), 
+                    content_type=ContentType.objects.get_for_model(Document),
+                    object_id=str(document.id),
+                )
+                
+                # Broadcast
+                notification_data = NotificationSerializer(notification).data
+                notification_data['unread_count'] = Notification.objects.filter(recipient=target_user, is_read=False).count()
+                
+                async_to_sync(channel_layer.group_send)(
+                    f"user_{target_user.id}",
+                    {
+                        "type": "gateway_signal", 
+                        "event": "NEW_NOTIFICATION",
+                        "data": notification_data
+                    }
+                )
     
     @action(detail=True, methods=["post"])
     def resolve(self, request, document_pk=None, pk=None):
@@ -369,3 +608,474 @@ class DocumentCommentViewSet(viewsets.ModelViewSet):
         comment.is_resolved = True
         comment.save()
         return Response(DocumentCommentSerializer(comment).data)
+class ProjectAllDocumentsView(APIView):
+    """
+    Unified endpoint to fetch both Project-level Documents 
+    and Task-level Attachments for a specific project.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def _generate_presigned_url(self, s3_client, s3_key, display_filename):
+        """Single helper — avoids duplicate presign logic for docs and attachments."""
+        content_type, _ = mimetypes.guess_type(display_filename)
+        if not content_type:
+            content_type = 'application/octet-stream'
+        try:
+            return s3_client.generate_presigned_url(
+                'get_object',
+                Params={
+                    'Bucket': settings.AWS_STORAGE_BUCKET_NAME,
+                    'Key': s3_key,
+                    'ResponseContentType': content_type,
+                    'ResponseContentDisposition': f'inline; filename="{display_filename}"',
+                },
+                ExpiresIn=3600
+            )
+        except Exception as e:
+            print(f"S3 presign error for key={s3_key}: {e}")
+            return None
+
+    def get(self, request, project_id):
+        # 1. Initialize S3 Client ONCE for performance
+        s3_client = boto3.client(
+            's3',
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region_name=settings.AWS_S3_REGION_NAME
+        )
+
+        # 2. Fetch Project-Level Documents
+        project_docs = Document.objects.filter(
+            Q(project_id=project_id) | Q(shares__shared_project_id=project_id)
+        ).distinct()
+        project_data = [] 
+        for doc in project_docs:
+            filename = doc.source_file.name.split('/')[-1] if doc.source_file else doc.name
+            
+            file_url = None
+            preview_url = None 
+            if doc.source_file:
+                try:
+                    # --- NEW FIX: Dynamically determine Content-Type ---
+                    content_type, _ = mimetypes.guess_type(filename)
+                    if not content_type:
+                        content_type = 'application/octet-stream'
+
+                    file_url = s3_client.generate_presigned_url(
+                        'get_object',
+                        Params={
+                            'Bucket': settings.AWS_STORAGE_BUCKET_NAME,
+                            'Key': doc.source_file.name,
+                            'ResponseContentType': content_type, # Forces Microsoft Viewer to recognize it as PPTX
+                            'ResponseContentDisposition': f'inline; filename="{filename}"' # Forces inline viewing
+                        },
+                        ExpiresIn=3600 
+                    )
+                    # ============ NEW: Generate preview PDF URL ============
+                    if doc.preview_pdf and doc.preview_status == 'ready':
+                        pdf_filename = f"{filename.rsplit('.', 1)[0]}.pdf"
+                        preview_url = s3_client.generate_presigned_url(
+                            'get_object',
+                            Params={
+                                'Bucket': settings.AWS_STORAGE_BUCKET_NAME,
+                                'Key': doc.preview_pdf.name,
+                                'ResponseContentType': 'application/pdf',
+                                'ResponseContentDisposition': f'inline; filename="{pdf_filename}"'
+                            },
+                            ExpiresIn=3600
+                        )
+                    # ========================================================
+                except Exception as e:
+                    print(f"S3 Error for Document {doc.id}: {e}")
+            elif doc.source_file_url:
+                file_url = doc.source_file_url # External URL fallback
+
+            project_data.append({
+                "id": str(doc.id), # UUID converted to string
+                "file_name": doc.name, 
+                "file_url": file_url, 
+                "preview_url": preview_url,  # NEW
+                "preview_status": doc.preview_status, 
+                "uploaded_at": doc.created_at,
+                "updated_at": doc.updated_at,
+                "source": "Project",
+                "task_id": None,
+                "task_heading": None
+            })
+
+        # 3. Fetch Task-Level Attachments
+        task_attachments = TaskAttachment.objects.filter(task__project_id=project_id)
+        task_data = []
+        for attachment in task_attachments:
+            raw_filename = attachment.file.name.split('/')[-1] if attachment.file else "Unknown"
+            clean_filename = re.sub(r'_[a-zA-Z0-9]{7}(\.[^.]+)$', r'\1', raw_filename)
+            
+            file_url = None
+            if attachment.file and attachment.file.name:
+                file_url = self._generate_presigned_url(s3_client, attachment.file.name, clean_filename)
+
+            task_data.append({
+                "id": str(attachment.id),
+                "file_name": clean_filename,
+                "file_url": file_url,
+                "uploaded_at": attachment.uploaded_at, # Adjust if your field is named differently
+                "updated_at": attachment.uploaded_at,
+                "source": "Task",
+                "task_id": attachment.task.id,
+                "task_heading": attachment.task.heading
+            })
+
+        # 4. Merge and Sort (Newest first)
+        all_documents = project_data + task_data
+        all_documents.sort(key=lambda x: x['uploaded_at'], reverse=True)
+
+        name_tracker = {}
+        for doc in all_documents:
+            original_name = doc['file_name']
+            
+            if original_name in name_tracker:
+                # We have seen this name before! Increase the count.
+                name_tracker[original_name] += 1
+                
+                # Split "LensVox_Theme.pdf" into "LensVox_Theme" and ".pdf"
+                name_part, ext_part = os.path.splitext(original_name)
+                
+                # Combine it back together as "LensVox_Theme (1).pdf"
+                doc['file_name'] = f"{name_part} ({name_tracker[original_name]}){ext_part}"
+            else:
+                # First time seeing this name, start the tracker at 0
+                name_tracker[original_name] = 0
+
+        # 5. Finally, sort by NEWEST first so the user sees the latest files at the top
+        all_documents.sort(key=lambda x: x['uploaded_at'], reverse=True)
+
+        return Response({
+            "message": "All project and task documents retrieved",
+            "total_files": len(all_documents),
+            "documents": all_documents
+        }, status=status.HTTP_200_OK)
+    
+class DocumentShareView(APIView):
+    """
+    Explicit endpoint to handle sharing and revoking a document 
+    with a user OR a project.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, document_id):
+        user = request.user
+        
+        # 1. Fetch document and strictly verify the user has access to it
+        document = get_object_or_404(
+            Document.objects.filter(
+                Q(project__created_by=user) | 
+                Q(project__members=user) | 
+                Q(shares__shared_with=user) |
+                Q(shares__shared_project__members=user) |
+                Q(shares__shared_project__created_by=user)
+            ).distinct(),
+            id=document_id
+        )
+
+        # 2. Validate request
+        serializer = DocumentShareSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        target_user_id = serializer.validated_data.get("user_id")
+        target_project_id = serializer.validated_data.get("project_id")
+        
+        User = get_user_model()
+        channel_layer = get_channel_layer()
+
+        # ==========================================
+        # PATH A: SHARE WITH SPECIFIC USER
+        # ==========================================
+        if target_user_id:
+            try:
+                target_user = User.objects.get(id=target_user_id)
+            except User.DoesNotExist:
+                return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+            if target_user == user:
+                return Response({"detail": "You cannot share a document with yourself."}, status=status.HTTP_400_BAD_REQUEST)
+
+            if document.project:
+                if document.project.created_by == target_user or document.project.members.filter(id=target_user.id).exists():
+                    return Response(
+                        {"detail": f"{target_user.username} already has access to this document through the project."}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+            share_record, created = DocumentShare.objects.get_or_create(
+                document=document, shared_with=target_user,
+                defaults={'created_by': user, 'updated_by': user}
+            )
+
+            if not created:
+                share_record.updated_by = user
+                share_record.save(update_fields=['updated_by', 'updated_at'])
+
+            log_action(document, "shared", change_summary=f"Document shared with {target_user.username}", user=user)
+
+            # Update the document's timestamp so the frontend shows it was updated "just now"
+            document.updated_by = user
+            document.updated_at = timezone.now()
+            document.save()
+
+            notification = Notification.objects.create(
+                recipient=target_user,
+                actor=user,
+                title="Shared Document",
+                message=f"{user.first_name or user.username} shared the document '{document.name}' with you.",
+                notification_type=Notification.NotificationType.DOCUMENT_SHARED,
+                content_type=ContentType.objects.get_for_model(Document),
+                object_id=str(document.id),
+                metadata={
+                    "document_id": str(document.id),
+                    "project_id": document.project_id
+                }
+            )
+            
+            notification_data = NotificationSerializer(notification).data
+            unread_count = Notification.objects.filter(recipient=target_user, is_read=False).count()
+            notification_data['unread_count'] = unread_count
+
+            async_to_sync(channel_layer.group_send)(
+                f"user_{target_user.id}",
+                {
+                    "type": "gateway_signal", 
+                    "event": "NEW_NOTIFICATION",
+                    "data": notification_data
+                }
+            )
+            
+            return Response(
+                {"detail": f"Document successfully shared with {target_user.username}."}, 
+                status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
+            )
+
+        # ==========================================
+        # PATH B: SHARE WITH ENTIRE PROJECT
+        # ==========================================
+        elif target_project_id:
+            try:
+                target_project = Project.objects.get(id=target_project_id)
+            except Project.DoesNotExist:
+                return Response({"detail": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+
+            if document.project == target_project:
+                return Response({"detail": "Document already belongs to this project."}, status=status.HTTP_400_BAD_REQUEST)
+
+            share_record, created = DocumentShare.objects.get_or_create(
+                document=document, shared_project=target_project,
+                defaults={'created_by': user, 'updated_by': user}
+            )
+
+            if not created:
+                share_record.updated_by = user
+                share_record.save(update_fields=['updated_by', 'updated_at'])
+
+            log_action(document, "shared", change_summary=f"Document shared with project {target_project.name}", user=user)
+
+            # Update the document's timestamp so the frontend shows it was updated "just now"
+            document.updated_by = user
+            document.updated_at = timezone.now()
+            document.save()
+
+            target_users = list(target_project.members.exclude(id=user.id))
+            if target_project.created_by != user and target_project.created_by not in target_users:
+                target_users.append(target_project.created_by)
+
+            # Broadcast to everyone in that project
+            for member in target_users:
+                notification = Notification.objects.create(
+                    recipient=member,
+                    actor=user,
+                    title="Shared Document via Project",
+                    message=f"{user.first_name or user.username} shared '{document.name}' with your project '{target_project.name}'.",
+                    notification_type=Notification.NotificationType.DOCUMENT_SHARED,
+                    content_type=ContentType.objects.get_for_model(Document),
+                    object_id=str(document.id),
+                    metadata={
+                        "document_id": str(document.id),
+                        "project_id": document.project_id
+                    }
+                )
+                
+                notification_data = NotificationSerializer(notification).data
+                unread_count = Notification.objects.filter(recipient=member, is_read=False).count()
+                notification_data['unread_count'] = unread_count
+                
+                async_to_sync(channel_layer.group_send)(
+                    f"user_{member.id}",
+                    {
+                        "type": "gateway_signal", 
+                        "event": "NEW_NOTIFICATION",
+                        "data": notification_data
+                    }
+                )
+
+            return Response(
+                {"detail": f"Document successfully shared with project {target_project.name}."}, 
+                status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
+            )
+
+    # ==========================================
+    # NEW METHOD: REVOKE SHARE ACCESS
+    # ==========================================
+    def delete(self, request, document_id):
+        user = request.user
+        
+        # 1. Fetch document and verify access
+        document = get_object_or_404(
+            Document.objects.filter(
+                Q(project__created_by=user) | 
+                Q(project__members=user) | 
+                Q(shares__shared_with=user) |
+                Q(shares__shared_project__members=user) |
+                Q(shares__shared_project__created_by=user)
+            ).distinct(),
+            id=document_id
+        )
+
+        target_user_id = request.data.get("user_id")
+        target_project_id = request.data.get("project_id")
+
+        if not target_user_id and not target_project_id:
+            return Response(
+                {"detail": "Please provide either user_id or project_id to revoke access."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if target_user_id:
+            try:
+                share_record = DocumentShare.objects.get(
+                    document=document, 
+                    shared_with_id=target_user_id
+                )
+                share_record.delete()
+                
+                # Audit Log
+                log_action(
+                    document, 
+                    "share_revoked", 
+                    change_summary=f"Revoked document access for user ID {target_user_id}", 
+                    user=user
+                )
+                
+            except DocumentShare.DoesNotExist:
+                return Response(
+                    {"detail": "Share record not found for this user."}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+        elif target_project_id:
+            try:
+                share_record = DocumentShare.objects.get(
+                    document=document, 
+                    shared_project_id=target_project_id
+                )
+                share_record.delete()
+                
+                # Audit Log
+                log_action(
+                    document, 
+                    "share_revoked", 
+                    change_summary=f"Revoked document access for project ID {target_project_id}", 
+                    user=user
+                )
+                
+            except DocumentShare.DoesNotExist:
+                return Response(
+                    {"detail": "Share record not found for this project."}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+        # Update the document's timestamp to reflect the revocation
+        document.updated_by = user
+        document.updated_at = timezone.now()
+        document.save(update_fields=['updated_by', 'updated_at'])
+
+        return Response({"detail": "Access revoked successfully."}, status=status.HTTP_200_OK)
+
+class FolderViewSet(viewsets.ModelViewSet):
+    serializer_class = FolderSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        project_id = self.request.query_params.get('project')
+        
+        # ==================== THE FIX ====================
+        # Delete `queryset = Folder.objects.all()`
+        # Replace it with this explicit project-member bypass:
+        queryset = Folder.objects.filter(
+            Q(project__created_by=user) | Q(project__members=user)
+        )
+        # =================================================
+
+        if project_id:
+            queryset = queryset.filter(project_id=project_id)
+            
+        parent_id = self.request.query_params.get('parent')
+        if parent_id is not None:
+            if parent_id.lower() == 'null':
+                queryset = queryset.filter(parent__isnull=True)
+            else:
+                queryset = queryset.filter(parent_id=parent_id)
+
+        return queryset.annotate(
+            document_count=Count(
+                'documents', 
+                filter=Q(documents__folder=F('id')), 
+                distinct=True
+            ),
+            folder_count=Count(
+                'subfolders',
+                filter=Q(subfolders__parent=F('id')),
+                distinct=True
+            )
+        ).distinct()
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    def perform_update(self, serializer):
+        folder = self.get_object()
+        # ============ GUARDRAIL: Block modifying system folders ============
+        if folder.is_system_generated:
+            raise PermissionDenied("You cannot rename or move a system-generated folder.")
+        # ===================================================================
+        serializer.save(updated_by=self.request.user)
+
+    def perform_destroy(self, instance):
+        # ============ GUARDRAIL: Block deleting system folders ============
+        if instance.is_system_generated:
+            raise PermissionDenied("You cannot delete a system-generated folder.")
+        # ==================================================================
+        instance.delete()
+
+class DocumentSummaryView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        
+        # Base querysets secured to the user's workspaces
+        secured_projects = Project.objects.filter(Q(created_by=user) | Q(members=user)).distinct()
+        secured_documents = Document.objects.filter(project__in=secured_projects)
+
+        total_projects = secured_projects.count()
+        total_documents = secured_documents.count()
+
+        # Group by project in a single query
+        project_counts = secured_documents.values('project_id').annotate(count=Count('id'))
+
+        return Response({
+            'total_documents': total_documents,
+            'total_projects': total_projects,
+            'by_project': {
+                str(pc['project_id']): pc['count'] for pc in project_counts
+            }
+        })
+    

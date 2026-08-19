@@ -1,0 +1,58 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+      - shubhang
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 30m
+          script: |
+            set -e
+            
+            cd ${{ secrets.APP_DIR }}
+            
+            echo "📥 Pulling latest code..."
+            git fetch origin
+            git checkout ${{ github.ref_name }}
+            git stash 2>/dev/null || true
+            git pull origin ${{ github.ref_name }}
+            
+            echo "🔧 Setting production URLs in api.ts..."
+            sed -i "s|http://192.168.1.17:8001/api/v1|https://zanflow.lensvox.com/api/v1|g" frontend/src/services/api.ts
+            sed -i "s|http://192.168.1.17:8001|https://zanflow.lensvox.com|g" frontend/src/services/api.ts
+            sed -i "s|http://192.168.1.17:8000|https://zanflow.lensvox.com|g" frontend/src/services/api.ts
+            sed -i "s|ws://192.168.1.17:8001|wss://zanflow.lensvox.com|g" frontend/src/services/api.ts
+            sed -i "s|http://localhost:8001|https://zanflow.lensvox.com|g" frontend/src/services/api.ts
+            sed -i "s|http://localhost:8000/api/v1|https://zanflow.lensvox.com/api/v1|g" frontend/src/services/api.ts
+            sed -i "s|http://localhost:8000|https://zanflow.lensvox.com|g" frontend/src/services/api.ts
+            sed -i "s|ws://localhost:8000|wss://zanflow.lensvox.com|g" frontend/src/services/api.ts
+          
+            
+            echo "🔧 Setting production build script..."
+            sed -i 's|"build": "tsc && vite build"|"build": "vite build"|g' frontend/package.json
+            
+            echo "🔨 Building new images (site still running)..."
+            sudo docker compose build
+            
+            echo "🚀 Restarting with new images (2-5 sec downtime)..."
+            sudo docker compose up -d --force-recreate --no-build
+            
+            echo "⏳ Waiting for services..."
+            sleep 15
+            
+            echo "📊 Container status:"
+            sudo docker compose ps
+            
+            echo "✅ Deployment completed!"

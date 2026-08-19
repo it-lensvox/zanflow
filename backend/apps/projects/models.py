@@ -3,64 +3,68 @@ Project management models for ZanFlow.
 """
 from django.conf import settings as django_settings
 from django.db import models
-
 from core.models import UserStampedModel
+from apps.organizations.models import TenantModel
 
 
-class Project(UserStampedModel):
+class Project(TenantModel, UserStampedModel):
     """
     Project containing documents, ground truth, and test runs.
+
+    Inherits from:
+      - TenantModel  → adds `organization` FK + auto-filtered `objects` manager
+      - UserStampedModel → adds `created_by`, `updated_by`, timestamps
     """
-    
+
     class TaskType(models.TextChoices):
-        KEY_VALUE_EXTRACTION = "key_value", "Key-Value Extraction"
-        TABLE_EXTRACTION = "table", "Table Extraction"
-        DOCUMENT_CLASSIFICATION = "classification", "Document Classification"
-        OCR = "ocr", "OCR"
         Client = "client", "Client"
         Internal = "internal", "Internal"
-        CONTENT_CREATION = "content_creation", "Content Creation",
+        CONTENT_CREATION = "content_creation", "Content Creation"
         Ideas = "ideas", "Ideas"
+        Demo = "demo", "Demo" 
+    
+    # ADD THIS: Status choices mapped exactly to the frontend requirements
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Active"
+        IN_REVIEW = "in_review", "In Review"
+        DRAFT = "draft", "Draft"
+        ARCHIVED = "archived", "Archived"
+        COMPLETED = "completed", "Completed"
     
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     task_type = models.CharField(
         max_length=50,
         choices=TaskType.choices,
-        default=TaskType.KEY_VALUE_EXTRACTION,
+        default=TaskType.Client,
     )
-    
-    # Project settings (JSON)
+    favorited_by = models.ManyToManyField(
+        django_settings.AUTH_USER_MODEL,
+        related_name="favorite_projects",
+        blank=True
+    )    
     project_settings = models.JSONField(default=dict, blank=True)
-    # Example settings:
-    # {
-    #     "metrics": ["accuracy", "precision", "recall", "f1"],
-    #     "comparison_rules": {
-    #         "ignore_whitespace": true,
-    #         "case_sensitive": false,
-    #         "numeric_tolerance": 0.01
-    #     },
-    #     "required_fields": ["field1", "field2"]
-    # }
-    
-    # Default labels for this project
     default_labels = models.JSONField(default=list, blank=True)
-    
-    # Default assignees (for issues, reviews, etc.)
     default_assignees = models.ManyToManyField(
         django_settings.AUTH_USER_MODEL,
         related_name="assigned_projects",
         blank=True,
     )
-    
-    # Project members with access
     members = models.ManyToManyField(
         django_settings.AUTH_USER_MODEL,
         through="ProjectMembership",
         related_name="projects",
     )
     
-    is_active = models.BooleanField(default=True)
+    # REMOVE THIS:
+    # is_active = models.BooleanField(default=True)
+    
+    # ADD THIS:
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.ACTIVE,
+    )
     
     class Meta:
         db_table = "projects"
@@ -69,21 +73,32 @@ class Project(UserStampedModel):
     def __str__(self):
         return self.name
 
-
 class ProjectMembership(models.Model):
     """
     Project membership with role-based access.
+    NOTE: Not tenant-scoped directly — scoped implicitly via the Project FK.
     """
     
     class Role(models.TextChoices):
-        OWNER = "owner", "Owner"
-        ADMIN = "admin", "Admin"
-        MEMBER = "member", "Member"
-        VIEWER = "viewer", "Viewer"
+        # New PM role system — aligned with Dyuksa RBAC
+        # project_admin   → full control within this project
+        # project_manager → manage tasks and team, no destructive access
+        # project_member  → day-to-day contributor
+        # project_viewer  → read-only access
+        PROJECT_ADMIN   = "project_admin",   "Project Admin"
+        PROJECT_MANAGER = "project_manager", "Project Manager"
+        PROJECT_MEMBER  = "project_member",  "Project Member"
+        PROJECT_VIEWER  = "project_viewer",  "Project Viewer"
     
     project = models.ForeignKey(Project, on_delete=models.CASCADE)
     user = models.ForeignKey(django_settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    role = models.CharField(max_length=20, choices=Role.choices, default=Role.MEMBER)
+    
+    role = models.CharField(
+        max_length=20, 
+        choices=Role.choices, 
+        default=Role.PROJECT_VIEWER
+    )
+    
     joined_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
@@ -94,7 +109,7 @@ class ProjectMembership(models.Model):
         return f"{self.user} - {self.project} ({self.role})"
 
 
-class Label(UserStampedModel):
+class Label(TenantModel, UserStampedModel):
     """
     Labels for categorizing documents, issues, etc.
     """
@@ -115,4 +130,3 @@ class Label(UserStampedModel):
     
     def __str__(self):
         return f"{self.name} ({self.project.name})"
-    
