@@ -162,8 +162,8 @@ export function useTaskDetail({ task, onClose, onDelete, onTaskUpdated }: UseTas
     useEffect(() => {
         (async () => {
             try {
-                const userRes = await usersApi.list();
-                setAvailableUsers(userRes.results || userRes);
+                const userRes = await usersApi.listAll();
+                setAvailableUsers(Array.isArray(userRes) ? userRes : (userRes as any).users || []);
                 const projectId = task.project || (task as any)?.project_details?.id;
                 if (projectId) {
                     const proj = await projectsApi.get(projectId);

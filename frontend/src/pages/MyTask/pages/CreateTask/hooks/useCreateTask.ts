@@ -94,8 +94,11 @@ export function useCreateTask({
   // ── Queries ──
   console.log('🔨 [CreateTask] hook mounted | fixedProjectId:', fixedProjectId, '| draftId:', draftId, '| isModal:', isModal);
   const { data: usersData, isLoading: usersLoading, error: usersError } = useQuery({
-    queryKey: ['users'],
-    queryFn: usersApi.list,
+    queryKey: ['users-all'],
+    // Use listAll (GET /tasksite/all-users/) instead of list (GET /auth/users/)
+    // list() uses X-Workspace-ID header which filters users by workspace in deployment
+    // listAll() returns all workspace users without workspace scoping
+    queryFn: usersApi.listAll,
     staleTime: Infinity,
   });
 
@@ -108,7 +111,10 @@ export function useCreateTask({
   // ── Derived data ──
   const allUserOptions = React.useMemo<UserOption[]>(() => {
     if (!usersData) return [];
-    const data = (usersData as any).results || usersData;
+    // listAll returns { message, users: [] }
+    // list returns { count, results: [] }
+    // Handle both shapes for safety
+    const data = (usersData as any).users || (usersData as any).results || usersData;
     return Array.isArray(data) ? data.map((user: any) => ({
       value: String(user.id),
       label: user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : user.username,
@@ -338,7 +344,7 @@ export function useCreateTask({
         email: '',
         first_name: u.label.split(' ')[0] || '',
         last_name: u.label.split(' ').slice(1).join(' ') || '',
-        role: 'project_member' as const,
+        role: 'annotator' as const,
         is_active: true,
         date_joined: new Date().toISOString(),
       }));

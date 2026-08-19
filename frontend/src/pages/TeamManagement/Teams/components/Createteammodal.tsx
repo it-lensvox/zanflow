@@ -111,14 +111,14 @@ export function CreateTeamModal({ isOpen, onClose, onSuccess }: CreateTeamModalP
   const teamTypes = teamTypeChoices?.team_types || [];
 
   const { data: usersData, isLoading: usersLoading } = useQuery({
-    queryKey: ['users'],
-    queryFn: usersApi.list,
+    queryKey: ['users-all'],
+    queryFn: usersApi.listAll, // GET /tasksite/all-users/ — returns all users
     staleTime: Infinity,
   });
 
   const allUserOptions = React.useMemo<Array<{ value: string; label: string; id: number }>>(() => {
     if (!usersData) return [];
-    const data = (usersData as any).results || usersData;
+    const data = (usersData as any).users || (usersData as any)?.results || usersData;
     return Array.isArray(data) ? data.map((u: any) => ({
       value: String(u.id),
       label: u.first_name && u.last_name ? `${u.first_name} ${u.last_name}` : u.username,
