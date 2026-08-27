@@ -12,6 +12,7 @@ from django_filters import rest_framework as filters
 from rest_framework.response import Response
 from rest_framework import status, viewsets
 from apps.audit.services import get_object_history, log_action
+from apps.org_config.services import check_permission
 from apps.groundtruth.models import Document  # Ensure this import exists
 from apps.groundtruth.serializers import DocumentSerializer
 from .models import Label, Project, ProjectMembership
@@ -255,7 +256,8 @@ class ProjectViewSet(viewsets.ModelViewSet):
         ).exists()
 
         if not (is_creator or is_owner_member):
-             raise PermissionDenied("You do not have permission to delete this project. Only the project owner can delete it.")
+             if not check_permission(self.request, "project:delete"):
+                raise PermissionDenied("You do not have permission to delete this project.")
 
         # --- NEW CODE: CLEAN UP AWS S3 FILES ---
         try:
@@ -428,14 +430,16 @@ class ProjectViewSet(viewsets.ModelViewSet):
         project = self.get_object()
         # --- SECURITY CHECK (Rule 1 Enforcement) ---
         # Only allow System Admins/Managers, or the Project Creator/Owner to add members
-        is_system_manager = request.user.is_manager or request.user.is_superuser
-        is_creator = project.created_by == request.user
-        is_owner = project.members.through.objects.filter(
-            project=project, user=request.user, role='project_admin'
-        ).exists()
-
-        if not (is_system_manager or is_creator or is_owner):
-            raise PermissionDenied("You do not have permission to add members to this project.")
+        # ── Org Config permission check ────────────────────────────────────
+        if not check_permission(request, "project.member:add"):
+            # Legacy fallback
+            is_system_manager = request.user.is_manager or request.user.is_superuser
+            is_creator = project.created_by == request.user
+            is_owner = project.members.through.objects.filter(
+                project=project, user=request.user, role='project_admin'
+            ).exists()
+            if not (is_system_manager or is_creator or is_owner):
+                raise PermissionDenied("You do not have permission to add members to this project.")
         # --- END SECURITY CHECK ---
         serializer = ProjectMembershipSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
@@ -478,7 +482,8 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
         if not (is_creator or is_owner_member):
             from rest_framework.exceptions import PermissionDenied
-            raise PermissionDenied("You do not have permission to remove members. Only the project owner can do this.")
+            if not check_permission(request, "project.member:remove"):
+                raise PermissionDenied("You do not have permission to remove members.")
         # --- END SECURITY CHECK ---
 
         try:
@@ -495,16 +500,15 @@ class ProjectViewSet(viewsets.ModelViewSet):
         Update the role of an existing project member.
         """
         project = self.get_object()
-        # --- SECURITY CHECK (Rule 2 Enforcement) ---
-        is_system_manager = request.user.is_manager or request.user.is_superuser
-        is_creator = project.created_by == request.user
-        is_owner = project.members.through.objects.filter(
-            project=project, user=request.user, role='project_admin'
-        ).exists()
-
-        if not (is_system_manager or is_creator or is_owner):
-            raise PermissionDenied("You do not have permission to change member roles.")
-        # --- END SECURITY CHECK ---
+        # project.member:assign_role — check org config first, fallback to legacy
+        if not check_permission(request, "project.member:assign_role"):
+            is_system_manager = request.user.is_manager or request.user.is_superuser
+            is_creator = project.created_by == request.user
+            is_owner = project.members.through.objects.filter(
+                project=project, user=request.user, role='project_admin'
+            ).exists()
+            if not (is_system_manager or is_creator or is_owner):
+                raise PermissionDenied("You do not have permission to change member roles.")
         new_role = request.data.get("role")
         
         try:

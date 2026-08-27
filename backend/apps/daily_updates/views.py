@@ -1,3 +1,4 @@
+from apps.org_config.services import check_permission
 from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
 from django.db.models import Q
@@ -42,7 +43,12 @@ class DailyUpdateViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         
-        is_manager = user.is_staff or user.is_superuser or getattr(user, 'role', '') in ['admin', 'manager']
+        # report:read level — managers/admins see all updates
+        is_manager = (
+            check_permission(self.request, "report:read") or
+            user.is_staff or user.is_superuser or
+            getattr(user, 'role', '') in ['admin', 'manager']
+        )
 
         if is_manager:
             # FIXED: Using user__organization instead of user__workspace

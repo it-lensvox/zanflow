@@ -64,6 +64,7 @@ LOCAL_APPS = [
     "apps.ai_agent.apps.AiAgentConfig",
     "apps.dashboard",
     "apps.rbac",
+    "apps.org_config.apps.OrgConfigConfig",  # S3 + Redis per-org role config
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -278,6 +279,13 @@ BEDROCK_MODEL_ID = os.getenv('BEDROCK_MODEL_ID')
 LLM_PROVIDER   = os.getenv("LLM_PROVIDER", "bedrock")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_MODEL   = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+
+# ── Org Config (S3 + Redis per-org role config) ───────────────────────────────
+# Central writes org JSON files to this bucket.
+# PM reads from it to enforce permissions dynamically.
+DYUKSA_CONFIG_BUCKET            = config("DYUKSA_CONFIG_BUCKET", default="dyuksa-configs")
+DYUKSA_CONFIG_CACHE_TTL_SECONDS = config("DYUKSA_CONFIG_CACHE_TTL_SECONDS", default=300, cast=int)
+
 if USE_S3:
     # Keep the storage configuration inside the IF block
     AWS_S3_FILE_OVERWRITE = False

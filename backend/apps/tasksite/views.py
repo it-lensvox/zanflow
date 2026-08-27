@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.generics import ListCreateAPIView
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from apps.org_config.services import check_permission
 from apps.groundtruth.models import Document
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from apps.organizations.authentication import (
@@ -36,11 +37,12 @@ class AllUsersListView(WorkspaceAPIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        if not request.user.is_manager:
-             return Response(
-                {"detail": "You do not have permission to view users."},
-                status=status.HTTP_403_FORBIDDEN
-            )
+        if not check_permission(request, "workspace.member:invite"):
+            if not request.user.is_manager:
+                return Response(
+                    {"detail": "You do not have permission to view users."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
 
         # Get active workspace ID from header
         workspace_id = request.META.get("HTTP_X_WORKSPACE_ID")
@@ -125,18 +127,22 @@ class TaskListCreateView(WorkspaceAPIView):
         return paginator.get_paginated_response(serializer.data)
 
     def post(self, request):
-        # Allow Admin, Manager, OR Developer to create tasks
-        is_authorized = (
-            request.user.is_manager or 
-            request.user.is_superuser or 
-            request.user.role == User.Role.DEVELOPER
-        )
-        
-        if not is_authorized:
-            return Response(
-                {"detail": "You do not have permission to create tasks."},
-                status=status.HTTP_403_FORBIDDEN
+        # ── Permission check — reads from S3/Redis org config ─────────────
+        # Replaces the old hardcoded role check (is_manager, is_developer etc.)
+        # Now controlled dynamically from Central admin panel.
+        # Fallback: if org config not found → checks legacy role (backward compat)
+        if not check_permission(request, "task:create"):
+            # Legacy fallback — allows admin/manager/developer even without config
+            is_legacy_authorized = (
+                request.user.is_manager or
+                request.user.is_superuser or
+                request.user.role == User.Role.DEVELOPER
             )
+            if not is_legacy_authorized:
+                return Response(
+                    {"detail": "You do not have permission to create tasks."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
         
         serializer = TaskSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
@@ -159,19 +165,18 @@ class TaskRetrieveUpdateView(WorkspaceAPIView):
     def get(self, request, task_id):
         task = get_object_or_404(Task, id=task_id)
 
-        # --- UPDATE THIS CONDITION ---
-        # Allow if Manager OR Superuser OR if assigned to the user
-        is_authorized = (
-            request.user.is_manager or 
-            request.user.is_superuser or 
-            task.assigned_to.filter(id=request.user.id).exists()
-        )
-
-        if not is_authorized:
-            return Response(
-                {"detail": "You do not have permission to view this task."},
-                status=status.HTTP_403_FORBIDDEN
+        # task:read — check org config first, fallback to legacy
+        if not check_permission(request, "task:read"):
+            is_authorized = (
+                request.user.is_manager or
+                request.user.is_superuser or
+                task.assigned_to.filter(id=request.user.id).exists()
             )
+            if not is_authorized:
+                return Response(
+                    {"detail": "You do not have permission to view this task."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
         
         serializer = TaskSerializer(task, context={'request': request})
         return Response({
@@ -186,11 +191,13 @@ class TaskRetrieveUpdateView(WorkspaceAPIView):
         # 1. Capture existing assignees BEFORE the update
         old_assignee_ids = set(task.assigned_to.values_list('id', flat=True))
 
-        # --- UPDATE THIS LOGIC ---
-        # A user gets FULL edit access if they are a Manager/Admin OR if they are a Developer who created the task
+        # task:update_any → full edit, task:update_own → own tasks only
+        can_update_any = check_permission(request, "task:update_any")
+        can_update_own = check_permission(request, "task:update_own")
         has_full_edit_access = (
-            request.user.is_manager or 
-            request.user.is_superuser or 
+            can_update_any or
+            request.user.is_manager or
+            request.user.is_superuser or
             (request.user.role == User.Role.DEVELOPER and task.assigned_by == request.user)
         )
 
@@ -252,19 +259,18 @@ class TaskRetrieveUpdateView(WorkspaceAPIView):
     def delete(self, request, task_id):
         task = get_object_or_404(Task, id=task_id)
 
-        # --- Security Check ---
-        # Allow deletion if Manager OR Superuser OR the user who created the task
-        is_authorized = (
-            request.user.is_manager or 
-            request.user.is_superuser or 
-            task.assigned_by == request.user
-        )
-
-        if not is_authorized:
-            return Response(
-                {"detail": "You do not have permission to delete this task."},
-                status=status.HTTP_403_FORBIDDEN
+        # task:delete — check org config first, fallback to legacy
+        if not check_permission(request, "task:delete"):
+            is_authorized = (
+                request.user.is_manager or
+                request.user.is_superuser or
+                task.assigned_by == request.user
             )
+            if not is_authorized:
+                return Response(
+                    {"detail": "You do not have permission to delete this task."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
         
         task.delete()
         
@@ -327,11 +333,11 @@ class TaskCommentListCreateView(WorkspaceListCreateAPIView):
         task_id = self.kwargs['task_id']
         task = get_object_or_404(Task, id=task_id)
 
-        # --- Security Check ---
-        # Only allow comments if user is Manager/Admin OR is assigned to the task
+        # task:comment — check org config first, fallback to legacy
         is_assigned = task.assigned_to.filter(id=self.request.user.id).exists()
-        if not (self.request.user.is_manager or self.request.user.is_superuser or is_assigned):
-            raise serializers.ValidationError("You do not have permission to comment on this task.")
+        if not check_permission(self.request, "task:comment"):
+            if not (self.request.user.is_manager or self.request.user.is_superuser or is_assigned):
+                raise serializers.ValidationError("You do not have permission to comment on this task.")
         comment = serializer.save(user=self.request.user, task=task)
         
         # ====================================================================
@@ -350,19 +356,19 @@ class TaskAttachmentDeleteView(WorkspaceAPIView):
         attachment = get_object_or_404(Document, id=pk)
         task = attachment.task
 
-        # 2. Permission Check
-        is_authorized = (
-            request.user.is_manager or 
-            request.user.is_superuser or 
-            (task and task.assigned_to.filter(id=request.user.id).exists()) or
-            (task and task.assigned_by == request.user)
-        )
-
-        if not is_authorized:
-            return Response(
-                {"detail": "You do not have permission to delete this file."},
-                status=status.HTTP_403_FORBIDDEN
+        # document:delete — check org config first, fallback to legacy
+        if not check_permission(request, "document:delete"):
+            is_authorized = (
+                request.user.is_manager or
+                request.user.is_superuser or
+                (task and task.assigned_to.filter(id=request.user.id).exists()) or
+                (task and task.assigned_by == request.user)
             )
+            if not is_authorized:
+                return Response(
+                    {"detail": "You do not have permission to delete this file."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
 
         # 3. Delete the file (Updates: Now uses source_file instead of file)
         if attachment.source_file:
@@ -385,19 +391,19 @@ class TaskPinToggleView(WorkspaceAPIView):
     def post(self, request, task_id):
         task = get_object_or_404(Task, id=task_id)
 
-        # Ensure the user has access to this task
-        is_authorized = (
-            request.user.is_manager or 
-            request.user.is_superuser or 
-            task.assigned_to.filter(id=request.user.id).exists() or
-            task.assigned_by == request.user
-        )
-
-        if not is_authorized:
-            return Response(
-                {"detail": "You do not have permission to pin this task."},
-                status=status.HTTP_403_FORBIDDEN
+        # task:read level — can pin if you can read
+        if not check_permission(request, "task:read"):
+            is_authorized = (
+                request.user.is_manager or
+                request.user.is_superuser or
+                task.assigned_to.filter(id=request.user.id).exists() or
+                task.assigned_by == request.user
             )
+            if not is_authorized:
+                return Response(
+                    {"detail": "You do not have permission to pin this task."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
 
         # Toggle Logic
         if task.pinned_by.filter(id=request.user.id).exists():
@@ -485,12 +491,13 @@ class TaskBulkUploadView(WorkspaceAPIView):
     parser_classes = (MultiPartParser, FormParser)
 
     def post(self, request, project_id):
-        # 1. Permission check (Only managers/superusers)
-        if not (request.user.is_manager or request.user.is_superuser):
-            return Response(
-                {"detail": "You do not have permission to bulk create tasks."},
-                status=status.HTTP_403_FORBIDDEN
-            )
+        # task:create — check org config first, fallback to legacy
+        if not check_permission(request, "task:create"):
+            if not (request.user.is_manager or request.user.is_superuser):
+                return Response(
+                    {"detail": "You do not have permission to bulk create tasks."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
 
         # 2. Get the uploaded file
         file_obj = request.FILES.get('file')
